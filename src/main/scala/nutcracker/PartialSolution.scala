@@ -1,22 +1,15 @@
 package nutcracker
 
-import nutcracker.ProblemDescription.Bind
-import nutcracker.ProblemDescription.Zip
-import shapeless.:+:
+import nutcracker.ProblemDescription.{Bind, Zip, _}
+import shapeless.ops.hlist.{Zip => _, _}
+import shapeless.{:+:, :: => _, _}
 
-import scala.language.higherKinds
 import scala.annotation.tailrec
-
-import ProblemDescription._
-
-import algebra.lattice.MeetSemilattice
-import scalaz.ReaderWriterState
+import scala.language.higherKinds
 import scalaz.Id.Id
-import scalaz.{\/, -\/, \/-, Traverse, StreamT}
 import scalaz.std.vector._
 import scalaz.syntax.monoid._
-import shapeless.{ :: => _, _ }
-import shapeless.ops.hlist.{ Zip => _, _ }
+import scalaz.{-\/, ReaderWriterState, StreamT, Traverse, \/, \/-}
 
 case class PartialSolution private(
     domains: Domains,
@@ -52,15 +45,12 @@ case class PartialSolution private(
 }
 
 object PartialSolution {
-  sealed trait CellRef[D]
-  case class PureDomRef[+A, D] private[nutcracker](private[nutcracker] val domainId: Long) extends CellRef[D]
 
   sealed trait Status
   case object Failed extends Status
   case object Done extends Status
   case class Incomplete(branchings: List[BranchingId], unresolvedDomains: List[PureDomRef[_, _]]) extends Status
 
-  final case class PromiseId[A](val id: Long) extends AnyVal
   final case class BranchingId(val id: Int) extends AnyVal
 
   private def empty: PartialSolution = new PartialSolution(

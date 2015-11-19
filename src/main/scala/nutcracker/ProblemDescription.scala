@@ -1,5 +1,7 @@
 package nutcracker
 
+import acyclic.file
+
 import scala.language.existentials
 
 import algebra.lattice.MeetSemilattice
@@ -25,8 +27,6 @@ sealed trait ProblemDescription[+A] {
 }
 
 object ProblemDescription {
-  import PartialSolution._
-
 
   implicit val problemDescriptionMonad: Monad[ProblemDescription] = new Monad[ProblemDescription] {
     override def bind[A, B](fa: ProblemDescription[A])(f: (A) => ProblemDescription[B]): ProblemDescription[B] = fa.flatMap(f)

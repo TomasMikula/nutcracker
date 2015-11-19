@@ -1,7 +1,5 @@
 package nutcracker
 
-import PartialSolution.PromiseId
-
 case class Promises(
     nextId: Long,
     promises: Map[Long, Option[_]]) {
