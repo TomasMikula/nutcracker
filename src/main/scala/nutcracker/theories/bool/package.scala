@@ -65,4 +65,17 @@ package object bool {
       case MustBeFalse => set(x, false)
     })
   }
+
+  def atLeastOne(x: Ref*): ProblemDescription[Unit] = {
+    // XXX the problem with watching just 1 variable is that if it is the last one satisfiable,
+    // it will not be immediately set to true (unless it is x(0)).
+    require(x.size >= 1)
+    def atLeastOne(x: Seq[Ref], i: Int): ProblemDescription[Unit] = {
+      if(i == 0) set(x(0), true)
+      else partialVarTrigger(x(i))({
+        case MustBeFalse => atLeastOne(x, i-1)
+      })
+    }
+    atLeastOne(x, x.size - 1)
+  }
 }
