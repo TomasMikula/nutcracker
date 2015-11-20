@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.existentials
 
-import algebra.lattice.MeetSemilattice
+import algebra.lattice.{BoundedLattice, MeetSemilattice}
 import shapeless.Coproduct
 import shapeless.Generic
 import shapeless.HList
@@ -85,8 +85,8 @@ object ProblemDescription {
 
 
   class VariableStub[A] {
-    def apply[D: Domain[A, ?] : BoolRing](): ProblemDescription[PureDomRef[A, D]] = apply(BoolRing[D].top)
-    def apply[D: Domain[A, ?] : BoolRng](d: D): ProblemDescription[PureDomRef[A, D]] = Variable(d, implicitly[Domain[A, D]])
+    def apply[D: Domain[A, ?] : BoundedLattice](): ProblemDescription[PureDomRef[A, D]] = apply(BoundedLattice[D].one)
+    def apply[D: Domain[A, ?]](d: D): ProblemDescription[PureDomRef[A, D]] = Variable(d, implicitly[Domain[A, D]])
 
 //    def composeOf[PA <: HList, PDA <: HList, PDS <: PDA](components: PDS)(implicit
 //        pa: Generic.Aux[A, PA],
