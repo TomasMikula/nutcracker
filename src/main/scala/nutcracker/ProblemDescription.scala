@@ -129,6 +129,7 @@ object ProblemDescription {
   def empty[A]: ProblemDescription[A] = branch(() => Nil)
   def whenComplete[A, B](pr: PromiseId[A])(f: A => ProblemDescription[B]): ProblemDescription[B] = WhenComplete(pr, f)
   def intersect[D](ref: PureDomRef[_, D], a: D): ProblemDescription[Unit] = Intersect(ref, a)
+  def set[A, D](ref: PureDomRef[A, D], a: A)(implicit dom: Domain[A, D]): ProblemDescription[Unit] = Intersect(ref, dom.singleton(a))
   def intersectVector[D, N <: Nat](refs: Sized[Vector[PureDomRef[A, D]], N] forSome { type A }, values: Sized[Vector[D], N]): ProblemDescription[Unit] = IntersectVector(refs, values)
 //  def constraint2[A, B](c: Constraint[(A, B)], domA: PureDomRef[_, A], domB: PureDomRef[_, B]): ProblemDescription[Unit] = ???
   def vectorConstraint[D: MeetSemilattice, N <: Nat](

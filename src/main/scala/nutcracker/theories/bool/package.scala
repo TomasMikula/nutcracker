@@ -12,15 +12,15 @@ package object bool {
   def and(x: Ref, y: Ref): ProblemDescription[Ref] = {
     variable[Boolean]() >>= { res =>
       partialVarTrigger(x)({
-        case MustBeFalse => Intersect(res, MustBeFalse)
+        case MustBeFalse => set(res, false)
         case MustBeTrue => y <=> res
       }) >>
       partialVarTrigger(y)({
-        case MustBeFalse => Intersect(res, MustBeFalse)
+        case MustBeFalse => set(res, false)
         case MustBeTrue => x <=> res
       }) >>
       partialVarTrigger(res)({
-        case MustBeTrue => Intersect(x, MustBeTrue) >> Intersect(y, MustBeTrue)
+        case MustBeTrue => set(x, true) >> set(y, true)
       }) >>
       Pure(res)
     }
@@ -29,15 +29,15 @@ package object bool {
   def or(x: Ref, y: Ref): ProblemDescription[Ref] = {
     variable[Boolean]() >>= { res =>
       partialVarTrigger(x)({
-        case MustBeTrue => Intersect(res, MustBeTrue)
+        case MustBeTrue => set(res, true)
         case MustBeFalse => y <=> res
       }) >>
       partialVarTrigger(y)({
-        case MustBeTrue => Intersect(res, MustBeTrue)
+        case MustBeTrue => set(res, true)
         case MustBeFalse => x <=> res
       }) >>
       partialVarTrigger(res)({
-        case MustBeFalse => Intersect(x, MustBeFalse) >> Intersect(y, MustBeFalse)
+        case MustBeFalse => set(x, false) >> set(y, false)
       }) >>
       Pure(res)
     }
@@ -46,12 +46,12 @@ package object bool {
   def not(x: Ref): ProblemDescription[Ref] = {
     variable[Boolean]() >>= { res =>
       partialVarTrigger(x)({
-        case MustBeTrue => Intersect(res, MustBeFalse)
-        case MustBeFalse => Intersect(res, MustBeTrue)
+        case MustBeTrue => set(res, false)
+        case MustBeFalse => set(res, true)
       }) >>
       partialVarTrigger(res)({
-        case MustBeTrue => Intersect(x, MustBeFalse)
-        case MustBeFalse => Intersect(x, MustBeTrue)
+        case MustBeTrue => set(x, false)
+        case MustBeFalse => set(x, true)
       }) >>
       Pure(res)
     }
@@ -59,10 +59,10 @@ package object bool {
 
   def imp(x: Ref, y: Ref): ProblemDescription[Unit] = {
     partialVarTrigger(x)({
-      case MustBeTrue => Intersect(y, MustBeTrue)
+      case MustBeTrue => set(y, true)
     }) >>
     partialVarTrigger(y)({
-      case MustBeFalse => Intersect(x, MustBeFalse)
+      case MustBeFalse => set(x, false)
     })
   }
 }
