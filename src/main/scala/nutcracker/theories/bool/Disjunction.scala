@@ -17,7 +17,7 @@ case class Disjunction[N <: Nat](signs: Sized[Vector[Boolean], N]) extends Const
       signedDomains map { case(sign, d) => if(!D.isEmpty(D.meet(d, D.singleton(sign)))) D.singleton(sign) else d }
     else if(nSatisfiable == 0)
       // no variable satisfiable; make sure at least one is failed
-      Sized.wrap(domains.updated(0, BoolDomain.bottom))
+      Sized.wrap(domains.updated(0, BoolDomain.Bottom))
     else
       domains
   }

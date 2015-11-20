@@ -7,13 +7,10 @@ sealed trait BoolDomain
 
 object BoolDomain {
 
-  private case object Top extends BoolDomain
-  private case object Bottom extends BoolDomain
-  private case object MustBeTrue extends BoolDomain
-  private case object MustBeFalse extends BoolDomain
-
-  def top: BoolDomain = Top
-  def bottom: BoolDomain = Bottom
+  case object Top extends BoolDomain
+  case object Bottom extends BoolDomain
+  case object MustBeTrue extends BoolDomain
+  case object MustBeFalse extends BoolDomain
 
   implicit val boolDomain: Domain[Boolean, BoolDomain] with BoolRing[BoolDomain] = new Domain[Boolean, BoolDomain] with BoolRing[BoolDomain] {
     def zero: BoolDomain = Bottom
