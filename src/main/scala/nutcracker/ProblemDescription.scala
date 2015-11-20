@@ -1,7 +1,5 @@
 package nutcracker
 
-import acyclic.file
-
 import scala.language.existentials
 
 import algebra.lattice.MeetSemilattice
@@ -22,11 +20,16 @@ sealed trait ProblemDescription[+A] {
   import ProblemDescription._
 
   def flatMap[B](f: A => ProblemDescription[B]): ProblemDescription[B] = Bind(this, f)
+  def >>=[B](f: A => ProblemDescription[B]): ProblemDescription[B] = Bind(this, f)
   def map[B](f: A => B): ProblemDescription[B] = Bind(this, (a: A) => Pure(f(a)))
   def zipWith[B](b: ProblemDescription[B]): ProblemDescription[(A, B)] = Zip(this, b)
 }
 
 object ProblemDescription {
+
+  implicit class ProblemDescriptionUnitOps(val pd: ProblemDescription[Unit]) extends AnyVal {
+    def >>[B](b: ProblemDescription[B]): ProblemDescription[B] = Second(pd, b)
+  }
 
   implicit val problemDescriptionMonad: Monad[ProblemDescription] = new Monad[ProblemDescription] {
     override def bind[A, B](fa: ProblemDescription[A])(f: (A) => ProblemDescription[B]): ProblemDescription[B] = fa.flatMap(f)
@@ -108,6 +111,10 @@ object ProblemDescription {
 
   def pure[A](a: A): ProblemDescription[A] = Pure(a)
   def variable[A]: VariableStub[A] = new VariableStub[A]
+  def varTrigger[A, D](ref: PureDomRef[A, D])(f: D => ProblemDescription[Unit]): ProblemDescription[Unit] =
+    VarTrigger(ref, f)
+  def partialVarTrigger[A, D](ref: PureDomRef[A, D])(f: PartialFunction[D, ProblemDescription[Unit]]): ProblemDescription[Unit] =
+    VarTrigger(ref, (d: D) => if(f.isDefinedAt(d)) f(d) else Pure(()))
 //  def compose[A]: ComposeStub[A] = new ComposeStub[A]
   def fetch[D](ref: PureDomRef[_, D]): ProblemDescription[D] = Fetch(ref)
   def fetchVector[D, N <: Nat](refs: Sized[Vector[PureDomRef[A, D]], N] forSome { type A }): ProblemDescription[Sized[Vector[D], N]] = FetchVector(refs)
