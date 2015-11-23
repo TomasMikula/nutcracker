@@ -10,6 +10,7 @@ trait Mapped[L <: HList, F[_]] extends Serializable {
   type Out <: HList
 
   def remap[G[_]](l: Out, f: F ~> G): (OutG, Mapped.Aux[L, G, OutG]) forSome { type OutG <: HList }
+  def toList(l: Out): List[F[_]]
   def toList[A](l: Out, f: F ~>> A): List[A]
 }
 
@@ -21,6 +22,7 @@ object Mapped {
   implicit def hnilMapped[F[_]]: Aux[HNil, F, HNil] = new Mapped[HNil, F] {
     type Out = HNil
     def remap[G[_]](l: HNil, f: F ~> G): (HNil, Mapped.Aux[HNil, G, HNil]) = (HNil, implicitly[Mapped.Aux[HNil, G, HNil]])
+    def toList(l: HNil): List[F[_]] = Nil
     def toList[A](l: HNil, f: F ~>> A): List[A] = Nil
   }
 
@@ -32,6 +34,7 @@ object Mapped {
         def aux[Z <: HList](res: (Z, Mapped.Aux[T, G, Z])) = (f(l.head) :: res._1, hconsMapped[H, T, G, Z](res._2))
         aux(tRes)
       }
+      def toList(l: F[H] :: OutM): List[F[_]] = l.head :: mt.toList(l.tail)
       def toList[A](l: F[H] :: OutM, f: F ~>> A): List[A] = f(l.head) :: mt.toList(l.tail, f)
     }
 }
