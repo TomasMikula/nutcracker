@@ -1,7 +1,7 @@
 package nutcracker.theories
 
-import nutcracker.PureDomRef
-import nutcracker.ProblemDescription
+import nutcracker.Triggers.{Fire, Sleep, Discard}
+import nutcracker.{Sel, PureDomRef, ProblemDescription}
 import nutcracker.ProblemDescription._
 import nutcracker.theories.bool.BoolDomain._
 
@@ -66,16 +66,30 @@ package object bool {
     })
   }
 
-  def atLeastOne(x: Ref*): ProblemDescription[Unit] = {
-    // XXX the problem with watching just 1 variable is that if it is the last one satisfiable,
-    // it will not be immediately set to true (unless it is x(0)).
+  def atLeastOneTrue(x: Ref*): ProblemDescription[Unit] = {
     require(x.size >= 1)
-    def atLeastOne(x: Seq[Ref], i: Int): ProblemDescription[Unit] = {
-      if(i == 0) set(x(0), true)
-      else partialVarTrigger(x(i))({
-        case MustBeFalse => atLeastOne(x, i-1)
-      })
+    def watch(i: Int, j: Int): ProblemDescription[Unit] = {
+      require(i < j)
+      require(j >= 0)
+      if (i < 0) {
+        set(x(j), true)
+      } else {
+        selectionTrigger2(x(i), x(j))((di, dj) => {
+          if (di == MustBeTrue || dj == MustBeTrue) {
+            // constraint satisfied, we are done
+            Discard
+          } else if (di == MustBeFalse) {
+            // pick next variable to watch instead of x(i)
+            Fire(watch(i-1, j))
+          } else if (dj == MustBeFalse) {
+            // pick next variable to watch instead of x(j)
+            Fire(watch(i-1, i))
+          } else {
+            Sleep
+          }
+        })
+      }
     }
-    atLeastOne(x, x.size - 1)
+    watch(x.size - 2, x.size - 1)
   }
 }
