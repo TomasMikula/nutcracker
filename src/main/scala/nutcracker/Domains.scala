@@ -26,7 +26,9 @@ case class Domains private(
     (Domains(nextId + 1, domains1, unresolvedVars1, failedVars1), ref)
   }
 
-  def fetch[A, D](ref: PureDomRef[A, D]): D = getDomain(ref)._1
+  def fetch[D](ref: CellRef[D]): D = ref match {
+    case pdr @ PureDomRef(_) => getDomain(pdr)._1
+  }
 
   def fetchVector[A, D, N <: Nat](refs: Sized[Vector[PureDomRef[A, D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))

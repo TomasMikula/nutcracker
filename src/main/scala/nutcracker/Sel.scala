@@ -2,6 +2,7 @@ package nutcracker
 
 import nutcracker.util.Mapped
 import shapeless._
+import shapeless.PolyDefns.~>
 
 /**
   * Selection of cells.
@@ -9,7 +10,13 @@ import shapeless._
 trait Sel[L <: HList] {
   type Refs <: HList
   def refs: Refs
-  def cells: Seq[CellRef[_]]
+  def mapped: Mapped.Aux[L, CellRef, Refs]
+
+  def cells: Seq[CellRef[_]] = mapped.toList(refs)
+
+  def fetch(f: CellRef ~> Id): L = {
+    mapped.extract(refs, f)
+  }
 }
 
 object Sel {
@@ -18,7 +25,7 @@ object Sel {
   def apply[L <: HList, Refs0 <: HList](refs0: Refs0)(implicit m: Mapped.Aux[L, CellRef, Refs0]): Sel.Aux[L, Refs0] = new Sel[L] {
     type Refs = Refs0
     def refs = refs0
-    def cells: Seq[CellRef[_]] = m.toList(refs0)
+    def mapped = m
   }
 
   def apply[D](ref: CellRef[D]): Sel[D :: HNil] = apply(ref :: HNil)

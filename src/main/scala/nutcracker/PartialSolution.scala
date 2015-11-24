@@ -1,6 +1,8 @@
 package nutcracker
 
 import nutcracker.ProblemDescription.{Bind, Zip, _}
+import nutcracker.Triggers.{FireReload, Trigger}
+import shapeless.PolyDefns.~>
 import shapeless.ops.hlist.{Zip => _, _}
 import shapeless.{:+:, :: => _, _}
 
@@ -42,6 +44,10 @@ case class PartialSolution private(
   }
 
   def getPromised[A](pr: PromiseId[A]): A = promises(pr).get
+
+  private val cellFetcher: CellRef ~> shapeless.Id = new ~>[CellRef, shapeless.Id] {
+    def apply[D](cell: CellRef[D]): D = domains.fetch(cell)
+  }
 }
 
 object PartialSolution {
@@ -107,17 +113,28 @@ object PartialSolution {
             interpret(ps2, ds |+| dirty1)
         }
         case DirtyDomain(ref) =>
-          val domainTriggers = ps.triggers.getForDomain(ref)
           ps.domains.getDomain(ref) match {
             case (dom, domain) =>
+              val (triggers1, toFire) = ps.triggers.getForDomain(ref, dom)
               val (ps1, domainResolutionTriggers) = domain.values(dom) match {
-                case Domain.Empty() => (ps, Nil)
-                case Domain.Just(a) => ps.triggers.domainResolvedTriggers(ref, a) match {
-                  case (triggers1, conts) => (ps.copy(triggers = triggers1), conts)
+                case Domain.Empty() => (ps.copy(triggers = triggers1), Nil)
+                case Domain.Just(a) => triggers1.domainResolvedTriggers(ref, a) match {
+                  case (triggers2, conts) => (ps.copy(triggers = triggers2), conts)
                 }
-                case Domain.Many(_) => (ps, Nil)
+                case Domain.Many(_) => (ps.copy(triggers = triggers1), Nil)
               }
-              interpret(ps1, ds |+| DirtyThings.continuations(domainTriggers ++ domainResolutionTriggers))
+              interpret(ps1, ds |+| DirtyThings.continuations(toFire ++ domainResolutionTriggers) |+| DirtyThings.dirtySels(ps1.triggers.getSelsForCell(ref)))
+          }
+        case DirtySel(sel) =>
+          // auxiliary function to capture sel's type parameter L
+          def aux[L <: HList](s: Sel[L]): (PartialSolution, List[ProblemDescription[Unit]]) ={
+            val selDom = s.fetch(ps.cellFetcher)
+            val (triggers1, conts) = ps.triggers.getForSel(s, selDom)
+            (ps.copy(triggers = triggers1), conts)
+          }
+          aux(sel) match {
+            case (ps1, conts) =>
+              interpret(ps1, ds |+| DirtyThings.continuations(conts))
           }
       }
     }
@@ -174,6 +191,7 @@ object PartialSolution {
     case Relation(rel, refs, toRefs) => relation(rel, refs, toRefs) map { Inl(_) }
     case RelTrigger(rel, f, toRefs) => relTrigger(rel, f, toRefs) map { Inl(_) }
     case VarTrigger(ref, f) => varTrigger(ref, f) map { Inl(_) }
+    case SelTrigger(sel, f) => selTrigger(sel, f) map { Inl(_) }
   }
 
   private def incorporate(istop: IStop[Unit]): InterpreterStep[Unit] =
@@ -225,10 +243,16 @@ object PartialSolution {
       ps.domains.addVariable(d, ev) match { case (doms, ref) => (ps.copy(domains = doms), ref) }
     }
   private def varTrigger[A, D](ref: PureDomRef[A, D], f: D => ProblemDescription[Unit]): InterpreterStep[Unit] = {
-    val f1: ProblemDescription[Unit] = Fetch(ref).flatMap(f)
+    val f1: D => Trigger = d => FireReload(f(d))
     InterpreterStep[Unit] { ps =>
       val triggers1 = ps.triggers.addDomainTrigger(ref, f1)
-      (DirtyThings.continuation(f1), (), ps.copy(triggers = triggers1))
+      (DirtyThings.dirtyDomain(ref), (), ps.copy(triggers = triggers1))
+    }
+  }
+  private def selTrigger[L <: HList](sel: Sel[L], f: L => Trigger): InterpreterStep[Unit] = {
+    InterpreterStep[Unit] { ps =>
+      val triggers1 = ps.triggers.addSelTrigger(sel, f)
+      (DirtyThings.dirtySel(sel), (), ps.copy(triggers = triggers1))
     }
   }
   private def fetch[A, D](ref: PureDomRef[A, D]): InterpreterStep[D] =
