@@ -1,19 +1,14 @@
 package nutcracker
 
-import nutcracker.Triggers.Trigger
-import shapeless.ops.nat.ToInt
-
 import scala.language.existentials
 
 import algebra.lattice.{BoundedLattice, MeetSemilattice}
-import shapeless._
-import shapeless.ops.coproduct.ToHList
-import shapeless.ops.hlist.Mapped
-import nutcracker.algebraic.BoolRng
-import nutcracker.algebraic.BoolRing
-
 import scalaz.{Traverse, Monad}
 import scalaz.std.vector._
+import shapeless._
+import shapeless.ops.hlist.Mapped
+
+import nutcracker.Triggers.Trigger
 
 sealed trait ProblemDescription[+A] {
   import ProblemDescription._
@@ -109,8 +104,8 @@ object ProblemDescription {
   def fetch[D](ref: PureDomRef[_, D]): ProblemDescription[D] = Fetch(ref)
   def fetchVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): ProblemDescription[Sized[Vector[D], N]] = FetchVector(refs)
   def fetchResult[A, D](ref: PureDomRef[A, D]): ProblemDescription[A] = WhenResolved[A, D, A](ref, a => Pure(a))
-  def fetchResults[A, D, N <: Nat](refs: Sized[Vector[PureDomRef[A, D]], N]): ProblemDescription[Sized[Vector[A], N]] = {
-    Traverse[Vector].traverse(refs.unsized)(ref => fetchResult(ref)) map { Sized.wrap(_) }
+  def fetchResults[A, D](refs: Vector[PureDomRef[A, D]]): ProblemDescription[Vector[A]] = {
+    Traverse[Vector].traverse(refs){ fetchResult(_) }
   }
   def branch2[A, B](a: () => ProblemDescription[A], b: () => ProblemDescription[B]): ProblemDescription[Either[A, B]] =
     branch[Either[A, B]](() => a().map(Left(_)), () => b().map(Right(_)))

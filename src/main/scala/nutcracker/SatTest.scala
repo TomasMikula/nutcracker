@@ -3,7 +3,6 @@ package nutcracker
 import nutcracker.ProblemDescription._
 import nutcracker.theories.bool.BoolDomain._
 import nutcracker.theories.bool._
-import shapeless.Sized
 import scalaz.syntax.traverse._
 import scalaz.std.vector._
 
@@ -20,7 +19,7 @@ object SatTest extends App {
     _ <- atLeastOneTrue(a(0), ā(1), a(3))
     _ <- atLeastOneTrue(a(0), a(2), a(3))
     _ <- atLeastOneTrue(ā(0), a(1), ā(2))
-    sol <- fetchResults(Sized[Vector](a(0), a(1), a(2), a(3)))
+    sol <- fetchResults(a)
   } yield sol
 
   val n = DFSSolver.solutions(problem).foldLeft(0)((i, s) => { println(s); i + 1 })
