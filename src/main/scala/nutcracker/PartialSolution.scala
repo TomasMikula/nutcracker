@@ -112,19 +112,21 @@ object PartialSolution {
             val ps2 = incorporate0(ps1, istop)
             interpret(ps2, ds |+| dirty1)
         }
-        case DirtyDomain(ref) =>
-          ps.domains.getDomain(ref) match {
-            case (dom, domain) =>
-              val (triggers1, toFire) = ps.triggers.getForDomain(ref, dom)
-              val (ps1, domainResolutionTriggers) = domain.values(dom) match {
-                case Domain.Empty() => (ps.copy(triggers = triggers1), Nil)
-                case Domain.Just(a) => triggers1.domainResolvedTriggers(ref, a) match {
-                  case (triggers2, conts) => (ps.copy(triggers = triggers2), conts)
+        case DirtyDomain(cr) => cr match {
+          case ref @ PureDomRef(_) =>
+            ps.domains.getDomain(ref) match {
+              case (dom, domain) =>
+                val (triggers1, toFire) = ps.triggers.getForDomain(ref, dom)
+                val (ps1, domainResolutionTriggers) = domain.values(dom) match {
+                  case Domain.Empty() => (ps.copy(triggers = triggers1), Nil)
+                  case Domain.Just(a) => triggers1.domainResolvedTriggers(ref, a) match {
+                    case (triggers2, conts) => (ps.copy(triggers = triggers2), conts)
+                  }
+                  case Domain.Many(_) => (ps.copy(triggers = triggers1), Nil)
                 }
-                case Domain.Many(_) => (ps.copy(triggers = triggers1), Nil)
-              }
-              interpret(ps1, ds |+| DirtyThings.continuations(toFire ++ domainResolutionTriggers) |+| DirtyThings.dirtySels(ps1.triggers.getSelsForCell(ref)))
-          }
+                interpret(ps1, ds |+| DirtyThings.continuations(toFire ++ domainResolutionTriggers) |+| DirtyThings.dirtySels(ps1.triggers.getSelsForCell(ref)))
+            }
+        }
         case DirtySel(sel) =>
           // auxiliary function to capture sel's type parameter L
           def aux[L <: HList](s: Sel[L]): (PartialSolution, List[ProblemDescription[Unit]]) ={
@@ -242,7 +244,7 @@ object PartialSolution {
     InterpreterStep.wrapStateMonad { ps =>
       ps.domains.addVariable(d, ev) match { case (doms, ref) => (ps.copy(domains = doms), ref) }
     }
-  private def varTrigger[A, D](ref: PureDomRef[A, D], f: D => ProblemDescription[Unit]): InterpreterStep[Unit] = {
+  private def varTrigger[D](ref: CellRef[D], f: D => ProblemDescription[Unit]): InterpreterStep[Unit] = {
     val f1: D => Trigger = d => FireReload(f(d))
     InterpreterStep[Unit] { ps =>
       val triggers1 = ps.triggers.addDomainTrigger(ref, f1)
@@ -257,9 +259,9 @@ object PartialSolution {
   }
   private def fetch[A, D](ref: PureDomRef[A, D]): InterpreterStep[D] =
     InterpreterStep.wrapStateMonad { ps => (ps, ps.domains.fetch(ref)) }
-  private def fetchVector[A, D, N <: Nat](refs: Sized[Vector[PureDomRef[A, D]], N]): InterpreterStep[Sized[Vector[D], N]] =
+  private def fetchVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): InterpreterStep[Sized[Vector[D], N]] =
     InterpreterStep.wrapStateMonad { ps => (ps, ps.domains.fetchVector(refs)) }
-  private def intersect[A, D](ref: PureDomRef[A, D], d: D): InterpreterStep[Unit] =
+  private def intersect[D](ref: CellRef[D], d: D): InterpreterStep[Unit] =
     InterpreterStep[Unit] { ps =>
       ps.domains.intersect(ref, d) match {
         case None => (DirtyThings.empty, (), ps)
@@ -267,7 +269,7 @@ object PartialSolution {
         // TODO also add dirty constraints when constraints are first class
       }
     }
-  private def intersectVector[A, D, N <: Nat](refs: Sized[Vector[PureDomRef[A, D]], N], values: Sized[Vector[D], N]): InterpreterStep[Unit] =
+  private def intersectVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N], values: Sized[Vector[D], N]): InterpreterStep[Unit] =
     Traverse[Vector].sequenceU(refs zip values map { case (ref, d) => intersect(ref, d) }) map { vectorOfUnit => () }
 
   private def relation[L <: HList, Refs <: HList](rel: Rel[L], refs: Refs, toRefs: Mapped.Aux[L, CellRef, Refs]): InterpreterStep[Unit] = ???

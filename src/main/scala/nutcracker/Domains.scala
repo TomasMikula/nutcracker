@@ -27,13 +27,17 @@ case class Domains private(
   }
 
   def fetch[D](ref: CellRef[D]): D = ref match {
-    case pdr @ PureDomRef(_) => getDomain(pdr)._1
+    case pdr@PureDomRef(_) => getDomain(pdr)._1
   }
 
-  def fetchVector[A, D, N <: Nat](refs: Sized[Vector[PureDomRef[A, D]], N]): Sized[Vector[D], N] =
+  def fetchVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))
 
-  def intersect[A, D](ref: PureDomRef[A, D], d: D): Option[Domains] = {
+  def intersect[D](ref: CellRef[D], d: D): Option[Domains] = ref match {
+    case pdr @ PureDomRef(_) => intersect(pdr, d)
+  }
+
+  private def intersect[A, D](ref: PureDomRef[A, D], d: D): Option[Domains] = {
     val (d0, dom) = getDomain(ref)
     val d1 = dom.meet(d0, d)
     if(dom.eqv(d0, d1))

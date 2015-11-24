@@ -7,16 +7,16 @@ import shapeless.HList
 import Triggers._
 
 case class Triggers(
-    domainTriggers: Map[PureDomRef[_, _], List[_ => Trigger]],
+    domainTriggers: Map[CellRef[_], List[_ => Trigger]],
     selTriggers: Map[Sel[_], List[_ => Trigger]],
     cellsToSels: Index[Sel[_ <: HList], CellRef[_]],
     domainResolutionTriggers: Map[PureDomRef[_, _], List[_ => ProblemDescription[Unit]]],
     promiseTriggers: Map[Long, List[_ => ProblemDescription[Unit]]]) {
 
-  def addDomainTrigger[A, D](ref: PureDomRef[A, D], t: D => Trigger): Triggers =
+  def addDomainTrigger[D](ref: CellRef[D], t: D => Trigger): Triggers =
     copy(domainTriggers = domainTriggers + ((ref, t :: domainTriggers.getOrElse(ref, Nil))))
 
-  def getForDomain[A, D](ref: PureDomRef[A, D], d: D): (Triggers, List[ProblemDescription[Unit]]) = {
+  def getForDomain[D](ref: CellRef[D], d: D): (Triggers, List[ProblemDescription[Unit]]) = {
     collectTriggers(d, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[D => Trigger]]) match {
       case (Nil, conts) => (copy(domainTriggers = domainTriggers - ref), conts)
       case (triggers1, conts) => (copy(domainTriggers = domainTriggers + ((ref, triggers1))), conts)
