@@ -1,6 +1,7 @@
 package nutcracker
 
 import nutcracker.Triggers.Trigger
+import shapeless.ops.nat.ToInt
 
 import scala.language.existentials
 
@@ -83,33 +84,20 @@ object ProblemDescription {
   private[nutcracker] case class WhenComplete[A, B](pr: PromiseId[A], f: A => ProblemDescription[B]) extends ProblemDescription[B]
 
 
-  class VariableStub[A] {
+  final class VariableStub[A] private[nutcracker] {
     def apply[D: Domain[A, ?] : BoundedLattice](): ProblemDescription[PureDomRef[A, D]] = apply(BoundedLattice[D].one)
     def apply[D: Domain[A, ?]](d: D): ProblemDescription[PureDomRef[A, D]] = Variable(d, implicitly[Domain[A, D]])
-
-//    def composeOf[PA <: HList, PDA <: HList, PDS <: PDA](components: PDS)(implicit
-//        pa: Generic.Aux[A, PA],
-//        pda: Mapped.Aux[PA, λ[X => ProblemDescription[DomRef[X]]], PDA]) = ???
-
-//    def branchByCase[CA <: Coproduct, PA <: HList, Cases <: HList](cases: Cases)(implicit
-//      ca: Generic.Aux[A, CA],
-//      pa: ToHList.Aux[CA, PA],
-//      m: Mapped.Aux[PA, λ[X => () => ProblemDescription[DomRef[X]]], Cases]): ProblemDescription[DomRef[A]] = CoproductVariable(cases)
   }
 
-//  class ComposeStub[A] {
-//    def by[L <: HList](f: L => A): ComposeByStub[A, L] = new ComposeByStub[A, L](f)
-//    def from[PA <: HList, RA <: HList, Refs <: RA](refs: Refs)(implicit
-//      pa: Generic.Aux[A, PA],
-//      ra: Mapped.Aux[PA, DomRef, RA]): ProblemDescription[DomRef[A]] = ??? //ProductVariable[A, PA, RA, Refs](refs)
-//  }
-
-//  class ComposeByStub[A, L <: HList](f: L => A) {
-//    def from(args: Mapped[L, DomRef]#Out): ProblemDescription[DomRef[A]] = ???
-//  }
+  final class VariablesStub[A] private[nutcracker] {
+    def apply[D: Domain[A, ?] : BoundedLattice](n: Int): ProblemDescription[Vector[PureDomRef[A, D]]] = apply[D](n, BoundedLattice[D].one)
+    def apply[D: Domain[A, ?] : BoundedLattice](n: Int, d: D): ProblemDescription[Vector[PureDomRef[A, D]]] =
+      Traverse[Vector].sequenceU(Vector.fill(n)(variable(d)))
+  }
 
   def pure[A](a: A): ProblemDescription[A] = Pure(a)
   def variable[A]: VariableStub[A] = new VariableStub[A]
+  def variables[A]: VariablesStub[A] = new VariablesStub[A]
   def varTrigger[D](ref: CellRef[D])(f: D => ProblemDescription[Unit]): ProblemDescription[Unit] =
     VarTrigger(ref, f)
   def partialVarTrigger[D](ref: CellRef[D])(f: PartialFunction[D, ProblemDescription[Unit]]): ProblemDescription[Unit] =
