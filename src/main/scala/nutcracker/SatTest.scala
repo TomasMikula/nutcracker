@@ -3,29 +3,24 @@ package nutcracker
 import nutcracker.ProblemDescription._
 import nutcracker.theories.bool.BoolDomain._
 import nutcracker.theories.bool._
-import shapeless.Nat._
 import shapeless.Sized
+import scalaz.syntax.traverse._
+import scalaz.std.vector._
 
 object SatTest extends App {
 
   val problem = for {
-    a1 <- variable[Boolean]()
-    a2 <- variable[Boolean]()
-    a3 <- variable[Boolean]()
-    a4 <- variable[Boolean]()
-    ā1 <- not(a1)
-    ā2 <- not(a2)
-    ā3 <- not(a3)
-    ā4 <- not(a4)
-    _ <- atLeastOneTrue(a1, a2, a3)
-    _ <- atLeastOneTrue(ā2, a3, ā4)
-    _ <- atLeastOneTrue(ā1, a3, a4)
-    _ <- atLeastOneTrue(ā1, ā3, ā4)
-    _ <- atLeastOneTrue(a2, a3, ā4)
-    _ <- atLeastOneTrue(a1, ā2, a4)
-    _ <- atLeastOneTrue(a1, a3, a4)
-    _ <- atLeastOneTrue(ā1, a2, ā3)
-    sol <- fetchResults(Sized[Vector](a1, a2, a3, a4))
+    a <- variables[Boolean](4)
+    ā <- a traverseU { not(_) }
+    _ <- atLeastOneTrue(a(0), a(1), a(2))
+    _ <- atLeastOneTrue(ā(1), a(2), ā(3))
+    _ <- atLeastOneTrue(ā(0), a(2), a(3))
+    _ <- atLeastOneTrue(ā(0), ā(2), ā(3))
+    _ <- atLeastOneTrue(a(1), a(2), ā(3))
+    _ <- atLeastOneTrue(a(0), ā(1), a(3))
+    _ <- atLeastOneTrue(a(0), a(2), a(3))
+    _ <- atLeastOneTrue(ā(0), a(1), ā(2))
+    sol <- fetchResults(Sized[Vector](a(0), a(1), a(2), a(3)))
   } yield sol
 
   val n = DFSSolver.solutions(problem).foldLeft(0)((i, s) => { println(s); i + 1 })
