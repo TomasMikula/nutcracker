@@ -244,10 +244,9 @@ object PartialSolution {
     InterpreterStep.wrapStateMonad { ps =>
       ps.domains.addVariable(d, ev) match { case (doms, ref) => (ps.copy(domains = doms), ref) }
     }
-  private def varTrigger[D](ref: CellRef[D], f: D => ProblemDescription[Unit]): InterpreterStep[Unit] = {
-    val f1: D => Trigger = d => FireReload(f(d))
+  private def varTrigger[D](ref: CellRef[D], f: D => Trigger): InterpreterStep[Unit] = {
     InterpreterStep[Unit] { ps =>
-      val triggers1 = ps.triggers.addDomainTrigger(ref, f1)
+      val triggers1 = ps.triggers.addDomainTrigger(ref, f)
       (DirtyThings.dirtyDomain(ref), (), ps.copy(triggers = triggers1))
     }
   }

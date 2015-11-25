@@ -8,7 +8,7 @@ import scalaz.std.vector._
 import shapeless._
 import shapeless.ops.hlist.Mapped
 
-import nutcracker.Triggers.Trigger
+import nutcracker.Triggers.{Sleep, FireReload, Trigger}
 
 sealed trait ProblemDescription[+A] {
   import ProblemDescription._
@@ -46,7 +46,7 @@ object ProblemDescription {
 
   // working with variables
   private[nutcracker] case class Variable[A, D](d: D, dom: Domain[A, D]) extends ProblemDescription[PureDomRef[A, D]]
-  private[nutcracker] case class VarTrigger[D](ref: CellRef[D], f: D => ProblemDescription[Unit]) extends ProblemDescription[Unit]
+  private[nutcracker] case class VarTrigger[D](ref: CellRef[D], f: D => Trigger) extends ProblemDescription[Unit]
   private[nutcracker] case class SelTrigger[L <: HList](sel: Sel[L], f: L => Trigger) extends ProblemDescription[Unit]
   private[nutcracker] case class Intersect[D](ref: CellRef[D], d: D) extends ProblemDescription[Unit]
   private[nutcracker] case class IntersectVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N], values: Sized[Vector[D], N]) extends ProblemDescription[Unit]
@@ -93,11 +93,10 @@ object ProblemDescription {
   def pure[A](a: A): ProblemDescription[A] = Pure(a)
   def variable[A]: VariableStub[A] = new VariableStub[A]
   def variables[A]: VariablesStub[A] = new VariablesStub[A]
-  def varTrigger[D](ref: CellRef[D])(f: D => ProblemDescription[Unit]): ProblemDescription[Unit] =
+  def varTrigger[D](ref: CellRef[D])(f: D => Trigger): ProblemDescription[Unit] =
     VarTrigger(ref, f)
-  def partialVarTrigger[D](ref: CellRef[D])(f: PartialFunction[D, ProblemDescription[Unit]]): ProblemDescription[Unit] =
-    VarTrigger(ref, (d: D) => if(f.isDefinedAt(d)) f(d) else Pure(()))
-//  def compose[A]: ComposeStub[A] = new ComposeStub[A]
+  def partialVarTrigger[D](ref: CellRef[D])(f: PartialFunction[D, Trigger]): ProblemDescription[Unit] =
+    VarTrigger(ref, (d: D) => if(f.isDefinedAt(d)) f(d) else Sleep)
   def selectionTrigger[L <: HList](sel: Sel[L])(f: L => Trigger): ProblemDescription[Unit] = SelTrigger(sel, f)
   def selectionTrigger2[D1, D2](ref1: CellRef[D1], ref2: CellRef[D2])(f: (D1, D2) => Trigger): ProblemDescription[Unit] =
     selectionTrigger[D1 :: D2 :: HNil](Sel(ref1, ref2))(l => f(l.head, l.tail.head))
@@ -116,12 +115,12 @@ object ProblemDescription {
   def intersect[D](ref: CellRef[D], a: D): ProblemDescription[Unit] = Intersect(ref, a)
   def set[A, D](ref: PureDomRef[A, D], a: A)(implicit dom: Domain[A, D]): ProblemDescription[Unit] = Intersect(ref, dom.singleton(a))
   def intersectVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N], values: Sized[Vector[D], N]): ProblemDescription[Unit] = IntersectVector(refs, values)
-//  def constraint2[A, B](c: Constraint[(A, B)], domA: PureDomRef[_, A], domB: PureDomRef[_, B]): ProblemDescription[Unit] = ???
+
   def vectorConstraint[D: MeetSemilattice, N <: Nat](
       c: Constraint[Sized[Vector[D], N]],
       refs: Sized[Vector[CellRef[D]], N]): ProblemDescription[Unit] = {
-    val trigger: D => ProblemDescription[Unit] =
-      d => fetchVector(refs).flatMap(doms => intersectVector(refs, c.enforce(doms)))
+    val trigger: D => Trigger =
+      d => FireReload(fetchVector(refs).flatMap(doms => intersectVector(refs, c.enforce(doms))))
     Traverse[Vector].traverse(refs.unsized)(ref => varTrigger(ref)(trigger)) map { vectorOfUnit => () }
     // TODO relation based constraints
   }

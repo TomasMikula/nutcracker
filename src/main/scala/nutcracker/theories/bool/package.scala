@@ -12,15 +12,15 @@ package object bool {
   def and(x: Ref, y: Ref): ProblemDescription[Ref] = {
     variable[Boolean]() >>= { res =>
       partialVarTrigger(x)({
-        case MustBeFalse => set(res, false)
-        case MustBeTrue => y <=> res
+        case MustBeFalse => Fire(set(res, false))
+        case MustBeTrue => Fire(y <=> res)
       }) >>
       partialVarTrigger(y)({
-        case MustBeFalse => set(res, false)
-        case MustBeTrue => x <=> res
+        case MustBeFalse => Fire(set(res, false))
+        case MustBeTrue => Fire(x <=> res)
       }) >>
       partialVarTrigger(res)({
-        case MustBeTrue => set(x, true) >> set(y, true)
+        case MustBeTrue => Fire(set(x, true) >> set(y, true))
       }) >>
       Pure(res)
     }
@@ -29,15 +29,15 @@ package object bool {
   def or(x: Ref, y: Ref): ProblemDescription[Ref] = {
     variable[Boolean]() >>= { res =>
       partialVarTrigger(x)({
-        case MustBeTrue => set(res, true)
-        case MustBeFalse => y <=> res
+        case MustBeTrue => Fire(set(res, true))
+        case MustBeFalse => Fire(y <=> res)
       }) >>
       partialVarTrigger(y)({
-        case MustBeTrue => set(res, true)
-        case MustBeFalse => x <=> res
+        case MustBeTrue => Fire(set(res, true))
+        case MustBeFalse => Fire(x <=> res)
       }) >>
       partialVarTrigger(res)({
-        case MustBeFalse => set(x, false) >> set(y, false)
+        case MustBeFalse => Fire(set(x, false) >> set(y, false))
       }) >>
       Pure(res)
     }
@@ -46,12 +46,12 @@ package object bool {
   def not(x: Ref): ProblemDescription[Ref] = {
     variable[Boolean]() >>= { res =>
       partialVarTrigger(x)({
-        case MustBeTrue => set(res, false)
-        case MustBeFalse => set(res, true)
+        case MustBeTrue => Fire(set(res, false))
+        case MustBeFalse => Fire(set(res, true))
       }) >>
       partialVarTrigger(res)({
-        case MustBeTrue => set(x, false)
-        case MustBeFalse => set(x, true)
+        case MustBeTrue => Fire(set(x, false))
+        case MustBeFalse => Fire(set(x, true))
       }) >>
       Pure(res)
     }
@@ -59,10 +59,10 @@ package object bool {
 
   def imp(x: Ref, y: Ref): ProblemDescription[Unit] = {
     partialVarTrigger(x)({
-      case MustBeTrue => set(y, true)
+      case MustBeTrue => Fire(set(y, true))
     }) >>
     partialVarTrigger(y)({
-      case MustBeFalse => set(x, false)
+      case MustBeFalse => Fire(set(x, false))
     })
   }
 
