@@ -85,6 +85,7 @@ object PartialSolution {
     def stopAtPure[A](a: A): InterpreterStep[IStop[A]] = apply[IStop[A]](ps => (DirtyThings.empty, Inl(a), ps))
     def stopAtBranch[A](br: Branch[A]): InterpreterStep[IStop[A]] = apply[IStop[A]](ps => (DirtyThings.empty, Inr(Inl(br)), ps))
     def stopAtPromise[A](pr: PromiseId[A]): InterpreterStep[IStop[A]] = apply[IStop[A]](ps => (DirtyThings.empty, Inr(Inr(Inl(pr))), ps))
+    def stopAtFailure[A]: InterpreterStep[IStop[A]] = stopAtBranch[A](Branch(() => Nil))
 
     def mapState(f: PartialSolution => PartialSolution): InterpreterStep[Unit] =
       apply[Unit](ps => (DirtyThings.empty, (), f(ps)))
@@ -181,8 +182,9 @@ object PartialSolution {
       case -\/(pdA) => interpret0(pdA)
       case \/-(prA) => InterpreterStep.stopAtPromise(prA)
     }
-    case WhenResolved(ref, f) => onResolved(ref)(f) flatMap {
-      case -\/(pdA) => interpret0(pdA)
+    case FetchResult(ref) => onResolved(ref) flatMap {
+      case -\/(None) => InterpreterStep.stopAtFailure
+      case -\/(Some(a)) => InterpreterStep.stopAtPure(a)
       case \/-(prA) => InterpreterStep.stopAtPromise(prA)
     }
     case Variable(d, ev) => addVariable(d, ev) map { Inl(_) }
@@ -219,14 +221,14 @@ object PartialSolution {
         (ps1.copy(triggers = ps1.triggers.addOnComplete[A](prA, { f(_) flatMap { b => Complete(prB, b) } })), \/-(prB))
     }}
 
-  private def onResolved[A, D, B](ref: PureDomRef[A, D])(f: A => ProblemDescription[B]): InterpreterStep[ProblemDescription[B] \/ PromiseId[B]] =
+  private def onResolved[A, D](ref: PureDomRef[A, D]): InterpreterStep[Option[A] \/ PromiseId[A]] =
     InterpreterStep.wrapStateMonad { ps => ps.domains.getDomain(ref) match {
       case (d, domain) => domain.values(d) match {
-        case Domain.Empty() => (ps, -\/(ProblemDescription.empty[B]))
-        case Domain.Just(a) => (ps, -\/(f(a)))
+        case Domain.Empty() => (ps, -\/(None))
+        case Domain.Just(a) => (ps, -\/(Some(a)))
         case Domain.Many(_) =>
-          val (ps1, prB) = promise0[B](ps)
-          (ps1.copy(triggers = ps.triggers.addDomainResolutionTrigger[A, D](ref, { f(_) flatMap { b => Complete(prB, b) }})), \/-(prB))
+          val (ps1, prA) = promise0[A](ps)
+          (ps1.copy(triggers = ps.triggers.addDomainResolutionTrigger[A, D](ref, { a => Complete(prA, a) })), \/-(prA))
       }
     }}
 

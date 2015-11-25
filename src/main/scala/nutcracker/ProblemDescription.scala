@@ -52,7 +52,7 @@ object ProblemDescription {
   private[nutcracker] case class IntersectVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N], values: Sized[Vector[D], N]) extends ProblemDescription[Unit]
   private[nutcracker] case class Fetch[A, D](ref: PureDomRef[A, D]) extends ProblemDescription[D]
   private[nutcracker] case class FetchVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]) extends ProblemDescription[Sized[Vector[D], N]]
-  private[nutcracker] case class WhenResolved[A, D, B](ref: PureDomRef[A, D], f: A => ProblemDescription[B]) extends ProblemDescription[B]
+  private[nutcracker] case class FetchResult[A, D](ref: PureDomRef[A, D]) extends ProblemDescription[A]
 
 
   // working with relations
@@ -102,7 +102,7 @@ object ProblemDescription {
     selectionTrigger[D1 :: D2 :: HNil](Sel(ref1, ref2))(l => f(l.head, l.tail.head))
   def fetch[D](ref: PureDomRef[_, D]): ProblemDescription[D] = Fetch(ref)
   def fetchVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): ProblemDescription[Sized[Vector[D], N]] = FetchVector(refs)
-  def fetchResult[A, D](ref: PureDomRef[A, D]): ProblemDescription[A] = WhenResolved[A, D, A](ref, a => Pure(a))
+  def fetchResult[A, D](ref: PureDomRef[A, D]): ProblemDescription[A] = FetchResult[A, D](ref)
   def fetchResults[A, D](refs: Vector[PureDomRef[A, D]]): ProblemDescription[Vector[A]] = {
     Traverse[Vector].traverse(refs){ fetchResult(_) }
   }
