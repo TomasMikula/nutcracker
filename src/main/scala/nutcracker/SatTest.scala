@@ -12,7 +12,7 @@ object SatTest extends App {
   // (doesn't have to be 3-SAT)
   val problem = for {
     a <- variables[Boolean](4)
-    ā <- a traverseU { not(_) }
+    ā <- a traverseU { neg(_) }
     _ <- atLeastOneTrue(a(0), a(1), a(2))
     _ <- atLeastOneTrue(ā(1), a(2), ā(3))
     _ <- atLeastOneTrue(ā(0), a(2), a(3))

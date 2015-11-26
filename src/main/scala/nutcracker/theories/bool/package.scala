@@ -60,7 +60,7 @@ package object bool {
     }
   }
 
-  def not(x: Ref): ProblemDescription[Ref] = {
+  def neg(x: Ref): ProblemDescription[Ref] = {
     variable[Boolean]() >>= { res =>
       partialVarTrigger(x)({
         case MustBeTrue => Fire(set(res, false))
@@ -73,6 +73,9 @@ package object bool {
       Pure(res)
     }
   }
+
+  def not(x: Ref): ProblemDescription[Unit] =
+    set(x, false)
 
   def imp(x: Ref, y: Ref): ProblemDescription[Unit] = {
     partialVarTrigger(x)({
