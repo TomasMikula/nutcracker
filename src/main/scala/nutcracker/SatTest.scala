@@ -8,6 +8,8 @@ import scalaz.std.vector._
 
 object SatTest extends App {
 
+  // description of a simple SAT problem
+  // (doesn't have to be 3-SAT)
   val problem = for {
     a <- variables[Boolean](4)
     ā <- a traverseU { not(_) }
@@ -22,6 +24,19 @@ object SatTest extends App {
     sol <- fetchResults(a)
   } yield sol
 
-  val n = DFSSolver.solutions(problem).foldLeft(0)((i, s) => { println(s); i + 1 })
-  println(s"Found $n solutions")
+  val solutions = DFSSolver.solutions(problem).toStream.toList
+
+
+  val expected = Set(
+    Vector(true, true, true, false),
+    Vector(false, true, true, true),
+    Vector(false, false, true, true),
+    Vector(false, false, true, false)
+  )
+
+  assert(solutions.size == 4)
+  assert(solutions.toSet == expected)
+
+  solutions foreach { println(_) }
+  println(s"Found ${solutions.size} solutions")
 }

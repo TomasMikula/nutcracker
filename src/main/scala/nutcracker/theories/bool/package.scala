@@ -26,20 +26,37 @@ package object bool {
     }
   }
 
-  def or(x: Ref, y: Ref): ProblemDescription[Ref] = {
+  def or(x: Ref*): ProblemDescription[Ref] = {
     variable[Boolean]() >>= { res =>
-      partialVarTrigger(x)({
-        case MustBeTrue => Fire(set(res, true))
-        case MustBeFalse => Fire(y <=> res)
-      }) >>
-      partialVarTrigger(y)({
-        case MustBeTrue => Fire(set(res, true))
-        case MustBeFalse => Fire(x <=> res)
-      }) >>
-      partialVarTrigger(res)({
-        case MustBeFalse => Fire(set(x, false) >> set(y, false))
-      }) >>
-      Pure(res)
+      def watch(i: Int, j: Int): ProblemDescription[Unit] = {
+        require(i < j)
+        if(j < 0) {
+          // all variables have been set to false,
+          // thus the result must be false
+          set(res, false)
+        } else if(i < 0) {
+          // all but one variable set to false,
+          // the result is equal to the remaining one
+          x(j) <=> res
+        } else {
+          selectionTrigger2(x(i), x(j))((di, dj) => {
+            if (di == MustBeTrue || dj == MustBeTrue) {
+              // found a variable set to true,
+              // thus the result must be true
+              Fire(set(res, true))
+            } else if (di == MustBeFalse) {
+              // pick next variable to watch instead of x(i)
+              Fire(watch(i-1, j))
+            } else if (dj == MustBeFalse) {
+              // pick next variable to watch instead of x(j)
+              Fire(watch(i-1, i))
+            } else {
+              Sleep
+            }
+          })
+        }
+      }
+      watch(x.size - 2, x.size - 1) >> Pure(res)
     }
   }
 
@@ -67,29 +84,6 @@ package object bool {
   }
 
   def atLeastOneTrue(x: Ref*): ProblemDescription[Unit] = {
-    require(x.size >= 1)
-    def watch(i: Int, j: Int): ProblemDescription[Unit] = {
-      require(i < j)
-      require(j >= 0)
-      if (i < 0) {
-        set(x(j), true)
-      } else {
-        selectionTrigger2(x(i), x(j))((di, dj) => {
-          if (di == MustBeTrue || dj == MustBeTrue) {
-            // constraint satisfied, we are done
-            Discard
-          } else if (di == MustBeFalse) {
-            // pick next variable to watch instead of x(i)
-            Fire(watch(i-1, j))
-          } else if (dj == MustBeFalse) {
-            // pick next variable to watch instead of x(j)
-            Fire(watch(i-1, i))
-          } else {
-            Sleep
-          }
-        })
-      }
-    }
-    watch(x.size - 2, x.size - 1)
+    or(x: _*) >>= { set(_, true) }
   }
 }
