@@ -87,6 +87,52 @@ package object bool {
   }
 
   def atLeastOneTrue(x: Ref*): ProblemDescription[Unit] = {
-    or(x: _*) >>= { set(_, true) }
+    presume(or(x: _*))
+  }
+
+  def presume(x: Ref): ProblemDescription[Unit] = {
+    set(x, true)
+  }
+
+  def presume(x: ProblemDescription[Ref]): ProblemDescription[Unit] = {
+    x >>= { set(_, true) }
+  }
+
+  implicit class BoolOps(self: Ref) {
+
+    def ===(that: Ref): ProblemDescription[Unit] = {
+      (self >>= { set(that, _) }) >>
+        (that >>= { set(self, _) })
+    }
+
+    def =!=(that: Ref): ProblemDescription[Unit] = {
+      (self >>= { x => set(that, !x) }) >>
+        (that >>= { x => set(self, !x) })
+    }
+
+    def =?=(that: Ref): ProblemDescription[Ref] = {
+      variable[Boolean]() >>= { res =>
+        (res >>= { if(_) (self === that) else (self =!= that) }) >>
+          (self >>= { if(_) (res === that) else (res  =!= that) }) >>
+          (that >>= { if(_) (res === self) else (res  =!= self) }) >>
+          Pure(res)
+      }
+    }
+
+    def =?=(that: ProblemDescription[Ref]): ProblemDescription[Ref] =
+      that >>= { self =?= _ }
+
+    def ∨(that: Ref): ProblemDescription[Ref] = or(self, that)
+    def ∨(that: ProblemDescription[Ref]): ProblemDescription[Ref] =
+      that >>= { self ∨ _ }
+  }
+
+  implicit class BoolOps1(self: ProblemDescription[Ref]) {
+    def ===(that: Ref): ProblemDescription[Unit] = self >>= { _ === that }
+    def =!=(that: Ref): ProblemDescription[Unit] = self >>= { _ =!= that }
+    def =?=(that: Ref): ProblemDescription[Ref] = self >>= { _ =?= that }
+    def =?=(that: ProblemDescription[Ref]): ProblemDescription[Ref] = self >>= { _ =?= that }
+    def ∨(that: Ref): ProblemDescription[Ref] = self >>= { _ ∨ that }
+    def ∨(that: ProblemDescription[Ref]): ProblemDescription[Ref] = self >>= { _ ∨ that }
   }
 }
