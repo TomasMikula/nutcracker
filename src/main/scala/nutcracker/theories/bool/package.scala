@@ -74,6 +74,8 @@ package object bool {
     }
   }
 
+  def neg(x: ProblemDescription[Ref]): ProblemDescription[Ref] = x >>= { neg(_) }
+
   def not(x: Ref): ProblemDescription[Unit] =
     set(x, false)
 
@@ -125,6 +127,10 @@ package object bool {
     def ∨(that: Ref): ProblemDescription[Ref] = or(self, that)
     def ∨(that: ProblemDescription[Ref]): ProblemDescription[Ref] =
       that >>= { self ∨ _ }
+
+    def ∧(that: Ref): ProblemDescription[Ref] = and(self, that)
+    def ∧(that: ProblemDescription[Ref]): ProblemDescription[Ref] =
+      that >>= { self ∧ _ }
   }
 
   implicit class BoolOps1(self: ProblemDescription[Ref]) {
@@ -134,5 +140,7 @@ package object bool {
     def =?=(that: ProblemDescription[Ref]): ProblemDescription[Ref] = self >>= { _ =?= that }
     def ∨(that: Ref): ProblemDescription[Ref] = self >>= { _ ∨ that }
     def ∨(that: ProblemDescription[Ref]): ProblemDescription[Ref] = self >>= { _ ∨ that }
+    def ∧(that: Ref): ProblemDescription[Ref] = self >>= { _ ∧ that }
+    def ∧(that: ProblemDescription[Ref]): ProblemDescription[Ref] = self >>= { _ ∧ that }
   }
 }
