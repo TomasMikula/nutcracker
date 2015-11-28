@@ -59,7 +59,16 @@ case class Domains private(
     }
   }
 
-  def addDomainTrigger[D](ref: CellRef[D], t: D => Trigger): Domains =
+  def addDomainTrigger[D](ref: CellRef[D], t: D => Trigger): (Domains, Option[ProblemDescription[Unit]]) = {
+    t(fetch(ref)) match {
+      case Discard => (this, None)
+      case Sleep => (addDomainTrigger0(ref, t), None)
+      case Fire(cont) => (this, Some(cont))
+      case FireReload(cont) => (addDomainTrigger0(ref, t), Some(cont))
+    }
+  }
+
+  private def addDomainTrigger0[D](ref: CellRef[D], t: D => Trigger): Domains =
     copy(domainTriggers = domainTriggers + ((ref, t :: domainTriggers.getOrElse(ref, Nil))))
 
   def triggersForDomain[D](ref: CellRef[D]): (Domains, List[ProblemDescription[Unit]]) =

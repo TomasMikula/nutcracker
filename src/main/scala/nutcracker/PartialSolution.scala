@@ -234,8 +234,8 @@ object PartialSolution {
     }
   private def varTrigger[D](ref: CellRef[D], f: D => Trigger): InterpreterStep[Unit] = {
     InterpreterStep[Unit] { ps =>
-      val domains1 = ps.domains.addDomainTrigger(ref, f)
-      (DirtyThings.dirtyDomain(ref), (), ps.copy(domains = domains1))
+      val (domains1, cont) = ps.domains.addDomainTrigger(ref, f)
+      (DirtyThings.continuations(cont.toList), (), ps.copy(domains = domains1))
     }
   }
   private def selTrigger[L <: HList](sel: Sel[L], f: L => Trigger): InterpreterStep[Unit] = {
