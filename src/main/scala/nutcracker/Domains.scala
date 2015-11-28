@@ -62,10 +62,21 @@ case class Domains private(
   def addDomainTrigger[D](ref: CellRef[D], t: D => Trigger): Domains =
     copy(domainTriggers = domainTriggers + ((ref, t :: domainTriggers.getOrElse(ref, Nil))))
 
-  def triggersForDomain[D](ref: CellRef[D], d: D): (Domains, List[ProblemDescription[Unit]]) = {
-    collectTriggers(d, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[D => Trigger]]) match {
-      case (Nil, conts) => (copy(domainTriggers = domainTriggers - ref), conts)
-      case (triggers1, conts) => (copy(domainTriggers = domainTriggers + ((ref, triggers1))), conts)
+  def triggersForDomain[D](ref: CellRef[D]): (Domains, List[ProblemDescription[Unit]]) =
+    ref match { case pdr@PureDomRef(_) => triggersForDomain0(pdr) }
+
+  private def triggersForDomain0[A, D](ref: PureDomRef[A, D]): (Domains, List[ProblemDescription[Unit]]) = {
+    val (d, domain) = getDomain(ref)
+    val (domainTriggers1, conts1) = collectTriggers(d, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[D => Trigger]]) match {
+      case (Nil, conts) => (domainTriggers - ref, conts)
+      case (triggers1, conts) => (domainTriggers + ((ref, triggers1)), conts)
+    }
+    domain.values(d) match {
+      case Domain.Just(a) =>
+        val conts2 = domainResolutionTriggers.getOrElse(ref, Nil).asInstanceOf[List[A => ProblemDescription[Unit]]] map { _(a) }
+        val domainResolutionTriggers1 = domainResolutionTriggers - ref
+        (copy(domainTriggers = domainTriggers1, domainResolutionTriggers = domainResolutionTriggers1), conts1 ++ conts2)
+      case _ => (copy(domainTriggers = domainTriggers1), conts1)
     }
   }
 
@@ -88,11 +99,6 @@ case class Domains private(
 
   def addDomainResolutionTrigger[A, D](ref: PureDomRef[A, D], f: A => ProblemDescription[Unit]): Domains =
     copy(domainResolutionTriggers = domainResolutionTriggers + ((ref, f :: domainResolutionTriggers.getOrElse(ref, Nil))))
-
-  def domainResolvedTriggers[A, D](ref: PureDomRef[A, D], a: A): (Domains, List[ProblemDescription[Unit]]) = {
-    val conts = domainResolutionTriggers.getOrElse(ref, Nil).asInstanceOf[List[A => ProblemDescription[Unit]]] map { _(a) }
-    (copy(domainResolutionTriggers = domainResolutionTriggers - ref), conts)
-  }
 
   private[nutcracker] def getDomain[A, D](ref: PureDomRef[A, D]): (D, Domain[A, D]) =
     domains(ref.domainId).asInstanceOf[(D, Domain[A, D])]

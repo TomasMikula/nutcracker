@@ -110,20 +110,10 @@ object PartialSolution {
             val ps2 = incorporate0(ps1, istop)
             interpret(ps2, ds |+| dirty1)
         }
-        case DirtyDomain(cr) => cr match {
-          case ref @ PureDomRef(_) =>
-            ps.domains.getDomain(ref) match {
-              case (dom, domain) =>
-                val (domains1, toFire) = ps.domains.triggersForDomain(ref, dom)
-                val (ps1, domainResolutionTriggers) = domain.values(dom) match {
-                  case Domain.Empty() => (ps.copy(domains = domains1), Nil)
-                  case Domain.Just(a) => domains1.domainResolvedTriggers(ref, a) match {
-                    case (domains2, conts) => (ps.copy(domains = domains2), conts)
-                  }
-                  case Domain.Many(_) => (ps.copy(domains = domains1), Nil)
-                }
-                interpret(ps1, ds |+| DirtyThings.continuations(toFire ++ domainResolutionTriggers) |+| DirtyThings.dirtySels(ps1.domains.getSelsForCell(ref)))
-            }
+        case DirtyDomain(ref) => ps.domains.triggersForDomain(ref) match {
+          case (domains1, conts) =>
+            val ps1 = ps.copy(domains = domains1)
+            interpret(ps1, ds |+| DirtyThings.continuations(conts) |+| DirtyThings.dirtySels(ps1.domains.getSelsForCell(ref)))
         }
         case DirtySel(sel) =>
           // auxiliary function to capture sel's type parameter L
