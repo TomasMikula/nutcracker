@@ -41,6 +41,7 @@ libraryDependencies ++= Seq(
   "org.scalaz" %% "scalaz-core" % "7.1.5",
   "com.chuusai" %% "shapeless" % "2.2.5",
   "org.principled" %% "principled" % "0.1-SNAPSHOT",
+  "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
   "org.scalacheck" %% "scalacheck" % "1.12.4"
 )
 
