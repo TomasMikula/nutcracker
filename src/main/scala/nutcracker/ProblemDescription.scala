@@ -80,8 +80,13 @@ object ProblemDescription {
 
 
   final class VariableStub[A] private[nutcracker] {
-    def apply[D: Domain[A, ?] : BoundedLattice](): ProblemDescription[PureDomRef[A, D]] = apply(BoundedLattice[D].one)
-    def apply[D: Domain[A, ?]](d: D): ProblemDescription[PureDomRef[A, D]] = Variable(d, implicitly[Domain[A, D]])
+    def apply[D: Domain[A, ?] : BoundedLattice](): ProblemDescription[PureDomRef[A, D]] = domain()
+    def apply[D: Domain[A, ?]](d: D): ProblemDescription[PureDomRef[A, D]] = domain(d)
+
+    def domain[D: Domain[A, ?] : BoundedLattice](): ProblemDescription[PureDomRef[A, D]] = domain(BoundedLattice[D].one)
+    def domain[D: Domain[A, ?]](d: D): ProblemDescription[PureDomRef[A, D]] = Variable(d, implicitly[Domain[A, D]])
+
+    def oneOf(s: Set[A]): ProblemDescription[PureDomRef[A, Set[A]]] = Variable(s, implicitly[Domain[A, Set[A]]])
   }
 
   final class VariablesStub[A] private[nutcracker] {

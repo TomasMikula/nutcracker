@@ -1,8 +1,7 @@
 package nutcracker.theories.bool
 
-import algebra.lattice.BoundedLattice
+import algebra.lattice.{Bool, BoundedLattice}
 import nutcracker.Domain
-import nutcracker.algebraic.BoolRing
 
 sealed trait BoolDomain
 
@@ -13,8 +12,8 @@ object BoolDomain {
   case object MustBeTrue extends BoolDomain
   case object MustBeFalse extends BoolDomain
 
-  implicit val boolDomain: Domain[Boolean, BoolDomain] with BoolRing[BoolDomain] with BoundedLattice[BoolDomain] =
-    new Domain[Boolean, BoolDomain] with BoolRing[BoolDomain] with BoundedLattice[BoolDomain] {
+  implicit val boolDomain: Domain[Boolean, BoolDomain] with Bool[BoolDomain] =
+    new Domain[Boolean, BoolDomain] with Bool[BoolDomain] {
       def zero: BoolDomain = Bottom
       def one: BoolDomain = Top
       def and(a: BoolDomain, b: BoolDomain): BoolDomain = (a, b) match {
@@ -29,23 +28,7 @@ object BoolDomain {
         case (x, y) if x == y => x
         case _ => Top
       }
-      def setMinus(a: BoolDomain, b: BoolDomain): BoolDomain = (a, b) match {
-        case (Bottom, x) => Bottom
-        case (x, Bottom) => x
-        case (Top, x) => complement(x)
-        case (x, Top) => Bottom
-        case (x, y) if x == y => Bottom
-        case (x, y) if x != y => x
-      }
-      def xor(a: BoolDomain, b: BoolDomain): BoolDomain = (a, b) match {
-        case (Bottom, x) => x
-        case (x, Bottom) => x
-        case (Top, x) => complement(x)
-        case (x, Top) => complement(x)
-        case (x, y) if x == y => Bottom
-        case (x, y) if x != y => Top
-      }
-      override def complement(a: BoolDomain): BoolDomain = a match {
+      def complement(a: BoolDomain): BoolDomain = a match {
         case Top => Bottom
         case Bottom => Top
         case MustBeTrue => MustBeFalse
