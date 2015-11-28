@@ -31,7 +31,7 @@ class KnightsAndKnaves extends FreeSpec {
       // c says knave(b)
       _ <- presume(c =?= neg(b))
 
-      sol <- fetchResults(Vector(a, b, c))
+      sol <- fetchResults(a, b, c)
     } yield sol
 
     val solutions = DFSSolver.solutions(problem).toStream.toList
@@ -59,7 +59,7 @@ class KnightsAndKnaves extends FreeSpec {
       // a says (knave(a) ∨ knave(b))
       _ <- presume(a =?= (neg(a) ∨ neg(b)))
 
-      sol <- fetchResults(Vector(a, b))
+      sol <- fetchResults(a, b)
     } yield sol
 
     val solutions = DFSSolver.solutions(problem).toStream.toList
@@ -85,7 +85,7 @@ class KnightsAndKnaves extends FreeSpec {
       // a says (knave(a) ∧ knave(b))
       _ <- presume(a =?= (neg(a) ∧ neg(b)))
 
-      sol <- fetchResults(Vector(a, b))
+      sol <- fetchResults(a, b)
     } yield sol
 
     val solutions = DFSSolver.solutions(problem).toStream.toList
@@ -116,7 +116,7 @@ class KnightsAndKnaves extends FreeSpec {
       // b says (kind(a) ≠ kind(b)
       _ <- presume(b =?= neg(a =?= b))
 
-      sol <- fetchResults(Vector(a, b))
+      sol <- fetchResults(a, b)
     } yield sol
 
     val solutions = DFSSolver.solutions(problem).toStream.toList

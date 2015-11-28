@@ -103,9 +103,9 @@ object ProblemDescription {
   def fetch[D](ref: PureDomRef[_, D]): ProblemDescription[D] = Fetch(ref)
   def fetchVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): ProblemDescription[Sized[Vector[D], N]] = FetchVector(refs)
   def fetchResult[A, D](ref: PureDomRef[A, D]): ProblemDescription[A] = FetchResult[A, D](ref)
-  def fetchResults[A, D](refs: Vector[PureDomRef[A, D]]): ProblemDescription[Vector[A]] = {
+  def fetchResults[A, D](refs: Vector[PureDomRef[A, D]]): ProblemDescription[Vector[A]] =
     Traverse[Vector].traverse(refs){ fetchResult(_) }
-  }
+  def fetchResults[A, D](refs: PureDomRef[A, D]*): ProblemDescription[Seq[A]] = fetchResults(refs.toVector)
   def branch2[A, B](a: () => ProblemDescription[A], b: () => ProblemDescription[B]): ProblemDescription[Either[A, B]] =
     branch[Either[A, B]](() => a().map(Left(_)), () => b().map(Right(_)))
   def branch[A](branches: () => List[ProblemDescription[A]]): ProblemDescription[A] = Branch(branches)
