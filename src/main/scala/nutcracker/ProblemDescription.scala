@@ -51,6 +51,7 @@ object ProblemDescription {
   private[nutcracker] case class Fetch[A, D](ref: PureDomRef[A, D]) extends ProblemDescription[D]
   private[nutcracker] case class FetchVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]) extends ProblemDescription[Sized[Vector[D], N]]
   private[nutcracker] case class FetchResult[A, D](ref: PureDomRef[A, D]) extends ProblemDescription[A]
+  private[nutcracker] case class WhenResolved[A, D](ref: PureDomRef[A, D], f: A => ProblemDescription[Unit]) extends ProblemDescription[Unit]
 
 
   // working with relations
@@ -109,6 +110,7 @@ object ProblemDescription {
   def fetchResults[A, D](refs: Vector[PureDomRef[A, D]]): ProblemDescription[Vector[A]] =
     Traverse[Vector].traverse(refs){ fetchResult(_) }
   def fetchResults[A, D](refs: PureDomRef[A, D]*): ProblemDescription[Seq[A]] = fetchResults(refs.toVector)
+  def whenResolved[A, D](ref: PureDomRef[A, D])(f: A => ProblemDescription[Unit]): ProblemDescription[Unit] = WhenResolved(ref, f)
   def branch2[A, B](a: () => ProblemDescription[A], b: () => ProblemDescription[B]): ProblemDescription[Either[A, B]] =
     branch[Either[A, B]](() => a().map(Left(_)), () => b().map(Right(_)))
   def branch[A](branches: () => List[ProblemDescription[A]]): ProblemDescription[A] = Branch(branches)

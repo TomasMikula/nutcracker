@@ -172,8 +172,9 @@ object PartialSolution {
     case FetchResult(ref) => fetchResultIfResolved(ref) flatMap { _ match {
       case Some(None) => InterpreterStep.stopAtFailure
       case Some(Some(a)) => InterpreterStep.stopAtPure(a)
-      case None => onResolved(ref) map { pr => Inr(Inr(Inl(pr))) }
+      case None => fetchResultWhenResolved(ref) map { pr => Inr(Inr(Inl(pr))) }
     }}
+    case WhenResolved(ref, f) => whenResolved(ref, f) map { Inl(_) }
     case Variable(d, ev) => addVariable(d, ev) map { Inl(_) }
     case Fetch(ref) => fetch(ref) map { Inl(_) }
     case FetchVector(refs) => fetchVector(refs) map { Inl(_) }
@@ -217,11 +218,16 @@ object PartialSolution {
       }
     }}
 
-  private def onResolved[A, D](ref: PureDomRef[A, D]): InterpreterStep[PromiseId[A]] =
+  private def fetchResultWhenResolved[A, D](ref: PureDomRef[A, D]): InterpreterStep[PromiseId[A]] =
+    for {
+      prA <- promise[A]
+      _ <- whenResolved(ref, (a: A) => Complete(prA, a))
+    } yield prA
+
+  private def whenResolved[A, D](ref: PureDomRef[A, D], f: A => ProblemDescription[Unit]): InterpreterStep[Unit] =
     InterpreterStep { ps =>
-      val (ps1, prA) = promise0[A](ps)
-      val (domains1, cont) = ps1.domains.addDomainResolutionTrigger[A, D](ref, { a => Complete(prA, a) })
-      (DirtyThings.continuations(cont.toList), prA, ps1.copy(domains = domains1))
+      val (domains1, cont) = ps.domains.addDomainResolutionTrigger[A, D](ref, f)
+      (DirtyThings.continuations(cont.toList), (), ps.copy(domains = domains1))
     }
 
   private def addBranching(br: Branch[Unit]): InterpreterStep[Unit] =
