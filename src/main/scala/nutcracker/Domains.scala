@@ -1,13 +1,11 @@
 package nutcracker
 
-import nutcracker.util.Index
-
 import scala.language.existentials
 
-import algebra.lattice.MeetSemilattice
+import nutcracker.util.Index
+
 import shapeless.{HList, Nat, Sized}
 
-import PartialSolution._
 import Domain._
 import Domains._
 
@@ -17,7 +15,6 @@ case class Domains private(
     domainTriggers: Map[CellRef[_], List[_ => Trigger]],
     selTriggers: Map[Sel[_], List[_ => Trigger]],
     cellsToSels: Index[Sel[_ <: HList], CellRef[_]],
-    domainResolutionTriggers: Map[PureDomRef[_, _], List[_ => ProblemDescription[Unit]]],
     unresolvedVars: Set[PureDomRef[A, D] forSome { type A; type D }],
     failedVars: Set[Long]) {
 
@@ -71,22 +68,21 @@ case class Domains private(
   private def addDomainTrigger0[D](ref: CellRef[D], t: D => Trigger): Domains =
     copy(domainTriggers = domainTriggers + ((ref, t :: domainTriggers.getOrElse(ref, Nil))))
 
-  def triggersForDomain[D](ref: CellRef[D]): (Domains, List[ProblemDescription[Unit]]) =
-    ref match { case pdr@PureDomRef(_) => triggersForDomain0(pdr) }
+  def triggersForDomain[D](ref: CellRef[D]): (Domains, List[ProblemDescription[Unit]]) = {
+    val d = fetch(ref)
+    collectTriggers(d, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[D => Trigger]]) match {
+      case (Nil, conts) => (copy(domainTriggers = domainTriggers - ref), conts)
+      case (triggers1, conts) => (copy(domainTriggers = domainTriggers + ((ref, triggers1))), conts)
+    }
+  }
 
-  private def triggersForDomain0[A, D](ref: PureDomRef[A, D]): (Domains, List[ProblemDescription[Unit]]) = {
-    val (d, domain) = getDomain(ref)
-    val (domainTriggers1, conts1) = collectTriggers(d, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[D => Trigger]]) match {
-      case (Nil, conts) => (domainTriggers - ref, conts)
-      case (triggers1, conts) => (domainTriggers + ((ref, triggers1)), conts)
-    }
-    domain.values(d) match {
-      case Domain.Just(a) =>
-        val conts2 = domainResolutionTriggers.getOrElse(ref, Nil).asInstanceOf[List[A => ProblemDescription[Unit]]] map { _(a) }
-        val domainResolutionTriggers1 = domainResolutionTriggers - ref
-        (copy(domainTriggers = domainTriggers1, domainResolutionTriggers = domainResolutionTriggers1), conts1 ++ conts2)
-      case _ => (copy(domainTriggers = domainTriggers1), conts1)
-    }
+  def addDomainResolutionTrigger[A, D](ref: PureDomRef[A, D], f: A => ProblemDescription[Unit]): (Domains, Option[ProblemDescription[Unit]]) = {
+    val domain = getDomain(ref)._2
+    addDomainTrigger(ref, (d: D) => domain.values(d) match {
+      case Domain.Empty() => Discard
+      case Domain.Just(a) => Fire(f(a))
+      case Domain.Many(_) => Sleep
+    })
   }
 
 
@@ -106,9 +102,6 @@ case class Domains private(
   def getSelsForCell(ref: CellRef[_]): Set[Sel[_ <: HList]] = cellsToSels.get(ref)
 
 
-  def addDomainResolutionTrigger[A, D](ref: PureDomRef[A, D], f: A => ProblemDescription[Unit]): Domains =
-    copy(domainResolutionTriggers = domainResolutionTriggers + ((ref, f :: domainResolutionTriggers.getOrElse(ref, Nil))))
-
   private[nutcracker] def getDomain[A, D](ref: PureDomRef[A, D]): (D, Domain[A, D]) =
     domains(ref.domainId).asInstanceOf[(D, Domain[A, D])]
 
@@ -123,7 +116,6 @@ object Domains {
       domainTriggers = Map(),
       selTriggers = Map(),
       cellsToSels = Index.empty(sel => sel.cells),
-      domainResolutionTriggers = Map(),
       unresolvedVars = Set(),
       failedVars = Set()
   )

@@ -169,11 +169,11 @@ object PartialSolution {
       case -\/(pdA) => interpret0(pdA)
       case \/-(prA) => InterpreterStep.stopAtPromise(prA)
     }
-    case FetchResult(ref) => onResolved(ref) flatMap {
-      case -\/(None) => InterpreterStep.stopAtFailure
-      case -\/(Some(a)) => InterpreterStep.stopAtPure(a)
-      case \/-(prA) => InterpreterStep.stopAtPromise(prA)
-    }
+    case FetchResult(ref) => fetchResultIfResolved(ref) flatMap { _ match {
+      case Some(None) => InterpreterStep.stopAtFailure
+      case Some(Some(a)) => InterpreterStep.stopAtPure(a)
+      case None => onResolved(ref) map { pr => Inr(Inr(Inl(pr))) }
+    }}
     case Variable(d, ev) => addVariable(d, ev) map { Inl(_) }
     case Fetch(ref) => fetch(ref) map { Inl(_) }
     case FetchVector(refs) => fetchVector(refs) map { Inl(_) }
@@ -208,16 +208,21 @@ object PartialSolution {
         (ps1.copy(promises = ps1.promises.addTrigger[A](prA, { f(_) flatMap { b => Complete(prB, b) } })), \/-(prB))
     }}
 
-  private def onResolved[A, D](ref: PureDomRef[A, D]): InterpreterStep[Option[A] \/ PromiseId[A]] =
+  private def fetchResultIfResolved[A, D](ref: PureDomRef[A, D]): InterpreterStep[Option[Option[A]]] =
     InterpreterStep.wrapStateMonad { ps => ps.domains.getDomain(ref) match {
       case (d, domain) => domain.values(d) match {
-        case Domain.Empty() => (ps, -\/(None))
-        case Domain.Just(a) => (ps, -\/(Some(a)))
-        case Domain.Many(_) =>
-          val (ps1, prA) = promise0[A](ps)
-          (ps1.copy(domains = ps.domains.addDomainResolutionTrigger[A, D](ref, { a => Complete(prA, a) })), \/-(prA))
+        case Domain.Empty() => (ps, Some(None))
+        case Domain.Just(a) => (ps, Some(Some(a)))
+        case Domain.Many(_) => (ps, None)
       }
     }}
+
+  private def onResolved[A, D](ref: PureDomRef[A, D]): InterpreterStep[PromiseId[A]] =
+    InterpreterStep { ps =>
+      val (ps1, prA) = promise0[A](ps)
+      val (domains1, cont) = ps1.domains.addDomainResolutionTrigger[A, D](ref, { a => Complete(prA, a) })
+      (DirtyThings.continuations(cont.toList), prA, ps1.copy(domains = domains1))
+    }
 
   private def addBranching(br: Branch[Unit]): InterpreterStep[Unit] =
     InterpreterStep mapState { ps => addBranching0(ps, br) }
