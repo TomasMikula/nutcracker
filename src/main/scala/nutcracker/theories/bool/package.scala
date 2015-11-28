@@ -1,7 +1,7 @@
 package nutcracker.theories
 
-import nutcracker.Triggers.{Fire, Sleep, Discard}
-import nutcracker.{Sel, PureDomRef, ProblemDescription}
+import nutcracker.{Fire, Sleep}
+import nutcracker.{PureDomRef, ProblemDescription}
 import nutcracker.ProblemDescription._
 import nutcracker.theories.bool.BoolDomain._
 

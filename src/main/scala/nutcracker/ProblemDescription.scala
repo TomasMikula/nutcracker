@@ -8,8 +8,6 @@ import scalaz.std.vector._
 import shapeless._
 import shapeless.ops.hlist.Mapped
 
-import nutcracker.Triggers.{Sleep, FireReload, Trigger}
-
 sealed trait ProblemDescription[+A] {
   import ProblemDescription._
 
