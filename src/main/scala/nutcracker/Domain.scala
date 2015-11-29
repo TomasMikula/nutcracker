@@ -1,7 +1,7 @@
 package nutcracker
 
 import algebra.Eq
-import algebra.lattice.MeetSemilattice
+import algebra.lattice.{GenBool, MeetSemilattice}
 
 trait Domain[A, D] extends Eq[D] with MeetSemilattice[D] {
   def values(d: D): Domain.Values[A, D]
@@ -30,4 +30,6 @@ object Domain {
     }
     def eqv(x: Set[A], y: Set[A]): Boolean = x == y // XXX uses universal equality of A
   }
+
+  implicit def setGenBool[A]: GenBool[Set[A]] = algebra.std.set.setLattice
 }

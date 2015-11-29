@@ -13,7 +13,7 @@ class Sat extends FunSpec {
   describe("A simple 3-SAT problem") {
 
     val problem = for {
-      a <- variables[Boolean](4)
+      a <- variables[Boolean](4)()
       ā <- a traverseU { neg(_) }
 
       _ <- atLeastOneTrue(a(0), a(1), a(2))

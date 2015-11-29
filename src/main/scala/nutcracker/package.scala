@@ -11,12 +11,4 @@ package object nutcracker {
       concat((i+1 until n) map { j => remove(doms(j))(a) }) }
     })
   }
-
-  private def concat(pds: Iterable[ProblemDescription[Unit]]): ProblemDescription[Unit] =
-    pds.foldLeft[ProblemDescription[Unit]](Pure(())) { _ >> _ }
-
-  private def remove[A, D: Domain[A, ?] : GenBool](ref: PureDomRef[A, D])(a: A): ProblemDescription[Unit] = {
-    val d = Domain[A, D].singleton(a)
-    fetch(ref) >>= { d0 => intersect(ref, GenBool[D].without(d0, d)) }
-  }
 }

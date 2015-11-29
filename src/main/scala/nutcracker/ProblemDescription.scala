@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.existentials
 
-import algebra.lattice.{BoundedLattice, MeetSemilattice}
+import algebra.lattice.{GenBool, BoundedLattice, MeetSemilattice}
 import scalaz.{Traverse, Monad}
 import scalaz.std.vector._
 import shapeless._
@@ -88,15 +88,18 @@ object ProblemDescription {
     def oneOf(s: Set[A]): ProblemDescription[PureDomRef[A, Set[A]]] = Variable(s, implicitly[Domain[A, Set[A]]])
   }
 
-  final class VariablesStub[A] private[nutcracker] {
-    def apply[D: Domain[A, ?] : BoundedLattice](n: Int): ProblemDescription[Vector[PureDomRef[A, D]]] = apply[D](n, BoundedLattice[D].one)
-    def apply[D: Domain[A, ?] : BoundedLattice](n: Int, d: D): ProblemDescription[Vector[PureDomRef[A, D]]] =
+  final class VariablesStub[A] private[nutcracker](n: Int) {
+    def apply[D: Domain[A, ?] : BoundedLattice](): ProblemDescription[Vector[PureDomRef[A, D]]] = apply[D](BoundedLattice[D].one)
+    def apply[D: Domain[A, ?] : BoundedLattice](d: D): ProblemDescription[Vector[PureDomRef[A, D]]] =
       Traverse[Vector].sequenceU(Vector.fill(n)(variable(d)))
+
+    def oneOf(s: Set[A]): ProblemDescription[Vector[PureDomRef[A, Set[A]]]] =
+      Traverse[Vector].sequenceU(Vector.fill(n)(variable(s)))
   }
 
   def pure[A](a: A): ProblemDescription[A] = Pure(a)
   def variable[A]: VariableStub[A] = new VariableStub[A]
-  def variables[A]: VariablesStub[A] = new VariablesStub[A]
+  def variables[A](n: Int): VariablesStub[A] = new VariablesStub[A](n)
   def varTrigger[D](ref: CellRef[D])(f: D => Trigger): ProblemDescription[Unit] =
     VarTrigger(ref, f)
   def partialVarTrigger[D](ref: CellRef[D])(f: PartialFunction[D, Trigger]): ProblemDescription[Unit] =
@@ -120,6 +123,12 @@ object ProblemDescription {
   def intersect[D](ref: CellRef[D], a: D): ProblemDescription[Unit] = Intersect(ref, a)
   def set[A, D](ref: PureDomRef[A, D], a: A)(implicit dom: Domain[A, D]): ProblemDescription[Unit] = Intersect(ref, dom.singleton(a))
   def intersectVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N], values: Sized[Vector[D], N]): ProblemDescription[Unit] = IntersectVector(refs, values)
+  def concat(pds: Iterable[ProblemDescription[Unit]]): ProblemDescription[Unit] =
+    pds.foldLeft[ProblemDescription[Unit]](Pure(())) { _ >> _ }
+  def remove[A, D: Domain[A, ?] : GenBool](ref: PureDomRef[A, D])(a: A): ProblemDescription[Unit] = {
+    val d = Domain[A, D].singleton(a)
+    fetch(ref) >>= { d0 => intersect(ref, GenBool[D].without(d0, d)) }
+  }
 
   def vectorConstraint[D: MeetSemilattice, N <: Nat](
       c: Constraint[Sized[Vector[D], N]],
