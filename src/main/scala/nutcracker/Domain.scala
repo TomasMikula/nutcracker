@@ -12,6 +12,8 @@ trait Domain[A, D] extends Eq[D] with MeetSemilattice[D] {
 }
 
 object Domain {
+  def apply[A, D: Domain[A, ?]]: Domain[A, D] = implicitly[Domain[A, D]]
+
   sealed trait Values[A, D]
   case class Empty[A, D]() extends Values[A, D]
   case class Just[A, D](value: A) extends Values[A, D]
