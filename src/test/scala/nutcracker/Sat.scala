@@ -1,8 +1,8 @@
 package nutcracker
 
 import nutcracker.ProblemDescription._
-import nutcracker.theories.bool.BoolDomain._
-import nutcracker.theories.bool._
+import nutcracker.lib.bool.BoolDomain._
+import nutcracker.lib.bool._
 import org.scalatest.FunSpec
 
 import scalaz.std.vector._

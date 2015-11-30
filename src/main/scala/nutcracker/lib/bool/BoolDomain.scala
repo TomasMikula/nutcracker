@@ -1,4 +1,4 @@
-package nutcracker.theories.bool
+package nutcracker.lib.bool
 
 import algebra.lattice.{Bool, BoundedLattice}
 import nutcracker.Domain

@@ -1,9 +1,9 @@
-package nutcracker.theories
+package nutcracker.lib
 
 import nutcracker.{Fire, Sleep}
 import nutcracker.{DomRef, ProblemDescription}
 import nutcracker.ProblemDescription._
-import nutcracker.theories.bool.BoolDomain._
+import nutcracker.lib.bool.BoolDomain._
 
 package object bool {
 
