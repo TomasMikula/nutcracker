@@ -32,7 +32,7 @@ case class PartialSolution private(
     StreamT.fromIterable(branching.branches()).map { interpret(ps1, _) }
   }
 
-  def splitDomain[A, D](ref: PureDomRef[A, D]): StreamT[Id, PartialSolution] = {
+  def splitDomain[A, D](ref: DomRef[A, D]): StreamT[Id, PartialSolution] = {
     val (d, domain) = domains.getDomain(ref)
     domain.values(d) match {
       case Domain.Empty() => StreamT.empty
@@ -53,7 +53,7 @@ object PartialSolution {
   sealed trait Status
   case object Failed extends Status
   case object Done extends Status
-  case class Incomplete(branchings: List[BranchingId], unresolvedDomains: List[PureDomRef[_, _]]) extends Status
+  case class Incomplete(branchings: List[BranchingId], unresolvedDomains: List[DomRef[_, _]]) extends Status
 
   final case class BranchingId(val id: Int) extends AnyVal
 
@@ -209,7 +209,7 @@ object PartialSolution {
         (ps1.copy(promises = ps1.promises.addTrigger[A](prA, { f(_) flatMap { b => Complete(prB, b) } })), \/-(prB))
     }}
 
-  private def fetchResultIfResolved[A, D](ref: PureDomRef[A, D]): InterpreterStep[Option[Option[A]]] =
+  private def fetchResultIfResolved[A, D](ref: DomRef[A, D]): InterpreterStep[Option[Option[A]]] =
     InterpreterStep.wrapStateMonad { ps => ps.domains.getDomain(ref) match {
       case (d, domain) => domain.values(d) match {
         case Domain.Empty() => (ps, Some(None))
@@ -218,13 +218,13 @@ object PartialSolution {
       }
     }}
 
-  private def fetchResultWhenResolved[A, D](ref: PureDomRef[A, D]): InterpreterStep[PromiseId[A]] =
+  private def fetchResultWhenResolved[A, D](ref: DomRef[A, D]): InterpreterStep[PromiseId[A]] =
     for {
       prA <- promise[A]
       _ <- whenResolved(ref, (a: A) => Complete(prA, a))
     } yield prA
 
-  private def whenResolved[A, D](ref: PureDomRef[A, D], f: A => ProblemDescription[Unit]): InterpreterStep[Unit] =
+  private def whenResolved[A, D](ref: DomRef[A, D], f: A => ProblemDescription[Unit]): InterpreterStep[Unit] =
     InterpreterStep { ps =>
       val (domains1, cont) = ps.domains.addDomainResolutionTrigger[A, D](ref, f)
       (DirtyThings.continuations(cont.toList), (), ps.copy(domains = domains1))
@@ -239,7 +239,7 @@ object PartialSolution {
     val (promises1, conts) = ps.promises.complete(pid, a)
     (DirtyThings.continuations(conts), (), ps.copy(promises = promises1))
   }
-  private def addVariable[A, D](d: D, ev: Domain[A, D]): InterpreterStep[PureDomRef[A, D]] =
+  private def addVariable[A, D](d: D, ev: Domain[A, D]): InterpreterStep[DomRef[A, D]] =
     InterpreterStep.wrapStateMonad { ps =>
       ps.domains.addVariable(d, ev) match { case (doms, ref) => (ps.copy(domains = doms), ref) }
     }
@@ -255,7 +255,7 @@ object PartialSolution {
       (DirtyThings.dirtySel(sel), (), ps.copy(domains = domains1))
     }
   }
-  private def fetch[A, D](ref: PureDomRef[A, D]): InterpreterStep[D] =
+  private def fetch[A, D](ref: DomRef[A, D]): InterpreterStep[D] =
     InterpreterStep.wrapStateMonad { ps => (ps, ps.domains.fetch(ref)) }
   private def fetchVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): InterpreterStep[Sized[Vector[D], N]] =
     InterpreterStep.wrapStateMonad { ps => (ps, ps.domains.fetchVector(refs)) }

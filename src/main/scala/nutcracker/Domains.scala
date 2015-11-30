@@ -15,12 +15,12 @@ case class Domains private(
     domainTriggers: Map[CellRef[_], List[_ => Trigger]],
     selTriggers: Map[Sel[_], List[_ => Trigger]],
     cellsToSels: Index[Sel[_ <: HList], CellRef[_]],
-    unresolvedVars: Set[PureDomRef[A, D] forSome { type A; type D }],
+    unresolvedVars: Set[DomRef[A, D] forSome { type A; type D }],
     failedVars: Set[Long]) {
 
-  def addVariable[A, D](d: D, ev: Domain[A, D]): (Domains, PureDomRef[A, D]) = {
+  def addVariable[A, D](d: D, ev: Domain[A, D]): (Domains, DomRef[A, D]) = {
     val domains1 = domains + ((nextId, (d, ev)))
-    val ref = PureDomRef[A, D](nextId)
+    val ref = DomRef[A, D](nextId)
     val (unresolvedVars1, failedVars1) = ev.values(d) match {
       case Empty() => (unresolvedVars, failedVars + nextId)
       case Just(a) => (unresolvedVars, failedVars)
@@ -30,17 +30,17 @@ case class Domains private(
   }
 
   def fetch[D](ref: CellRef[D]): D = ref match {
-    case pdr@PureDomRef(_) => getDomain(pdr)._1
+    case dr@DomRef(_) => getDomain(dr)._1
   }
 
   def fetchVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))
 
   def intersect[D](ref: CellRef[D], d: D): Option[Domains] = ref match {
-    case pdr @ PureDomRef(_) => intersect(pdr, d)
+    case dr @ DomRef(_) => intersect(dr, d)
   }
 
-  private def intersect[A, D](ref: PureDomRef[A, D], d: D): Option[Domains] = {
+  private def intersect[A, D](ref: DomRef[A, D], d: D): Option[Domains] = {
     val (d0, dom) = getDomain(ref)
     val d1 = dom.meet(d0, d)
     if(dom.eqv(d0, d1))
@@ -76,7 +76,7 @@ case class Domains private(
     }
   }
 
-  def addDomainResolutionTrigger[A, D](ref: PureDomRef[A, D], f: A => ProblemDescription[Unit]): (Domains, Option[ProblemDescription[Unit]]) = {
+  def addDomainResolutionTrigger[A, D](ref: DomRef[A, D], f: A => ProblemDescription[Unit]): (Domains, Option[ProblemDescription[Unit]]) = {
     val domain = getDomain(ref)._2
     addDomainTrigger(ref, (d: D) => domain.values(d) match {
       case Domain.Empty() => Discard
@@ -102,10 +102,10 @@ case class Domains private(
   def getSelsForCell(ref: CellRef[_]): Set[Sel[_ <: HList]] = cellsToSels.get(ref)
 
 
-  private[nutcracker] def getDomain[A, D](ref: PureDomRef[A, D]): (D, Domain[A, D]) =
+  private[nutcracker] def getDomain[A, D](ref: DomRef[A, D]): (D, Domain[A, D]) =
     domains(ref.domainId).asInstanceOf[(D, Domain[A, D])]
 
-  private[nutcracker] def setDomain[A, D](ref: PureDomRef[A, D], d: D, dom: Domain[A, D]): Domains =
+  private[nutcracker] def setDomain[A, D](ref: DomRef[A, D], d: D, dom: Domain[A, D]): Domains =
     copy(domains = domains + ((ref.domainId, (d, dom))))
 }
 

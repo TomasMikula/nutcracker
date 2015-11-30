@@ -1,13 +1,13 @@
 package nutcracker.theories
 
 import nutcracker.{Fire, Sleep}
-import nutcracker.{PureDomRef, ProblemDescription}
+import nutcracker.{DomRef, ProblemDescription}
 import nutcracker.ProblemDescription._
 import nutcracker.theories.bool.BoolDomain._
 
 package object bool {
 
-  type Ref = PureDomRef[Boolean, BoolDomain]
+  type Ref = DomRef[Boolean, BoolDomain]
 
   def and(x: Ref, y: Ref): ProblemDescription[Ref] = {
     variable[Boolean]() >>= { res =>

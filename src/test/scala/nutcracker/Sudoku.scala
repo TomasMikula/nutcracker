@@ -6,7 +6,7 @@ import org.scalatest.FunSuite
 
 class Sudoku extends FunSuite {
 
-  type Cell = PureDomRef[Int, Set[Int]]
+  type Cell = DomRef[Int, Set[Int]]
   type Cells = Vector[Cell]
 
   /** A program that sets up an empty Sudoku, that is 81 integer variables
