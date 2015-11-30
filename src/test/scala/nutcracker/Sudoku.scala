@@ -28,6 +28,38 @@ class Sudoku extends FunSuite {
     } yield cells
   }
 
+  /** A more sofisticated Sudoku program that includes additional constraints
+    * and thus reduces the amount of guessing and backtracking.
+    */
+  val sudoku1: ProblemDescription[Cells] = {
+
+    // For the given segment (row/column/3x3 square) and number,
+    // keep a set of possible positions of that number in that segment.
+    // When only one possible position remains, enter the number to that cell.
+    def segNumConstraint(seg: Seq[Cell], x: Int): ProblemDescription[Unit] = {
+      for {
+        xPos <- variable[Cell].oneOf(seg.toSet)
+        _ <- concat(seg map { cell => varTrigger(cell) { ys =>
+          if(!ys.contains(x)) Fire(remove(xPos)(cell))
+          else if(ys.size == 1) Fire(ProblemDescription.set(xPos, cell))
+          else Sleep
+        } })
+        _ <- whenResolved(xPos) { cell => ProblemDescription.set(cell, x) }
+      } yield ()
+    }
+
+    def segConstraints(seg: Seq[Cell]): ProblemDescription[Unit] = {
+      concat((1 to 9) map { segNumConstraint(seg, _) })
+    }
+
+    for {
+      cells <- sudoku0
+      _ <- concat(rows(cells) map { segConstraints(_) })
+      _ <- concat(cols(cells) map { segConstraints(_) })
+      _ <- concat(sqrs(cells) map { segConstraints(_) })
+    } yield cells
+  }
+
   /** Returns function that, given Sudoku cells, returns a program
     * to enter the given number to the specified cell.
     */
@@ -65,48 +97,61 @@ class Sudoku extends FunSuite {
 
   test("Sample Sudoku") {
 
-    // ..3...612
+    // ..3...61.
     // .6..24..3
     // 5......8.
     // 1....9...
     // ...3.6...
     // ...7....9
     // .5......7
-    // 3..84..2.
+    // 3..84....
     // 846...1..
 
-    val problem = for {
-      cells <- sudoku0
+    // we test both the simple and the advanced sudoku program
+    val problems = Seq(sudoku0, sudoku1) map { sudoku =>
+      for {
+        cells <- sudoku
 
-      _ <- concat(Seq(
-        set(0, 2, 3), set(0, 6, 6), set(0, 7, 1), set(0, 8, 2),
-        set(1, 1, 6), set(1, 4, 2), set(1, 5, 4), set(1, 8, 3),
-        set(2, 0, 5), set(2, 7, 8),
-        set(3, 0, 1), set(3, 5, 9),
-        set(4, 3, 3), set(4, 5, 6),
-        set(5, 3, 7), set(5, 8, 9),
-        set(6, 1, 5), set(6, 8, 7),
-        set(7, 0, 3), set(7, 3, 8), set(7, 4, 4), set(7, 7, 2),
-        set(8, 0, 8), set(8, 1, 4), set(8, 2, 6), set(8, 6, 1)
-      ) map { _(cells) })
+        _ <- concat(Seq(
+          set(0, 2, 3), set(0, 6, 6), set(0, 7, 1),
+          set(1, 1, 6), set(1, 4, 2), set(1, 5, 4), set(1, 8, 3),
+          set(2, 0, 5), set(2, 7, 8),
+          set(3, 0, 1), set(3, 5, 9),
+          set(4, 3, 3), set(4, 5, 6),
+          set(5, 3, 7), set(5, 8, 9),
+          set(6, 1, 5), set(6, 8, 7),
+          set(7, 0, 3), set(7, 3, 8), set(7, 4, 4),
+          set(8, 0, 8), set(8, 1, 4), set(8, 2, 6), set(8, 6, 1)
+        ) map {
+          _ (cells)
+        })
 
-      solution <- fetchResults(cells)
-    } yield solution
+        solution <- fetchResults(cells)
+      } yield solution
+    }
 
-    val solutions = DFSSolver.solutions(problem).toStream.toList
+    val solutions = problems map { DFSSolver.allSolutions1(_) }
 
-    assertResult(1)(solutions.size)
+    // both programs should produce a unique and correct solution
+    solutions foreach { case (sols, failureCount) =>
+      assertResult(1)(sols.size)
+      assertResult(Vector(
+        4,9,3,5,7,8,6,1,2,
+        7,6,8,1,2,4,5,9,3,
+        5,1,2,9,6,3,7,8,4,
+        1,3,7,4,5,9,2,6,8,
+        9,2,5,3,8,6,4,7,1,
+        6,8,4,7,1,2,3,5,9,
+        2,5,9,6,3,1,8,4,7,
+        3,7,1,8,4,5,9,2,6,
+        8,4,6,2,9,7,1,3,5
+      ))(sols(0))
+    }
 
-    assertResult(Vector(
-      4,9,3,5,7,8,6,1,2,
-      7,6,8,1,2,4,5,9,3,
-      5,1,2,9,6,3,7,8,4,
-      1,3,7,4,5,9,2,6,8,
-      9,2,5,3,8,6,4,7,1,
-      6,8,4,7,1,2,3,5,9,
-      2,5,9,6,3,1,8,4,7,
-      3,7,1,8,4,5,9,2,6,
-      8,4,6,2,9,7,1,3,5
-    ))(solutions(0))
+    assert(solutions(1)._2 <= solutions(0)._2, "advanced sudoku program should not increase the number of backtrackings")
+
+    // actually, on this sample puzzle the advanced
+    // program eliminates backtracking altogether
+    assertResult(0)(solutions(1)._2)
   }
 }
