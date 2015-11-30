@@ -3,8 +3,10 @@ package nutcracker
 import nutcracker.PartialSolution._
 
 import scala.annotation.tailrec
+import scalaz.Free.Trampoline
 import scalaz.Id._
-import scalaz.StreamT
+import scalaz.{StreamT, ~>}
+import scalaz.syntax.applicative._
 
 object DFSSolver {
 
@@ -49,13 +51,27 @@ object DFSSolver {
       pr: PromiseId[A],
       failed: StreamT[Id, B],
       done: A => StreamT[Id, B]): StreamT[Id, B] =
+    hideTrampoline(solutionsT(ps, pr, failed, done))
+
+  private def hideTrampoline[A](stream: StreamT[Trampoline, A]): StreamT[Id, A] =
+    StreamT.unfold[A, StreamT[Trampoline, A]](stream){ _.uncons.run }
+
+  private object trampolineId extends (Id ~> Trampoline) {
+    def apply[A](i: A): Trampoline[A] = i.point[Trampoline]
+  }
+
+  private def solutionsT[A, B](
+      ps: PartialSolution,
+      pr: PromiseId[A],
+      failed: StreamT[Id, B],
+      done: A => StreamT[Id, B]): StreamT[Trampoline, B] =
     ps.status match {
-      case Failed => failed
-      case Done => done(ps.getPromised(pr))
+      case Failed => failed.trans(trampolineId)
+      case Done => done(ps.getPromised(pr)).trans(trampolineId)
       case Incomplete(b::branchings, unresolvedDomains) =>
-        ps.branchBy(b) flatMap { solutions(_, pr, failed, done) }
+        ps.branchBy(b).trans(trampolineId) flatMap { solutionsT(_, pr, failed, done) }
       case Incomplete(Nil, dRef::dRefs) =>
-        ps.splitDomain(dRef) flatMap { solutions(_, pr, failed, done) }
+        ps.splitDomain(dRef).trans(trampolineId) flatMap { solutionsT(_, pr, failed, done) }
       case Incomplete(Nil, Nil) =>
         sys.error("Incomplete solution must have at least one unevaluated branching or unresolved variable")
     }
