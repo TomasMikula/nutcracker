@@ -13,7 +13,7 @@ import scalaz.syntax.monoid._
 import scalaz.{-\/, ReaderWriterState, StreamT, Traverse, \/, \/-}
 
 case class PartialSolution private(
-    domains: Domains,
+    domains: Domains[ProblemDescription],
     promises: Promises,
     branchings: List[Branch[Unit]],
     relations: RelTable) {
