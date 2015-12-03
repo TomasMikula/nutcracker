@@ -51,7 +51,7 @@ package object bool {
               // pick next variable to watch instead of x(j)
               Fire(watch(i-1, i))
             } else {
-              Sleep
+              Sleep()
             }
           })
         }

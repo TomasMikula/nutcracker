@@ -12,8 +12,8 @@ import Domains._
 case class Domains private(
     nextId: Long,
     domains: Map[Long, (D, Domain[A, D]) forSome { type A; type D }],
-    domainTriggers: Map[CellRef[_], List[_ => Trigger]],
-    selTriggers: Map[Sel[_], List[_ => Trigger]],
+    domainTriggers: Map[CellRef[_], List[_ => Trigger[ProblemDescription]]],
+    selTriggers: Map[Sel[_], List[_ => Trigger[ProblemDescription]]],
     cellsToSels: Index[Sel[_ <: HList], CellRef[_]],
     unresolvedVars: Set[DomRef[A, D] forSome { type A; type D }],
     failedVars: Set[Long]) {
@@ -56,21 +56,21 @@ case class Domains private(
     }
   }
 
-  def addDomainTrigger[D](ref: CellRef[D], t: D => Trigger): (Domains, Option[ProblemDescription[Unit]]) = {
+  def addDomainTrigger[D](ref: CellRef[D], t: D => Trigger[ProblemDescription]): (Domains, Option[ProblemDescription[Unit]]) = {
     t(fetch(ref)) match {
-      case Discard => (this, None)
-      case Sleep => (addDomainTrigger0(ref, t), None)
+      case Discard() => (this, None)
+      case Sleep() => (addDomainTrigger0(ref, t), None)
       case Fire(cont) => (this, Some(cont))
       case FireReload(cont) => (addDomainTrigger0(ref, t), Some(cont))
     }
   }
 
-  private def addDomainTrigger0[D](ref: CellRef[D], t: D => Trigger): Domains =
+  private def addDomainTrigger0[D](ref: CellRef[D], t: D => Trigger[ProblemDescription]): Domains =
     copy(domainTriggers = domainTriggers + ((ref, t :: domainTriggers.getOrElse(ref, Nil))))
 
   def triggersForDomain[D](ref: CellRef[D]): (Domains, List[ProblemDescription[Unit]]) = {
     val d = fetch(ref)
-    collectTriggers(d, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[D => Trigger]]) match {
+    collectTriggers(d, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[D => Trigger[ProblemDescription]]]) match {
       case (Nil, conts) => (copy(domainTriggers = domainTriggers - ref), conts)
       case (triggers1, conts) => (copy(domainTriggers = domainTriggers + ((ref, triggers1))), conts)
     }
@@ -79,21 +79,21 @@ case class Domains private(
   def addDomainResolutionTrigger[A, D](ref: DomRef[A, D], f: A => ProblemDescription[Unit]): (Domains, Option[ProblemDescription[Unit]]) = {
     val domain = getDomain(ref)._2
     addDomainTrigger(ref, (d: D) => domain.values(d) match {
-      case Domain.Empty() => Discard
+      case Domain.Empty() => Discard()
       case Domain.Just(a) => Fire(f(a))
-      case Domain.Many(_) => Sleep
+      case Domain.Many(_) => Sleep()
     })
   }
 
 
-  def addSelTrigger[L <: HList](sel: Sel[L], t: L => Trigger): Domains =
+  def addSelTrigger[L <: HList](sel: Sel[L], t: L => Trigger[ProblemDescription]): Domains =
     copy(
       selTriggers = selTriggers + ((sel, t :: selTriggers.getOrElse(sel, Nil))),
       cellsToSels = cellsToSels.add(sel)
     )
 
   def triggersForSel[L <: HList](sel: Sel[L], d: L): (Domains, List[ProblemDescription[Unit]]) = {
-    collectTriggers(d, selTriggers.getOrElse(sel, Nil).asInstanceOf[List[L => Trigger]]) match {
+    collectTriggers(d, selTriggers.getOrElse(sel, Nil).asInstanceOf[List[L => Trigger[ProblemDescription]]]) match {
       case (Nil, conts) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), conts)
       case (triggers1, conts) => (copy(selTriggers = selTriggers + ((sel, triggers1))), conts)
     }
@@ -120,14 +120,14 @@ object Domains {
       failedVars = Set()
   )
 
-  private def collectTriggers[D](d: D, triggers: List[D => Trigger]): (List[D => Trigger], List[ProblemDescription[Unit]]) =
+  private def collectTriggers[D](d: D, triggers: List[D => Trigger[ProblemDescription]]): (List[D => Trigger[ProblemDescription]], List[ProblemDescription[Unit]]) =
     triggers match {
       case Nil => (Nil, Nil)
       case t :: ts =>
         val (ts1, conts) = collectTriggers(d, ts)
         t(d) match {
-          case Discard => (ts1, conts)
-          case Sleep => (t :: ts1, conts)
+          case Discard() => (ts1, conts)
+          case Sleep() => (t :: ts1, conts)
           case Fire(cont) => (ts1, cont :: conts)
           case FireReload(cont) => (t :: ts1, cont :: conts)
         }

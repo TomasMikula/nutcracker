@@ -28,7 +28,7 @@ class Sudoku extends FunSuite {
     } yield cells
   }
 
-  /** A more sofisticated Sudoku program that includes additional constraints
+  /** A more sophisticated Sudoku program that includes additional constraints
     * and thus reduces the amount of guessing and backtracking.
     */
   val sudoku1: ProblemDescription[Cells] = {
@@ -42,7 +42,7 @@ class Sudoku extends FunSuite {
         _ <- concat(seg map { cell => varTrigger(cell) { ys =>
           if(!ys.contains(x)) Fire(remove(xPos)(cell))
           else if(ys.size == 1) Fire(ProblemDescription.set(xPos, cell))
-          else Sleep
+          else Sleep()
         } })
         _ <- whenResolved(xPos) { cell => ProblemDescription.set(cell, x) }
       } yield ()

@@ -1,7 +1,9 @@
 package nutcracker
 
-sealed trait Trigger
-case object Discard extends Trigger
-case object Sleep extends Trigger
-case class Fire(cont: ProblemDescription[Unit]) extends Trigger
-case class FireReload(cont: ProblemDescription[Unit]) extends Trigger
+import scala.language.higherKinds
+
+sealed trait Trigger[K[_]]
+case class Discard[K[_]]() extends Trigger[K]
+case class Sleep[K[_]]() extends Trigger[K]
+case class Fire[K[_]](cont: K[Unit]) extends Trigger[K]
+case class FireReload[K[_]](cont: K[Unit]) extends Trigger[K]

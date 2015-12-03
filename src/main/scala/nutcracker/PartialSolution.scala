@@ -243,13 +243,13 @@ object PartialSolution {
     InterpreterStep.wrapStateMonad { ps =>
       ps.domains.addVariable(d, ev) match { case (doms, ref) => (ps.copy(domains = doms), ref) }
     }
-  private def varTrigger[D](ref: CellRef[D], f: D => Trigger): InterpreterStep[Unit] = {
+  private def varTrigger[D](ref: CellRef[D], f: D => Trigger[ProblemDescription]): InterpreterStep[Unit] = {
     InterpreterStep[Unit] { ps =>
       val (domains1, cont) = ps.domains.addDomainTrigger(ref, f)
       (DirtyThings.continuations(cont.toList), (), ps.copy(domains = domains1))
     }
   }
-  private def selTrigger[L <: HList](sel: Sel[L], f: L => Trigger): InterpreterStep[Unit] = {
+  private def selTrigger[L <: HList](sel: Sel[L], f: L => Trigger[ProblemDescription]): InterpreterStep[Unit] = {
     InterpreterStep[Unit] { ps =>
       val domains1 = ps.domains.addSelTrigger(sel, f)
       (DirtyThings.dirtySel(sel), (), ps.copy(domains = domains1))
