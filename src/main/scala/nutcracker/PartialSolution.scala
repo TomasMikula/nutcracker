@@ -258,11 +258,14 @@ object PartialSolution {
       ps.domains.intersect(ref, d) match {
         case None => (DirtyThings.empty, (), ps)
         case Some(domains1) => (DirtyThings.dirtyDomain(ref), (), ps.copy(domains = domains1))
-        // TODO also add dirty constraints when constraints are first class
       }
     }
   private def intersectVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N], values: Sized[Vector[D], N]): InterpreterStep[Unit] =
-    Traverse[Vector].sequenceU(refs zip values map { case (ref, d) => intersect(ref, d) }) map { vectorOfUnit => () }
+    InterpreterStep[Unit] { ps =>
+      ps.domains.intersectVector(refs, values) match {
+        case (domains1, dirtyCells) => (DirtyThings.dirtyDomains(dirtyCells), (), ps.copy(domains = domains1))
+      }
+    }
 
   private def relation[L <: HList, Refs <: HList](rel: Rel[L], refs: Refs, toRefs: Mapped.Aux[L, CellRef, Refs]): InterpreterStep[Unit] = ???
   private def relTrigger[L <: HList, Refs <: HList](rel: Rel[L], f: Refs => ProblemDescription[Unit], toRefs: Mapped.Aux[L, CellRef, Refs]): InterpreterStep[Unit] = ???

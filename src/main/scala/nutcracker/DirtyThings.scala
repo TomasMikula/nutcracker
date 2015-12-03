@@ -30,6 +30,7 @@ object DirtyThings {
   }
 
   def dirtyDomain[D](ref: CellRef[D]): DirtyThings = DirtyThings(Nil, Set(ref), Set())
+  def dirtyDomains[D](refs: Iterable[CellRef[D]]): DirtyThings = DirtyThings(Nil, refs.toSet, Set())
   def dirtySel(sel: Sel[_ <: HList]): DirtyThings = DirtyThings(Nil, Set(), Set(sel))
   def dirtySels(sels: Set[Sel[_ <: HList]]): DirtyThings = DirtyThings(Nil, Set(), sels)
   def continuation(cont: ProblemDescription[Unit]): DirtyThings = DirtyThings(List(cont), Set(), Set())

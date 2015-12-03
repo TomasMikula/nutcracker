@@ -45,6 +45,14 @@ case class Domains[K[_]] private(
     case dr @ DomRef(_) => intersect(dr, d)
   }
 
+  def intersectVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N], values: Sized[Vector[D], N]): (Domains[K], List[CellRef[D]]) =
+    (refs zip values).foldLeft[(Domains[K], List[CellRef[D]])]((this, Nil)) {
+      case ((doms, dirtyCells), (ref, d)) => intersect(ref, d) match {
+        case Some(doms1) => (doms1, ref :: dirtyCells)
+        case None => (doms, dirtyCells)
+      }
+    }
+
   private def intersect[A, D](ref: DomRef[A, D], d: D): Option[Domains[K]] = {
     val (d0, dom) = getDomain(ref)
     val d1 = dom.meet(d0, d)
