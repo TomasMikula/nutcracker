@@ -1,7 +1,6 @@
 package nutcracker
 
 import nutcracker.ProblemDescription.{Bind, Zip, _}
-import shapeless.PolyDefns.~>
 import shapeless.ops.hlist.{Zip => _, _}
 import shapeless.{:+:, :: => _, _}
 
@@ -42,10 +41,6 @@ case class PartialSolution private(
   }
 
   def getPromised[A](pr: PromiseId[A]): A = promises(pr).get
-
-  private val cellFetcher: CellRef ~> shapeless.Id = new ~>[CellRef, shapeless.Id] {
-    def apply[D](cell: CellRef[D]): D = domains.fetch(cell)
-  }
 }
 
 object PartialSolution {
@@ -117,9 +112,8 @@ object PartialSolution {
         }
         case DirtySel(sel) =>
           // auxiliary function to capture sel's type parameter L
-          def aux[L <: HList](s: Sel[L]): (PartialSolution, List[ProblemDescription[Unit]]) ={
-            val selDom = s.fetch(ps.cellFetcher)
-            val (domains1, conts) = ps.domains.triggersForSel(s, selDom)
+          def aux[L <: HList](s: Sel[L]): (PartialSolution, List[ProblemDescription[Unit]]) = {
+            val (domains1, conts) = ps.domains.triggersForSel(s)
             (ps.copy(domains = domains1), conts)
           }
           aux(sel) match {

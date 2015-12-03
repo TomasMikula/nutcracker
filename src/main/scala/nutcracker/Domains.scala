@@ -5,6 +5,7 @@ import scala.language.{existentials, higherKinds}
 import nutcracker.util.Index
 
 import shapeless.{HList, Nat, Sized}
+import shapeless.PolyDefns.~>
 
 import Domain._
 import Domains._
@@ -17,6 +18,10 @@ case class Domains[K[_]] private(
     cellsToSels: Index[Sel[_ <: HList], CellRef[_]],
     unresolvedVars: Set[DomRef[A, D] forSome { type A; type D }],
     failedVars: Set[Long]) {
+
+  private val cellFetcher: CellRef ~> shapeless.Id = new ~>[CellRef, shapeless.Id] {
+    def apply[D](cell: CellRef[D]): D = fetch(cell)
+  }
 
   def addVariable[A, D](d: D, ev: Domain[A, D]): (Domains[K], DomRef[A, D]) = {
     val domains1 = domains + ((nextId, (d, ev)))
@@ -92,7 +97,8 @@ case class Domains[K[_]] private(
       cellsToSels = cellsToSels.add(sel)
     )
 
-  def triggersForSel[L <: HList](sel: Sel[L], d: L): (Domains[K], List[K[Unit]]) = {
+  def triggersForSel[L <: HList](sel: Sel[L]): (Domains[K], List[K[Unit]]) = {
+    val d = sel.fetch(cellFetcher)
     collectTriggers(d, selTriggers.getOrElse(sel, Nil).asInstanceOf[List[L => Trigger[K]]]) match {
       case (Nil, conts) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), conts)
       case (triggers1, conts) => (copy(selTriggers = selTriggers + ((sel, triggers1))), conts)
