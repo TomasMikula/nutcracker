@@ -18,11 +18,12 @@ case class PartialSolution private(
     relations: RelTable) {
 
   import PartialSolution._
+  import Assessment._
 
-  def status: Status =
+  private def assess: Assessment[UnresolvedStuff] =
     if(domains.failedVars.nonEmpty) Failed
     else if(branchings.isEmpty && domains.unresolvedVars.isEmpty) Done
-    else Incomplete(((0 until branchings.length) map { BranchingId(_) }).toList, domains.unresolvedVars.toList)
+    else Incomplete((((0 until branchings.length) map { BranchingId(_) }).toList, domains.unresolvedVars.toList))
 
   def branchBy(brId: BranchingId): StreamT[Id, PartialSolution] = {
     val (br1, br2) = branchings.splitAt(brId.id)
@@ -45,12 +46,13 @@ case class PartialSolution private(
 
 object PartialSolution {
 
-  sealed trait Status
-  case object Failed extends Status
-  case object Done extends Status
-  case class Incomplete(branchings: List[BranchingId], unresolvedDomains: List[DomRef[_, _]]) extends Status
+  type UnresolvedStuff = (List[BranchingId], List[DomRef[_, _]])
 
   final case class BranchingId(val id: Int) extends AnyVal
+
+  object assess extends Assessor[PartialSolution, UnresolvedStuff] {
+    def apply(ps: PartialSolution): Assessment[UnresolvedStuff] = ps.assess
+  }
 
   private def empty: PartialSolution = new PartialSolution(
       domains = Domains.empty,

@@ -1,11 +1,12 @@
 package nutcracker
 
 import nutcracker.PartialSolution._
+import nutcracker.Assessment._
 
 import scala.annotation.tailrec
 import scalaz.Free.Trampoline
 import scalaz.Id._
-import scalaz.{StreamT, ~>}
+import scalaz.{Id, StreamT, ~>}
 import scalaz.syntax.applicative._
 
 object DFSSolver {
@@ -65,14 +66,14 @@ object DFSSolver {
       pr: PromiseId[A],
       failed: StreamT[Id, B],
       done: A => StreamT[Id, B]): StreamT[Trampoline, B] =
-    ps.status match {
+    PartialSolution.assess(ps) match {
       case Failed => failed.trans(trampolineId)
       case Done => done(ps.getPromised(pr)).trans(trampolineId)
-      case Incomplete(b::branchings, unresolvedDomains) =>
+      case Incomplete((b::branchings, unresolvedDomains)) =>
         ps.branchBy(b).trans(trampolineId) flatMap { solutionsT(_, pr, failed, done) }
-      case Incomplete(Nil, dRef::dRefs) =>
+      case Incomplete((Nil, dRef::dRefs)) =>
         ps.splitDomain(dRef).trans(trampolineId) flatMap { solutionsT(_, pr, failed, done) }
-      case Incomplete(Nil, Nil) =>
+      case Incomplete((Nil, Nil)) =>
         sys.error("Incomplete solution must have at least one unevaluated branching or unresolved variable")
     }
 }

@@ -1,8 +1,13 @@
+import scala.language.higherKinds
+
 import algebra.lattice.GenBool
 import nutcracker.ProblemDescription._
 
 package object nutcracker {
   import acyclic.pkg
+
+  type Assessor[S, U] = S => Assessment[U]
+  type Advancer[S, U, F[_], K[_]] = (S, U) => F[(S, K[Unit])]
 
   def allDifferent[A, D: Domain[A, ?] : GenBool](doms: DomRef[A, D]*): ProblemDescription[Unit] = {
     val n = doms.size
