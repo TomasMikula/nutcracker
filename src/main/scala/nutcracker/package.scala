@@ -9,6 +9,8 @@ package object nutcracker {
   type Assessor[S, U] = S => Assessment[U]
   type Advancer[S, U, F[_], K[_]] = (S, U) => F[(S, K[Unit])]
 
+  type AssessAdvance[S, F[_], K[_]] = S => Assessment[F[(S, K[Unit])]]
+
   def allDifferent[A, D: Domain[A, ?] : GenBool](doms: DomRef[A, D]*): ProblemDescription[Unit] = {
     val n = doms.size
     concat((0 until n) map { i => whenResolved(doms(i)){ a =>

@@ -4,6 +4,9 @@ import scala.language.higherKinds
 
 import scalaz.Monoid
 
+/** This is similar to `cats.MonoidK`,
+  * except `F`'s kind is `(* -> *) -> *` instead of `* -> *`.
+  */
 trait MonoidK[F[_[_]]] { self =>
 
   def zero[K[_]]: F[K]

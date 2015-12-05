@@ -12,7 +12,7 @@ sealed trait PromiseLang[K[_], A]
 
 object PromiseLang {
 
-  final case class Promised[A] private (private val id: Long)
+  final case class Promised[A](id: Long)
 
   case class Promise[K[_], A]() extends PromiseLang[K, Promised[A]]
   case class Complete[K[_], A](p: Promised[A], a: A) extends PromiseLang[K, Unit]

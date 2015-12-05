@@ -17,11 +17,15 @@ final class PromiseStore[K[_]](
   def promise[A]: (PromiseStore[K], Promised[A]) = ???
   def complete[A](p: Promised[A], a: A): (PromiseStore[K], K[Unit]) = ???
   def addOnComplete[A](p: Promised[A], f: A => K[Unit]): (PromiseStore[K], K[Unit]) = ???
+
+  def apply[A](pr: Promised[A]): Option[A] = promises(pr.id).asInstanceOf[Option[A]]
 }
 
 object PromiseStore {
 
-  def interpreter: Interpreter[PromiseLang, PromiseStore, AlwaysClean] =
+  def empty[K[_]] = new PromiseStore[K](0L, LongMap(), LongMap())
+
+  implicit def interpreter: Interpreter[PromiseLang, PromiseStore, AlwaysClean] =
     new Interpreter[PromiseLang, PromiseStore, AlwaysClean] {
 
       def step[K[_]: Applicative, A](p: PromiseLang[K, A])(s: PromiseStore[K]): (PromiseStore[K], AlwaysClean[K], K[A]) = {

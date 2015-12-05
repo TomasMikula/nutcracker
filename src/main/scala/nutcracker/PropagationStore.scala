@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.{existentials, higherKinds}
 
-import nutcracker.util.free.Interpreter
+import nutcracker.util.free.{MonoidK, Interpreter}
 import shapeless.HList
 
 import scalaz._
@@ -25,12 +25,13 @@ object PropagationStore {
   object DirtyThings {
     def empty[K[_]]: DirtyThings[K] = DirtyThings(Set(), Set())
 
-    implicit def monoid[K[_]]: Monoid[DirtyThings[K]] = new Monoid[DirtyThings[K]] {
-      def zero: DirtyThings[K] = DirtyThings.empty
-      def append(x: DirtyThings[K], y: => DirtyThings[K]): DirtyThings[K] = DirtyThings(
+    implicit def monoidK: MonoidK[DirtyThings] = new MonoidK[DirtyThings] {
+      def zero[K[_]]: DirtyThings[K] = DirtyThings.empty
+      def append[K[_]](x: DirtyThings[K], y: DirtyThings[K]): DirtyThings[K] = DirtyThings(
         x.domains ++ y.domains,
         x.selections ++ y.selections)
     }
+    implicit def monoid[K[_]]: Monoid[DirtyThings[K]] = monoidK.monoid
 
     def dirtyDomain[K[_], D](ref: CellRef[D]): DirtyThings[K] = DirtyThings(Set(ref), Set())
     def dirtyDomains[K[_], D](refs: Iterable[CellRef[D]]): DirtyThings[K] = DirtyThings(refs.toSet, Set())
@@ -43,7 +44,7 @@ object PropagationStore {
   case class DirtySel(sel: Sel[_ <: HList]) extends DirtyThing
 
 
-  def interpreter: Interpreter[PropagationLang, Domains, DirtyThings] =
+  implicit def interpreter: Interpreter[PropagationLang, Domains, DirtyThings] =
     new Interpreter[PropagationLang, Domains, DirtyThings] {
 
       def step[K[_]: Applicative, A](p: PropagationLang[K, A])(s: Domains[K]): (Domains[K], DirtyThings[K], K[A]) = {
