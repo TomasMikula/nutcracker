@@ -7,15 +7,23 @@ import scala.language.higherKinds
 import nutcracker.util.free.PromiseLang._
 import scala.collection.immutable.LongMap
 import scalaz._
+import scalaz.std.list._
 import scalaz.syntax.applicative._
 
-final class PromiseStore[K[_]](
+final case class PromiseStore[K[_]](
     nextId: Long,
     promises: LongMap[Option[_]],
     continuations: LongMap[List[_ => K[Unit]]]) {
 
-  def promise[A]: (PromiseStore[K], Promised[A]) = ???
-  def complete[A](p: Promised[A], a: A): (PromiseStore[K], K[Unit]) = ???
+  def promise[A]: (PromiseStore[K], Promised[A]) =
+    (copy(nextId = nextId + 1, promises = promises + ((nextId, Option.empty))), Promised(nextId))
+
+  def complete[A](p: Promised[A], a: A)(implicit K: Applicative[K]): (PromiseStore[K], K[Unit]) = {
+    val conts = continuations.getOrElse(p.id, Nil).asInstanceOf[List[A => K[Unit]]] map { _(a) }
+    val cont = Foldable[List].sequence_(conts)
+    (copy(promises = promises + ((p.id, Some(a))), continuations = continuations - p.id), cont)
+  }
+
   def addOnComplete[A](p: Promised[A], f: A => K[Unit]): (PromiseStore[K], K[Unit]) = ???
 
   def apply[A](pr: Promised[A]): Option[A] = promises(pr.id).asInstanceOf[Option[A]]

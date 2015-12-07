@@ -1,7 +1,9 @@
 package nutcracker
 
 import nutcracker.Domain._
-import nutcracker.ProblemDescription._
+import nutcracker.PropagationLang._
+import nutcracker.Trigger._
+import nutcracker.util.free.FreeK
 import org.scalatest.FunSuite
 
 class Sudoku extends FunSuite {
@@ -12,10 +14,10 @@ class Sudoku extends FunSuite {
   /** A program that sets up an empty Sudoku, that is 81 integer variables
     * and definitional constraints.
     */
-  val sudoku0: ProblemDescription[Cells] = {
+  val sudoku0: FreeK[PropagationLang, Cells] = {
     for {
       // create 81 integer variables, ranging from 1 to 9
-      cells <- variables[Int](81).oneOf((1 to 9).toSet)
+      cells <- variable[Int].count(81).oneOf((1 to 9).toSet)
 
       // numbers in each row are all different
       _ <- concat(rows(cells) map { allDifferent(_:_*) })
@@ -31,24 +33,24 @@ class Sudoku extends FunSuite {
   /** A more sophisticated Sudoku program that includes additional constraints
     * and thus reduces the amount of guessing and backtracking.
     */
-  val sudoku1: ProblemDescription[Cells] = {
+  val sudoku1: FreeK[PropagationLang, Cells] = {
 
     // For the given segment (row/column/3x3 square) and number,
     // keep a set of possible positions of that number in that segment.
     // When only one possible position remains, enter the number to that cell.
-    def segNumConstraint(seg: Seq[Cell], x: Int): ProblemDescription[Unit] = {
+    def segNumConstraint(seg: Seq[Cell], x: Int): FreeK[PropagationLang, Unit] = {
       for {
         xPos <- variable[Cell].oneOf(seg.toSet)
-        _ <- concat(seg map { cell => varTrigger(cell) { ys =>
-          if(!ys.contains(x)) Fire(remove(xPos)(cell))
-          else if(ys.size == 1) Fire(ProblemDescription.set(xPos, cell))
-          else Sleep()
+        _ <- concat(seg map { cell => varTriggerF(cell) { ys =>
+          if(!ys.contains(x)) fire(remove(xPos, cell))
+          else if(ys.size == 1) fire(PropagationLang.set(xPos, cell))
+          else sleep[PropagationLang]()
         } })
-        _ <- whenResolved(xPos) { cell => ProblemDescription.set(cell, x) }
+        _ <- whenResolvedF(xPos) { cell => PropagationLang.set(cell, x) }
       } yield ()
     }
 
-    def segConstraints(seg: Seq[Cell]): ProblemDescription[Unit] = {
+    def segConstraints(seg: Seq[Cell]): FreeK[PropagationLang, Unit] = {
       concat((1 to 9) map { segNumConstraint(seg, _) })
     }
 
@@ -63,8 +65,8 @@ class Sudoku extends FunSuite {
   /** Returns function that, given Sudoku cells, returns a program
     * to enter the given number to the specified cell.
     */
-  def set(i: Int, j: Int, value: Int): Cells => ProblemDescription[Unit] =
-    cells => ProblemDescription.set(cells(i*9 + j), value)
+  def set(i: Int, j: Int, value: Int): Cells => FreeK[PropagationLang, Unit] =
+    cells => PropagationLang.set(cells(i*9 + j), value)
 
 
   // technicalities
@@ -110,7 +112,7 @@ class Sudoku extends FunSuite {
     // we test both the simple and the advanced sudoku program
     val problems = Seq(sudoku0, sudoku1) map { sudoku =>
       for {
-        cells <- sudoku
+        cells <- sudoku.inject[Lang]
 
         _ <- concat(Seq(
           set(0, 2, 3), set(0, 6, 6), set(0, 7, 1),
@@ -124,13 +126,13 @@ class Sudoku extends FunSuite {
           set(8, 0, 8), set(8, 1, 4), set(8, 2, 6), set(8, 6, 1)
         ) map {
           _ (cells)
-        })
+        }).inject[Lang]
 
-        solution <- fetchResults(cells)
+        solution <- promiseResults(cells).inject[Lang]
       } yield solution
     }
 
-    val solutions = problems map { DFSSolver.allSolutions1(_) }
+    val solutions = problems map { (new DFSSolver).allSolutions1(_) }
 
     // both programs should produce a unique and correct solution
     solutions foreach { case (sols, failureCount) =>

@@ -1,7 +1,7 @@
 package nutcracker
 
-import nutcracker.PropagationLang.Intersect
-import nutcracker.util.free.PromiseLang.Promised
+import nutcracker.PropagationLang._
+import nutcracker.util.free.PromiseLang._
 
 import scala.language.higherKinds
 
@@ -14,13 +14,14 @@ import nutcracker.util.free._
 import scala.annotation.tailrec
 import scalaz.Free.Trampoline
 import scalaz.Id._
-import scalaz.{Coyoneda, Functor, Monoid, StreamT, ~>, -\/}
+import scalaz.{Functor, Monoid, StreamT, ~>, -\/}
 import scalaz.syntax.applicative._
 
 class DFSSolver {
   type K[A] = FreeK[Lang, A]
+
   private val DirtyMonoid: Monoid[Dirty[K]] = implicitly[Monoid[Dirty[K]]]
-  private val LangFunctor: Functor[Lang[K, ?]] = Coyoneda.coyonedaFunctor[Lang1[K, ?]]
+  private val LangFunctor: Functor[Lang[K, ?]] = CoyonedaK.functorInstance[Lang1, K]
 
   private def init[A](p: K[Promised[A]]): (Store[K], Promised[A]) = {
     import ProductK._
@@ -91,19 +92,6 @@ class DFSSolver {
 
 object DFSSolver {
 
-  type BranchL[K[_], A] = BranchLang[StreamT[Id, ?], K, A]
-  type BranchS[K[_]] = BranchStore[StreamT[Id, ?], K]
-
-  type Lang0[K[_], A] = CoproductK[BranchL, PromiseLang, K, A]
-  type Lang1[K[_], A] = CoproductK[PropagationLang, Lang0, K, A]
-  type Lang[K[_], A] = Coyoneda[Lang1[K, ?], A]
-
-  type Store0[K[_]] = ProductK[BranchS, PromiseStore, K]
-  type Store[K[_]] = ProductK[Domains, Store0, K]
-
-  type Dirty0[K[_]] = ProductK[AlwaysClean, AlwaysClean, K]
-  type Dirty[K[_]] = ProductK[PropagationStore.DirtyThings, Dirty0, K]
-
   private implicit val BranchInterpreter: Interpreter[BranchL, BranchS, AlwaysClean] = BranchStore.interpreter[StreamT[Id, ?]]
   private val interpreter: Interpreter[Lang, Store, Dirty] = Interpreter.coyonedaInterpreter[Lang1, Store, Dirty]
 
@@ -126,7 +114,7 @@ object DFSSolver {
               case Domain.Many(branchings) => StreamT.fromIterable(branchings.head) map { d =>
                 val p0: PropagationLang[K, Unit] = Intersect(ref, d)
                 val p1: Lang1[K, Unit] = CoproductK(-\/(p0))
-                val p2: Lang[K, Unit] = Coyoneda.lift[Lang1[K, ?], Unit](p1)
+                val p2: Lang[K, Unit] = CoyonedaK.Pure(p1)
                 FreeK.Suspend(p2)
               }
             }

@@ -98,5 +98,13 @@ object Interpreter {
     }
   }
 
-  implicit def coyonedaInterpreter[F[_[_], _], S[_[_]], W[_[_]]]: Interpreter[Lambda[(K[_], A) => Coyoneda[F[K, ?], A]], S, W] = ???
+  implicit def coyonedaInterpreter[F[_[_], _], S[_[_]], W[_[_]]](implicit i: Interpreter[F, S, W]): Interpreter[CoyonedaK[F, ?[_], ?], S, W] =
+    new Interpreter[CoyonedaK[F, ?[_], ?], S, W] {
+      def step[K[_] : Applicative, A](c: CoyonedaK[F, K, A])(s: S[K]): (S[K], W[K], K[A]) = c match {
+        case CoyonedaK.Pure(fa) => i.step(fa)(s)
+        case CoyonedaK.Map(fx, f) => i.step(fx)(s) match { case (s1, w1, kx) => (s1, w1, Applicative[K].map(kx)(f)) }
+      }
+
+      def uncons[K[_] : Applicative](w: W[K])(s: S[K]): Option[(K[Unit], W[K], S[K])] = i.uncons(w)(s)
+    }
 }
