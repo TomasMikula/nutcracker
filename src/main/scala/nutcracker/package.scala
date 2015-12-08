@@ -24,7 +24,7 @@ package object nutcracker {
   type Lang[K[_], A] = CoyonedaK[Lang1, K, A]
 
   type Store0[K[_]] = ProductK[BranchS, PromiseStore, K]
-  type Store[K[_]] = ProductK[Domains, Store0, K]
+  type Store[K[_]] = ProductK[PropagationStore, Store0, K]
 
   type Dirty0[K[_]] = ProductK[AlwaysClean, AlwaysClean, K]
   type Dirty[K[_]] = ProductK[PropagationStore.DirtyThings, Dirty0, K]

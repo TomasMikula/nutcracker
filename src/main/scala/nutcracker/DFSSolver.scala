@@ -24,7 +24,7 @@ class DFSSolver {
   private def init[A](p: K[Promised[A]]): (Store[K], Promised[A]) = {
     import ProductK._
 
-    val emptyD = Domains.empty[K]
+    val emptyD = PropagationStore.empty[K]
     val emptyB: BranchS[K] = BranchStore.empty[StreamT[Id, ?], K]
     val emptyP = PromiseStore.empty[K]
     val empty = emptyD :*: emptyB :*: emptyP
