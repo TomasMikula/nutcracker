@@ -25,6 +25,8 @@ object PromiseLang {
 
   def promiseF[A]: FreeK[PromiseLang, Promised[A]] = FreeK.lift(promise[FreeK[PromiseLang, ?], A])
   def completeF[A](p: Promised[A], a: A): FreeK[PromiseLang, Unit] = FreeK.lift(complete[FreeK[PromiseLang, ?], A](p, a))
+  def onCompleteF[F[_[_], _], A](p: Promised[A])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PromiseLang, F]): FreeK[F, Unit] =
+    FreeK.lift(onComplete[FreeK[F, ?], A](p)(f))
 
 
   implicit def functorKInstance: FunctorKA[PromiseLang] = new FunctorKA[PromiseLang] {

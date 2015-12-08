@@ -24,7 +24,11 @@ final case class PromiseStore[K[_]](
     (copy(promises = promises + ((p.id, Some(a))), continuations = continuations - p.id), cont)
   }
 
-  def addOnComplete[A](p: Promised[A], f: A => K[Unit]): (PromiseStore[K], K[Unit]) = ???
+  def addOnComplete[A](p: Promised[A], f: A => K[Unit])(implicit K: Applicative[K]): (PromiseStore[K], K[Unit]) =
+    promises.get(p.id).asInstanceOf[Option[A]] match {
+      case Some(a) => (this, f(a))
+      case None => (copy(continuations = continuations + ((p.id, f :: continuations.getOrElse(p.id, Nil)))), K.pure(()))
+    }
 
   def apply[A](pr: Promised[A]): Option[A] = promises(pr.id).asInstanceOf[Option[A]]
 }

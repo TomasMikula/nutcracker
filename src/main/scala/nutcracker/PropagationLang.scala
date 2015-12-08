@@ -81,10 +81,10 @@ object PropagationLang {
     liftF(selTrigger2[FreeK[F, ?], D1, D2](ref1, ref2)(f))
 
   private def lift[A](p: PropagationLang[FreeK[PropagationLang, ?], A]): FP[A] =
-    FreeK.lift(p)
+    FreeK.suspend(p)
 
   private def liftF[F[_[_], _], A](p: PropagationLang[FreeK[F, ?], A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, A] =
-    FreeK.lift(inj.inj[FreeK[F, ?], A](p))
+    FreeK.lift(p)
 
   implicit def functorKInstance: FunctorKA[PropagationLang] = new FunctorKA[PropagationLang] {
 

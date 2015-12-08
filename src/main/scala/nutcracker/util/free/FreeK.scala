@@ -42,7 +42,12 @@ object FreeK {
   case class Suspend[F[_[_], _], A](a: F[FreeK[F, ?], A]) extends FreeK[F, A]
   case class Bind[F[_[_], _], A1, A2](a: FreeK[F, A1], f: A1 => FreeK[F, A2]) extends FreeK[F, A2]
 
-  def lift[F[_[_], _], A](a: F[FreeK[F, ?], A]): FreeK[F, A] = Suspend(a)
+  def pure[F[_[_], _], A](a: A): FreeK[F, A] = Pure(a)
+  def suspend[F[_[_], _], A](a: F[FreeK[F, ?], A]): FreeK[F, A] = Suspend(a)
+  def bind[F[_[_], _], A1, A2](a: FreeK[F, A1])(f: A1 => FreeK[F, A2]): FreeK[F, A2] = Bind(a, f)
+
+  def lift[F[_[_], _], G[_[_], _], A](a: F[FreeK[G, ?], A])(implicit inj: InjectK[F, G]): FreeK[G, A] =
+    suspend(inj.inj[FreeK[G, ?], A](a))
 
   implicit def freeKMonad[F[_[_], _]]: Monad[FreeK[F, ?]] = new Monad[FreeK[F, ?]] {
     def point[A](a: => A): FreeK[F, A] = Pure(a)
