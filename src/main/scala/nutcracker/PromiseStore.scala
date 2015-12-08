@@ -1,11 +1,11 @@
-package nutcracker.util.free
+package nutcracker
 
+import nutcracker.PromiseLang._
+import nutcracker.util.free.Interpreter
 import nutcracker.util.free.Interpreter.AlwaysClean
 
-import scala.language.higherKinds
-
-import nutcracker.util.free.PromiseLang._
 import scala.collection.immutable.LongMap
+import scala.language.higherKinds
 import scalaz._
 import scalaz.std.list._
 import scalaz.syntax.applicative._

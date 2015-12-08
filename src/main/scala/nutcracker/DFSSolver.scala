@@ -2,8 +2,8 @@ package nutcracker
 
 import scala.language.higherKinds
 
+import nutcracker.PromiseLang._
 import nutcracker.PropagationLang._
-import nutcracker.util.free.PromiseLang._
 import nutcracker.DFSSolver._
 import nutcracker.Assessment._
 import nutcracker.util.free.Interpreter._

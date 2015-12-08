@@ -1,9 +1,9 @@
 import scala.language.higherKinds
 
+import nutcracker.PromiseLang._
 import nutcracker.PropagationLang._
 import nutcracker.util.free._
 import nutcracker.util.free.Interpreter._
-import nutcracker.util.free.PromiseLang._
 
 import algebra.lattice.GenBool
 import scalaz.Id._
