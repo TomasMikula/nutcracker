@@ -101,7 +101,7 @@ object DFSSolver {
     else s._2._1.branches match {
       case b::bs =>
         val s1 = s.update_2(s._2.update_1(new BranchStore[StreamT[Id, ?], FreeK[Lang, ?]](bs)))
-        Incomplete(b.options map { k => (s1, k) })
+        Incomplete(b map { k => (s1, k) })
       case Nil =>
         if(s._1.unresolvedVars.isEmpty) Done
         else {

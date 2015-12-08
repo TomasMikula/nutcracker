@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.BranchLang.{AddBranching, BranchT}
+import nutcracker.BranchLang.{AddBranching}
 import nutcracker.util.free.Interpreter
 import nutcracker.util.free.Interpreter.AlwaysClean
 
@@ -8,9 +8,9 @@ import scala.language.higherKinds
 import scalaz.{Applicative, \/-, -\/, \/}
 import scalaz.syntax.applicative._
 
-class BranchStore[F[_], K[_]](val branches: List[BranchT[F, K, Unit]]) extends AnyVal {
+class BranchStore[F[_], K[_]](val branches: List[F[K[Unit]]]) extends AnyVal {
 
-  private def addBranching(b: BranchT[F, K, Unit]) = new BranchStore(b::branches)
+  private def addBranching(b: F[K[Unit]]) = new BranchStore(b::branches)
 }
 
 object BranchStore {
