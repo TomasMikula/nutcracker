@@ -1,0 +1,27 @@
+package nutcracker
+
+import scala.language.higherKinds
+
+import nutcracker.util.free.Interpreter
+import nutcracker.util.free.Interpreter.AlwaysClean
+
+import scalaz.{Semigroup, Applicative}
+import scalaz.syntax.applicative._
+
+sealed trait CostLang[C, K[_], A]
+
+object CostLang {
+  case class Cost[C, K[_]](c: C) extends CostLang[C, K, Unit]
+  case class GetCost[C, K[_]]() extends CostLang[C, K, C]
+
+  type ConstK[T, K[_]] = T
+  implicit def interpreter[C: Semigroup]: Interpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]], AlwaysClean] =
+    new Interpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]], AlwaysClean] {
+      def step[K[_] : Applicative, A](f: CostLang[C, K, A])(c0: C): (ConstK[C, K], AlwaysClean[K], K[A]) = f match {
+        case Cost(c1) => (Semigroup[C].append(c0, c1), (), ().pure[K])
+        case g@GetCost() => (c0, (), c0.asInstanceOf[A].pure[K]) // XXX is there a way to convince scalac that C =:= A?
+      }
+
+      def uncons[K[_] : Applicative](w: AlwaysClean[K])(s: ConstK[C, K]): Option[(K[Unit], AlwaysClean[K], ConstK[C, K])] = None
+    }
+}
