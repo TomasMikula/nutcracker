@@ -33,7 +33,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b, c)) >>>= { case (a, b, c) => promiseResults(a, b, c).inject[Lang] }
 
-    val solutions = (new DFSSolver).solutions(problem).toStream.toList
+    val solutions = DFSSolver.solutions(problem).toStream.toList
 
     "should have 2 solutions" in {
       assertResult(2)(solutions.size)
@@ -60,7 +60,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b).inject[Lang] }
 
-    val solutions = (new DFSSolver).solutions(problem).toStream.toList
+    val solutions = DFSSolver.solutions(problem).toStream.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
@@ -85,7 +85,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b).inject[Lang] }
 
-    val solutions = (new DFSSolver).solutions(problem).toStream.toList
+    val solutions = DFSSolver.solutions(problem).toStream.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
@@ -115,7 +115,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b).inject[Lang] }
 
-    val solutions = (new DFSSolver).solutions(problem).toStream.toList
+    val solutions = DFSSolver.solutions(problem).toStream.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }

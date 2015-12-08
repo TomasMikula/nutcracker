@@ -26,7 +26,7 @@ class Sat extends FunSpec {
 
     } yield a) >>>= { promiseResults(_).inject[Lang] }
 
-    val solutions = (new DFSSolver).solutions(problem).toStream.toList
+    val solutions = DFSSolver.solutions(problem).toStream.toList
 
     it("should have 4 solutions") {
       assertResult(4)(solutions.size)

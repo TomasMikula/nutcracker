@@ -15,7 +15,7 @@ import scalaz.Id._
 import scalaz.{Functor, Monoid, StreamT, ~>, -\/}
 import scalaz.syntax.applicative._
 
-class DFSSolver {
+object DFSSolver {
   type K[A] = FreeK[Lang, A]
 
   private val DirtyMonoid: Monoid[Dirty[K]] = implicitly[Monoid[Dirty[K]]]
@@ -86,9 +86,6 @@ class DFSSolver {
       case Incomplete(str) =>
         str.trans(trampolineId) flatMap { case (s1, k) => solutionsT(interpreter.runFreeUnit(s1, k)(DirtyMonoid, LangFunctor), pr, failed, done) }
     }
-}
-
-object DFSSolver {
 
   private implicit val BranchInterpreter: Interpreter[BranchL, BranchS, AlwaysClean] = BranchStore.interpreter[StreamT[Id, ?]]
   private val interpreter: Interpreter[Lang, Store, Dirty] = Interpreter.coyonedaInterpreter[Lang1, Store, Dirty]
@@ -110,10 +107,7 @@ object DFSSolver {
               case Domain.Empty() => StreamT.empty
               case Domain.Just(a) => FreeK.Pure[Lang, Unit](()) :: StreamT.empty[Id, FreeK[Lang, Unit]]
               case Domain.Many(branchings) => StreamT.fromIterable(branchings.head) map { d =>
-                val p0: PropagationLang[K, Unit] = Intersect(ref, d)
-                val p1: Lang1[K, Unit] = CoproductK(-\/(p0))
-                val p2: Lang[K, Unit] = CoyonedaK.Pure(p1)
-                FreeK.Suspend(p2)
+                intersectF(ref)(d)
               }
             }
           }
