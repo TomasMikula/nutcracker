@@ -8,6 +8,7 @@ import shapeless.HList
 import scalaz._
 import scalaz.std.list._
 import scalaz.syntax.applicative._
+import scalaz.syntax.monoid._
 
 object PropagationStore {
   import PropagationLang._
@@ -43,6 +44,7 @@ object PropagationStore {
   case class DirtyDomain[D](ref: CellRef[D]) extends DirtyThing
   case class DirtySel(sel: Sel[_ <: HList]) extends DirtyThing
 
+  import DirtyThings._
 
   implicit def interpreter: Interpreter[PropagationLang, Domains, DirtyThings] =
     new Interpreter[PropagationLang, Domains, DirtyThings] {
@@ -56,14 +58,14 @@ object PropagationStore {
             case (s1, ok) => (s1, DirtyThings.empty, ok.getOrElse(().point[K]))
           }
           case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
-            case s1 => (s1, DirtyThings.dirtySel(sel), ().point[K])
+            case s1 => (s1, dirtySel(sel), ().point[K])
           }
           case Intersect(ref, d) => s.intersect(ref, d) match {
-            case Some(s1) => (s1, DirtyThings.dirtyDomain(ref), ().point[K])
+            case Some(s1) => (s1, dirtyDomain(ref), ().point[K])
             case None => (s, DirtyThings.empty[K], ().point[K])
           }
           case IntersectVector(refs, values) => s.intersectVector(refs, values) match {
-            case (s1, dirtyCells) => (s1, DirtyThings.dirtyDomains(dirtyCells), ().point[K])
+            case (s1, dirtyCells) => (s1, dirtyDomains(dirtyCells), ().point[K])
           }
           case Fetch(ref) => (s, DirtyThings.empty[K], s.fetch(ref).point[K])
           case FetchVector(refs) => (s, DirtyThings.empty[K], s.fetchVector(refs).point[K])
@@ -77,11 +79,9 @@ object PropagationStore {
         case None => None
         case Some((dt, dts)) => dt match {
           case DirtyDomain(ref) => s.triggersForDomain(ref) match {
-            case (s1, Nil) => Some((Applicative[K].pure(()), dts, s1))
-            case (s1, ks) => Some((Foldable[List].sequence_(ks), dts, s1))
+            case (s1, ks) => Some((Foldable[List].sequence_(ks), dts |+| dirtySels[K](s.getSelsForCell(ref)), s1))
           }
           case DirtySel(sel) => s.triggersForSel(sel) match {
-            case (s1, Nil) => Some((Applicative[K].pure(()), dts, s1))
             case (s1, ks) => Some((Foldable[List].sequence_(ks), dts, s1))
           }
         }

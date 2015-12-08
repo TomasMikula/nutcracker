@@ -7,7 +7,7 @@ import nutcracker.util.free.PromiseLang._
 
 import algebra.lattice.GenBool
 import scalaz.Id._
-import scalaz.StreamT
+import scalaz.{Traverse, StreamT}
 
 package object nutcracker {
 
@@ -33,6 +33,12 @@ package object nutcracker {
 
   def concat[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
     ps.foldLeft[FreeK[F, Unit]](FreeK.Pure(())) { _ >> _ }
+
+  def sequence[F[_[_], _], C[_]: Traverse, A](ps: C[FreeK[F, A]]): FreeK[F, C[A]] =
+    Traverse[C].sequence[FreeK[F, ?], A](ps)
+
+  def traverse[F[_[_], _], C[_]: Traverse, A, B](ps: C[A])(f: A => FreeK[F, B]): FreeK[F, C[B]] =
+    Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)
 
   def allDifferent[A, D: Domain[A, ?] : GenBool](doms: DomRef[A, D]*): FreeK[PropagationLang, Unit] = {
     val n = doms.size
@@ -66,4 +72,7 @@ package object nutcracker {
       _ <- go(pr, Nil, cells.size - 1)
     } yield pr
   }
+
+  def promiseResults[A, D](cells: DomRef[A, D]*): FreeK[CoproductK[PropagationLang, PromiseLang, ?[_], ?], Promised[Vector[A]]] =
+    promiseResults(cells.toVector)
 }

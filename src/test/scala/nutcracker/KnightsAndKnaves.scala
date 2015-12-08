@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.ProblemDescription._
+import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.lib.bool._
 import org.scalatest.FreeSpec
@@ -20,7 +20,7 @@ class KnightsAndKnaves extends FreeSpec {
     // The visitor asks A what type he is, but does not hear A's answer.
     // B then says "A said that he is a knave" and
     // C says "Don't believe B; he is lying!"
-    val problem = for {
+    val problem = (for {
       a <- variable[Boolean]()
       b <- variable[Boolean]()
       c <- variable[Boolean]()
@@ -31,10 +31,9 @@ class KnightsAndKnaves extends FreeSpec {
       // c says knave(b)
       _ <- presume(c =?= neg(b))
 
-      sol <- fetchResults(a, b, c)
-    } yield sol
+    } yield (a, b, c)) >>>= { case (a, b, c) => promiseResults(a, b, c).inject[Lang] }
 
-    val solutions = DFSSolver.solutions(problem).toStream.toList
+    val solutions = (new DFSSolver).solutions(problem).toStream.toList
 
     "should have 2 solutions" in {
       assertResult(2)(solutions.size)
@@ -52,17 +51,16 @@ class KnightsAndKnaves extends FreeSpec {
     // The visitor meets inhabitants A and B and asks
     // "Are there any knaves among you?"
     // A replies "Yes."
-    val problem = for {
+    val problem = (for {
       a <- variable[Boolean]()
       b <- variable[Boolean]()
 
       // a says (knave(a) ∨ knave(b))
       _ <- presume(a =?= (neg(a) ∨ neg(b)))
 
-      sol <- fetchResults(a, b)
-    } yield sol
+    } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b).inject[Lang] }
 
-    val solutions = DFSSolver.solutions(problem).toStream.toList
+    val solutions = (new DFSSolver).solutions(problem).toStream.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
@@ -78,17 +76,16 @@ class KnightsAndKnaves extends FreeSpec {
   "Both knaves" - {
     // The visitor meets inhabitants A and B.
     // A says "We are both knaves."
-    val problem = for {
+    val problem = (for {
       a <- variable[Boolean]()
       b <- variable[Boolean]()
 
       // a says (knave(a) ∧ knave(b))
       _ <- presume(a =?= (neg(a) ∧ neg(b)))
 
-      sol <- fetchResults(a, b)
-    } yield sol
+    } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b).inject[Lang] }
 
-    val solutions = DFSSolver.solutions(problem).toStream.toList
+    val solutions = (new DFSSolver).solutions(problem).toStream.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
@@ -106,7 +103,7 @@ class KnightsAndKnaves extends FreeSpec {
     // The visitor meets inhabitants A and B.
     // A says "We are the same kind."
     // B says "We are of different kinds."
-    val problem = for {
+    val problem = (for {
       a <- variable[Boolean]()
       b <- variable[Boolean]()
 
@@ -116,10 +113,9 @@ class KnightsAndKnaves extends FreeSpec {
       // b says (kind(a) ≠ kind(b)
       _ <- presume(b =?= neg(a =?= b))
 
-      sol <- fetchResults(a, b)
-    } yield sol
+    } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b).inject[Lang] }
 
-    val solutions = DFSSolver.solutions(problem).toStream.toList
+    val solutions = (new DFSSolver).solutions(problem).toStream.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }

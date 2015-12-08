@@ -2,6 +2,7 @@ package nutcracker.util.free
 
 import scala.annotation.tailrec
 import scala.language.{higherKinds, implicitConversions}
+import scalaz.Leibniz.{===, refl}
 import scalaz._
 
 sealed trait FreeK[F[_[_], _], A] {
@@ -9,6 +10,10 @@ sealed trait FreeK[F[_[_], _], A] {
 
   def flatMap[B](f: A => FreeK[F, B]): FreeK[F, B] = Bind(this, f)
   def >>=[B](f: A => FreeK[F, B]): FreeK[F, B] = flatMap(f)
+  def >>>=[G[_[_], _], B](f: A => FreeK[G, B])(implicit
+    inj: InjectK[F, G],
+    FK: FunctorKA[F]
+  ): FreeK[G, B] = injectTransform(inj, FK)(this) flatMap f
   def map[B](f: A => B): FreeK[F, B] = flatMap { a => Pure(f(a)) }
 
   def inj[G[_[_], _]](implicit tr: (FreeK[F, ?] ~> FreeK[G, ?])): FreeK[G, A] = tr(this)
@@ -46,6 +51,10 @@ object FreeK {
 
   implicit class FreeKUnitOps[F[_[_], _]](fu: FreeK[F, Unit]) {
     def >>[B](fb: FreeK[F, B]): FreeK[F, B] = fu >>= { _ => fb }
+    def >>>[G[_[_], _], B](gb: FreeK[G, B])(implicit
+      inj: InjectK[F, G],
+      FK: FunctorKA[F]
+    ): FreeK[G, B] = fu >>>= { _ => gb }
   }
 
   implicit def injectTransform[F[_[_], _], G[_[_], _]](implicit

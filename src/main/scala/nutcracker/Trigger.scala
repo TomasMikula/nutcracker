@@ -12,10 +12,10 @@ case class Fire[K[_]](cont: K[Unit]) extends Trigger[K]
 case class FireReload[K[_]](cont: K[Unit]) extends Trigger[K]
 
 object Trigger {
-  def discard[F[_[_], _]](): Trigger[FreeK[F, ?]] = Discard[FreeK[F, ?]]()
-  def sleep[F[_[_], _]](): Trigger[FreeK[F, ?]] = Sleep[FreeK[F, ?]]()
+  def discard[F[_[_], _]]: Trigger[FreeK[F, ?]] = Discard[FreeK[F, ?]]()
+  def sleep[F[_[_], _]]: Trigger[FreeK[F, ?]] = Sleep[FreeK[F, ?]]()
   def fire[F[_[_], _]](cont: FreeK[F, Unit]): Trigger[FreeK[F, ?]] = Fire[FreeK[F, ?]](cont)
-  def sleep[F[_[_], _]](cont: FreeK[F, Unit]): Trigger[FreeK[F, ?]] = FireReload[FreeK[F, ?]](cont)
+  def fireReload[F[_[_], _]](cont: FreeK[F, Unit]): Trigger[FreeK[F, ?]] = FireReload[FreeK[F, ?]](cont)
 
   implicit def functorKInstance: FunctorK[Trigger] = new FunctorK[Trigger] {
     def transform[K[_], L[_]](tk: Trigger[K])(f: K ~> L): Trigger[L] = tk match {

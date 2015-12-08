@@ -5,7 +5,7 @@ import scala.language.higherKinds
 import algebra.lattice.{BoundedLattice, GenBool}
 import nutcracker.util.free.{InjectK, FreeK, FunctorK, FunctorKA}
 
-import shapeless.{Sized, Nat, HList}
+import shapeless.{::, HNil, Sized, Nat, HList}
 import scalaz.{Traverse, ~>}
 import scalaz.std.vector._
 
@@ -75,6 +75,10 @@ object PropagationLang {
     val d = Domain[A, D].singleton(a)
     fetchF(ref) >>= { d0 => intersectF(ref)(GenBool[D].without(d0, d)) }
   }
+  def selTrigger2[K[_], D1, D2](ref1: CellRef[D1], ref2: CellRef[D2])(f: (D1, D2) => Trigger[K]): PropagationLang[K, Unit] =
+    selTrigger[K, D1 :: D2 :: HNil](Sel(ref1, ref2))(l => f(l.head, l.tail.head))
+  def selTrigger2F[F[_[_], _], D1, D2](ref1: CellRef[D1], ref2: CellRef[D2])(f: (D1, D2) => Trigger[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+    liftF(selTrigger2[FreeK[F, ?], D1, D2](ref1, ref2)(f))
 
   private def lift[A](p: PropagationLang[FreeK[PropagationLang, ?], A]): FP[A] =
     FreeK.lift(p)

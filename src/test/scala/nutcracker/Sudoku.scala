@@ -44,7 +44,7 @@ class Sudoku extends FunSuite {
         _ <- concat(seg map { cell => varTriggerF(cell) { ys =>
           if(!ys.contains(x)) fire(remove(xPos, cell))
           else if(ys.size == 1) fire(PropagationLang.set(xPos, cell))
-          else sleep[PropagationLang]()
+          else sleep[PropagationLang]
         } })
         _ <- whenResolvedF(xPos) { cell => PropagationLang.set(cell, x) }
       } yield ()

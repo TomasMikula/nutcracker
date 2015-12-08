@@ -1,20 +1,19 @@
 package nutcracker
 
-import nutcracker.ProblemDescription._
+import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.lib.bool._
 import org.scalatest.FunSpec
 
 import scalaz.std.vector._
-import scalaz.syntax.traverse._
 
 class Sat extends FunSpec {
 
   describe("A simple 3-SAT problem") {
 
-    val problem = for {
-      a <- variables[Boolean](4)()
-      ā <- a traverseU { neg(_) }
+    val problem = (for {
+      a <- variable[Boolean].count(4)()
+      ā <- traverse(a){ neg(_) }
 
       _ <- atLeastOneTrue(a(0), a(1), a(2))
       _ <- atLeastOneTrue(ā(1), a(2), ā(3))
@@ -25,10 +24,9 @@ class Sat extends FunSpec {
       _ <- atLeastOneTrue(a(0), a(2), a(3))
       _ <- atLeastOneTrue(ā(0), a(1), ā(2))
 
-      sol <- fetchResults(a)
-    } yield sol
+    } yield a) >>>= { promiseResults(_).inject[Lang] }
 
-    val solutions = DFSSolver.solutions(problem).toStream.toList
+    val solutions = (new DFSSolver).solutions(problem).toStream.toList
 
     it("should have 4 solutions") {
       assertResult(4)(solutions.size)

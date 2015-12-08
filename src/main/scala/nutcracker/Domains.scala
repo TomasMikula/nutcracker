@@ -84,8 +84,8 @@ case class Domains[K[_]] private(
   def triggersForDomain[D](ref: CellRef[D]): (Domains[K], List[K[Unit]]) = {
     val d = fetch(ref)
     collectTriggers(d, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[D => Trigger[K]]]) match {
-      case (Nil, conts) => (copy(domainTriggers = domainTriggers - ref), conts)
-      case (triggers1, conts) => (copy(domainTriggers = domainTriggers + ((ref, triggers1))), conts)
+      case (Nil, fired) => (copy(domainTriggers = domainTriggers - ref), fired)
+      case (forLater, fired) => (copy(domainTriggers = domainTriggers + ((ref, forLater))), fired)
     }
   }
 
@@ -99,17 +99,18 @@ case class Domains[K[_]] private(
   }
 
 
-  def addSelTrigger[L <: HList](sel: Sel[L], t: L => Trigger[K]): Domains[K] =
+  def addSelTrigger[L <: HList](sel: Sel[L], t: L => Trigger[K]): Domains[K] = {
     copy(
       selTriggers = selTriggers + ((sel, t :: selTriggers.getOrElse(sel, Nil))),
       cellsToSels = cellsToSels.add(sel)
     )
+  }
 
   def triggersForSel[L <: HList](sel: Sel[L]): (Domains[K], List[K[Unit]]) = {
     val d = sel.fetch(cellFetcher)
     collectTriggers(d, selTriggers.getOrElse(sel, Nil).asInstanceOf[List[L => Trigger[K]]]) match {
-      case (Nil, conts) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), conts)
-      case (triggers1, conts) => (copy(selTriggers = selTriggers + ((sel, triggers1))), conts)
+      case (Nil, fired) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), fired)
+      case (forLater, fired) => (copy(selTriggers = selTriggers + ((sel, forLater))), fired)
     }
   }
 
