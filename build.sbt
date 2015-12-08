@@ -38,7 +38,7 @@ libraryDependencies ++= Seq(
   "com.github.mpilquist" %% "simulacrum" % "0.4.0",
   "org.spire-math" %% "algebra" % "0.3.2-SNAPSHOT",
   "org.spire-math" %% "algebra-std" % "0.3.2-SNAPSHOT",
-  "org.scalaz" %% "scalaz-core" % "7.2.0-RC1",
+  "org.scalaz" %% "scalaz-core" % "7.2.0",
   "com.chuusai" %% "shapeless" % "2.2.5",
   "org.principled" %% "principled" % "0.1-SNAPSHOT",
   "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
