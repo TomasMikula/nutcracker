@@ -2,8 +2,6 @@ package nutcracker
 
 import scala.language.existentials
 
-import PartialSolution._
-
 import shapeless.HList
 import nutcracker.util.Mapped
 
