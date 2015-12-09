@@ -65,6 +65,16 @@ object Interpreter {
     def append[K[_]](f1: AlwaysClean[K], f2: AlwaysClean[K]): AlwaysClean[K] = ()
   }
 
+  trait CleanInterpreter[F[_[_], _], S[_[_]]] extends Interpreter[F, S, AlwaysClean] {
+    def step0[K[_]: Applicative, A](f: F[K, A])(s: S[K]): (S[K], K[A])
+
+    final def step[K[_]: Applicative, A](f: F[K, A])(s: S[K]): (S[K], AlwaysClean[K], K[A]) = step0(f)(s) match {
+      case (s1, k) => (s1, (), k)
+    }
+
+    final def uncons[K[_]: Applicative](w: AlwaysClean[K])(s: S[K]): Option[(K[Unit], AlwaysClean[K], S[K])] = None
+  }
+
   implicit def coproductInterpreter[G[_[_], _], H[_[_], _], T[_[_]], U[_[_]], X[_[_]], Y[_[_]]](implicit
     i1: Interpreter[G, T, X],
     i2: Interpreter[H, U, Y],

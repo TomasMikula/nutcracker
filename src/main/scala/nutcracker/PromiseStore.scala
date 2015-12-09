@@ -2,7 +2,7 @@ package nutcracker
 
 import nutcracker.PromiseLang._
 import nutcracker.util.free.Interpreter
-import nutcracker.util.free.Interpreter.AlwaysClean
+import nutcracker.util.free.Interpreter.{CleanInterpreter, AlwaysClean}
 
 import scala.collection.immutable.LongMap
 import scala.language.higherKinds
@@ -38,22 +38,19 @@ object PromiseStore {
   def empty[K[_]] = new PromiseStore[K](0L, LongMap(), LongMap())
 
   implicit def interpreter: Interpreter[PromiseLang, PromiseStore, AlwaysClean] =
-    new Interpreter[PromiseLang, PromiseStore, AlwaysClean] {
+    new CleanInterpreter[PromiseLang, PromiseStore] {
 
-      def step[K[_]: Applicative, A](p: PromiseLang[K, A])(s: PromiseStore[K]): (PromiseStore[K], AlwaysClean[K], K[A]) = {
+      def step0[K[_]: Applicative, A](p: PromiseLang[K, A])(s: PromiseStore[K]): (PromiseStore[K], K[A]) = {
         p match {
           case Promise() => // A =:= Promised[X] forSome { type X }
             val promised: (PromiseStore[K], A) = s.promise
-            (promised._1, (), promised._2.point[K])
+            (promised._1, promised._2.point[K])
           case Complete(pr, x) => // A =:= Unit, (pr, x): (Promised[X], X) forSome { type X }
-            val completed: (PromiseStore[K], K[Unit]) = s.complete(pr, x)
-            (completed._1, (), completed._2)
+            s.complete(pr, x)
           case OnComplete(pr, f) => // A =:= Unit, (pr, f): (Promised[X], X => K[Unit]) forSome { type X }
-            val onCompleteAdded: (PromiseStore[K], K[Unit]) = s.addOnComplete(pr, f)
-            (onCompleteAdded._1, (), onCompleteAdded._2)
+            s.addOnComplete(pr, f)
         }
       }
 
-      def uncons[K[_]: Applicative](w: AlwaysClean[K])(s: PromiseStore[K]) = None
     }
 }
