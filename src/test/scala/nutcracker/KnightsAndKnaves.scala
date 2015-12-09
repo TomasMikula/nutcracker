@@ -16,7 +16,8 @@ import org.scalatest.FreeSpec
 // the inhabitants' type from their statements.
 
 class KnightsAndKnaves extends FreeSpec {
-  type Lang[K[_], A] = DFSSolver.lang.Vocabulary[K, A]
+  val solver = DFSSolver()
+  type Lang[K[_], A] = solver.lang.Vocabulary[K, A]
 
   "Problem 1" - {
     // The visitor meets three inhabitants referred to as A, B and C.
@@ -36,7 +37,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b, c)) >>>= { case (a, b, c) => promiseResults(a, b, c).inject[Lang] }
 
-    val solutions = DFSSolver.solutions(problem).toStream.toList
+    val solutions = solver.solutions(problem).toStream.toList
 
     "should have 2 solutions" in {
       assertResult(2)(solutions.size)
@@ -63,7 +64,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b).inject[Lang] }
 
-    val solutions = DFSSolver.solutions(problem).toStream.toList
+    val solutions = solver.solutions(problem).toStream.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
@@ -88,7 +89,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b).inject[Lang] }
 
-    val solutions = DFSSolver.solutions(problem).toStream.toList
+    val solutions = solver.solutions(problem).toStream.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
@@ -118,7 +119,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b).inject[Lang] }
 
-    val solutions = DFSSolver.solutions(problem).toStream.toList
+    val solutions = solver.solutions(problem).toStream.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }

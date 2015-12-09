@@ -10,7 +10,8 @@ import org.scalatest.FunSpec
 import scalaz.std.vector._
 
 class Sat extends FunSpec {
-  type Lang[K[_], A] = DFSSolver.lang.Vocabulary[K, A]
+  val solver = DFSSolver()
+  type Lang[K[_], A] = solver.lang.Vocabulary[K, A]
 
   describe("A simple 3-SAT problem") {
 
@@ -29,7 +30,7 @@ class Sat extends FunSpec {
 
     } yield a) >>>= { promiseResults(_).inject[Lang] }
 
-    val solutions = DFSSolver.solutions(problem).toStream.toList
+    val solutions = solver.solutions(problem).toStream.toList
 
     it("should have 4 solutions") {
       assertResult(4)(solutions.size)

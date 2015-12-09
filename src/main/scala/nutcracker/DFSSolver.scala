@@ -9,12 +9,12 @@ import nutcracker.Assessment._
 import scala.annotation.tailrec
 import scalaz.Free.Trampoline
 import scalaz.Id._
-import scalaz.{StreamT, ~>}
+import scalaz.{Monoid, StreamT, ~>}
 import scalaz.syntax.applicative._
 
-object DFSSolver extends Solver[PropBranchProm.type, StreamT[Id, ?]] {
+class DFSSolver[C: Monoid] extends Solver[PropBranchPromCost[C], StreamT[Id, ?]] {
 
-  val lang = PropBranchProm
+  val lang: PropBranchPromCost[C] = new PropBranchPromCost[C]
 
   def solutions[A](p: K[Promised[A]]): StreamT[Id, A] = {
     val (s, pr) = init(p)
@@ -34,17 +34,17 @@ object DFSSolver extends Solver[PropBranchProm.type, StreamT[Id, ?]] {
   }
 
   def assess(s: S): Assessment[StreamT[Id, (S, K[Unit])]] = {
-    if(s._1.failedVars.nonEmpty) Failed
-    else s._2._1.branches match {
+    if(lang.propStore.get(s).failedVars.nonEmpty) Failed
+    else lang.branchStore.get(s).branches match {
       case b::bs =>
-        val s1 = s.update_2(s._2.update_1(new BranchStore[StreamT[Id, ?], K](bs)))
+        val s1 = lang.branchStore.set(new BranchStore[StreamT[Id, ?], K](bs))(s)
         Incomplete(b map { k => (s1, k) })
       case Nil =>
-        if(s._1.unresolvedVars.isEmpty) Done
+        if(lang.propStore.get(s).unresolvedVars.isEmpty) Done
         else {
 
           def splitDomain[A, D](ref: DomRef[A, D]): StreamT[Id, K[Unit]] = {
-            val (d, domain) = s._1.getDomain(ref)
+            val (d, domain) = lang.propStore.get(s).getDomain(ref)
             domain.values(d) match {
               case Domain.Empty() => StreamT.empty
               case Domain.Just(a) => ().pure[K] :: StreamT.empty[Id, K[Unit]]
@@ -54,7 +54,7 @@ object DFSSolver extends Solver[PropBranchProm.type, StreamT[Id, ?]] {
             }
           }
 
-          Incomplete(splitDomain(s._1.unresolvedVars.head) map { k => (s, k) })
+          Incomplete(splitDomain(lang.propStore.get(s).unresolvedVars.head) map { k => (s, k) })
         }
     }
   }
@@ -96,7 +96,7 @@ object DFSSolver extends Solver[PropBranchProm.type, StreamT[Id, ?]] {
     done: A => StreamT[Id, B]): StreamT[Trampoline, B] =
     assess(s) match {
       case Failed => failed.trans(trampolineId)
-      case Done => done(s._2._2.apply(pr).get).trans(trampolineId)
+      case Done => done(lang.promStore.get(s).apply(pr).get).trans(trampolineId)
       case Incomplete(str) =>
         str.trans(trampolineId) flatMap { case (s1, k) => solutionsT(lang.interpreter.runFreeUnit(s1, k), pr, failed, done) }
     }
@@ -107,4 +107,13 @@ object DFSSolver extends Solver[PropBranchProm.type, StreamT[Id, ?]] {
   private object trampolineId extends (Id ~> Trampoline) {
     def apply[A](i: A): Trampoline[A] = i.point[Trampoline]
   }
+}
+
+object DFSSolver {
+  private implicit def unitMonoid: Monoid[Unit] = new Monoid[Unit] {
+    def zero: Unit = ()
+    def append(f1: Unit, f2: => Unit): Unit = ()
+  }
+
+  def apply(): DFSSolver[Unit] = new DFSSolver[Unit]
 }

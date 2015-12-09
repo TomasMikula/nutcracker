@@ -9,7 +9,8 @@ import nutcracker.util.free.FreeK
 import org.scalatest.FunSuite
 
 class Sudoku extends FunSuite {
-  type Lang[K[_], A] = DFSSolver.lang.Vocabulary[K, A]
+  val solver = DFSSolver()
+  type Lang[K[_], A] = solver.lang.Vocabulary[K, A]
 
   type Cell = DomRef[Int, Set[Int]]
   type Cells = Vector[Cell]
@@ -135,7 +136,7 @@ class Sudoku extends FunSuite {
       } yield solution
     }
 
-    val solutions = problems map { DFSSolver.allSolutions1(_) }
+    val solutions = problems map { solver.allSolutions1(_) }
 
     // both programs should produce a unique and correct solution
     solutions foreach { case (sols, failureCount) =>

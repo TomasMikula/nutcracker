@@ -58,6 +58,12 @@ object Interpreter {
     def uncons[K[_]](w: W[K])(s: S[K]): Option[(K[Unit], W[K])]
   }
 
+  type ConstK[T, K[_]] = T
+  implicit def constMonoidK[T: Monoid]: MonoidK[ConstK[T, ?[_]]] = new MonoidK[ConstK[T, ?[_]]] {
+    def zero[K[_]]: ConstK[T, K] = Monoid[T].zero
+    def append[K[_]](f1: ConstK[T, K], f2: ConstK[T, K]): ConstK[T, K] = Monoid[T].append(f1, f2)
+  }
+
   type AlwaysClean[K[_]] = Unit
   implicit def monoid[K[_]]: Monoid[AlwaysClean[K]] = monoidK.monoid
   implicit def monoidK: MonoidK[AlwaysClean] = new MonoidK[AlwaysClean] {

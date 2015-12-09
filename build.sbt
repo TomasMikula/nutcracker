@@ -40,6 +40,7 @@ libraryDependencies ++= Seq(
   "org.spire-math" %% "algebra-std" % "0.3.2-SNAPSHOT",
   "org.scalaz" %% "scalaz-core" % "7.2.0",
   "com.chuusai" %% "shapeless" % "2.2.5",
+  "com.github.julien-truffaut"  %%  "monocle-core" % "1.2.0-M2",
   "org.principled" %% "principled" % "0.1-SNAPSHOT",
   "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
   "org.scalacheck" %% "scalacheck" % "1.12.4"

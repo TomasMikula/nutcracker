@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 
 import nutcracker.util.free.Interpreter
-import nutcracker.util.free.Interpreter.{CleanInterpreter, AlwaysClean}
+import nutcracker.util.free.Interpreter.{ConstK, CleanInterpreter, AlwaysClean}
 
 import scalaz.{Semigroup, Applicative}
 import scalaz.syntax.applicative._
@@ -14,7 +14,6 @@ object CostLang {
   case class Cost[C, K[_]](c: C) extends CostLang[C, K, Unit]
   case class GetCost[C, K[_]]() extends CostLang[C, K, C]
 
-  type ConstK[T, K[_]] = T
   implicit def interpreter[C: Semigroup]: Interpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]], AlwaysClean] =
     new CleanInterpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] {
 
