@@ -33,31 +33,7 @@ class DFSSolver[C: Monoid] extends Solver[PropBranchPromCost[C], StreamT[Id, ?]]
     }
   }
 
-  def assess(s: S): Assessment[StreamT[Id, (S, K[Unit])]] = {
-    if(lang.propStore.get(s).failedVars.nonEmpty) Failed
-    else lang.branchStore.get(s).branches match {
-      case b::bs =>
-        val s1 = lang.branchStore.set(new BranchStore[StreamT[Id, ?], K](bs))(s)
-        Incomplete(b map { k => (s1, k) })
-      case Nil =>
-        if(lang.propStore.get(s).unresolvedVars.isEmpty) Done
-        else {
-
-          def splitDomain[A, D](ref: DomRef[A, D]): StreamT[Id, K[Unit]] = {
-            val (d, domain) = lang.propStore.get(s).getDomain(ref)
-            domain.values(d) match {
-              case Domain.Empty() => StreamT.empty
-              case Domain.Just(a) => ().pure[K] :: StreamT.empty[Id, K[Unit]]
-              case Domain.Many(branchings) => StreamT.fromIterable(branchings.head) map { d =>
-                intersectF(ref)(d)
-              }
-            }
-          }
-
-          Incomplete(splitDomain(lang.propStore.get(s).unresolvedVars.head) map { k => (s, k) })
-        }
-    }
-  }
+  def assess(s: S): Assessment[StreamT[Id, (S, K[Unit])]] = lang.naiveAssess(s)
 
   private def init[A](p: K[Promised[A]]): (S, Promised[A]) = {
     lang.interpreter.runFree(emptyState, p)
