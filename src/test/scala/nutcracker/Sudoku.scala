@@ -1,5 +1,7 @@
 package nutcracker
 
+import scala.language.higherKinds
+
 import nutcracker.Domain._
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._
@@ -7,6 +9,7 @@ import nutcracker.util.free.FreeK
 import org.scalatest.FunSuite
 
 class Sudoku extends FunSuite {
+  type Lang[K[_], A] = DFSSolver.lang.Vocabulary[K, A]
 
   type Cell = DomRef[Int, Set[Int]]
   type Cells = Vector[Cell]

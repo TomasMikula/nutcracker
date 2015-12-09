@@ -1,5 +1,7 @@
 package nutcracker
 
+import scala.language.higherKinds
+
 import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.lib.bool._
@@ -14,6 +16,7 @@ import org.scalatest.FreeSpec
 // the inhabitants' type from their statements.
 
 class KnightsAndKnaves extends FreeSpec {
+  type Lang[K[_], A] = DFSSolver.lang.Vocabulary[K, A]
 
   "Problem 1" - {
     // The visitor meets three inhabitants referred to as A, B and C.

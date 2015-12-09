@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.BranchLang.{AddBranching}
+import nutcracker.BranchLang._
 import nutcracker.util.free.Interpreter
 import nutcracker.util.free.Interpreter.AlwaysClean
 

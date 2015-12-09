@@ -3,33 +3,11 @@ import scala.language.higherKinds
 import nutcracker.PromiseLang._
 import nutcracker.PropagationLang._
 import nutcracker.util.free._
-import nutcracker.util.free.Interpreter._
 
 import algebra.lattice.GenBool
-import scalaz.Id._
-import scalaz.{Traverse, StreamT}
+import scalaz.Traverse
 
 package object nutcracker {
-
-  type Assessor[S, U] = S => Assessment[U]
-  type Advancer[S, U, F[_], K[_]] = (S, U) => F[(S, K[Unit])]
-
-  type AssessAdvance[S, F[_], K[_]] = S => Assessment[F[(S, K[Unit])]]
-
-  type BranchL[K[_], A] = BranchLang[StreamT[Id, ?], K, A]
-  type BranchS[K[_]] = BranchStore[StreamT[Id, ?], K]
-
-  type Lang0[K[_], A] = CoproductK[BranchL, PromiseLang, K, A]
-  type Lang1[K[_], A] = CoproductK[PropagationLang, Lang0, K, A]
-  type Lang[K[_], A] = CoyonedaK[Lang1, K, A]
-
-  type Store0[K[_]] = ProductK[BranchS, PromiseStore, K]
-  type Store[K[_]] = ProductK[PropagationStore, Store0, K]
-
-  type Dirty0[K[_]] = ProductK[AlwaysClean, AlwaysClean, K]
-  type Dirty[K[_]] = ProductK[PropagationStore.DirtyThings, Dirty0, K]
-
-  type Program[A] = FreeK[Lang, A]
 
   def concat[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
     ps.foldLeft[FreeK[F, Unit]](FreeK.Pure(())) { _ >> _ }

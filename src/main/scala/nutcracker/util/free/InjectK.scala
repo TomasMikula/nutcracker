@@ -1,7 +1,7 @@
 package nutcracker.util.free
 
 import scala.language.{higherKinds, implicitConversions}
-import scalaz.{Inject, Coyoneda, \/-, -\/}
+import scalaz.{\/-, -\/}
 
 trait InjectK[F[_[_], _], H[_[_], _]] {
   def inj[K[_], A](fa: F[K, A]): H[K, A]

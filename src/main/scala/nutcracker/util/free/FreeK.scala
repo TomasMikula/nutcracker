@@ -2,7 +2,6 @@ package nutcracker.util.free
 
 import scala.annotation.tailrec
 import scala.language.{higherKinds, implicitConversions}
-import scalaz.Leibniz.{===, refl}
 import scalaz._
 
 sealed trait FreeK[F[_[_], _], A] {

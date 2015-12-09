@@ -1,5 +1,7 @@
 package nutcracker
 
+import scala.language.higherKinds
+
 import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.lib.bool._
@@ -8,6 +10,7 @@ import org.scalatest.FunSpec
 import scalaz.std.vector._
 
 class Sat extends FunSpec {
+  type Lang[K[_], A] = DFSSolver.lang.Vocabulary[K, A]
 
   describe("A simple 3-SAT problem") {
 
