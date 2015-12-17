@@ -27,19 +27,23 @@ object PropagationLang {
   // builder API for Variables
   def variable[A]: VarBuilder[A] = new VarBuilder[A]
   final class VarBuilder[A] private[PropagationLang] {
-    def apply[D: Domain[A, ?] : BoundedLattice](): FP[DomRef[A, D]] = apply(BoundedLattice[D].one)
-    def apply[D: Domain[A, ?]](d: D): FP[DomRef[A, D]] = lift(Variable[FP, A, D](d, implicitly[Domain[A, D]]))
+    def apply[D: Domain[A, ?] : BoundedLattice](): FP[DomRef[A, D]] = any()
+    def any[D: Domain[A, ?] : BoundedLattice](): FP[DomRef[A, D]] = init(BoundedLattice[D].one)
+    def init[D: Domain[A, ?]](d: D): FP[DomRef[A, D]] = lift(Variable[FP, A, D](d, implicitly[Domain[A, D]]))
 
-    def oneOf(s: Set[A]): FP[DomRef[A, Set[A]]] = lift(Variable[FP, A, Set[A]](s, implicitly[Domain[A, Set[A]]]))
+    def oneOf(as: Set[A]): FP[DomRef[A, Set[A]]] = lift(Variable[FP, A, Set[A]](as, implicitly[Domain[A, Set[A]]]))
+    def oneOf(as: A*): FP[DomRef[A, Set[A]]] = oneOf(as.toSet)
 
     def count(n: Int): VarsBuilder[A] = new VarsBuilder(n)
   }
   final class VarsBuilder[A] private[PropagationLang](n: Int) {
-    def apply[D: Domain[A, ?] : BoundedLattice](): FP[Vector[DomRef[A, D]]] = apply[D](BoundedLattice[D].one)
-    def apply[D: Domain[A, ?]](d: D): FP[Vector[DomRef[A, D]]] =
-      Traverse[Vector].sequenceU(Vector.fill(n)(variable(d)))
+    def apply[D: Domain[A, ?] : BoundedLattice](): FP[Vector[DomRef[A, D]]] = any()
+    def any[D: Domain[A, ?] : BoundedLattice](): FP[Vector[DomRef[A, D]]] = init[D](BoundedLattice[D].one)
+    def init[D: Domain[A, ?]](d: D): FP[Vector[DomRef[A, D]]] =
+      Traverse[Vector].sequenceU(Vector.fill(n)(variable[A].init(d)))
 
-    def oneOf(s: Set[A]): FP[Vector[DomRef[A, Set[A]]]] = apply(s)
+    def oneOf(as: Set[A]): FP[Vector[DomRef[A, Set[A]]]] = init(as)
+    def oneOf(as: A*): FP[Vector[DomRef[A, Set[A]]]] = oneOf(as.toSet)
   }
 
   // constructors returning less specific types, and curried to help with type inference

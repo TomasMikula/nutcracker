@@ -18,6 +18,11 @@ package object nutcracker {
   def traverse[F[_[_], _], C[_]: Traverse, A, B](ps: C[A])(f: A => FreeK[F, B]): FreeK[F, C[B]] =
     Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)
 
+  def different[A, D: Domain[A, ?] : GenBool](d1: DomRef[A, D], d2: DomRef[A, D]): FreeK[PropagationLang, Unit] = {
+    whenResolvedF(d1){ a => remove(d2, a) } >>
+    whenResolvedF(d2){ a => remove(d1, a) }
+  }
+
   def allDifferent[A, D: Domain[A, ?] : GenBool](doms: DomRef[A, D]*): FreeK[PropagationLang, Unit] = {
     val n = doms.size
     concat((0 until n) map { i => whenResolvedF(doms(i)){ a =>
