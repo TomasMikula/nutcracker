@@ -1,7 +1,10 @@
 import scala.language.higherKinds
 
+import algebra.Eq
 import nutcracker.PromiseLang._
 import nutcracker.PropagationLang._
+import nutcracker.lib.bool.BoolDomain
+import nutcracker.lib.bool.BoolDomain._
 import nutcracker.util.free._
 
 import algebra.lattice.GenBool
@@ -30,6 +33,13 @@ package object nutcracker {
       concat((i+1 until n) map { j => remove(doms(j), a) }) }
     })
   }
+
+  def isDifferent[A: Eq, D: Domain[A, ?] : GenBool](d1: DomRef[A, D], d2: DomRef[A, D]): FreeK[PropagationLang, DomRef[Boolean, BoolDomain]] =
+    for {
+      res <- variable[Boolean]()
+      _ <- whenResolvedF(res) { if(_) different(d1, d2) else d1 <=> d2 }
+      _ <- whenResolvedF(d1) { a1 => whenResolvedF(d2) { a2 => set(res, Eq[A].eqv(a1, a2)) } }
+    } yield res
 
   def promiseResult[A, D](cell: DomRef[A, D]): FreeK[CoproductK[PropagationLang, PromiseLang, ?[_], ?], Promised[A]] = {
     type PP[K[_], T] = CoproductK[PropagationLang, PromiseLang, K, T]
