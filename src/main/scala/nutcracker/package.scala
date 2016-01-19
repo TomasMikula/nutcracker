@@ -38,7 +38,7 @@ package object nutcracker {
     for {
       res <- variable[Boolean]()
       _ <- whenResolvedF(res) { if(_) different(d1, d2) else d1 <=> d2 }
-      _ <- whenResolvedF(d1) { a1 => whenResolvedF(d2) { a2 => set(res, Eq[A].eqv(a1, a2)) } }
+      _ <- whenResolvedF(d1) { a1 => whenResolvedF(d2) { a2 => set(res, Eq[A].neqv(a1, a2)) } }
     } yield res
 
   def promiseResult[A, D](cell: DomRef[A, D]): FreeK[CoproductK[PropagationLang, PromiseLang, ?[_], ?], Promised[A]] = {
