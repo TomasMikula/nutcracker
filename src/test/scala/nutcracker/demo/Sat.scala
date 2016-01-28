@@ -1,12 +1,12 @@
-package nutcracker
-
-import scala.language.higherKinds
+package nutcracker.demo
 
 import nutcracker.PropagationLang._
+import nutcracker._
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.lib.bool._
 import org.scalatest.FunSpec
 
+import scala.language.higherKinds
 import scalaz.std.vector._
 
 class Sat extends FunSpec {

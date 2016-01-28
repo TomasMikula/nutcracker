@@ -1,11 +1,12 @@
-package nutcracker
-
-import scala.language.higherKinds
+package nutcracker.demo
 
 import nutcracker.PropagationLang._
+import nutcracker._
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.lib.bool._
 import org.scalatest.FreeSpec
+
+import scala.language.higherKinds
 
 // From https://en.wikipedia.org/wiki/Knights_and_Knaves:
 //

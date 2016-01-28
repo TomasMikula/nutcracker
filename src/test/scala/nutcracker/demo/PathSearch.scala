@@ -1,16 +1,15 @@
-package nutcracker
+package nutcracker.demo
 
-import nutcracker.algebraic.NonDecreasingMonoid
-
-import scala.annotation.tailrec
-import scala.language.higherKinds
-
+import nutcracker.BFSSolver
 import nutcracker.BranchLang._
 import nutcracker.CostLang._
 import nutcracker.PromiseLang._
-import nutcracker.util.free.{InjectK, FreeK}
-
+import nutcracker.algebraic.NonDecreasingMonoid
+import nutcracker.util.free.{FreeK, InjectK}
 import org.scalatest.FunSuite
+
+import scala.annotation.tailrec
+import scala.language.higherKinds
 import scalaz.Id._
 import scalaz.{Ordering, StreamT}
 

@@ -1,12 +1,13 @@
-package nutcracker
-
-import scala.language.higherKinds
+package nutcracker.demo
 
 import nutcracker.Domain._
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._
+import nutcracker._
 import nutcracker.util.free.FreeK
 import org.scalatest.FunSuite
+
+import scala.language.higherKinds
 
 class Sudoku extends FunSuite {
   val solver = DFSSolver()
