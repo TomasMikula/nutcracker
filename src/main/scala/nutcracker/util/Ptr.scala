@@ -8,9 +8,10 @@ trait Ptr[L <: HList, N <: Nat] extends At[L, N] {
 }
 
 object Ptr {
-  def apply[L <: HList, N <: Nat](implicit at: Ptr[L, N]): Aux[L, N, at.Out] = at
-
   type Aux[L <: HList, N <: Nat, Out0] = Ptr[L, N] { type Out = Out0 }
+
+  def apply[L <: HList, N <: Nat](implicit at: Ptr[L, N]): Aux[L, N, at.Out] = at
+  def apply[L <: HList, N <: Nat](n: N)(implicit at: Ptr[L, N]): Aux[L, N, at.Out] = at
 
   implicit def hlistAtZero[H, T <: HList]: Aux[H :: T, _0, H] =
     new Ptr[H :: T, _0] {
