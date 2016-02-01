@@ -3,7 +3,7 @@ package nutcracker
 import nutcracker.util.free.{FreeK, FunctorKA, InjectK}
 
 import scala.language.higherKinds
-import scalaz.~>
+import scalaz.{Cont, ~>}
 
 /**
   *
@@ -15,7 +15,12 @@ sealed trait PromiseLang[K[_], A]
 
 object PromiseLang {
 
-  final case class Promised[A](id: Long)
+  final case class Promised[A](id: Long) { self =>
+
+    implicit def asCont[F[_[_], _]](implicit inj: InjectK[PromiseLang, F]): Cont[FreeK[F, Unit], A] =
+      Cont { onCompleteF(self)(_) }
+
+  }
 
   case class Promise[K[_], A]() extends PromiseLang[K, Promised[A]]
   case class Complete[K[_], A](p: Promised[A], a: A) extends PromiseLang[K, Unit]
