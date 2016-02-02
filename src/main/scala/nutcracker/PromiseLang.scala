@@ -3,6 +3,7 @@ package nutcracker
 import nutcracker.util.free.{FreeK, FunctorKA, InjectK}
 
 import scala.language.higherKinds
+import scala.language.implicitConversions
 import scalaz.{Cont, ~>}
 
 /**
@@ -17,8 +18,15 @@ object PromiseLang {
 
   final case class Promised[A](id: Long) { self =>
 
-    implicit def asCont[F[_[_], _]](implicit inj: InjectK[PromiseLang, F]): Cont[FreeK[F, Unit], A] =
+    def asCont[F[_[_], _]](implicit inj: InjectK[PromiseLang, F]): Cont[FreeK[F, Unit], A] =
       Cont { onCompleteF(self)(_) }
+
+  }
+
+  object Promised {
+
+    implicit def toCont[F[_[_], _], A](p: Promised[A])(implicit inj: InjectK[PromiseLang, F]): Cont[FreeK[F, Unit], A] =
+      p.asCont
 
   }
 
