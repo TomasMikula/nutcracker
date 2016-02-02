@@ -4,7 +4,7 @@ import nutcracker.util.free.{FreeK, FunctorKA, InjectK}
 
 import scala.language.higherKinds
 import scala.language.implicitConversions
-import scalaz.{Cont, ~>}
+import scalaz.{Apply, Cont, ~>}
 
 /**
   *
@@ -42,6 +42,38 @@ object PromiseLang {
   def completeF[A](p: Promised[A], a: A): FreeK[PromiseLang, Unit] = FreeK.lift(complete[FreeK[PromiseLang, ?], A](p, a))
   def onCompleteF[F[_[_], _], A](p: Promised[A])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PromiseLang, F]): FreeK[F, Unit] =
     FreeK.lift(onComplete[FreeK[F, ?], A](p)(f))
+
+  def promiseC[F[_[_], _], A](cont: Cont[FreeK[F, Unit], A])(implicit inj: InjectK[PromiseLang, F]): FreeK[F, Promised[A]] = for {
+    pa <- promiseF[A].inject[F]
+    _ <- cont(completeF(pa, _))
+  } yield pa
+
+  // Scalac doesn't seem to always pick up the Applicative instance and syntax for Cont[FreeK[F, Unit], ?],
+  // so we provide this API for convenience.
+  def promiseC[F[_[_], _]]: PromiseContBuilder[F] = PromiseContBuilder()
+
+  case class PromiseContBuilder[F[_[_], _]]() {
+    private type Kont[A] = Cont[FreeK[F, Unit], A]
+    private val A = Apply[Kont]
+
+    def tuple[A1, A2](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2])(implicit inj: InjectK[PromiseLang, F]): FreeK[F, Promised[(A1, A2)]] =
+      promiseC(A.tuple2(a1, a2))
+    def tuple[A1, A2, A3](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3])(implicit inj: InjectK[PromiseLang, F]): FreeK[F, Promised[(A1, A2, A3)]] =
+      promiseC(A.tuple3(a1, a2, a3))
+    def tuple[A1, A2, A3, A4](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3], a4: Cont[FreeK[F, Unit], A4])(implicit inj: InjectK[PromiseLang, F]): FreeK[F, Promised[(A1, A2, A3, A4)]] =
+      promiseC(A.tuple4(a1, a2, a3, a4))
+    def tuple[A1, A2, A3, A4, A5](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3], a4: Cont[FreeK[F, Unit], A4], a5: Cont[FreeK[F, Unit], A5])(implicit inj: InjectK[PromiseLang, F]): FreeK[F, Promised[(A1, A2, A3, A4, A5)]] =
+      promiseC(A.tuple5(a1, a2, a3, a4, a5))
+
+    def apply[A1, A2, R](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2])(f: (A1, A2) => R)(implicit inj: InjectK[PromiseLang, F]): FreeK[F, Promised[R]] =
+      promiseC(A.apply2(a1, a2)(f))
+    def apply[A1, A2, A3, R](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3])(f: (A1, A2, A3) => R)(implicit inj: InjectK[PromiseLang, F]): FreeK[F, Promised[R]] =
+      promiseC(A.apply3(a1, a2, a3)(f))
+    def apply[A1, A2, A3, A4, R](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3], a4: Cont[FreeK[F, Unit], A4])(f: (A1, A2, A3, A4) => R)(implicit inj: InjectK[PromiseLang, F]): FreeK[F, Promised[R]] =
+      promiseC(A.apply4(a1, a2, a3, a4)(f))
+    def apply[A1, A2, A3, A4, A5, R](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3], a4: Cont[FreeK[F, Unit], A4], a5: Cont[FreeK[F, Unit], A5])(f: (A1, A2, A3, A4, A5) => R)(implicit inj: InjectK[PromiseLang, F]): FreeK[F, Promised[R]] =
+      promiseC(A.apply5(a1, a2, a3, a4, a5)(f))
+  }
 
 
   implicit def functorKInstance: FunctorKA[PromiseLang] = new FunctorKA[PromiseLang] {
