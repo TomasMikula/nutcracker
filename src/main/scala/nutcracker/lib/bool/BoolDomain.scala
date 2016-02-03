@@ -1,6 +1,6 @@
 package nutcracker.lib.bool
 
-import algebra.lattice.{Bool, BoundedLattice}
+import algebra.lattice.Bool
 import nutcracker.Domain
 
 sealed trait BoolDomain

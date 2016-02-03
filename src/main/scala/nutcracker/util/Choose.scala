@@ -5,7 +5,7 @@ import shapeless._
 trait Choose[L <: HList, C <: HList] extends (L => C) {
   def vertexSet: Set[Int]
 
-  def ::[N <: Nat, A](n: N)(implicit ptr: Ptr.Aux[L, N, A]): Choose[L, A :: C] = new Choose[L, A :: C] {
+  def ::[N <: Nat, A](n: N)(implicit ptr: Ptr.Aux[L, n.N, A]): Choose[L, A :: C] = new Choose[L, A :: C] { // linter:ignore UnusedParameter // argument n is there just to infer N
     override lazy val vertexSet: Set[Int] = Choose.this.vertexSet + ptr.index
     def apply(l: L): (A :: C) = ptr(l) :: Choose.this.apply(l)
   }
