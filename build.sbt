@@ -14,6 +14,7 @@ autoCompilerPlugins := true
 addCompilerPlugin("com.lihaoyi" %% "acyclic" % "0.1.3")
 addCompilerPlugin("org.spire-math" % "kind-projector" % "0.6.0" cross CrossVersion.binary)
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0-M5" cross CrossVersion.full)
+addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.12")
 
 scalastyleFailOnError := true
 
@@ -62,10 +63,6 @@ addWartRemoverToLintTarget
 
 removeWartRemoverFromCompileTarget 
 
-addFoursquareLinterToLintTarget 
-
-removeFoursquareLinterFromCompileTarget 
-
 def addMainSourcesToLintTarget = {
   inConfig(LintTarget) {
     Defaults.compileSettings ++ Seq(
@@ -110,30 +107,5 @@ def removeWartRemoverFromCompileTarget = {
   scalacOptions in Compile := (scalacOptions in Compile).value filterNot { switch =>
     switch.startsWith("-P:wartremover:") ||
     "^-Xplugin:.*/org[.]brianmckenna/.*wartremover.*[.]jar$".r.pattern.matcher(switch).find
-  }
-}
-
-def addFoursquareLinterToLintTarget = {
-  Seq(
-    resolvers += "Linter Repository" at "https://hairyfotr.github.io/linteRepo/releases",
-    addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.12"),
-    // See https://github.com/HairyFotr/linter#list-of-implemented-checks
-    // for a list of checks that foursquare linter implements.
-    // By default linter enables all checks.
-    // I don't mind using match on boolean variables.
-    scalacOptions in LintTarget += "-P:linter:disable:PreferIfToBooleanMatch"
-  )
-}
-
-def removeFoursquareLinterFromCompileTarget = {
-  // We call addCompilerPlugin in project/plugins.sbt to add a depenency
-  // on the foursquare linter so that sbt magically manages the JAR for us.
-  // Unfortunately, addCompilerPlugin also adds a switch to scalacOptions
-  // in the Compile config to load the plugin.
-  // The bit below removes all switches that could be passed to scalac
-  // about foursquare linter during a non-lint compile.
-  scalacOptions in Compile := (scalacOptions in Compile).value filterNot { switch =>
-    switch.startsWith("-P:linter:") ||
-      "^-Xplugin:.*/com[.]foursquare[.]lint/.*linter.*[.]jar$".r.pattern.matcher(switch).find
   }
 }
