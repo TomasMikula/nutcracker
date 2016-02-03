@@ -29,9 +29,9 @@ object PropagationLang {
   final class VarBuilder[A] private[PropagationLang] {
     def apply[D: Domain[A, ?] : BoundedLattice](): FP[DomRef[A, D]] = any()
     def any[D: Domain[A, ?] : BoundedLattice](): FP[DomRef[A, D]] = init(BoundedLattice[D].one)
-    def init[D: Domain[A, ?]](d: D): FP[DomRef[A, D]] = lift(Variable[FP, A, D](d, implicitly[Domain[A, D]]))
+    def init[D: Domain[A, ?]](d: D): FP[DomRef[A, D]] = FreeK.suspend(Variable[FP, A, D](d, implicitly[Domain[A, D]]))
 
-    def oneOf(as: Set[A]): FP[DomRef[A, Set[A]]] = lift(Variable[FP, A, Set[A]](as, implicitly[Domain[A, Set[A]]]))
+    def oneOf(as: Set[A]): FP[DomRef[A, Set[A]]] = FreeK.suspend(Variable[FP, A, Set[A]](as, implicitly[Domain[A, Set[A]]]))
     def oneOf(as: A*): FP[DomRef[A, Set[A]]] = oneOf(as.toSet)
 
     def count(n: Int): VarsBuilder[A] = new VarsBuilder(n)
@@ -57,19 +57,19 @@ object PropagationLang {
 
   // constructors lifted to free programs
   def intersectF[D](ref: CellRef[D])(d: D): FP[Unit] =
-    lift(intersect[FP, D](ref)(d))
+    FreeK.suspend(intersect[FP, D](ref)(d))
   def intersectVectorF[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N])(values: Sized[Vector[D], N]): FP[Unit] =
-    lift(intersectVector[FP, D, N](refs)(values))
+    FreeK.suspend(intersectVector[FP, D, N](refs)(values))
   def fetchF[D](ref: CellRef[D]): FP[D] =
-    lift(fetch[FP, D](ref))
+    FreeK.suspend(fetch[FP, D](ref))
   def fetchVectorF[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): FP[Sized[Vector[D], N]] =
-    lift(fetchVector[FP, D, N](refs))
+    FreeK.suspend(fetchVector[FP, D, N](refs))
   def varTriggerF[F[_[_], _], D](ref: CellRef[D])(f: D => Trigger[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    liftF(varTrigger[FreeK[F, ?], D](ref)(f))
+    FreeK.lift(varTrigger[FreeK[F, ?], D](ref)(f))
   def selTriggerF[F[_[_], _], L <: HList](sel: Sel[L])(f: L => Trigger[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    liftF(selTrigger[FreeK[F, ?], L](sel)(f))
+    FreeK.lift(selTrigger[FreeK[F, ?], L](sel)(f))
   def whenResolvedF[F[_[_], _], A, D](ref: DomRef[A, D])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    liftF(whenResolved[FreeK[F, ?], A, D](ref)(f))
+    FreeK.lift(whenResolved[FreeK[F, ?], A, D](ref)(f))
 
 
   // convenience API
@@ -82,13 +82,7 @@ object PropagationLang {
   def selTrigger2[K[_], D1, D2](ref1: CellRef[D1], ref2: CellRef[D2])(f: (D1, D2) => Trigger[K]): PropagationLang[K, Unit] =
     selTrigger[K, D1 :: D2 :: HNil](Sel(ref1, ref2))(l => f(l.head, l.tail.head))
   def selTrigger2F[F[_[_], _], D1, D2](ref1: CellRef[D1], ref2: CellRef[D2])(f: (D1, D2) => Trigger[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    liftF(selTrigger2[FreeK[F, ?], D1, D2](ref1, ref2)(f))
-
-  private def lift[A](p: PropagationLang[FreeK[PropagationLang, ?], A]): FP[A] =
-    FreeK.suspend(p)
-
-  private def liftF[F[_[_], _], A](p: PropagationLang[FreeK[F, ?], A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, A] =
-    FreeK.lift(p)
+    FreeK.lift(selTrigger2[FreeK[F, ?], D1, D2](ref1, ref2)(f))
 
   implicit def functorKInstance: FunctorKA[PropagationLang] = new FunctorKA[PropagationLang] {
 
