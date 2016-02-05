@@ -1,11 +1,11 @@
-package nutcracker
+package nutcracker.rel
 
-import nutcracker.Rel.{Rel1, Rel2, Rel3}
-import org.scalatest.{Matchers, FlatSpec}
+import nutcracker.rel.Rel.{Rel1, Rel2, Rel3}
+import org.scalatest.{FlatSpec, Matchers}
 import shapeless.test.illTyped
-import shapeless.{HNil, ::}
+import shapeless.{::, HNil}
 
-import scalaz.{IList, NonEmptyList}
+import scalaz.NonEmptyList
 
 class PatternTest extends FlatSpec with Matchers {
 
@@ -49,19 +49,20 @@ class PatternTest extends FlatSpec with Matchers {
   val pat = Pattern[Int::Int::Int::Int::Int::Int::Int::Int::HNil].build({ case a::b::c::d::e::f::g::h::HNil => NonEmptyList(
     p(a, b), p(b, c), q(c, d), q(d, e), q(e, f), q(f, g), q(g, h), q(h, a)
   ) })
+  val ppat = pat.orient(p)
 
   "Orienting { p(a, b), p(b, c), q(c, d), q(d, e), q(e, f), q(f, g), q(g, h), q(h, a) } towards p" should "yield two results" in {
-    pat.orient(p).size should be (2)
+    ppat.orientations.size should be (2)
   }
 
   it should "preserve the set of predicates" in {
-    pat.orient(p) foreach {
+    ppat.orientations foreach {
       case (r, rs) => (rs.toSet + r) should be (pat.relations.toSet)
     }
   }
 
   it should "produce results whose every prefix is connected" in {
-    pat.orient(p) foreach {
+    ppat.orientations foreach {
       case (r, rs) => NonEmptyList(r, rs:_*).reverse.tails.init.toList.foreach {
         case NonEmptyList(h, t) => (h.vertexSet intersect t.foldLeft(Set[Int]())((acc, rel) => acc union rel.vertexSet)) should not be (Set.empty)
       }

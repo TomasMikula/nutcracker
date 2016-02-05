@@ -54,9 +54,6 @@ trait Interpreter[F[_[_], _], S[_[_]], W[_[_]]] {
 }
 
 object Interpreter {
-  trait Uncons[W[_[_]], S[_[_]]] {
-    def uncons[K[_]](w: W[K])(s: S[K]): Option[(K[Unit], W[K])]
-  }
 
   type ConstK[T, K[_]] = T
   implicit def constMonoidK[T: Monoid]: MonoidK[ConstK[T, ?[_]]] = new MonoidK[ConstK[T, ?[_]]] {

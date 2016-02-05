@@ -1,10 +1,13 @@
 package nutcracker.util
 
+import scala.language.higherKinds
+
 import shapeless._
 import shapeless.ops.hlist.At
 
 trait Ptr[L <: HList, N <: Nat] extends At[L, N] {
   def index: Int
+  def lift[F[_]](implicit m: Mapped[L, F]): Ptr.Aux[m.Out, N, F[Out]] = this.asInstanceOf[Ptr.Aux[m.Out, N, F[Out]]] // cheating, but screw it
 }
 
 object Ptr {

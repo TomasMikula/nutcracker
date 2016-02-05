@@ -1,6 +1,6 @@
-package nutcracker
+package nutcracker.rel
 
-import nutcracker.util._
+import nutcracker.util.ChooseByPtrs
 import shapeless._
 
 trait Rel[L <: HList] {
