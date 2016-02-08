@@ -17,16 +17,24 @@ case class Assignment[L <: HList] private (values: Vector[Option[_]]) extends An
 
   def get[C <: HList](ch: Choose[L, C]): Assignment[C] = Assignment(ch.vertices.map(values(_)).toVector)
   def set[C <: HList](ch: Choose[L, C])(c: C): Assignment[L] = set1(ch.vertices, c)
+  def extend[C <: HList](ch: Choose[L, C])(c : C): Option[Assignment[L]] =
+    if(matches(ch)(c)) Some(set1(ch.vertices, c))
+    else None
 
   def get(ptr: Ptr[L, _]): Option[ptr.Out] = values(ptr.index).asInstanceOf[Option[ptr.Out]]
   def set[A](ptr: Ptr.Aux[L, _, A])(a: A): Assignment[L] = set0(ptr.index, a)
 
   def matches(l: L): Boolean = matches0(l, 0)
+  def matches[C <: HList](ch: Choose[L, C])(c: C): Boolean = matches0(ch.vertices, c)
 
   private def matches0[M <: HList](m: M, from: Int): Boolean = m match {
     case HNil => assert(from == values.size); true
-    case h :: t =>
-      if(!values(from).map(_ == h).getOrElse(false)) false else this.matches0(t, from + 1)
+    case h :: t => values(from).map(_ == h).getOrElse(true) && matches0(t, from + 1)
+  }
+
+  private def matches0[C <: HList](vertices: List[Int], c: C): Boolean = c match {
+    case HNil => assert(vertices.isEmpty); true
+    case h :: t => values(vertices.head).map(_ == h).getOrElse(true) && matches0(vertices.tail, t)
   }
 
   private def set0(i: Int, a: Any): Assignment[L] = Assignment(values.updated(i, Some(a)))
