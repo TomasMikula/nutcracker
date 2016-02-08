@@ -115,6 +115,12 @@ case class RelDB[K[_]] private (
 
 object RelDB {
 
+  def empty[K[_]]: RelDB[K] = RelDB(
+    Map.empty,
+    Map.empty,
+    Map.empty
+  )
+
   implicit def interpreter: Interpreter[RelLang, RelDB, AlwaysClean] = new CleanInterpreter[RelLang, RelDB] {
 
     def step0[K[_] : Applicative, A](f: RelLang[K, A])(db: RelDB[K]): (RelDB[K], K[A]) = f match {
