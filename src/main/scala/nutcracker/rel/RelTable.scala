@@ -29,5 +29,6 @@ private[rel] case class RelTable0[L <: HList, OS <: HList](rows: Vector[L])(impl
     else Some(RelTable0(rows :+ row))
 
   def query(q: Assignment[L]): List[L] =
-    rows.foldRight[List[L]](Nil)((row, acc) => if(q.matches(row)) row :: acc else acc)
+    if(q.isEmpty) rows.toList
+    else rows.foldRight[List[L]](Nil)((row, acc) => if(q.matches(row)) row :: acc else acc)
 }

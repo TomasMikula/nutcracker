@@ -12,6 +12,7 @@ import shapeless.ops.hlist.Length
 
 case class Assignment[L <: HList] private (values: Vector[Option[_]]) extends AnyVal {
 
+  def isEmpty: Boolean = values all { _.isEmpty }
   def getIfComplete: Option[L] = values.sequence map { _.foldRight[HList](HNil)(_ :: _).asInstanceOf[L] }
 
   def get[C <: HList](ch: Choose[L, C]): Assignment[C] = Assignment(ch.vertices.map(values(_)).toVector)
