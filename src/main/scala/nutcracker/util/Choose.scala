@@ -31,6 +31,8 @@ object Choose {
     def vertices: List[Int] = Nil
     def apply(v1: L): HNil = HNil
   }
+
+  implicit def chooseByNats[L <: HList, C <: HList, NS <: HList](ns: NS)(implicit ch: ChooseByNats[L, C, NS]): Choose[L, C] = ch(ns)
 }
 
 
@@ -46,4 +48,19 @@ object ChooseByPtrs {
     new ChooseByPtrs[L, H :: T, Ptr.Aux[L, N, H] :: PT] {
       def apply(ptrs: Ptr.Aux[L, N, H] :: PT): Choose[L, H :: T] = ptrs.head :: ch(ptrs.tail)
     }
+}
+
+trait ChooseByNats[L <: HList, C <: HList, NS <: HList] extends (NS => Choose[L, C])
+
+object ChooseByNats {
+  implicit def chooseHNil[L <: HList]: ChooseByNats[L, HNil, HNil] = new ChooseByNats[L, HNil, HNil] {
+    def apply(nats: HNil): Choose[L, HNil] = Choose[L]
+  }
+
+  implicit def chooseHCons[L <: HList, H, T <: HList, N <: Nat, NS <: HList](implicit
+    ch: ChooseByNats[L, T, NS],
+    ptr: Ptr.Aux[L, N, H]
+  ): ChooseByNats[L, H :: T, N :: NS] = new ChooseByNats[L, H :: T, N :: NS] {
+    def apply(nats: N :: NS): Choose[L, H :: T] = ptr :: ch(nats.tail)
+  }
 }

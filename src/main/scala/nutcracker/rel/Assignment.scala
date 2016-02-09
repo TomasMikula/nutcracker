@@ -1,6 +1,6 @@
 package nutcracker.rel
 
-import nutcracker.util.{Ptr, Choose}
+import nutcracker.util.{Mapped, Ptr, Choose}
 
 import scala.annotation.tailrec
 import scalaz.std.option._
@@ -18,14 +18,14 @@ case class Assignment[L <: HList] private (values: Vector[Option[_]]) extends An
   def get[C <: HList](ch: Choose[L, C]): Assignment[C] = Assignment(ch.vertices.map(values(_)).toVector)
   def set[C <: HList](ch: Choose[L, C])(c: C): Assignment[L] = set1(ch.vertices, c)
   def extend[C <: HList](ch: Choose[L, C])(c : C): Option[Assignment[L]] =
-    if(matches(ch)(c)) Some(set1(ch.vertices, c))
+    if(matchesAt(ch)(c)) Some(set1(ch.vertices, c))
     else None
 
   def get(ptr: Ptr[L, _]): Option[ptr.Out] = values(ptr.index).asInstanceOf[Option[ptr.Out]]
-  def set[A](ptr: Ptr.Aux[L, _, A])(a: A): Assignment[L] = set0(ptr.index, a)
+  def set(ptr: Ptr[L, _])(a: ptr.Out): Assignment[L] = set0(ptr.index, a)
 
   def matches(l: L): Boolean = matches0(l, 0)
-  def matches[C <: HList](ch: Choose[L, C])(c: C): Boolean = matches0(ch.vertices, c)
+  def matchesAt[C <: HList](ch: Choose[L, C])(c: C): Boolean = matches0(ch.vertices, c)
 
   private def matches0[M <: HList](m: M, from: Int): Boolean = m match {
     case HNil => assert(from == values.size); true
@@ -49,5 +49,7 @@ object Assignment {
 
   case class AssignmentBuilder[L <: HList, N <: Nat] private[rel] () {
     def empty(implicit nToInt: ToInt[N]): Assignment[L] = Assignment(Vector.fill(nToInt())(Option.empty))
+    def from[OL <: HList](ol: OL)(implicit m: Mapped.Aux[L, Option, OL]): Assignment[L] =
+      Assignment(m.toList(ol).toVector)
   }
 }

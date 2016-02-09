@@ -1,6 +1,7 @@
 package nutcracker.util
 
 import scala.language.higherKinds
+import scala.language.implicitConversions
 
 import shapeless._
 import shapeless.ops.hlist.At
@@ -30,4 +31,6 @@ object Ptr {
       def apply(l : H :: T) : Out = att(l.tail)
       def index = att.index + 1
     }
+
+  implicit def ptrFromNat[L <: HList, N <: Nat, A](n : N)(implicit ptr: Ptr.Aux[L, N, A]): Ptr.Aux[L, N, A] = ptr
 }
