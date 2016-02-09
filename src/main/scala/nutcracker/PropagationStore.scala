@@ -20,7 +20,7 @@ case class PropagationStore[K[_]] private(
   domains: Map[Long, (D, Domain[A, D]) forSome { type A; type D }],
   domainTriggers: Map[CellRef[_], List[_ => Trigger[K]]],
   selTriggers: Map[Sel[_], List[_ => Trigger[K]]],
-  cellsToSels: Index[Sel[_ <: HList], CellRef[_]],
+  cellsToSels: Index[CellRef[_], Sel[_ <: HList]],
   unresolvedVars: Set[DomRef[A, D] forSome { type A; type D }],
   failedVars: Set[Long]) {
 
