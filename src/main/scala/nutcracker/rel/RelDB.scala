@@ -127,7 +127,10 @@ case class RelDB[K[_]] private (
     copy(tables = tables + ((rel, tbl)))
 
   private def addTrigger[V <: HList](p: PartiallyAssignedPattern[V], h: V => K[Unit]): RelDB[K] =
-    copy(patternTriggers = patternTriggers + ((p, h :: triggers(p))))
+    copy(
+      patternTriggers = patternTriggers + ((p, h :: triggers(p))),
+      relToPatterns = relToPatterns.add(p)
+    )
 }
 
 object RelDB {
