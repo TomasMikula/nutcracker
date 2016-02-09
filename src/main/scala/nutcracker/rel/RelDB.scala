@@ -4,7 +4,7 @@ import scala.language.existentials
 import scala.language.higherKinds
 
 import nutcracker.rel.RelLang._
-import nutcracker.util.Mapped
+import nutcracker.util.{TransformedIndex, Mapped}
 import nutcracker.util.free.Interpreter
 import nutcracker.util.free.Interpreter.{CleanInterpreter, AlwaysClean}
 
@@ -18,7 +18,7 @@ import RelDB._
 case class RelDB[K[_]] private (
   private val tables: Map[Rel[_], RelTable[_]],
   private val patternTriggers: Map[PartiallyAssignedPattern[_], List[_ => K[Unit]]],
-  private val relToPatterns: Map[Rel[_], Set[PartiallyAssignedOrientedPattern[_, _]]]
+  private val relToPatterns: TransformedIndex[Rel[_ <: HList], PartiallyAssignedPattern[_ <: HList], PartiallyAssignedOrientedPattern[_ <: HList, _ <: HList]]
 ) {
 
   case class Inserter[L <: HList, OS <: HList] private[RelDB] (rel: Rel[L])(implicit m: Mapped.Aux[L, Order, OS]) {
@@ -113,7 +113,7 @@ case class RelDB[K[_]] private (
 
   // lookup all watched patterns that contain the given rel
   private def watchedPatterns[L <: HList](rel: Rel[L]): List[PartiallyAssignedOrientedPattern[_ <: HList, L]] =
-    relToPatterns.get(rel).map(_.toList.asInstanceOf[List[PartiallyAssignedOrientedPattern[_ <: HList, L]]]).getOrElse(Nil)
+    relToPatterns.get(rel).toList.asInstanceOf[List[PartiallyAssignedOrientedPattern[_ <: HList, L]]]
 
   private def query[L <: HList](rel: Rel[L])(q: Assignment[L]): List[L] = table0(rel) match {
     case Some(tbl) => tbl.query(q)
@@ -132,7 +132,10 @@ case class RelDB[K[_]] private (
 
 object RelDB {
 
-  private[rel] case class PartiallyAssignedPattern[V <: HList](pattern: Pattern[V], assignment: Assignment[V])
+  private[rel] case class PartiallyAssignedPattern[V <: HList](pattern: Pattern[V], assignment: Assignment[V]) {
+    def orient[L <: HList](rel: Rel[L]): PartiallyAssignedOrientedPattern[V, L] =
+      PartiallyAssignedOrientedPattern(pattern.orient(rel), assignment)
+  }
   private[rel] case class PartiallyAssignedOrientedPattern[V <: HList, L <: HList](pattern: OrientedPattern[V, L], assignment: Assignment[V]) {
     def unorient: PartiallyAssignedPattern[V] = PartiallyAssignedPattern(pattern.pattern, assignment)
   }
@@ -140,7 +143,7 @@ object RelDB {
   def empty[K[_]]: RelDB[K] = RelDB(
     Map.empty,
     Map.empty,
-    Map.empty
+    TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel))
   )
 
   implicit def interpreter: Interpreter[RelLang, RelDB, AlwaysClean] = new CleanInterpreter[RelLang, RelDB] {
