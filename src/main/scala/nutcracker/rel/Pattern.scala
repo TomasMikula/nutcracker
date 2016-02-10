@@ -1,7 +1,8 @@
 package nutcracker.rel
 
 import nutcracker.rel.Pattern.Orientation
-import nutcracker.util.Pointers
+import nutcracker.rel.RelDB.PartiallyAssignedPattern
+import nutcracker.util.{ValuedPointers, Ptr, Mapped, Pointers}
 import shapeless.ops.hlist.Length
 import shapeless.ops.nat.ToInt
 import shapeless.{:: => _, _}
@@ -58,6 +59,20 @@ object Pattern {
 
   case class PatternBuilder[V <: HList, Ptrs <: HList](ptrs: Ptrs) {
     def build[N <: Nat](f: Ptrs => NonEmptyList[RelChoice[V, _ <: HList]])(implicit l: Length.Aux[V, N], nToInt: ToInt[N]): Pattern[V] = Pattern.build(f(ptrs))
+    def where[PA <: HList, N <: Nat](f: Ptrs => PA)(implicit
+      vp: ValuedPointers[V, PA],
+      l: Length.Aux[V, N],
+      nToInt: ToInt[N]
+    ): PartiallyAssignedPatternBuilder[V, Ptrs] = {
+      val (ch, c) = vp(f(ptrs))
+      val asg = Assignment[V].empty.set(ch)(c)
+      PartiallyAssignedPatternBuilder(ptrs, asg)
+    }
+  }
+
+  case class PartiallyAssignedPatternBuilder[V <: HList, Ptrs <: HList](ptrs: Ptrs, asg: Assignment[V]) {
+    def build[N <: Nat](f: Ptrs => NonEmptyList[RelChoice[V, _ <: HList]])(implicit l: Length.Aux[V, N], nToInt: ToInt[N]): PartiallyAssignedPattern[V] =
+      PartiallyAssignedPattern(Pattern.build(f(ptrs)), asg)
   }
 
   def apply[V <: HList](implicit ptrs: Pointers[V]): PatternBuilder[V, ptrs.Out] = PatternBuilder(ptrs.get)

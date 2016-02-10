@@ -1,6 +1,7 @@
 package nutcracker.rel
 
 import algebra.Order
+import nutcracker.rel.RelDB.PartiallyAssignedPattern
 import nutcracker.util.{SummonHList, Mapped}
 import nutcracker.util.free.{FunctorKA, InjectK, FreeK}
 
@@ -33,6 +34,8 @@ object RelLang {
 
   def onPatternMatchF[F[_[_], _], V <: HList](p: Pattern[V])(h: V => FreeK[F, Unit])(implicit inj: InjectK[RelLang, F]): FreeK[F, Unit] =
     FreeK.lift(onPatternMatch[FreeK[F, ?], V](p, p.emptyAssignment)(h))
+  def onPatternMatchF[F[_[_], _], V <: HList](p: PartiallyAssignedPattern[V])(h: V => FreeK[F, Unit])(implicit inj: InjectK[RelLang, F]): FreeK[F, Unit] =
+    FreeK.lift(onPatternMatch[FreeK[F, ?], V](p.pattern, p.assignment)(h))
 
 
   implicit def functorKInstance: FunctorKA[RelLang] = new FunctorKA[RelLang] {
