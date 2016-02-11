@@ -68,4 +68,15 @@ class PatternTest extends FlatSpec with Matchers {
       }
     }
   }
+
+  "Two patterns with different order of relations" should "be viewed as equal" in {
+    val pat1 = Pattern[Int::Int::Int::Int::Int::Int::Int::Int::HNil].build({ case a::b::c::d::e::f::g::h::HNil => NonEmptyList(
+      p(a, b), p(b, c), q(c, d), q(d, e), q(e, f), q(f, g), q(g, h), q(h, a)
+    ) })
+    val pat2 = Pattern[Int::Int::Int::Int::Int::Int::Int::Int::HNil].build({ case a::b::c::d::e::f::g::h::HNil => NonEmptyList(
+      q(g, h), q(h, a), p(a, b), q(f, g), p(b, c), q(e, f), q(c, d), q(d, e)
+    ) })
+
+    pat1 should be (pat2)
+  }
 }

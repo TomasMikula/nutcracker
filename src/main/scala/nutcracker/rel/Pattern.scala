@@ -23,6 +23,12 @@ sealed trait Pattern[V <: HList] {
 
   def orient[L <: HList](r: Rel[L]): OrientedPattern[V, L] = OrientedPattern(this, r)
 
+  final override def equals(other: Any): Boolean = other match {
+    case that: Pattern[_] => that.relations.toSet == this.relations.toSet
+    case _ => false
+  }
+  final override def hashCode: Int = relations.toSet.hashCode()
+
   private[rel] def head: RelChoice[V, _ <: HList]
   private[rel] def matchHead[K <: HList](r: Rel[K]): Option[Pattern0[V, K]]
 }

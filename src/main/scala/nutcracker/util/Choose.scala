@@ -1,6 +1,7 @@
 package nutcracker.util
 
 import scala.language.higherKinds
+import scala.language.implicitConversions
 
 import shapeless._
 
@@ -22,6 +23,13 @@ trait Choose[L <: HList, C <: HList] extends (L => C) {
   trait Lifter[F[_]] {
     def apply[FL <: HList, FC <: HList]()(implicit ml: Mapped.Aux[L, F, FL], mc: Mapped.Aux[C, F, FC]): Choose[FL, FC]
   }
+
+  final override def equals(other: Any): Boolean = other match {
+    case that: Choose[_, _] => that.vertices == this.vertices
+    case _ => false
+  }
+
+  final override def hashCode: Int = vertices.hashCode
 }
 
 object Choose {
