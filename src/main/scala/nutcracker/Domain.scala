@@ -26,7 +26,7 @@ object Domain {
     def values(d: Set[A]): Values[A, Set[A]] = d.size match {
       case 0 => Empty()
       case 1 => Just(d.head)
-      case _ => Many(Stream(d.splitAt(d.size / 2) match { case (b1, b2) => b1 :: b2 :: Nil }))
+      case _ => Many(Stream(d.toList map (Set(_)))) // split into singleton sets
     }
     def eqv(x: Set[A], y: Set[A]): Boolean = x == y // XXX uses universal equality of A
   }
