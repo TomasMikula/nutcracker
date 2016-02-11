@@ -12,7 +12,7 @@ import scalaz.syntax.semigroup.ToSemigroupOps
   *     a ≤ a⊕b
   *     b ≤ a⊕b
   */
-trait NonDecreasingSemigroup[A] extends OrderedSemigroup[A] {
+trait NonDecreasingSemigroup[A] extends OrderPreservingSemigroup[A] {
 
 }
 
@@ -22,7 +22,7 @@ object NonDecreasingSemigroup {
   case class Laws[A: Arbitrary](S: NonDecreasingSemigroup[A]) extends LawSet("NonDecreasingSemigroup") {
     implicit val upSemigroup = S
 
-    override val bases = Seq("orderedSemigroup" -> OrderedSemigroup.Laws(S))
+    override val bases = Seq("orderedSemigroup" -> OrderPreservingSemigroup.Laws(S))
     override val props = Seq(
       "leftAbsorption" -> forAll((a: A, b: A) => a lte (a |+| b)),
       "rightAbsorption" -> forAll((a: A, b: A) => b lte (a |+| b)))

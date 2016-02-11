@@ -13,7 +13,7 @@ import principled.LawSet
   *
   *   ∀a: 0 ≤ a
   */
-trait NonDecreasingMonoid[A] extends NonDecreasingSemigroup[A] with OrderedMonoid[A] {
+trait NonDecreasingMonoid[A] extends NonDecreasingSemigroup[A] with OrderPreservingMonoid[A] {
 
 }
 
@@ -24,7 +24,7 @@ object NonDecreasingMonoid {
 
     override val bases = Seq(
       "nonDecreasingSemigroup" -> NonDecreasingSemigroup.Laws(M),
-      "orderedMonoid" -> OrderedMonoid.Laws(M))
+      "orderPreservingMonoid" -> OrderPreservingMonoid.Laws(M))
 
     override def props = Seq()
   }

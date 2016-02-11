@@ -12,17 +12,17 @@ import org.scalacheck.Arbitrary
   *
   * @see [[https://en.wikipedia.org/wiki/Ordered_semigroup]]
   */
-trait OrderedMonoid[A] extends OrderedSemigroup[A] with Monoid[A] {
+trait OrderPreservingMonoid[A] extends OrderPreservingSemigroup[A] with Monoid[A] {
 
 }
 
-object OrderedMonoid {
-  def apply[A](implicit A: OrderedMonoid[A]): OrderedMonoid[A] = A
+object OrderPreservingMonoid {
+  def apply[A](implicit A: OrderPreservingMonoid[A]): OrderPreservingMonoid[A] = A
 
-  case class Laws[A: Arbitrary](M: OrderedMonoid[A]) extends LawSet("OrderedMonoid") {
+  case class Laws[A: Arbitrary](M: OrderPreservingMonoid[A]) extends LawSet("OrderPreservingMonoid") {
 
     override val bases = Seq(
-      "orderedSemigroup" -> OrderedSemigroup.Laws(M),
+      "orderPreservingSemigroup" -> OrderPreservingSemigroup.Laws(M),
       "monoid" -> MissingLaws.MonoidLaws(M))
 
     override def props = Seq()
