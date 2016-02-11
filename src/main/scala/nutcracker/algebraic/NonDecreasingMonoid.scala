@@ -2,8 +2,10 @@ package nutcracker.algebraic
 
 import org.scalacheck.Arbitrary
 import principled.LawSet
+import scalaz.Monoid
 
-/** Ordered monoid with an extra property
+/** Monoid with a property that the result of the monoid operation
+  * is greater than or equal to any of the operands:
   *
   *   ∀ a,b:
   *     a ≤ a⊕b
@@ -13,9 +15,7 @@ import principled.LawSet
   *
   *   ∀a: 0 ≤ a
   */
-trait NonDecreasingMonoid[A] extends NonDecreasingSemigroup[A] with OrderPreservingMonoid[A] {
-
-}
+trait NonDecreasingMonoid[A] extends NonDecreasingSemigroup[A] with Monoid[A]
 
 object NonDecreasingMonoid {
   def apply[A](implicit A: NonDecreasingMonoid[A]): NonDecreasingMonoid[A] = A
@@ -24,7 +24,7 @@ object NonDecreasingMonoid {
 
     override val bases = Seq(
       "nonDecreasingSemigroup" -> NonDecreasingSemigroup.Laws(M),
-      "orderPreservingMonoid" -> OrderPreservingMonoid.Laws(M))
+      "monoid" -> MissingLaws.MonoidLaws(M))
 
     override def props = Seq()
   }
