@@ -103,26 +103,6 @@ object Pattern {
     }
   }
 
-
-  def isConnected(p: Pattern[_]): Boolean = {
-    val componentAssignment = getComponentAssignment(p, ComponentId.Zero)
-    val componentCount = componentAssignment.values.groupBy(i => i).size
-    componentCount <= 1
-  }
-
-  private type VertexIndex = Int
-
-  private def getComponentAssignment(p: Pattern[_], c: ComponentId): Map[VertexIndex, ComponentId] = p match {
-    case SingleRelPattern(rel) => (rel.vertexSet map { (_, c) }).toMap
-    case ComposedPattern(rel, base) =>
-      val assignment0 = getComponentAssignment(base, c.next)
-      val indices = rel.vertexSet
-      val components = (indices map { assignment0.get(_) } collect { case Some(comp) => comp }).toList
-      components match {
-        case Nil => assignment0 ++ (indices map { (_, c) })
-        case c0 :: cs => (assignment0 mapValues { c1 => if(cs contains c1) c0 else c1 }) ++ (indices map { (_, c0) })
-      }
-  }
 }
 
 case class OrientedPattern[V <: HList, L <: HList] private[rel] (pattern: Pattern[V], rel: Rel[L]) {
