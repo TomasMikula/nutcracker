@@ -69,18 +69,20 @@ final class PropBranchPromRelCost[C: Monoid] extends Language {
         if(propStore.get(s).unresolvedVars.isEmpty) Done
         else {
 
-          def splitDomain[A, D](ref: DomRef[A, D]): StreamT[Id, K[Unit]] = {
+          def splitDomain[A, D](ref: DomRef[A, D]): Option[StreamT[Id, K[Unit]]] = {
             val (d, domain) = propStore.get(s).getDomain(ref)
             domain.values(d) match {
-              case Domain.Empty() => StreamT.empty
-              case Domain.Just(a) => ().pure[K] :: StreamT.empty[Id, K[Unit]]
-              case Domain.Many(branchings) => StreamT.fromIterable(branchings.head) map { d =>
-                tr(intersectF(ref)(d))
-              }
+              case Domain.Empty() => Some(StreamT.empty)
+              case Domain.Just(a) => Some(().pure[K] :: StreamT.empty[Id, K[Unit]])
+              case Domain.Many(branchings) =>
+                if(branchings.isEmpty) None
+                else Some(StreamT.fromIterable(branchings.head) map { d => tr(intersectF(ref)(d)) })
             }
           }
 
-          Incomplete(splitDomain(propStore.get(s).unresolvedVars.head) map { k => (s, k) })
+          propStore.get(s).unresolvedVars.toStream.map(splitDomain(_)).collectFirst({
+            case Some(branches) => Incomplete(branches.map { k => (s, k) })
+          }).getOrElse(Stuck)
         }
     }
   }

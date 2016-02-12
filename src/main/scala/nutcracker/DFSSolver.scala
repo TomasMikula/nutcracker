@@ -72,6 +72,7 @@ class DFSSolver[C: Monoid] extends Solver[PropBranchPromRelCost[C], StreamT[Id, 
     done: A => StreamT[Id, B]): StreamT[Trampoline, B] =
     assess(s) match {
       case Failed => failed.trans(trampolineId)
+      case Stuck => failed.trans(trampolineId) // TODO: Don't treat as failed.
       case Done => done(lang.promStore.get(s).apply(pr).get).trans(trampolineId)
       case Incomplete(str) =>
         str.trans(trampolineId) flatMap { case (s1, k) => solutionsT(lang.interpreter.runFreeUnit(s1, k), pr, failed, done) }

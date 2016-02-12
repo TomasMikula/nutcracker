@@ -31,6 +31,7 @@ class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropBranchPromRelCost[C],
     case None => None
     case Some((s, heap1)) => assess(s) match {
       case Failed => unfold(heap1, pr)
+      case Stuck => unfold(heap1, pr) // not done, but we don't know how to proceed. TODO: Don't treat as failed
       case Done => Some(((lang.promStore.get(s).apply(pr).get, lang.cost.get(s)), heap1))
       case Incomplete(sks) =>
         val newStates = sks map { case (s1, k) => lang.interpreter.runFreeUnit(s1, k) }
