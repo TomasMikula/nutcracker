@@ -43,6 +43,13 @@ case class PropagationStore[K[_]] private(
     case dr@DomRef(_) => getDomain(dr)._1
   }
 
+  def fetchResult[A, D](ref: DomRef[A, D]): Option[A] = getDomain(ref) match {
+    case (d, dom) => dom.values(d) match {
+      case Just(a) => Some(a)
+      case _ => None
+    }
+  }
+
   def fetchVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))
 

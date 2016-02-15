@@ -23,7 +23,7 @@ scalacOptions ++= Seq(
   "-unchecked",
   "-deprecation",
   "-feature",
-  "-Xfatal-warnings",
+//  "-Xfatal-warnings",
   "-Yno-adapted-args",
   "-Ywarn-numeric-widen",
   "-Ywarn-value-discard",
@@ -38,9 +38,10 @@ javacOptions ++= Seq(
 
 libraryDependencies ++= Seq(
   "com.lihaoyi" %% "acyclic" % "0.1.3" % "provided",
-  "com.github.mpilquist" %% "simulacrum" % "0.4.0",
+  "com.github.mpilquist" %% "simulacrum" % "0.7.0",
   "org.spire-math" %% "algebra" % "0.3.2-SNAPSHOT",
   "org.spire-math" %% "algebra-std" % "0.3.2-SNAPSHOT",
+  "org.typelevel" %% "cats" % "0.4.1",
   "org.scalaz" %% "scalaz-core" % "7.2.0",
   "com.chuusai" %% "shapeless" % "2.2.5",
   "com.github.julien-truffaut"  %%  "monocle-core" % "1.2.0",

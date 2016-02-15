@@ -1,8 +1,6 @@
 package nutcracker
 
 import scala.language.higherKinds
-
-import nutcracker.PromiseLang._
 import nutcracker.PropagationLang._
 import nutcracker.Assessment._
 
@@ -12,9 +10,9 @@ import scalaz.Id._
 import scalaz.{Monoid, StreamT, ~>}
 import scalaz.syntax.applicative._
 
-class DFSSolver[C: Monoid] extends Solver[PropBranchPromRelCost[C], StreamT[Id, ?]] {
+class DFSSolver[C: Monoid] extends Solver[PropBranchRelCost[C], StreamT[Id, ?]] {
 
-  val lang: PropBranchPromRelCost[C] = new PropBranchPromRelCost[C]
+  val lang: PropBranchRelCost[C] = new PropBranchRelCost[C]
 
   def solutions[A](p: K[Promised[A]]): StreamT[Id, A] = {
     val (s, pr) = init(p)
@@ -73,7 +71,7 @@ class DFSSolver[C: Monoid] extends Solver[PropBranchPromRelCost[C], StreamT[Id, 
     assess(s) match {
       case Failed => failed.trans(trampolineId)
       case Stuck => failed.trans(trampolineId) // TODO: Don't treat as failed.
-      case Done => done(lang.promStore.get(s).apply(pr).get).trans(trampolineId)
+      case Done => done(lang.propStore.get(s).fetchResult(pr).get).trans(trampolineId)
       case Incomplete(str) =>
         str.trans(trampolineId) flatMap { case (s1, k) => solutionsT(lang.interpreter.runFreeUnit(s1, k), pr, failed, done) }
     }

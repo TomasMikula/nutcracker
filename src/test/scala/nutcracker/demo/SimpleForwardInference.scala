@@ -2,13 +2,14 @@ package nutcracker.demo
 
 import algebra.Order
 import algebra.std.string._
+import algebra.std.unit._
 import monocle._
 import nutcracker.rel.Rel.Rel2
 import nutcracker.util.free.Interpreter._
-import nutcracker.{PromiseStore, PromiseLang}
+import nutcracker.{PropagationLang, PropagationStore}
+import nutcracker.PropagationLang._
 import nutcracker.rel.{Pattern, RelDB, RelLang}
 import nutcracker.rel.RelLang._
-import nutcracker.PromiseLang._
 import nutcracker.util.free._
 import org.scalatest.{Matchers, FunSpec}
 import shapeless.{::, HNil}
@@ -19,10 +20,10 @@ import scalaz.{Functor, Monoid, NonEmptyList}
 class SimpleForwardInference extends FunSpec with Matchers {
 
   // à la carte composition of the desired instruction set and the state it operates on
-  type Vocabulary[K[_], A] = CoproductK[RelLang, PromiseLang, K, A]
+  type Vocabulary[K[_], A] = CoproductK[RelLang, PropagationLang, K, A]
   type Lang[K[_], A] = CoyonedaK[Vocabulary, K, A]
-  type State[K[_]] = ProductK[RelDB, PromiseStore, K]
-  type Dirty[K[_]] = ProductK[AlwaysClean, AlwaysClean, K]
+  type State[K[_]] = ProductK[RelDB, PropagationStore, K]
+  type Dirty[K[_]] = ProductK[AlwaysClean, PropagationStore.DirtyThings, K]
 
   // summon an interpreter for the above language
   val interpreter: Interpreter[Lang, State, Dirty] = implicitly[Interpreter[Lang, State, Dirty]]
@@ -30,12 +31,12 @@ class SimpleForwardInference extends FunSpec with Matchers {
   // definition of the composed empty state
   def emptyState[K[_]]: State[K] = {
     import ProductK._
-    RelDB.empty[K] :*: PromiseStore.empty[K]
+    RelDB.empty[K] :*: PropagationStore.empty[K]
   }
 
   // lens into state to pull out the PromiseStore
-  def promStore0[K[_]]: Lens[State[K], PromiseStore[K]] = implicitly[Lens[State[K], PromiseStore[K]]]
-  val promStore = promStore0[FreeK[Lang, ?]]
+  def propStore0[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
+  val propStore = propStore0[FreeK[Lang, ?]]
 
   implicit val dirtyMonoid: Monoid[Dirty[FreeK[Lang, ?]]] = implicitly[MonoidK[Dirty]].monoid[FreeK[Lang, ?]]
   implicit val langFunctor: Functor[Lang[FreeK[Lang, ?], ?]] = CoyonedaK.functorInstance[Vocabulary, FreeK[Lang, ?]]
@@ -98,7 +99,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
 
     it("should follow that a < e") {
       val (s, promise) = interpreter.runFree(emptyState[FreeK[Lang, ?]], problem)
-      promStore.get(s).apply(promise) should be (Some(()))
+      propStore.get(s).fetchResult(promise) should be (Some(()))
     }
   }
 }

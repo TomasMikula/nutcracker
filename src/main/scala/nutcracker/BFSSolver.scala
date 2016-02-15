@@ -1,15 +1,14 @@
 package nutcracker
 
 import nutcracker.Assessment._
-import nutcracker.PromiseLang.Promised
 import nutcracker.algebraic.NonDecreasingMonoid
 
 import scala.annotation.tailrec
 import scalaz.Id._
 import scalaz._
 
-class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropBranchPromRelCost[C], StreamT[Id, ?]] {
-  val lang: PropBranchPromRelCost[C] = new PropBranchPromRelCost[C]
+class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropBranchRelCost[C], StreamT[Id, ?]] {
+  val lang: PropBranchRelCost[C] = new PropBranchRelCost[C]
 
   implicit val orderByCost: Order[S] = Order.orderBy(s => lang.cost.get(s))
 
@@ -32,7 +31,7 @@ class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropBranchPromRelCost[C],
     case Some((s, heap1)) => assess(s) match {
       case Failed => unfold(heap1, pr)
       case Stuck => unfold(heap1, pr) // not done, but we don't know how to proceed. TODO: Don't treat as failed
-      case Done => Some(((lang.promStore.get(s).apply(pr).get, lang.cost.get(s)), heap1))
+      case Done => Some(((lang.propStore.get(s).fetchResult(pr).get, lang.cost.get(s)), heap1))
       case Incomplete(sks) =>
         val newStates = sks map { case (s1, k) => lang.interpreter.runFreeUnit(s1, k) }
         type Stream[T] = StreamT[Id, T] // helps infer the Foldable instance on the next line

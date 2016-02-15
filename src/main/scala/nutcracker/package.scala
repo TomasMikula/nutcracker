@@ -1,7 +1,7 @@
 import scala.language.higherKinds
 
 import algebra.Eq
-import nutcracker.PromiseLang._
+import cats.std.vector._
 import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolDomain
 import nutcracker.lib.bool.BoolDomain._
@@ -11,6 +11,8 @@ import algebra.lattice.GenBool
 import scalaz.Traverse
 
 package object nutcracker {
+
+  type Promised[A] = DomRef[A, nutcracker.Promise[A]]
 
   def concat[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
     ps.foldLeft[FreeK[F, Unit]](FreeK.Pure(())) { _ >> _ }
@@ -41,31 +43,22 @@ package object nutcracker {
       _ <- whenResolvedF(d1) { a1 => whenResolvedF(d2) { a2 => set(res, Eq[A].neqv(a1, a2)) } }
     } yield res
 
-  def promiseResult[A, D](cell: DomRef[A, D]): FreeK[CoproductK[PropagationLang, PromiseLang, ?[_], ?], Promised[A]] = {
-    type PP[K[_], T] = CoproductK[PropagationLang, PromiseLang, K, T]
-    for {
-      prA <- promiseF[A].inj[PP]
-      _ <- whenResolvedF[PP, A, D](cell){ a => completeF(prA, a) }
-    } yield prA
-  }
+  def promiseResults[A: Eq, D](cells: Vector[DomRef[A, D]]): FreeK[PropagationLang, Promised[Vector[A]]] = {
 
-  def promiseResults[A, D](cells: Vector[DomRef[A, D]]): FreeK[CoproductK[PropagationLang, PromiseLang, ?[_], ?], Promised[Vector[A]]] = {
-    type PP[K[_], T] = CoproductK[PropagationLang, PromiseLang, K, T]
-
-    def go(pr: Promised[Vector[A]], tail: List[A], i: Int): FreeK[PP, Unit] = {
+    def go(pr: Promised[Vector[A]], tail: List[A], i: Int): FreeK[PropagationLang, Unit] = {
       if(i < 0) {
-        completeF(pr, tail.toVector).inj[PP]
+        completeF(pr, tail.toVector)
       } else {
         whenResolvedF(cells(i)){ a => go(pr, a :: tail, i-1) }
       }
     }
 
     for {
-      pr <- promiseF[Vector[A]].inj[PP]
+      pr <- promiseF[Vector[A]]
       _ <- go(pr, Nil, cells.size - 1)
     } yield pr
   }
 
-  def promiseResults[A, D](cells: DomRef[A, D]*): FreeK[CoproductK[PropagationLang, PromiseLang, ?[_], ?], Promised[Vector[A]]] =
+  def promiseResults[A: Eq, D](cells: DomRef[A, D]*): FreeK[PropagationLang, Promised[Vector[A]]] =
     promiseResults(cells.toVector)
 }

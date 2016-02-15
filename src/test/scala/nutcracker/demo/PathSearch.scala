@@ -1,9 +1,11 @@
 package nutcracker.demo
 
+import algebra.Eq
 import nutcracker.BFSSolver
 import nutcracker.BranchLang._
 import nutcracker.CostLang._
-import nutcracker.PromiseLang._
+import nutcracker.Promised
+import nutcracker.PropagationLang._
 import nutcracker.algebraic.NonDecreasingMonoid
 import nutcracker.util.free.{FreeK, InjectK}
 import org.scalatest.FunSuite
@@ -61,6 +63,10 @@ class PathSearch extends FunSuite {
   def path(v: Vertex, vs: Vertex*): Path =
     if(vs.isEmpty) identity(v)
     else cons(v, path(vs.head, vs.tail:_*))
+
+  implicit val EqP: Eq[Path] = new Eq[Path] {
+    def eqv(x: Path, y: Path): Boolean = x == y
+  }
 
   def revPath(vs: List[Vertex]): Path = {
     @tailrec def go(vs: List[Vertex], tail: Path): Path = vs match {
