@@ -7,8 +7,8 @@ import scala.annotation.tailrec
 import scalaz.Id._
 import scalaz._
 
-class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropBranchRelCost[C], StreamT[Id, ?]] {
-  val lang: PropBranchRelCost[C] = new PropBranchRelCost[C]
+class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropRelCost[C], StreamT[Id, ?]] {
+  val lang: PropRelCost[C] = new PropRelCost[C]
 
   implicit val orderByCost: Order[S] = Order.orderBy(s => lang.cost.get(s))
 

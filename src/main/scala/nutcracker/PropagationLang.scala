@@ -84,11 +84,20 @@ object PropagationLang {
     FreeK.lift(selTrigger2[FreeK[F, ?], D1, D2](ref1, ref2)(f))
 
 
+  // Convenience API for branching as a special kind of lattice
+  def branch[A](as: Set[A]): FP[DomRef[A, Set[A]]] = variable[A].oneOf(as)
+  def branch[A](as: A*): FP[DomRef[A, Set[A]]] = branch(as.toSet)
+  def branchAndExec[F[_[_], _]](conts: Set[FreeK[F, Unit]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+    branch(conts) >>>= { whenResolvedF(_)(k => k) }
+  def branchAndExec[F[_[_], _]](conts: FreeK[F, Unit]*)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+    branchAndExec(conts.toSet)
+
+
   // Convenience API for promises as special kind of lattices
 
   import nutcracker.Promise._
-  def promiseF[A]: FreeK[PropagationLang, Promised[A]] = PropagationLang.variable[A].any[nutcracker.Promise[A]]
-  def completeF[A](p: Promised[A], a: A): FreeK[PropagationLang, Unit] = PropagationLang.set[A, nutcracker.Promise[A]](p, a)
+  def promiseF[A]: FreeK[PropagationLang, Promised[A]] = variable[A].any[nutcracker.Promise[A]]
+  def completeF[A](p: Promised[A], a: A): FreeK[PropagationLang, Unit] = set[A, nutcracker.Promise[A]](p, a)
 
   def promiseC[F[_[_], _], A](cont: Cont[FreeK[F, Unit], A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[A]] = for {
     pa <- promiseF[A].inject[F]

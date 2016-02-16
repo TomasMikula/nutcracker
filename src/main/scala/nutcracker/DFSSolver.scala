@@ -10,9 +10,9 @@ import scalaz.Id._
 import scalaz.{Monoid, StreamT, ~>}
 import scalaz.syntax.applicative._
 
-class DFSSolver[C: Monoid] extends Solver[PropBranchRelCost[C], StreamT[Id, ?]] {
+class DFSSolver[C: Monoid] extends Solver[PropRelCost[C], StreamT[Id, ?]] {
 
-  val lang: PropBranchRelCost[C] = new PropBranchRelCost[C]
+  val lang: PropRelCost[C] = new PropRelCost[C]
 
   def solutions[A](p: K[Promised[A]]): StreamT[Id, A] = {
     val (s, pr) = init(p)

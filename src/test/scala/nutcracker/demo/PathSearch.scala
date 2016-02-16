@@ -1,9 +1,7 @@
 package nutcracker.demo
 
-import nutcracker.BFSSolver
-import nutcracker.BranchLang._
+import nutcracker.{PropagationLang, BFSSolver, Promised}
 import nutcracker.CostLang._
-import nutcracker.Promised
 import nutcracker.PropagationLang._
 import nutcracker.algebraic.NonDecreasingMonoid
 import nutcracker.util.free.{FreeK, InjectK}
@@ -20,6 +18,9 @@ class PathSearch extends FunSuite {
     def append(a: Int, b: => Int): Int = a + b
     def order(x: Int, y: Int): Ordering = Ordering.fromInt(x - y)
   }
+  // not sure why scalac is not able to find these itself
+  implicit val injP = implicitly[InjectK[PropagationLang, Lang]]
+  implicit val injC = implicitly[InjectK[solver.lang.CostL, Lang]]
 
   val solver: BFSSolver[Int] = new BFSSolver[Int]
 
@@ -79,7 +80,7 @@ class PathSearch extends FunSuite {
   } yield pr
 
   def findPath(visited: List[Vertex], u: Vertex, v: Vertex, pr: Promised[Path]): FreeK[Lang, Unit] = {
-    branch(
+    branchAndExec(
       zeroLengthPaths(visited, u, v, pr),
       nonZeroLengthPaths(visited, u, v, pr)
     )
@@ -87,17 +88,16 @@ class PathSearch extends FunSuite {
 
   def zeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Promised[Path]): FreeK[Lang, Unit] = {
     if(u == v) completeF(pr, revPath(u::visited)).inject[Lang]
-    else branch()
+    else branchAndExec[Lang]()
   }
 
   def nonZeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Promised[Path]): FreeK[Lang, Unit] = {
-    implicit val inj = implicitly[InjectK[solver.lang.CostL, Lang]]
     val branches = successors(u) filter {
       case (c, w) => w != u && !visited.contains(w)
     } map {
       case (c, w) => costF(c) >>> findPath(u::visited, w, v, pr)
     }
-    branch(branches:_*)
+    branchAndExec(branches:_*)
   }
 
   test("Test path search") {
@@ -105,17 +105,11 @@ class PathSearch extends FunSuite {
     type Stream[A] = StreamT[Id, A]
 
     val paths = solver.solutions(findPath('A, 'K)).toStream.toList
-//    val paths = findPath[Stream]('A, 'K).toStream.toSet
 
     assertResult(List(
       (path('A, 'B, 'D, 'H, 'K), 15),
       (path('A, 'B, 'E, 'G, 'K), 16),
       (path('A, 'C, 'G, 'K), 17)
     ))(paths)
-  }
-
-  private def branch(ks: FreeK[Lang, Unit]*): FreeK[Lang, Unit] = {
-    implicit val inj = implicitly[InjectK[solver.lang.BranchL, Lang]]
-    addBranchingF[StreamT[Id, ?], Lang](StreamT.fromIterable(ks))
   }
 }
