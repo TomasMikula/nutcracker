@@ -1,12 +1,20 @@
 package nutcracker
 
-import algebra.Eq
 import algebra.lattice.{GenBool, MeetSemilattice}
 
-trait Domain[A, D] extends Eq[D] with MeetSemilattice[D] {
+trait Domain[A, D] extends MeetSemilattice[D] {
   def values(d: D): Domain.Values[A, D]
   def sizeUpperBound(d: D): Option[Long]
   def singleton(a: A): D
+
+  /**
+    * Non-commutative version of `meet`, which returns a new value only if
+    * progress was made, i.e. if `meet(d, by) != d`
+    * @param d value to refine
+    * @param by value to refine by
+    * @return `Some(d ∧ by)` if `d ∧ by < d`, `None` otherwise.
+    */
+  def refine(d: D, by: D): Option[D]
 
   def isEmpty(d: D): Boolean = sizeUpperBound(d).map(_ == 0).getOrElse(false)
 }
@@ -28,7 +36,11 @@ object Domain {
       case 1 => Just(d.head)
       case _ => Many(Stream(d.toList map (Set(_)))) // split into singleton sets
     }
-    def eqv(x: Set[A], y: Set[A]): Boolean = x == y // XXX uses universal equality of A
+    def refine(d: Set[A], by: Set[A]): Option[Set[A]] = {
+      val res = d intersect by
+      if(res.size < d.size) Some(res)
+      else None
+    }
   }
 
   implicit def setGenBool[A]: GenBool[Set[A]] = algebra.std.set.setLattice

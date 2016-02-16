@@ -1,6 +1,5 @@
 package nutcracker.demo
 
-import algebra.std.boolean._
 import nutcracker.PropagationLang._
 import nutcracker._
 import nutcracker.lib.bool.BoolDomain._

@@ -67,17 +67,16 @@ case class PropagationStore[K[_]] private(
 
   private def intersect[A, D](ref: DomRef[A, D], d: D): Option[PropagationStore[K]] = {
     val (d0, dom) = getDomain(ref)
-    val d1 = dom.meet(d0, d)
-    if(dom.eqv(d0, d1))
-      None
-    else {
-      val (unresolvedVars1, failedVars1) = dom.values(d1) match {
-        case Empty() => (unresolvedVars - ref, failedVars + ref.domainId)
-        case Just(_) => (unresolvedVars - ref, failedVars)
-        case Many(_) => (unresolvedVars, failedVars)
-      }
-      val domains1 = domains + ((ref.domainId, (d1, dom)))
-      Some(copy(domains = domains1, unresolvedVars = unresolvedVars1, failedVars = failedVars1))
+    dom.refine(d0, d) match {
+      case None => None
+      case Some(d1) =>
+        val (unresolvedVars1, failedVars1) = dom.values(d1) match {
+          case Empty() => (unresolvedVars - ref, failedVars + ref.domainId)
+          case Just(_) => (unresolvedVars - ref, failedVars)
+          case Many(_) => (unresolvedVars, failedVars)
+        }
+        val domains1 = domains + ((ref.domainId, (d1, dom)))
+        Some(copy(domains = domains1, unresolvedVars = unresolvedVars1, failedVars = failedVars1))
     }
   }
 

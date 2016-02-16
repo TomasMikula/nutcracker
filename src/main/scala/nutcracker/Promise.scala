@@ -10,9 +10,9 @@ object Promise {
 
   private final case object Empty extends Promise[Nothing] // incomplete promise
   private final case class Completed[A](value: A) extends Promise[A]
-  private final case object Contradiction extends Promise[Nothing] // promise completed multiple times with different values
+  private final case object Contradiction extends Promise[Nothing] // promise completed multiple times
 
-  implicit def promiseLattice[A](implicit EqA: Eq[A]): Domain[A, Promise[A]] with BoundedMeetSemilattice[Promise[A]] = new Domain[A, Promise[A]] with BoundedMeetSemilattice[Promise[A]] {
+  implicit def promiseLattice[A]: Domain[A, Promise[A]] with BoundedMeetSemilattice[Promise[A]] = new Domain[A, Promise[A]] with BoundedMeetSemilattice[Promise[A]] {
     def values(pa: Promise[A]): Values[A, Promise[A]] = pa match {
       case Empty => Domain.Many(Stream.empty)
       case Completed(a) => Domain.Just(a)
@@ -26,17 +26,26 @@ object Promise {
 
     def singleton(a: A): Promise[A] = Completed(a)
 
-    def eqv(x: Promise[A], y: Promise[A]): Boolean = (x, y) match {
-      case (Empty, Empty) => true
-      case (Contradiction, Contradiction) => true
-      case (Completed(a), Completed(b)) => EqA.eqv(a, b)
-      case _ => false
+    /** Completed promise cannot be completed again. Therefore, any attempt
+      * to refine a completed promise will result in bottom, even if refining
+      * with the exact same value. Note that this breaks the idempotence of
+      * `meet`, but it allows us to not require `Eq` instance on `A`.
+      */
+    def refine(x: Promise[A], y: Promise[A]): Option[Promise[A]] = (x, y) match {
+      case (_, Empty) => None
+      case (Empty, p) => Some(p)
+      case (Completed(a), _) => Some(Contradiction)
+      case _ => None
     }
 
+    /** Completed promise cannot be completed again. Therefore, any attempt
+      * to refine a completed promise will result in bottom, even if refining
+      * with the exact same value. Note that this breaks the idempotence of
+      * `meet`, but it allows us to not require `Eq` instance on `A`.
+      */
     def meet(x: Promise[A], y: Promise[A]): Promise[A] = (x, y) match {
       case (Empty, p) => p
       case (p, Empty) => p
-      case (Completed(a), Completed(b)) if EqA.eqv(a, b) => x
       case _ => Contradiction
     }
 

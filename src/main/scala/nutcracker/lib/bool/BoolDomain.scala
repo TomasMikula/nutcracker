@@ -22,6 +22,12 @@ object BoolDomain {
         case (x, y) if x == y => x
         case _ => Bottom
       }
+      def refine(a: BoolDomain, b: BoolDomain): Option[BoolDomain] = (a, b) match {
+        case (_, Top) => None
+        case (Top, y) => Some(y)
+        case (Bottom, _) => None
+        case (x, y) => if(x == y) None else Some(Bottom)
+      }
       def or(a: BoolDomain, b: BoolDomain): BoolDomain = (a, b) match {
         case (Bottom, x) => x
         case (x, Bottom) => x
@@ -48,7 +54,6 @@ object BoolDomain {
         case Bottom => 0
         case _ => 1
       })
-      def eqv(x: BoolDomain, y: BoolDomain): Boolean = x == y
       override def isEmpty(d: BoolDomain): Boolean = d == Bottom
     }
 }

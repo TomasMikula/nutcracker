@@ -1,6 +1,5 @@
 package nutcracker.demo
 
-import algebra.std.int._
 import nutcracker.Domain._
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._

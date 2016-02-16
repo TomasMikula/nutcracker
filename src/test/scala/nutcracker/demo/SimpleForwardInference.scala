@@ -2,7 +2,6 @@ package nutcracker.demo
 
 import algebra.Order
 import algebra.std.string._
-import algebra.std.unit._
 import monocle._
 import nutcracker.rel.Rel.Rel2
 import nutcracker.util.free.Interpreter._

@@ -1,6 +1,5 @@
 package nutcracker.demo
 
-import algebra.Eq
 import nutcracker.BFSSolver
 import nutcracker.BranchLang._
 import nutcracker.CostLang._
@@ -63,10 +62,6 @@ class PathSearch extends FunSuite {
   def path(v: Vertex, vs: Vertex*): Path =
     if(vs.isEmpty) identity(v)
     else cons(v, path(vs.head, vs.tail:_*))
-
-  implicit val EqP: Eq[Path] = new Eq[Path] {
-    def eqv(x: Path, y: Path): Boolean = x == y
-  }
 
   def revPath(vs: List[Vertex]): Path = {
     @tailrec def go(vs: List[Vertex], tail: Path): Path = vs match {

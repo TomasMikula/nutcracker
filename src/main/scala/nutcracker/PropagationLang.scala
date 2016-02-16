@@ -2,9 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 
-import algebra.Eq
 import algebra.lattice.{BoundedMeetSemilattice, GenBool}
-import algebra.std.tuple._
 import nutcracker.util.free.{InjectK, FreeK, FunctorK, FunctorKA}
 import shapeless.{::, HNil, Sized, Nat, HList}
 import scalaz._
@@ -89,10 +87,10 @@ object PropagationLang {
   // Convenience API for promises as special kind of lattices
 
   import nutcracker.Promise._
-  def promiseF[A: Eq]: FreeK[PropagationLang, Promised[A]] = PropagationLang.variable[A].any[nutcracker.Promise[A]]
-  def completeF[A: Eq](p: Promised[A], a: A): FreeK[PropagationLang, Unit] = PropagationLang.set[A, nutcracker.Promise[A]](p, a)
+  def promiseF[A]: FreeK[PropagationLang, Promised[A]] = PropagationLang.variable[A].any[nutcracker.Promise[A]]
+  def completeF[A](p: Promised[A], a: A): FreeK[PropagationLang, Unit] = PropagationLang.set[A, nutcracker.Promise[A]](p, a)
 
-  def promiseC[F[_[_], _], A](cont: Cont[FreeK[F, Unit], A])(implicit inj: InjectK[PropagationLang, F], eqa: Eq[A]): FreeK[F, Promised[A]] = for {
+  def promiseC[F[_[_], _], A](cont: Cont[FreeK[F, Unit], A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[A]] = for {
     pa <- promiseF[A].inject[F]
     _ <- cont(completeF(pa, _))
   } yield pa
@@ -105,22 +103,22 @@ object PropagationLang {
     private type Kont[A] = Cont[FreeK[F, Unit], A]
     private val A = Apply[Kont]
 
-    def tuple[A1: Eq, A2: Eq](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[(A1, A2)]] =
+    def tuple[A1, A2](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[(A1, A2)]] =
       promiseC(A.tuple2(a1, a2))
-    def tuple[A1: Eq, A2: Eq, A3: Eq](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[(A1, A2, A3)]] =
+    def tuple[A1, A2, A3](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[(A1, A2, A3)]] =
       promiseC(A.tuple3(a1, a2, a3))
-    def tuple[A1: Eq, A2: Eq, A3: Eq, A4: Eq](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3], a4: Cont[FreeK[F, Unit], A4])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[(A1, A2, A3, A4)]] =
+    def tuple[A1, A2, A3, A4](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3], a4: Cont[FreeK[F, Unit], A4])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[(A1, A2, A3, A4)]] =
       promiseC(A.tuple4(a1, a2, a3, a4))
-    def tuple[A1: Eq, A2: Eq, A3: Eq, A4: Eq, A5: Eq](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3], a4: Cont[FreeK[F, Unit], A4], a5: Cont[FreeK[F, Unit], A5])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[(A1, A2, A3, A4, A5)]] =
+    def tuple[A1, A2, A3, A4, A5](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3], a4: Cont[FreeK[F, Unit], A4], a5: Cont[FreeK[F, Unit], A5])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[(A1, A2, A3, A4, A5)]] =
       promiseC(A.tuple5(a1, a2, a3, a4, a5))
 
-    def apply[A1, A2, R: Eq](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2])(f: (A1, A2) => R)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[R]] =
+    def apply[A1, A2, R](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2])(f: (A1, A2) => R)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[R]] =
       promiseC(A.apply2(a1, a2)(f))
-    def apply[A1, A2, A3, R: Eq](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3])(f: (A1, A2, A3) => R)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[R]] =
+    def apply[A1, A2, A3, R](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3])(f: (A1, A2, A3) => R)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[R]] =
       promiseC(A.apply3(a1, a2, a3)(f))
-    def apply[A1, A2, A3, A4, R: Eq](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3], a4: Cont[FreeK[F, Unit], A4])(f: (A1, A2, A3, A4) => R)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[R]] =
+    def apply[A1, A2, A3, A4, R](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3], a4: Cont[FreeK[F, Unit], A4])(f: (A1, A2, A3, A4) => R)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[R]] =
       promiseC(A.apply4(a1, a2, a3, a4)(f))
-    def apply[A1, A2, A3, A4, A5, R: Eq](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3], a4: Cont[FreeK[F, Unit], A4], a5: Cont[FreeK[F, Unit], A5])(f: (A1, A2, A3, A4, A5) => R)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[R]] =
+    def apply[A1, A2, A3, A4, A5, R](a1: Cont[FreeK[F, Unit], A1], a2: Cont[FreeK[F, Unit], A2], a3: Cont[FreeK[F, Unit], A3], a4: Cont[FreeK[F, Unit], A4], a5: Cont[FreeK[F, Unit], A5])(f: (A1, A2, A3, A4, A5) => R)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[R]] =
       promiseC(A.apply5(a1, a2, a3, a4, a5)(f))
   }
 
