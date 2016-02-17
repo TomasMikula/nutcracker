@@ -85,12 +85,35 @@ object PropagationLang {
 
 
   // Convenience API for branching as a special kind of lattice
+
+  /** Convenience method to add an exclusive choice of multiple possibilities.
+    * This is a shorthand for adding a cell whose semi-lattice is the lattice
+    * of finite sets of elements of type A, initialized to the given set of
+    * elements.
+    */
   def branch[A](as: Set[A]): FP[DomRef[A, Set[A]]] = variable[A].oneOf(as)
   def branch[A](as: A*): FP[DomRef[A, Set[A]]] = branch(as.toSet)
+
+  /** Convenience method to add an exclusive choice of arbitrary free programs
+    * to continue. When the choice is made, the chosen program is executed.
+    */
   def branchAndExec[F[_[_], _]](conts: Set[FreeK[F, Unit]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     branch(conts) >>>= { whenResolvedF(_)(k => k) }
   def branchAndExec[F[_[_], _]](conts: FreeK[F, Unit]*)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     branchAndExec(conts.toSet)
+
+  /** Convenience method to add an exclusive choice of multiple possibilities,
+    * presented as a continuation of the chosen element. Note that a "branching
+    * cell" (see [[branch(Set[A])]]) is added for each callback that is registered
+    * on the returned continuation. Thus, if two callback are registered on the
+    * returned continuation, it will have the effect of making a choice from the
+    * cartesian product `as × as`. If this is not what you want, use
+    * [[branch(Set[A])]] directly.
+    */
+  def branchC[A, F[_[_], _]](as: Set[A])(implicit inj: InjectK[PropagationLang, F]): Cont[FreeK[F, Unit], A] =
+    Cont(f => branch(as) >>>= { _.asCont.apply(f) })
+  def branchC[A, F[_[_], _]](as: A*)(implicit inj: InjectK[PropagationLang, F]): Cont[FreeK[F, Unit], A] =
+    branchC(as.toSet)
 
 
   // Convenience API for promises as special kind of lattices
