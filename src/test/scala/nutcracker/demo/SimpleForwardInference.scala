@@ -11,16 +11,15 @@ import nutcracker.rel.{Pattern, RelDB, RelLang}
 import nutcracker.rel.RelLang._
 import nutcracker.util.free._
 import org.scalatest.{Matchers, FunSpec}
+import scalaz.NonEmptyList
 import shapeless.{::, HNil}
 
 import scala.language.higherKinds
-import scalaz.{Functor, Monoid, NonEmptyList}
 
 class SimpleForwardInference extends FunSpec with Matchers {
 
   // à la carte composition of the desired instruction set and the state it operates on
-  type Vocabulary[K[_], A] = CoproductK[RelLang, PropagationLang, K, A]
-  type Lang[K[_], A] = CoyonedaK[Vocabulary, K, A]
+  type Lang[K[_], A] = CoproductK[RelLang, PropagationLang, K, A]
   type State[K[_]] = ProductK[RelDB, PropagationStore, K]
   type Dirty[K[_]] = ProductK[AlwaysClean, PropagationStore.DirtyThings, K]
 
@@ -36,9 +35,6 @@ class SimpleForwardInference extends FunSpec with Matchers {
   // lens into state to pull out the PromiseStore
   def propStore0[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
   val propStore = propStore0[FreeK[Lang, ?]]
-
-  implicit val dirtyMonoid: Monoid[Dirty[FreeK[Lang, ?]]] = implicitly[MonoidK[Dirty]].monoid[FreeK[Lang, ?]]
-  implicit val langFunctor: Functor[Lang[FreeK[Lang, ?], ?]] = CoyonedaK.functorInstance[Vocabulary, FreeK[Lang, ?]]
 
 
   // Define some relations.
