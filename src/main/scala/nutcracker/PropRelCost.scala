@@ -42,8 +42,6 @@ final class PropRelCost[C: Monoid] extends Language {
   def propStore[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
-  def dirtyMonoidK: MonoidK[Dirty] = implicitly[MonoidK[Dirty]]
-
 
   def naiveAssess[K[_]: Applicative](s: State[K])(implicit tr: FreeK[PropagationLang, ?] ~> K): Assessment[StreamT[Id, (State[K], K[Unit])]] = {
     if(propStore.get(s).failedVars.nonEmpty) Failed

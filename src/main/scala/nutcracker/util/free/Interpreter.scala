@@ -4,7 +4,6 @@ import scala.language.higherKinds
 
 import scala.annotation.tailrec
 import scalaz._
-import scalaz.syntax.monoid._
 
 trait Interpreter[F[_[_], _]] {
   type State[K[_]]
@@ -15,48 +14,46 @@ trait Interpreter[F[_[_], _]] {
 
   def dirtyMonoidK: MonoidK[Dirty]
 
+  private def mappend(a: Dirty[FreeK[F, ?]], b: Dirty[FreeK[F, ?]]): Dirty[FreeK[F, ?]] = dirtyMonoidK.append[FreeK[F, ?]](a, b)
+
   def runFree[A](
     s: State[FreeK[F, ?]],
-    p: FreeK[F, A])(implicit
-    D: Monoid[Dirty[FreeK[F, ?]]]
-  ): (State[FreeK[F, ?]], A) = runFree(s, p, D.zero)
+    p: FreeK[F, A]
+  ): (State[FreeK[F, ?]], A) = runFree(s, p, dirtyMonoidK.zero[FreeK[F, ?]])
 
   def runFreeUnit(
     s: State[FreeK[F, ?]],
-    p: FreeK[F, Unit])(implicit
-    D: Monoid[Dirty[FreeK[F, ?]]]
-  ): State[FreeK[F, ?]] = runFreeUnit(s, p, D.zero)
+    p: FreeK[F, Unit]
+  ): State[FreeK[F, ?]] = runFreeUnit(s, p, dirtyMonoidK.zero[FreeK[F, ?]])
 
   @tailrec private def runFree[A](
     s: State[FreeK[F, ?]],
     p: FreeK[F, A],
-    d: Dirty[FreeK[F, ?]])(implicit
-    D: Monoid[Dirty[FreeK[F, ?]]]
+    d: Dirty[FreeK[F, ?]]
   ): (State[FreeK[F, ?]], A) = p match {
     case FreeK.Pure(a) => (runFreeUnit(s, FreeK.Pure(()), d), a)
     case FreeK.Suspend(ffa) => step[FreeK[F, ?], A](ffa)(s) match {
-      case (s1, d1, fa) => runFree(s1, fa, d |+| d1)
+      case (s1, d1, fa) => runFree(s1, fa, mappend(d, d1))
     }
     case bnd: FreeK.Bind[F, a1, A] => step[FreeK[F, ?], a1](bnd.a)(s) match {
-      case (s1, d1, fx) => runFree(s1, fx >>= { bnd.f(_) }, d |+| d1)
+      case (s1, d1, fx) => runFree(s1, fx >>= { bnd.f(_) }, mappend(d, d1))
     }
   }
 
   @tailrec private def runFreeUnit(
     s: State[FreeK[F, ?]],
     p: FreeK[F, Unit],
-    d: Dirty[FreeK[F, ?]])(implicit
-    D: Monoid[Dirty[FreeK[F, ?]]]
+    d: Dirty[FreeK[F, ?]]
   ): State[FreeK[F, ?]] = p match {
     case FreeK.Pure(()) => uncons[FreeK[F, ?]](d)(s) match {
       case Some((cont, w1, s1)) => runFreeUnit(s1, cont, w1)
       case None => s
     }
     case FreeK.Suspend(ffu) => step[FreeK[F, ?], Unit](ffu)(s) match {
-      case (s1, d1, fu) => runFreeUnit(s1, fu, d |+| d1)
+      case (s1, d1, fu) => runFreeUnit(s1, fu, mappend(d, d1))
     }
     case bnd: FreeK.Bind[F, a1, Unit] => step[FreeK[F, ?], a1](bnd.a)(s) match {
-      case (s1, d1, fx) => runFreeUnit(s1, fx >>= { bnd.f(_) }, d |+| d1)
+      case (s1, d1, fx) => runFreeUnit(s1, fx >>= { bnd.f(_) }, mappend(d, d1))
     }
   }
 }
@@ -72,8 +69,7 @@ object Interpreter {
   }
 
   type AlwaysClean[K[_]] = Unit
-  implicit def alwaysCleanMonoid[K[_]]: Monoid[AlwaysClean[K]] = alwaysCleanMonoidK.monoid
-  implicit def alwaysCleanMonoidK: MonoidK[AlwaysClean] = new MonoidK[AlwaysClean] {
+  implicit val alwaysCleanMonoidK: MonoidK[AlwaysClean] = new MonoidK[AlwaysClean] {
     def zero[K[_]]: AlwaysClean[K] = ()
     def append[K[_]](f1: AlwaysClean[K], f2: AlwaysClean[K]): AlwaysClean[K] = ()
   }

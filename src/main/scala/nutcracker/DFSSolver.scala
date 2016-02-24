@@ -1,7 +1,6 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.PropagationLang._
 import nutcracker.Assessment._
 
 import scala.annotation.tailrec
