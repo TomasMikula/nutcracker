@@ -156,5 +156,6 @@ object RelDB {
       case OnPatternMatch(p, a, h) => db.addOnPatternMatch(p, a)(h)
     }
 
+    def emptyState[K[_]]: RelDB[K] = RelDB.empty
   }
 }

@@ -26,12 +26,6 @@ class SimpleForwardInference extends FunSpec with Matchers {
   // summon an interpreter for the above language
   val interpreter: Interpreter.Aux[Lang, State, Dirty] = implicitly[Interpreter.Aux[Lang, State, Dirty]]
 
-  // definition of the composed empty state
-  def emptyState[K[_]]: State[K] = {
-    import ProductK._
-    RelDB.empty[K] :*: PropagationStore.empty[K]
-  }
-
   // lens into state to pull out the PromiseStore
   def propStore0[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
   val propStore = propStore0[FreeK[Lang, ?]]
@@ -93,7 +87,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
       } yield pr)
 
     it("should follow that a < e") {
-      val (s, promise) = interpreter.runFree(emptyState[FreeK[Lang, ?]], problem)
+      val (s, promise) = interpreter.runFree(problem)
       propStore.get(s).fetchResult(promise) should be (Some(()))
     }
   }

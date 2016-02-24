@@ -237,6 +237,7 @@ object PropagationStore {
         }
       }
 
+      def emptyState[K[_]]: PropagationStore[K] = PropagationStore.empty
       def dirtyMonoidK: MonoidK[Dirty] = DirtyThings.monoidK
     }
 }

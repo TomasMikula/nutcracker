@@ -33,7 +33,7 @@ class DFSSolver[C: Monoid] extends Solver[PropRelCost[C], StreamT[Id, ?]] {
   def assess(s: S): Assessment[StreamT[Id, (S, K[Unit])]] = lang.naiveAssess(s)
 
   private def init[A](p: K[Promised[A]]): (S, Promised[A]) = {
-    lang.interpreter.runFree(emptyState, p)
+    lang.interpreter.runFree(p)
   }
 
   private def solutions[A](s: S, pr: Promised[A]): StreamT[Id, A] =

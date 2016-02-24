@@ -12,19 +12,22 @@ trait Interpreter[F[_[_], _]] {
   def step[K[_]: Applicative, A](f: F[K, A])(s: State[K]): (State[K], Dirty[K], K[A])
   def uncons[K[_]: Applicative](w: Dirty[K])(s: State[K]): Option[(K[Unit], Dirty[K], State[K])]
 
-  def dirtyMonoidK: MonoidK[Dirty]
+  def emptyState[K[_]]: State[K]
 
+  def dirtyMonoidK: MonoidK[Dirty]
   private def mappend(a: Dirty[FreeK[F, ?]], b: Dirty[FreeK[F, ?]]): Dirty[FreeK[F, ?]] = dirtyMonoidK.append[FreeK[F, ?]](a, b)
 
-  def runFree[A](
-    s: State[FreeK[F, ?]],
-    p: FreeK[F, A]
-  ): (State[FreeK[F, ?]], A) = runFree(s, p, dirtyMonoidK.zero[FreeK[F, ?]])
+  def runFree[A](p: FreeK[F, A]): (State[FreeK[F, ?]], A) =
+    runFree(emptyState[FreeK[F, ?]], p, dirtyMonoidK.zero[FreeK[F, ?]])
 
-  def runFreeUnit(
-    s: State[FreeK[F, ?]],
-    p: FreeK[F, Unit]
-  ): State[FreeK[F, ?]] = runFreeUnit(s, p, dirtyMonoidK.zero[FreeK[F, ?]])
+  def runFreeUnit(p: FreeK[F, Unit]): State[FreeK[F, ?]] =
+    runFreeUnit(emptyState[FreeK[F, ?]], p, dirtyMonoidK.zero[FreeK[F, ?]])
+
+  def runFree[A](s: State[FreeK[F, ?]], p: FreeK[F, A]): (State[FreeK[F, ?]], A) =
+    runFree(s, p, dirtyMonoidK.zero[FreeK[F, ?]])
+
+  def runFreeUnit(s: State[FreeK[F, ?]], p: FreeK[F, Unit]): State[FreeK[F, ?]] =
+    runFreeUnit(s, p, dirtyMonoidK.zero[FreeK[F, ?]])
 
   @tailrec private def runFree[A](
     s: State[FreeK[F, ?]],
@@ -118,6 +121,7 @@ object Interpreter {
         }
       }
 
+      def emptyState[K[_]]: State[K] = ProductK(i1.emptyState[K], i2.emptyState[K])
       def dirtyMonoidK: MonoidK[Dirty] = ProductK.monoidK(i1.dirtyMonoidK, i2.dirtyMonoidK)
     }
   }
@@ -134,6 +138,7 @@ object Interpreter {
 
       def uncons[K[_] : Applicative](w: W[K])(s: S[K]): Option[(K[Unit], W[K], S[K])] = i.uncons(w)(s)
 
+      def emptyState[K[_]]: State[K] = i.emptyState
       def dirtyMonoidK: MonoidK[Dirty] = i.dirtyMonoidK
     }
 }

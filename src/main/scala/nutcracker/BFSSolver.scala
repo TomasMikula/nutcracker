@@ -13,7 +13,7 @@ class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropRelCost[C], StreamT[I
   implicit val orderByCost: Order[S] = Order.orderBy(s => lang.cost.get(s))
 
   def solutions[A](p: K[Promised[A]]): StreamT[Id, (A, C)] = {
-    lang.interpreter.runFree(emptyState, p) match {
+    lang.interpreter.runFree(p) match {
       case (s, pr) => solutions(s, pr)
     }
   }

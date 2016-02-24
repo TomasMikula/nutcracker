@@ -15,7 +15,6 @@ import scalaz.{Applicative, Monoid, StreamT, ~>}
 import scalaz.syntax.applicative._
 
 final class PropRelCost[C: Monoid] extends Language {
-  type Stream[A] = StreamT[Id, A]
   type CostL[K[_], A] = CostLang[C, K, A]
   type CostS[K[_]] = ConstK[C, K]
 
@@ -27,16 +26,6 @@ final class PropRelCost[C: Monoid] extends Language {
 
   type Dirty0[K[_]] = ProductK[AlwaysClean, AlwaysClean, K]
   type Dirty[K[_]] = ProductK[PropagationStore.DirtyThings, Dirty0, K]
-
-  def emptyState[K[_]]: State[K] =  {
-    import ProductK._
-
-    val emptyP = PropagationStore.empty[K]
-    val emptyDB = RelDB.empty[K]
-    val zeroC: CostS[K] = implicitly[Monoid[C]].zero
-
-    emptyP :*: emptyDB :*: zeroC
-  }
 
   val interpreter: Interpreter.Aux[Vocabulary, State, Dirty] = implicitly[Interpreter.Aux[Vocabulary, State, Dirty]]
   def propStore[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
