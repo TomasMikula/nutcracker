@@ -11,7 +11,7 @@ import nutcracker.util.free.Interpreter._
 import nutcracker.util.free._
 
 import scalaz.Id._
-import scalaz.{Applicative, Monoid, Functor, StreamT, ~>}
+import scalaz.{Applicative, Monoid, StreamT, ~>}
 import scalaz.syntax.applicative._
 
 final class PropRelCost[C: Monoid] extends Language {
@@ -19,9 +19,8 @@ final class PropRelCost[C: Monoid] extends Language {
   type CostL[K[_], A] = CostLang[C, K, A]
   type CostS[K[_]] = ConstK[C, K]
 
-  type Lang1[K[_], A] = CoproductK[RelLang, CostL, K, A]
-  type Lang0[K[_], A] = CoproductK[PropagationLang, Lang1, K, A]
-  type Vocabulary[K[_], A] = CoyonedaK[Lang0, K, A]
+  type Vocabulary0[K[_], A] = CoproductK[RelLang, CostL, K, A]
+  type Vocabulary[K[_], A] = CoproductK[PropagationLang, Vocabulary0, K, A]
 
   type State0[K[_]] = ProductK[RelDB, CostS, K]
   type State[K[_]] = ProductK[PropagationStore, State0, K]
@@ -43,7 +42,6 @@ final class PropRelCost[C: Monoid] extends Language {
   def propStore[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
-  def vocabularyFunctor[K[_]]: Functor[Vocabulary[K, ?]] = CoyonedaK.functorInstance[Lang0, K] // could not find it implicitly
   def dirtyMonoidK: MonoidK[Dirty] = implicitly[MonoidK[Dirty]]
 
 

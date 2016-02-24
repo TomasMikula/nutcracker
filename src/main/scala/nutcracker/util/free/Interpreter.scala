@@ -16,24 +16,31 @@ trait Interpreter[F[_[_], _], S[_[_]], W[_[_]]] {
   def runFree[A](
     s: S[FreeK[F, ?]],
     p: FreeK[F, A])(implicit
-    W: Monoid[W[FreeK[F, ?]]],
-    F: Functor[FF]): (S[FreeK[F, ?]], A) = runFree(s, p, W.zero)
+    W: Monoid[W[FreeK[F, ?]]]
+  ): (S[FreeK[F, ?]], A) = runFree(s, p, W.zero)
 
   def runFreeUnit(
     s: S[FreeK[F, ?]],
     p: FreeK[F, Unit])(implicit
-    W: Monoid[W[FreeK[F, ?]]],
-    F: Functor[FF]): S[FreeK[F, ?]] = runFreeUnit(s, p, W.zero)
+    W: Monoid[W[FreeK[F, ?]]]
+  ): S[FreeK[F, ?]] = runFreeUnit(s, p, W.zero)
 
   @tailrec private def runFree[A](
     s: S[FreeK[F, ?]],
     p: FreeK[F, A],
     w: W[FreeK[F, ?]])(implicit
-    W: Monoid[W[FreeK[F, ?]]],
-    F: Functor[FF]): (S[FreeK[F, ?]], A) = p.resume match {
-    case \/-(a) => (runFreeUnit(s, FreeK.Pure(()), w), a)
-    case -\/(ffa) => step[FreeK[F, ?], FreeK[F, A]](ffa)(s) match {
-      case (s1, w1, fa) => runFree(s1, fa >>= { a => a }, w |+| w1)
+    W: Monoid[W[FreeK[F, ?]]]
+  ): (S[FreeK[F, ?]], A) = p match {
+    case FreeK.Pure(a) => (runFreeUnit(s, FreeK.Pure(()), w), a)
+    case FreeK.Suspend(ffa) => step[FreeK[F, ?], A](ffa)(s) match {
+      case (s1, w1, fa) => runFree(s1, fa, w |+| w1)
+    }
+    case bnd: FreeK.Bind[F, a1, A] => bnd.a match {
+      case FreeK.Pure(x) => runFree(s, bnd.f(x), w)
+      case FreeK.Suspend(ffa1) => step[FreeK[F, ?], a1](ffa1)(s) match {
+        case (s1, w1, fx) => runFree(s1, fx >>= { bnd.f(_) }, w |+| w1)
+      }
+      case FreeK.Bind(fa0, f) => runFree(s, FreeK.bind(fa0)({ f(_) >>= bnd.f }), w)
     }
   }
 
@@ -41,14 +48,21 @@ trait Interpreter[F[_[_], _], S[_[_]], W[_[_]]] {
     s: S[FreeK[F, ?]],
     p: FreeK[F, Unit],
     w: W[FreeK[F, ?]])(implicit
-    W: Monoid[W[FreeK[F, ?]]],
-    F: Functor[FF]): S[FreeK[F, ?]] = p.resume match {
-    case \/-(()) => uncons[FreeK[F, ?]](w)(s) match {
+    W: Monoid[W[FreeK[F, ?]]]
+  ): S[FreeK[F, ?]] = p match {
+    case FreeK.Pure(()) => uncons[FreeK[F, ?]](w)(s) match {
       case Some((cont, w1, s1)) => runFreeUnit(s1, cont, w1)
       case None => s
     }
-    case -\/(ffu) => step[FreeK[F, ?], FreeK[F, Unit]](ffu)(s) match {
-      case (s1, w1, fu) => runFreeUnit(s1, fu >>= { u => u }, w |+| w1)
+    case FreeK.Suspend(ffu) => step[FreeK[F, ?], Unit](ffu)(s) match {
+      case (s1, w1, fu) => runFreeUnit(s1, fu, w |+| w1)
+    }
+    case bnd: FreeK.Bind[F, a1, Unit] => bnd.a match {
+      case FreeK.Pure(x) => runFreeUnit(s, bnd.f(x), w)
+      case FreeK.Suspend(ffa1) => step[FreeK[F, ?], a1](ffa1)(s) match {
+        case (s1, w1, fx) => runFreeUnit(s1, fx >>= { bnd.f(_) }, w |+| w1)
+      }
+      case FreeK.Bind(fa0, f) => runFreeUnit(s, FreeK.bind(fa0)({ f(_) >>= bnd.f }), w)
     }
   }
 }
