@@ -28,7 +28,7 @@ object CostLang {
     }
   }
 
-  implicit def interpreter[C: Semigroup]: Interpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]], AlwaysClean] =
+  implicit def interpreter[C: Semigroup]: Interpreter.Aux[CostLang[C, ?[_], ?], ConstK[C, ?[_]], AlwaysClean] =
     new CleanInterpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] {
 
       def step0[K[_] : Applicative, A](f: CostLang[C, K, A])(c0: C): (ConstK[C, K], K[A]) = f match {

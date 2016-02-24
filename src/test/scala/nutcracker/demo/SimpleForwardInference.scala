@@ -25,7 +25,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
   type Dirty[K[_]] = ProductK[AlwaysClean, PropagationStore.DirtyThings, K]
 
   // summon an interpreter for the above language
-  val interpreter: Interpreter[Lang, State, Dirty] = implicitly[Interpreter[Lang, State, Dirty]]
+  val interpreter: Interpreter.Aux[Lang, State, Dirty] = implicitly[Interpreter.Aux[Lang, State, Dirty]]
 
   // definition of the composed empty state
   def emptyState[K[_]]: State[K] = {

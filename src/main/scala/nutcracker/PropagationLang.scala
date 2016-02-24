@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 
 import algebra.lattice.{BoundedMeetSemilattice, GenBool}
-import nutcracker.util.free.{InjectK, FreeK, FunctorK, FunctorKA}
+import nutcracker.util.free._
 import shapeless.{::, HNil, Sized, Nat, HList}
 import scalaz._
 import scalaz.std.vector._
@@ -172,4 +172,6 @@ object PropagationLang {
       case FetchVector(refs)           => FetchVector(refs)
     }
   }
+
+  implicit def interpreter: Interpreter.Aux[PropagationLang, PropagationStore, PropagationStore.DirtyThings] = PropagationStore.interpreter
 }

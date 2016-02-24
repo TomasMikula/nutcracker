@@ -9,7 +9,7 @@ trait Language {
   type State[K[_]]
   type Dirty[K[_]]
 
-  val interpreter: Interpreter[Vocabulary, State, Dirty]
+  val interpreter: Interpreter.Aux[Vocabulary, State, Dirty]
 
   def emptyState[K[_]]: State[K]
 

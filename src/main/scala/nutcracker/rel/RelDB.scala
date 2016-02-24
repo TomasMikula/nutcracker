@@ -149,7 +149,7 @@ object RelDB {
     TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel))
   )
 
-  implicit def interpreter: Interpreter[RelLang, RelDB, AlwaysClean] = new CleanInterpreter[RelLang, RelDB] {
+  implicit def interpreter: Interpreter.Aux[RelLang, RelDB, AlwaysClean] = new CleanInterpreter[RelLang, RelDB] {
 
     def step0[K[_] : Applicative, A](f: RelLang[K, A])(db: RelDB[K]): (RelDB[K], K[A]) = f match {
       case r @ Relate(rel, values) => db.into(rel)(r.ordersWitness).insert(values)(r.orders, Applicative[K])

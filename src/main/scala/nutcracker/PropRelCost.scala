@@ -38,7 +38,7 @@ final class PropRelCost[C: Monoid] extends Language {
     emptyP :*: emptyDB :*: zeroC
   }
 
-  val interpreter: Interpreter[Vocabulary, State, Dirty] = implicitly[Interpreter[Vocabulary, State, Dirty]]
+  val interpreter: Interpreter.Aux[Vocabulary, State, Dirty] = implicitly[Interpreter.Aux[Vocabulary, State, Dirty]]
   def propStore[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 

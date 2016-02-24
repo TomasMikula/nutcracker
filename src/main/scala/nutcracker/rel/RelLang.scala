@@ -2,8 +2,9 @@ package nutcracker.rel
 
 import algebra.Order
 import nutcracker.rel.RelDB.PartiallyAssignedPattern
+import nutcracker.util.free.Interpreter._
 import nutcracker.util.{SummonHList, Mapped}
-import nutcracker.util.free.{FunctorKA, InjectK, FreeK}
+import nutcracker.util.free.{Interpreter, FunctorKA, InjectK, FreeK}
 
 import scala.language.higherKinds
 
@@ -44,5 +45,7 @@ object RelLang {
       case OnPatternMatch(p, a, h) => onPatternMatch(p, a)(v => f(h(v)))
     }
   }
+
+  implicit def interpreter: Interpreter.Aux[RelLang, RelDB, AlwaysClean] = RelDB.interpreter
 
 }

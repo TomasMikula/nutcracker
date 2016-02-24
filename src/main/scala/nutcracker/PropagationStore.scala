@@ -174,7 +174,7 @@ object PropagationStore {
   object DirtyThings {
     def empty[K[_]]: DirtyThings[K] = DirtyThings(Set(), Set())
 
-    implicit def monoidK: MonoidK[DirtyThings] = new MonoidK[DirtyThings] {
+    implicit val monoidK: MonoidK[DirtyThings] = new MonoidK[DirtyThings] {
       def zero[K[_]]: DirtyThings[K] = DirtyThings.empty
       def append[K[_]](x: DirtyThings[K], y: DirtyThings[K]): DirtyThings[K] = DirtyThings(
         x.domains ++ y.domains,
@@ -194,8 +194,10 @@ object PropagationStore {
 
   import DirtyThings._
 
-  implicit def interpreter: Interpreter[PropagationLang, PropagationStore, DirtyThings] =
-    new Interpreter[PropagationLang, PropagationStore, DirtyThings] {
+  implicit def interpreter: Interpreter.Aux[PropagationLang, PropagationStore, DirtyThings] =
+    new Interpreter[PropagationLang] {
+      type State[K[_]] = PropagationStore[K]
+      type Dirty[K[_]] = DirtyThings[K]
 
       def step[K[_]: Applicative, A](p: PropagationLang[K, A])(s: PropagationStore[K]): (PropagationStore[K], DirtyThings[K], K[A]) = {
         p match {
@@ -234,5 +236,7 @@ object PropagationStore {
           }
         }
       }
+
+      def dirtyMonoidK: MonoidK[Dirty] = DirtyThings.monoidK
     }
 }
