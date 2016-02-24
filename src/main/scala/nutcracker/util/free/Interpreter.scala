@@ -11,8 +11,6 @@ trait Interpreter[F[_[_], _], S[_[_]], W[_[_]]] {
   def step[K[_]: Applicative, A](f: F[K, A])(s: S[K]): (S[K], W[K], K[A])
   def uncons[K[_]: Applicative](w: W[K])(s: S[K]): Option[(K[Unit], W[K], S[K])]
 
-  type FF[A] = F[FreeK[F, ?], A]
-
   def runFree[A](
     s: S[FreeK[F, ?]],
     p: FreeK[F, A])(implicit
@@ -35,12 +33,8 @@ trait Interpreter[F[_[_], _], S[_[_]], W[_[_]]] {
     case FreeK.Suspend(ffa) => step[FreeK[F, ?], A](ffa)(s) match {
       case (s1, w1, fa) => runFree(s1, fa, w |+| w1)
     }
-    case bnd: FreeK.Bind[F, a1, A] => bnd.a match {
-      case FreeK.Pure(x) => runFree(s, bnd.f(x), w)
-      case FreeK.Suspend(ffa1) => step[FreeK[F, ?], a1](ffa1)(s) match {
-        case (s1, w1, fx) => runFree(s1, fx >>= { bnd.f(_) }, w |+| w1)
-      }
-      case FreeK.Bind(fa0, f) => runFree(s, FreeK.bind(fa0)({ f(_) >>= bnd.f }), w)
+    case bnd: FreeK.Bind[F, a1, A] => step[FreeK[F, ?], a1](bnd.a)(s) match {
+      case (s1, w1, fx) => runFree(s1, fx >>= { bnd.f(_) }, w |+| w1)
     }
   }
 
@@ -57,12 +51,8 @@ trait Interpreter[F[_[_], _], S[_[_]], W[_[_]]] {
     case FreeK.Suspend(ffu) => step[FreeK[F, ?], Unit](ffu)(s) match {
       case (s1, w1, fu) => runFreeUnit(s1, fu, w |+| w1)
     }
-    case bnd: FreeK.Bind[F, a1, Unit] => bnd.a match {
-      case FreeK.Pure(x) => runFreeUnit(s, bnd.f(x), w)
-      case FreeK.Suspend(ffa1) => step[FreeK[F, ?], a1](ffa1)(s) match {
-        case (s1, w1, fx) => runFreeUnit(s1, fx >>= { bnd.f(_) }, w |+| w1)
-      }
-      case FreeK.Bind(fa0, f) => runFreeUnit(s, FreeK.bind(fa0)({ f(_) >>= bnd.f }), w)
+    case bnd: FreeK.Bind[F, a1, Unit] => step[FreeK[F, ?], a1](bnd.a)(s) match {
+      case (s1, w1, fx) => runFreeUnit(s1, fx >>= { bnd.f(_) }, w |+| w1)
     }
   }
 }
