@@ -9,7 +9,7 @@ import scalaz.Id._
 import scalaz.{Monoid, StreamT, ~>}
 import scalaz.syntax.applicative._
 
-class DFSSolver[C: Monoid] extends Solver[PropRelCost[C], StreamT[Id, ?]] {
+class DFSSolver[C: Monoid] extends Solver[PropRelCost[C], List] {
 
   val lang: PropRelCost[C] = new PropRelCost[C]
 
@@ -30,7 +30,7 @@ class DFSSolver[C: Monoid] extends Solver[PropRelCost[C], StreamT[Id, ?]] {
     }
   }
 
-  def assess(s: S): Assessment[StreamT[Id, (S, K[Unit])]] = lang.naiveAssess(s)
+  def assess(s: S): Assessment[List[(S, K[Unit])]] = lang.naiveAssess(s)
 
   private def init[A](p: K[Promised[A]]): (S, Promised[A]) = {
     lang.interpreter.runFree(p)
@@ -72,7 +72,7 @@ class DFSSolver[C: Monoid] extends Solver[PropRelCost[C], StreamT[Id, ?]] {
       case Stuck => failed.trans(trampolineId) // TODO: Don't treat as failed.
       case Done => done(lang.propStore.get(s).fetchResult(pr).get).trans(trampolineId)
       case Incomplete(str) =>
-        str.trans(trampolineId) flatMap { case (s1, k) => solutionsT(lang.interpreter.runFreeUnit(s1, k), pr, failed, done) }
+        StreamT.fromIterable(str).trans(trampolineId) flatMap { case (s1, k) => solutionsT(lang.interpreter.runFreeUnit(s1, k), pr, failed, done) }
     }
 
   private def hideTrampoline[A](stream: StreamT[Trampoline, A]): StreamT[Id, A] =

@@ -4,10 +4,11 @@ import nutcracker.Assessment._
 import nutcracker.algebraic.NonDecreasingMonoid
 
 import scala.annotation.tailrec
-import scalaz.Id._
 import scalaz._
+import scalaz.Id._
+import scalaz.std.list._
 
-class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropRelCost[C], StreamT[Id, ?]] {
+class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropRelCost[C], List] {
   val lang: PropRelCost[C] = new PropRelCost[C]
 
   implicit val orderByCost: Order[S] = Order.orderBy(s => lang.cost.get(s))
@@ -18,7 +19,7 @@ class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropRelCost[C], StreamT[I
     }
   }
 
-  def assess(state: S): Assessment[StreamT[Id, (S, K[Unit])]] = lang.naiveAssess(state)
+  def assess(state: S): Assessment[List[(S, K[Unit])]] = lang.naiveAssess(state)
 
   private def solutions[A](s: S, pr: Promised[A]): StreamT[Id, (A, C)] = {
     val heap = Heap.singleton[S](s)
@@ -34,8 +35,7 @@ class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropRelCost[C], StreamT[I
       case Done => Some(((lang.propStore.get(s).fetchResult(pr).get, lang.cost.get(s)), heap1))
       case Incomplete(sks) =>
         val newStates = sks map { case (s1, k) => lang.interpreter.runFreeUnit(s1, k) }
-        type Stream[T] = StreamT[Id, T] // helps infer the Foldable instance on the next line
-        val heap2 = heap1.insertAllF[Stream](newStates)
+        val heap2 = heap1.insertAllF[List](newStates)
         unfold(heap2, pr)
     }
   }

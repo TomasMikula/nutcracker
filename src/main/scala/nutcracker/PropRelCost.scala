@@ -10,8 +10,7 @@ import scala.language.higherKinds
 import nutcracker.util.free.Interpreter._
 import nutcracker.util.free._
 
-import scalaz.Id._
-import scalaz.{Applicative, Monoid, StreamT, ~>}
+import scalaz.{Applicative, Monoid, ~>}
 import scalaz.syntax.applicative._
 
 final class PropRelCost[C: Monoid] extends Language {
@@ -32,18 +31,18 @@ final class PropRelCost[C: Monoid] extends Language {
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
 
-  def naiveAssess[K[_]: Applicative](s: State[K])(implicit tr: FreeK[PropagationLang, ?] ~> K): Assessment[StreamT[Id, (State[K], K[Unit])]] = {
+  def naiveAssess[K[_]: Applicative](s: State[K])(implicit tr: FreeK[PropagationLang, ?] ~> K): Assessment[List[(State[K], K[Unit])]] = {
     if(propStore.get(s).failedVars.nonEmpty) Failed
     else if(propStore.get(s).unresolvedVars.isEmpty) Done
     else {
-      def splitDomain[A, D](ref: DomRef[A, D]): Option[StreamT[Id, K[Unit]]] = {
+      def splitDomain[A, D](ref: DomRef[A, D]): Option[List[K[Unit]]] = {
         val (d, domain) = propStore.get(s).getDomain(ref)
         domain.values(d) match {
-          case Domain.Empty() => Some(StreamT.empty)
-          case Domain.Just(a) => Some(().pure[K] :: StreamT.empty[Id, K[Unit]])
+          case Domain.Empty() => Some(Nil)
+          case Domain.Just(a) => Some(().pure[K] :: Nil)
           case Domain.Many(branchings) =>
             if(branchings.isEmpty) None
-            else Some(StreamT.fromIterable(branchings.head) map { d => tr(intersectF(ref)(d)) })
+            else Some(branchings.head map { d => tr(intersectF(ref)(d)) })
         }
       }
 
