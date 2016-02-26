@@ -9,7 +9,7 @@ import scalaz.Id._
 import scalaz.{Monoid, StreamT, ~>}
 import scalaz.syntax.applicative._
 
-class DFSSolver[C: Monoid] extends Solver[PropRelCost[C], List] {
+class DFSSolver[C: Monoid] extends Solver[PropRelCost[C]] {
 
   val lang: PropRelCost[C] = new PropRelCost[C]
 

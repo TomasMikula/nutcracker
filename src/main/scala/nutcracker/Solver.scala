@@ -4,11 +4,11 @@ import scala.language.higherKinds
 
 import nutcracker.util.free.FreeK
 
-trait Solver[L <: Language, F[_]] {
+trait Solver[L <: Language] {
   val lang: L
 
   type K[A] = FreeK[lang.Vocabulary, A]
   type S = lang.State[K]
 
-  def assess: S => Assessment[F[K[Unit]]]
+  def assess: S => Assessment[List[K[Unit]]]
 }

@@ -8,7 +8,7 @@ import scalaz._
 import scalaz.Id._
 import scalaz.std.list._
 
-class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropRelCost[C], List] {
+class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropRelCost[C]] {
   val lang: PropRelCost[C] = new PropRelCost[C]
 
   implicit val orderByCost: Order[S] = Order.orderBy(s => lang.cost.get(s))
