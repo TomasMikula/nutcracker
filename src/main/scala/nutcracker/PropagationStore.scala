@@ -243,7 +243,7 @@ object PropagationStore {
     }
 
   import scalaz.~>
-  def naiveAssess[K[_]: Applicative](implicit tr: FreeK[PropagationLang, ?] ~> K): PropagationStore[K] => Assessment[List[(PropagationStore[K], K[Unit])]] = s => {
+  def naiveAssess[K[_]: Applicative](implicit tr: FreeK[PropagationLang, ?] ~> K): PropagationStore[K] => Assessment[List[K[Unit]]] = s => {
     if(s.failedVars.nonEmpty) Failed
     else if(s.unresolvedVars.isEmpty) Done
     else {
@@ -259,7 +259,7 @@ object PropagationStore {
       }
 
       s.unresolvedVars.toStream.map(splitDomain(_)).collectFirst({
-        case Some(branches) => Incomplete(branches.map { k => (s, k) })
+        case Some(branches) => Incomplete(branches)
       }).getOrElse(Stuck)
     }
   }

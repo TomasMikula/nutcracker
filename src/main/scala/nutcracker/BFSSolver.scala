@@ -19,7 +19,7 @@ class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropRelCost[C], List] {
     }
   }
 
-  def assess: S => Assessment[List[(S, K[Unit])]] = lang.naiveAssess
+  def assess: S => Assessment[List[K[Unit]]] = lang.naiveAssess
 
   private def solutions[A](s: S, pr: Promised[A]): StreamT[Id, (A, C)] = {
     val heap = Heap.singleton[S](s)
@@ -34,7 +34,7 @@ class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropRelCost[C], List] {
       case Stuck => unfold(heap1, pr) // not done, but we don't know how to proceed. TODO: Don't treat as failed
       case Done => Some(((lang.propStore.get(s).fetchResult(pr).get, lang.cost.get(s)), heap1))
       case Incomplete(sks) =>
-        val newStates = sks map { case (s1, k) => lang.interpreter.runFreeUnit(s1, k) }
+        val newStates = sks map { k => lang.interpreter.runFreeUnit(s, k) }
         val heap2 = heap1.insertAllF[List](newStates)
         unfold(heap2, pr)
     }

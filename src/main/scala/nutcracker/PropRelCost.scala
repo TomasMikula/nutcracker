@@ -1,7 +1,6 @@
 package nutcracker
 
 import monocle.Lens
-import nutcracker.Assessment._
 import nutcracker.rel.{RelDB, RelLang}
 
 import scala.language.higherKinds
@@ -9,7 +8,7 @@ import scala.language.higherKinds
 import nutcracker.util.free.Interpreter._
 import nutcracker.util.free._
 
-import scalaz.{Functor, Monoid}
+import scalaz.{~>, Applicative, Monoid}
 
 final class PropRelCost[C: Monoid] extends Language {
   type CostL[K[_], A] = CostLang[C, K, A]
@@ -29,14 +28,8 @@ final class PropRelCost[C: Monoid] extends Language {
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
   private type Q[A] = FreeK[Vocabulary, A]
-  private type Ass[X] = Assessment[List[(X, Q[Unit])]]
-  private implicit def assessmentFunctor: Functor[Ass] = new Functor[Ass] {
-    def map[A, B](fa: Ass[A])(f: A => B): Ass[B] = fa match {
-      case Done => Done
-      case Failed => Failed
-      case Stuck => Stuck
-      case Incomplete(branches) => Incomplete(branches map { case (a, q) => (f(a), q) })
-    }
-  }
-  def naiveAssess: State[Q] => Assessment[List[(State[Q], Q[Unit])]] = propStore[Q].modifyF[Ass](PropagationStore.naiveAssess)
+  private type P[A] = FreeK[PropagationLang, A]
+  private implicit val pq = implicitly[P ~> Q]
+  private implicit val aq = Applicative[Q]
+  def naiveAssess: State[Q] => Assessment[List[Q[Unit]]] = s => (PropagationStore.naiveAssess[Q](aq, pq))(propStore[Q].get(s))
 }

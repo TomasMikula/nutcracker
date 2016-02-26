@@ -10,5 +10,5 @@ trait Solver[L <: Language, F[_]] {
   type K[A] = FreeK[lang.Vocabulary, A]
   type S = lang.State[K]
 
-  def assess: S => Assessment[F[(S, K[Unit])]]
+  def assess: S => Assessment[F[K[Unit]]]
 }

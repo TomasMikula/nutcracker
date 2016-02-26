@@ -30,7 +30,7 @@ class DFSSolver[C: Monoid] extends Solver[PropRelCost[C], List] {
     }
   }
 
-  def assess: S => Assessment[List[(S, K[Unit])]] = lang.naiveAssess
+  def assess: S => Assessment[List[K[Unit]]] = lang.naiveAssess
 
   private def init[A](p: K[Promised[A]]): (S, Promised[A]) = {
     lang.interpreter.runFree(p)
@@ -71,8 +71,8 @@ class DFSSolver[C: Monoid] extends Solver[PropRelCost[C], List] {
       case Failed => failed.trans(trampolineId)
       case Stuck => failed.trans(trampolineId) // TODO: Don't treat as failed.
       case Done => done(lang.propStore.get(s).fetchResult(pr).get).trans(trampolineId)
-      case Incomplete(str) =>
-        StreamT.fromIterable(str).trans(trampolineId) flatMap { case (s1, k) => solutionsT(lang.interpreter.runFreeUnit(s1, k), pr, failed, done) }
+      case Incomplete(branches) =>
+        StreamT.fromIterable(branches).trans(trampolineId) flatMap { k => solutionsT(lang.interpreter.runFreeUnit(s, k), pr, failed, done) }
     }
 
   private def hideTrampoline[A](stream: StreamT[Trampoline, A]): StreamT[Id, A] =
