@@ -2,7 +2,6 @@ package nutcracker
 
 import monocle.Lens
 import nutcracker.Assessment._
-import nutcracker.PropagationLang._
 import nutcracker.rel.{RelDB, RelLang}
 
 import scala.language.higherKinds
@@ -10,8 +9,7 @@ import scala.language.higherKinds
 import nutcracker.util.free.Interpreter._
 import nutcracker.util.free._
 
-import scalaz.{Applicative, Monoid, ~>}
-import scalaz.syntax.applicative._
+import scalaz.{Functor, Monoid}
 
 final class PropRelCost[C: Monoid] extends Language {
   type CostL[K[_], A] = CostLang[C, K, A]
@@ -30,25 +28,15 @@ final class PropRelCost[C: Monoid] extends Language {
   def propStore[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
-
-  def naiveAssess[K[_]: Applicative](s: State[K])(implicit tr: FreeK[PropagationLang, ?] ~> K): Assessment[List[(State[K], K[Unit])]] = {
-    if(propStore.get(s).failedVars.nonEmpty) Failed
-    else if(propStore.get(s).unresolvedVars.isEmpty) Done
-    else {
-      def splitDomain[A, D](ref: DomRef[A, D]): Option[List[K[Unit]]] = {
-        val (d, domain) = propStore.get(s).getDomain(ref)
-        domain.values(d) match {
-          case Domain.Empty() => Some(Nil)
-          case Domain.Just(a) => Some(().pure[K] :: Nil)
-          case Domain.Many(branchings) =>
-            if(branchings.isEmpty) None
-            else Some(branchings.head map { d => tr(intersectF(ref)(d)) })
-        }
-      }
-
-      propStore.get(s).unresolvedVars.toStream.map(splitDomain(_)).collectFirst({
-        case Some(branches) => Incomplete(branches.map { k => (s, k) })
-      }).getOrElse(Stuck)
+  private type Q[A] = FreeK[Vocabulary, A]
+  private type Ass[X] = Assessment[List[(X, Q[Unit])]]
+  private implicit def assessmentFunctor: Functor[Ass] = new Functor[Ass] {
+    def map[A, B](fa: Ass[A])(f: A => B): Ass[B] = fa match {
+      case Done => Done
+      case Failed => Failed
+      case Stuck => Stuck
+      case Incomplete(branches) => Incomplete(branches map { case (a, q) => (f(a), q) })
     }
   }
+  def naiveAssess: State[Q] => Assessment[List[(State[Q], Q[Unit])]] = propStore[Q].modifyF[Ass](PropagationStore.naiveAssess)
 }

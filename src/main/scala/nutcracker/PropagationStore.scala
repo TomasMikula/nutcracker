@@ -2,8 +2,9 @@ package nutcracker
 
 import scala.language.{existentials, higherKinds}
 
+import nutcracker.Assessment.{Stuck, Incomplete, Done, Failed}
 import nutcracker.util.Index
-import nutcracker.util.free.{MonoidK, Interpreter}
+import nutcracker.util.free.{FreeK, MonoidK, Interpreter}
 
 import shapeless.{HList, Nat, Sized}
 import shapeless.PolyDefns.~>
@@ -240,4 +241,26 @@ object PropagationStore {
       def emptyState[K[_]]: PropagationStore[K] = PropagationStore.empty
       def dirtyMonoidK: MonoidK[Dirty] = DirtyThings.monoidK
     }
+
+  import scalaz.~>
+  def naiveAssess[K[_]: Applicative](implicit tr: FreeK[PropagationLang, ?] ~> K): PropagationStore[K] => Assessment[List[(PropagationStore[K], K[Unit])]] = s => {
+    if(s.failedVars.nonEmpty) Failed
+    else if(s.unresolvedVars.isEmpty) Done
+    else {
+      def splitDomain[A, D](ref: DomRef[A, D]): Option[List[K[Unit]]] = {
+        val (d, domain) = s.getDomain(ref)
+        domain.values(d) match {
+          case Domain.Empty() => Some(Nil)
+          case Domain.Just(a) => Some(().pure[K] :: Nil)
+          case Domain.Many(branchings) =>
+            if(branchings.isEmpty) None
+            else Some(branchings.head map { d => tr(intersectF(ref)(d)) })
+        }
+      }
+
+      s.unresolvedVars.toStream.map(splitDomain(_)).collectFirst({
+        case Some(branches) => Incomplete(branches.map { k => (s, k) })
+      }).getOrElse(Stuck)
+    }
+  }
 }

@@ -19,7 +19,7 @@ class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropRelCost[C], List] {
     }
   }
 
-  def assess(state: S): Assessment[List[(S, K[Unit])]] = lang.naiveAssess(state)
+  def assess: S => Assessment[List[(S, K[Unit])]] = lang.naiveAssess
 
   private def solutions[A](s: S, pr: Promised[A]): StreamT[Id, (A, C)] = {
     val heap = Heap.singleton[S](s)

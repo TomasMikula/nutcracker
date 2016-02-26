@@ -30,7 +30,7 @@ class DFSSolver[C: Monoid] extends Solver[PropRelCost[C], List] {
     }
   }
 
-  def assess(s: S): Assessment[List[(S, K[Unit])]] = lang.naiveAssess(s)
+  def assess: S => Assessment[List[(S, K[Unit])]] = lang.naiveAssess
 
   private def init[A](p: K[Promised[A]]): (S, Promised[A]) = {
     lang.interpreter.runFree(p)
