@@ -8,7 +8,7 @@ import scala.language.higherKinds
 import nutcracker.util.free.Interpreter._
 import nutcracker.util.free._
 
-import scalaz.{~>, Applicative, Monoid}
+import scalaz.Monoid
 
 final class PropRelCost[C: Monoid] extends Language {
   type CostL[K[_], A] = CostLang[C, K, A]
@@ -28,8 +28,5 @@ final class PropRelCost[C: Monoid] extends Language {
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
   private type Q[A] = FreeK[Vocabulary, A]
-  private type P[A] = FreeK[PropagationLang, A]
-  private implicit val pq = implicitly[P ~> Q]
-  private implicit val aq = Applicative[Q]
-  def naiveAssess: State[Q] => Assessment[List[Q[Unit]]] = s => (PropagationStore.naiveAssess[Q](aq, pq))(propStore[Q].get(s))
+  def naiveAssess: State[Q] => Assessment[List[Q[Unit]]] = PropagationStore.naiveAssess(propStore[Q])
 }

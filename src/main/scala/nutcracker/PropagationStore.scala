@@ -2,17 +2,16 @@ package nutcracker
 
 import scala.language.{existentials, higherKinds}
 
+import monocle.Lens
 import nutcracker.Assessment.{Stuck, Incomplete, Done, Failed}
 import nutcracker.util.Index
 import nutcracker.util.free.{FreeK, MonoidK, Interpreter}
-
-import shapeless.{HList, Nat, Sized}
-import shapeless.PolyDefns.~>
-
-import scalaz._
+import scalaz.{Applicative, Foldable, Monoid}
 import scalaz.std.list._
 import scalaz.syntax.applicative._
 import scalaz.syntax.monoid._
+import shapeless.{HList, Nat, Sized}
+import shapeless.PolyDefns.~>
 
 import Domain._
 
@@ -263,4 +262,10 @@ object PropagationStore {
       }).getOrElse(Stuck)
     }
   }
+
+  def naiveAssess[K[_]: Applicative, S[_[_]]](
+    lens: Lens[S[K], PropagationStore[K]])(implicit
+    tr: FreeK[PropagationLang, ?] ~> K
+  ): S[K] => Assessment[List[K[Unit]]] =
+    s => (naiveAssess[K](Applicative[K], tr))(lens.get(s))
 }
