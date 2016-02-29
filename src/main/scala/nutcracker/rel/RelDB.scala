@@ -5,8 +5,7 @@ import scala.language.higherKinds
 
 import nutcracker.rel.RelLang._
 import nutcracker.util.{TransformedIndex, Mapped}
-import nutcracker.util.free.Interpreter
-import nutcracker.util.free.Interpreter.{CleanInterpreter, AlwaysClean}
+import nutcracker.util.free.{MonoidK, Interpreter}
 
 import algebra.Order
 import scalaz.{Foldable, Applicative}
@@ -149,13 +148,26 @@ object RelDB {
     TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel))
   )
 
-  implicit def interpreter: Interpreter.Aux[RelLang, RelDB, AlwaysClean] = new CleanInterpreter[RelLang, RelDB] {
+  type Dirty[K[_]] = List[K[Unit]]
 
-    def step0[K[_] : Applicative, A](f: RelLang[K, A])(db: RelDB[K]): (RelDB[K], K[A]) = f match {
-      case r @ Relate(rel, values) => db.into(rel)(r.ordersWitness).insert(values)(r.orders, Applicative[K])
-      case OnPatternMatch(p, a, h) => db.addOnPatternMatch(p, a)(h)
+  implicit def interpreter: Interpreter.Aux[RelLang, RelDB, Dirty] = new Interpreter[RelLang] {
+    type State[K[_]] = RelDB[K]
+    type Dirty[K[_]] = List[K[Unit]]
+
+    def step[K[_] : Applicative, A](f: RelLang[K, A])(db: RelDB[K]): (RelDB[K], List[K[Unit]], A) = f match {
+      case r @ Relate(rel, values) => db.into(rel)(r.ordersWitness).insert(values)(r.orders, Applicative[K]) match { case (s, k) => (s, List(k), ()) }
+      case OnPatternMatch(p, a, h) => db.addOnPatternMatch(p, a)(h) match { case (s, k) => (s, List(k), ()) }
+    }
+
+    def uncons[K[_]: Applicative](d: Dirty[K])(s: State[K]): Option[(K[Unit], Dirty[K], State[K])] = d match {
+      case Nil => None
+      case h::t => Some((h, t, s))
     }
 
     def emptyState[K[_]]: RelDB[K] = RelDB.empty
+    def dirtyMonoidK: MonoidK[Dirty] = new MonoidK[Dirty] {
+      def zero[K[_]]: Dirty[K] = Nil
+      def append[K[_]](d1: Dirty[K], d2: Dirty[K]): Dirty[K] = if(d1.size < d2.size) d1 ++ d2 else d2 ++ d1
+    }
   }
 }

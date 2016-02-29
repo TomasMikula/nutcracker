@@ -4,7 +4,6 @@ import algebra.Order
 import algebra.std.string._
 import monocle._
 import nutcracker.rel.Rel.Rel2
-import nutcracker.util.free.Interpreter._
 import nutcracker.{PropagationLang, PropagationStore}
 import nutcracker.PropagationLang._
 import nutcracker.rel.{Pattern, RelDB, RelLang}
@@ -21,7 +20,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
   // à la carte composition of the desired instruction set and the state it operates on
   type Lang[K[_], A] = CoproductK[RelLang, PropagationLang, K, A]
   type State[K[_]] = ProductK[RelDB, PropagationStore, K]
-  type Dirty[K[_]] = ProductK[AlwaysClean, PropagationStore.DirtyThings, K]
+  type Dirty[K[_]] = ProductK[RelDB.Dirty, PropagationStore.DirtyThings, K]
 
   // summon an interpreter for the above language
   val interpreter: Interpreter.Aux[Lang, State, Dirty] = implicitly[Interpreter.Aux[Lang, State, Dirty]]

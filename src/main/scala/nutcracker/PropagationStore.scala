@@ -162,35 +162,40 @@ object PropagationStore {
   )
 
   case class DirtyThings[K[_]](
+    continuations: List[K[Unit]],
     domains: Set[CellRef[D] forSome { type D }],
     selections: Set[Sel[_ <: HList]]
   ) {
-    def uncons: Option[(DirtyThing, DirtyThings[K])] =
-      if(domains.nonEmpty) Some((DirtyDomain(domains.head), this.copy(domains = domains.tail)))
+    def uncons: Option[(DirtyThing[K], DirtyThings[K])] =
+      if(continuations.nonEmpty) Some((Continuation(continuations.head), this.copy(continuations = continuations.tail)))
+      else if(domains.nonEmpty) Some((DirtyDomain(domains.head), this.copy(domains = domains.tail)))
       else if(selections.nonEmpty) Some((DirtySel(selections.head), this.copy(selections = selections.tail)))
       else None
   }
 
   object DirtyThings {
-    def empty[K[_]]: DirtyThings[K] = DirtyThings(Set(), Set())
+    def empty[K[_]]: DirtyThings[K] = DirtyThings(Nil, Set(), Set())
 
     implicit val monoidK: MonoidK[DirtyThings] = new MonoidK[DirtyThings] {
       def zero[K[_]]: DirtyThings[K] = DirtyThings.empty
       def append[K[_]](x: DirtyThings[K], y: DirtyThings[K]): DirtyThings[K] = DirtyThings(
+        if(x.continuations.size < y.continuations.size) x.continuations ++ y.continuations else y.continuations ++ x.continuations,
         x.domains ++ y.domains,
         x.selections ++ y.selections)
     }
     implicit def monoid[K[_]]: Monoid[DirtyThings[K]] = monoidK.monoid
 
-    def dirtyDomain[K[_], D](ref: CellRef[D]): DirtyThings[K] = DirtyThings(Set(ref), Set())
-    def dirtyDomains[K[_], D](refs: Iterable[CellRef[D]]): DirtyThings[K] = DirtyThings(refs.toSet, Set())
-    def dirtySel[K[_]](sel: Sel[_ <: HList]): DirtyThings[K] = DirtyThings(Set(), Set(sel))
-    def dirtySels[K[_]](sels: Set[Sel[_ <: HList]]): DirtyThings[K] = DirtyThings(Set(), sels)
+    def continuation[K[_]](k: K[Unit]): DirtyThings[K] = DirtyThings(k::Nil, Set(), Set())
+    def dirtyDomain[K[_], D](ref: CellRef[D]): DirtyThings[K] = DirtyThings(Nil, Set(ref), Set())
+    def dirtyDomains[K[_], D](refs: Iterable[CellRef[D]]): DirtyThings[K] = DirtyThings(Nil, refs.toSet, Set())
+    def dirtySel[K[_]](sel: Sel[_ <: HList]): DirtyThings[K] = DirtyThings(Nil, Set(), Set(sel))
+    def dirtySels[K[_]](sels: Set[Sel[_ <: HList]]): DirtyThings[K] = DirtyThings(Nil, Set(), sels)
   }
 
-  sealed trait DirtyThing
-  case class DirtyDomain[D](ref: CellRef[D]) extends DirtyThing
-  case class DirtySel(sel: Sel[_ <: HList]) extends DirtyThing
+  sealed trait DirtyThing[K[_]]
+  case class Continuation[K[_]](k: K[Unit]) extends DirtyThing[K]
+  case class DirtyDomain[K[_], D](ref: CellRef[D]) extends DirtyThing[K]
+  case class DirtySel[K[_]](sel: Sel[_ <: HList]) extends DirtyThing[K]
 
   import DirtyThings._
 
@@ -199,28 +204,28 @@ object PropagationStore {
       type State[K[_]] = PropagationStore[K]
       type Dirty[K[_]] = DirtyThings[K]
 
-      def step[K[_]: Applicative, A](p: PropagationLang[K, A])(s: PropagationStore[K]): (PropagationStore[K], DirtyThings[K], K[A]) = {
+      def step[K[_]: Applicative, A](p: PropagationLang[K, A])(s: PropagationStore[K]): (PropagationStore[K], DirtyThings[K], A) = {
         p match {
           case Variable(d, dom) => s.addVariable(d, dom) match {
-            case (s1, ref) => (s1, DirtyThings.empty, ref.point[K])
+            case (s1, ref) => (s1, DirtyThings.empty, ref)
           }
           case VarTrigger(ref, f) => s.addDomainTrigger(ref, f) match {
-            case (s1, ok) => (s1, DirtyThings.empty, ok.getOrElse(().point[K]))
+            case (s1, ok) => (s1, ok.map(continuation(_)).getOrElse(DirtyThings.empty), ())
           }
           case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
-            case s1 => (s1, dirtySel(sel), ().point[K])
+            case s1 => (s1, dirtySel(sel), ())
           }
           case Intersect(ref, d) => s.intersect(ref, d) match {
-            case Some(s1) => (s1, dirtyDomain(ref), ().point[K])
-            case None => (s, DirtyThings.empty[K], ().point[K])
+            case Some(s1) => (s1, dirtyDomain(ref), ())
+            case None => (s, DirtyThings.empty[K], ())
           }
           case IntersectVector(refs, values) => s.intersectVector(refs, values) match {
-            case (s1, dirtyCells) => (s1, dirtyDomains(dirtyCells), ().point[K])
+            case (s1, dirtyCells) => (s1, dirtyDomains(dirtyCells), ())
           }
-          case Fetch(ref) => (s, DirtyThings.empty[K], s.fetch(ref).point[K])
-          case FetchVector(refs) => (s, DirtyThings.empty[K], s.fetchVector(refs).point[K])
+          case Fetch(ref) => (s, DirtyThings.empty[K], s.fetch(ref))
+          case FetchVector(refs) => (s, DirtyThings.empty[K], s.fetchVector(refs))
           case WhenResolved(ref, f) => s.addDomainResolutionTrigger(ref, f) match {
-            case (s1, ok) => (s1, DirtyThings.empty[K], ok.getOrElse(().point[K]))
+            case (s1, ok) => (s1, ok.map(continuation(_)).getOrElse(DirtyThings.empty[K]), ())
           }
         }
       }
@@ -228,6 +233,7 @@ object PropagationStore {
       def uncons[K[_]: Applicative](w: DirtyThings[K])(s: PropagationStore[K]): Option[(K[Unit], DirtyThings[K], PropagationStore[K])] = w.uncons match {
         case None => None
         case Some((dt, dts)) => dt match {
+          case Continuation(k) => Some((k, dts, s))
           case DirtyDomain(ref) => s.triggersForDomain(ref) match {
             case (s1, ks) => Some((Foldable[List].sequence_(ks), dts |+| dirtySels[K](s.getSelsForCell(ref)), s1))
           }

@@ -20,7 +20,7 @@ final class PropRelCost[C: Monoid] {
   type State0[K[_]] = ProductK[RelDB, CostS, K]
   type State[K[_]] = ProductK[PropagationStore, State0, K]
 
-  type Dirty0[K[_]] = ProductK[AlwaysClean, AlwaysClean, K]
+  type Dirty0[K[_]] = ProductK[RelDB.Dirty, AlwaysClean, K]
   type Dirty[K[_]] = ProductK[PropagationStore.DirtyThings, Dirty0, K]
 
   val interpreter: Interpreter.Aux[Vocabulary, State, Dirty] = implicitly[Interpreter.Aux[Vocabulary, State, Dirty]]

@@ -9,8 +9,8 @@ trait Interpreter[F[_[_], _]] {
   type State[K[_]]
   type Dirty[K[_]]
 
-  def step[K[_]: Applicative, A](f: F[K, A])(s: State[K]): (State[K], Dirty[K], K[A])
-  def uncons[K[_]: Applicative](w: Dirty[K])(s: State[K]): Option[(K[Unit], Dirty[K], State[K])]
+  def step[K[_]: Applicative, A](f: F[K, A])(s: State[K]): (State[K], Dirty[K], A)
+  def uncons[K[_]: Applicative](d: Dirty[K])(s: State[K]): Option[(K[Unit], Dirty[K], State[K])]
 
   def emptyState[K[_]]: State[K]
 
@@ -36,10 +36,10 @@ trait Interpreter[F[_[_], _]] {
   ): (State[FreeK[F, ?]], A) = p match {
     case FreeK.Pure(a) => (runFreeUnit(s, FreeK.Pure(()), d), a)
     case FreeK.Suspend(ffa) => step[FreeK[F, ?], A](ffa)(s) match {
-      case (s1, d1, fa) => runFree(s1, fa, mappend(d, d1))
+      case (s1, d1, a) => (runFreeUnit(s1, FreeK.Pure(()), mappend(d, d1)), a)
     }
     case bnd: FreeK.Bind[F, a1, A] => step[FreeK[F, ?], a1](bnd.a)(s) match {
-      case (s1, d1, fx) => runFree(s1, fx >>= { bnd.f(_) }, mappend(d, d1))
+      case (s1, d1, x) => runFree(s1, bnd.f(x), mappend(d, d1))
     }
   }
 
@@ -53,10 +53,10 @@ trait Interpreter[F[_[_], _]] {
       case None => s
     }
     case FreeK.Suspend(ffu) => step[FreeK[F, ?], Unit](ffu)(s) match {
-      case (s1, d1, fu) => runFreeUnit(s1, fu, mappend(d, d1))
+      case (s1, d1, ()) => runFreeUnit(s1, FreeK.Pure(()), mappend(d, d1))
     }
     case bnd: FreeK.Bind[F, a1, Unit] => step[FreeK[F, ?], a1](bnd.a)(s) match {
-      case (s1, d1, fx) => runFreeUnit(s1, fx >>= { bnd.f(_) }, mappend(d, d1))
+      case (s1, d1, x) => runFreeUnit(s1, bnd.f(x), mappend(d, d1))
     }
   }
 }
@@ -81,10 +81,10 @@ object Interpreter {
     type State[K[_]] = S[K]
     type Dirty[K[_]] = AlwaysClean[K]
 
-    def step0[K[_]: Applicative, A](f: F[K, A])(s: S[K]): (S[K], K[A])
+    def step0[K[_]: Applicative, A](f: F[K, A])(s: S[K]): (S[K], A)
 
-    final def step[K[_]: Applicative, A](f: F[K, A])(s: S[K]): (S[K], AlwaysClean[K], K[A]) = step0(f)(s) match {
-      case (s1, k) => (s1, (), k)
+    final def step[K[_]: Applicative, A](f: F[K, A])(s: S[K]): (S[K], AlwaysClean[K], A) = step0(f)(s) match {
+      case (s1, a) => (s1, (), a)
     }
 
     final def uncons[K[_]: Applicative](w: AlwaysClean[K])(s: S[K]): Option[(K[Unit], AlwaysClean[K], S[K])] = None
@@ -102,12 +102,12 @@ object Interpreter {
     new Interpreter[F] {
       type State[K[_]] = ProductK[i1.State, i2.State, K]
       type Dirty[K[_]] = ProductK[i1.Dirty, i2.Dirty, K]
-      def step[K[_] : Applicative, A](f: F[K, A])(s: State[K]): (State[K], Dirty[K], K[A]) = f.run match {
+      def step[K[_] : Applicative, A](f: F[K, A])(s: State[K]): (State[K], Dirty[K], A) = f.run match {
         case -\/(g) => i1.step(g)(s._1) match {
-          case (t, x, k) => (s.update_1(t), ProductK(x, i2.dirtyMonoidK.zero[K]), k)
+          case (t, x, a) => (s.update_1(t), ProductK(x, i2.dirtyMonoidK.zero[K]), a)
         }
         case \/-(h) => i2.step(h)(s._2) match {
-          case (u, y, k) => (s.update_2(u), ProductK(i1.dirtyMonoidK.zero[K], y), k)
+          case (u, y, a) => (s.update_2(u), ProductK(i1.dirtyMonoidK.zero[K], y), a)
         }
       }
 
@@ -131,9 +131,9 @@ object Interpreter {
       type State[K[_]] = S[K]
       type Dirty[K[_]] = W[K]
 
-      def step[K[_] : Applicative, A](c: CoyonedaK[F, K, A])(s: S[K]): (S[K], W[K], K[A]) = c match {
+      def step[K[_] : Applicative, A](c: CoyonedaK[F, K, A])(s: S[K]): (S[K], W[K], A) = c match {
         case CoyonedaK.Pure(fa) => i.step(fa)(s)
-        case CoyonedaK.Map(fx, f) => i.step(fx)(s) match { case (s1, w1, kx) => (s1, w1, Applicative[K].map(kx)(f)) }
+        case CoyonedaK.Map(fx, f) => i.step(fx)(s) match { case (s1, w1, x) => (s1, w1, f(x)) }
       }
 
       def uncons[K[_] : Applicative](w: W[K])(s: S[K]): Option[(K[Unit], W[K], S[K])] = i.uncons(w)(s)
