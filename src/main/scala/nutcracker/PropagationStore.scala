@@ -89,8 +89,24 @@ case class PropagationStore[K[_]] private(
     }
   }
 
+  def addSelTrigger[L <: HList](sel: Sel[L], t: L => Trigger[K]): (PropagationStore[K], Option[K[Unit]]) = {
+    t(sel.fetch(cellFetcher)) match {
+      case Discard() => (this, None)
+      case Sleep() => (addSelTrigger0(sel, t), None)
+      case Fire(cont) => (this, Some(cont))
+      case FireReload(cont) => (addSelTrigger0(sel, t), Some(cont))
+    }
+  }
+
   private def addDomainTrigger0[D](ref: CellRef[D], t: D => Trigger[K]): PropagationStore[K] =
     copy(domainTriggers = domainTriggers + ((ref, t :: domainTriggers.getOrElse(ref, Nil))))
+
+  private def addSelTrigger0[L <: HList](sel: Sel[L], t: L => Trigger[K]): PropagationStore[K] = {
+    copy(
+      selTriggers = selTriggers + ((sel, t :: selTriggers.getOrElse(sel, Nil))),
+      cellsToSels = cellsToSels.add(sel)
+    )
+  }
 
   def triggersForDomain[D](ref: CellRef[D]): (PropagationStore[K], List[K[Unit]]) = {
     val d = fetch(ref)
@@ -107,14 +123,6 @@ case class PropagationStore[K[_]] private(
       case Domain.Just(a) => Fire(f(a))
       case Domain.Many(_) => Sleep()
     })
-  }
-
-
-  def addSelTrigger[L <: HList](sel: Sel[L], t: L => Trigger[K]): PropagationStore[K] = {
-    copy(
-      selTriggers = selTriggers + ((sel, t :: selTriggers.getOrElse(sel, Nil))),
-      cellsToSels = cellsToSels.add(sel)
-    )
   }
 
   def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], List[K[Unit]]) = {
@@ -213,7 +221,7 @@ object PropagationStore {
             case (s1, ok) => (s1, ok.map(continuation(_)).getOrElse(DirtyThings.empty), ())
           }
           case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
-            case s1 => (s1, dirtySel(sel), ())
+            case (s1, ok) => (s1, ok.map(continuation(_)).getOrElse(DirtyThings.empty), ())
           }
           case Intersect(ref, d) => s.intersect(ref, d) match {
             case Some(s1) => (s1, dirtyDomain(ref), ())
