@@ -19,12 +19,12 @@ class DFSSolver[C: Monoid] {
 
   def solutions[A](p: K[Promised[A]]): StreamT[Id, A] = {
     val (s, pr) = init(p)
-    solutions(s, pr)
+    solutions(s) map { s => lang.propStore.get(s).fetchResult(pr).get }
   }
 
   def solutions1[A](p: K[Promised[A]]): StreamT[Id, (Option[A], Int)] = {
     val (s, pr) = init(p)
-    solutions1(s, pr)
+    solutions1(s) map { case (so, n) => (so map { lang.propStore.get(_).fetchResult(pr).get }, n) }
   }
 
   def allSolutions1[A](p: K[Promised[A]]): (List[A], Int) = {
@@ -40,15 +40,15 @@ class DFSSolver[C: Monoid] {
     lang.interpreter.runFree(p)
   }
 
-  private def solutions[A](s: S, pr: Promised[A]): StreamT[Id, A] =
-    solutions[A, A](s, pr, StreamT.empty, _ :: StreamT.empty[Id, A])
+  private def solutions(s: S): StreamT[Id, S] =
+    solutions[S](s, StreamT.empty[Id, S], (_: S) :: StreamT.empty[Id, S])
 
-  private def solutions1[A](ps: S, pr: Promised[A]): StreamT[Id, (Option[A], Int)] = {
-    val leafs = solutions[A, Option[A]](ps, pr, None :: StreamT.empty[Id, Option[A]], Some(_) :: StreamT.empty[Id, Option[A]])
+  private def solutions1(ps: S): StreamT[Id, (Option[S], Int)] = {
+    val leafs = solutions[Option[S]](ps, None :: StreamT.empty[Id, Option[S]], Some(_: S) :: StreamT.empty[Id, Option[S]])
 
-    def takeOne(s: StreamT[Id, Option[A]]): Option[((Option[A], Int), StreamT[Id, Option[A]])] = takeOne0(s, 0)
+    def takeOne(s: StreamT[Id, Option[S]]): Option[((Option[S], Int), StreamT[Id, Option[S]])] = takeOne0(s, 0)
 
-    @tailrec def takeOne0(s: StreamT[Id, Option[A]], acc: Int): Option[((Option[A], Int), StreamT[Id, Option[A]])] = s.uncons match {
+    @tailrec def takeOne0(s: StreamT[Id, Option[S]], acc: Int): Option[((Option[S], Int), StreamT[Id, Option[S]])] = s.uncons match {
       case Some((Some(a), tail)) => Some(((Some(a), acc), tail))
       case Some((None, tail)) => takeOne0(tail, acc+1)
       case None =>
@@ -56,27 +56,26 @@ class DFSSolver[C: Monoid] {
         else None
     }
 
-    StreamT.unfold[(Option[A], Int), StreamT[Id, Option[A]]](leafs){ takeOne(_) }
+    StreamT.unfold[(Option[S], Int), StreamT[Id, Option[S]]](leafs){ takeOne(_) }
   }
 
-  private def solutions[A, B](
+  private def solutions[B](
     s: S,
-    pr: Promised[A],
     failed: StreamT[Id, B],
-    done: A => StreamT[Id, B]): StreamT[Id, B] =
-    hideTrampoline(solutionsT(s, pr, failed, done))
+    done: S => StreamT[Id, B]
+  ): StreamT[Id, B] =
+    hideTrampoline(solutionsT(s, failed, done))
 
-  private def solutionsT[A, B](
+  private def solutionsT[B](
     s: S,
-    pr: Promised[A],
     failed: StreamT[Id, B],
-    done: A => StreamT[Id, B]): StreamT[Trampoline, B] =
+    done: S => StreamT[Id, B]): StreamT[Trampoline, B] =
     assess(s) match {
       case Failed => failed.trans(trampolineId)
       case Stuck => failed.trans(trampolineId) // TODO: Don't treat as failed.
-      case Done => done(lang.propStore.get(s).fetchResult(pr).get).trans(trampolineId)
+      case Done => done(s).trans(trampolineId)
       case Incomplete(branches) =>
-        StreamT.fromIterable(branches).trans(trampolineId) flatMap { k => solutionsT(lang.interpreter.runFreeUnit(s, k), pr, failed, done) }
+        StreamT.fromIterable(branches).trans(trampolineId) flatMap { k => solutionsT(lang.interpreter.runFreeUnit(s, k), failed, done) }
     }
 
   private def hideTrampoline[A](stream: StreamT[Trampoline, A]): StreamT[Id, A] =

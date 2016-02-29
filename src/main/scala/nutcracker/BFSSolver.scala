@@ -19,28 +19,28 @@ class BFSSolver[C: NonDecreasingMonoid] {
 
   def solutions[A](p: K[Promised[A]]): StreamT[Id, (A, C)] = {
     lang.interpreter.runFree(p) match {
-      case (s, pr) => solutions(s, pr)
+      case (s, pr) => solutions(s) map { s => (lang.propStore.get(s).fetchResult(pr).get, lang.cost.get(s)) }
     }
   }
 
   def assess: S => Assessment[List[K[Unit]]] = lang.naiveAssess
 
-  private def solutions[A](s: S, pr: Promised[A]): StreamT[Id, (A, C)] = {
+  private def solutions(s: S): StreamT[Id, S] = {
     val heap = Heap.singleton[S](s)
-    StreamT.unfold(heap)(h => unfold(h, pr))
+    StreamT.unfold(heap)(unfold)
   }
 
   @tailrec
-  private def unfold[A](heap: Heap[S], pr: Promised[A]): Option[((A, C), Heap[S])] = heap.uncons match {
+  private def unfold(heap: Heap[S]): Option[(S, Heap[S])] = heap.uncons match {
     case None => None
     case Some((s, heap1)) => assess(s) match {
-      case Failed => unfold(heap1, pr)
-      case Stuck => unfold(heap1, pr) // not done, but we don't know how to proceed. TODO: Don't treat as failed
-      case Done => Some(((lang.propStore.get(s).fetchResult(pr).get, lang.cost.get(s)), heap1))
+      case Failed => unfold(heap1)
+      case Stuck => unfold(heap1) // not done, but we don't know how to proceed. TODO: Don't treat as failed
+      case Done => Some((s, heap1))
       case Incomplete(sks) =>
         val newStates = sks map { k => lang.interpreter.runFreeUnit(s, k) }
         val heap2 = heap1.insertAllF[List](newStates)
-        unfold(heap2, pr)
+        unfold(heap2)
     }
   }
 
