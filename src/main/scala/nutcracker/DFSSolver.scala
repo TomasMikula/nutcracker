@@ -2,6 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.Assessment._
+import nutcracker.util.free.FreeK
 
 import scala.annotation.tailrec
 import scalaz.Free.Trampoline
@@ -9,9 +10,12 @@ import scalaz.Id._
 import scalaz.{Monoid, StreamT, ~>}
 import scalaz.syntax.applicative._
 
-class DFSSolver[C: Monoid] extends Solver[PropRelCost[C]] {
+class DFSSolver[C: Monoid] {
 
   val lang: PropRelCost[C] = new PropRelCost[C]
+
+  type K[A] = FreeK[lang.Vocabulary, A]
+  type S = lang.State[K]
 
   def solutions[A](p: K[Promised[A]]): StreamT[Id, A] = {
     val (s, pr) = init(p)

@@ -2,14 +2,18 @@ package nutcracker
 
 import nutcracker.Assessment._
 import nutcracker.algebraic.NonDecreasingMonoid
+import nutcracker.util.free.FreeK
 
 import scala.annotation.tailrec
 import scalaz._
 import scalaz.Id._
 import scalaz.std.list._
 
-class BFSSolver[C: NonDecreasingMonoid] extends Solver[PropRelCost[C]] {
+class BFSSolver[C: NonDecreasingMonoid] {
   val lang: PropRelCost[C] = new PropRelCost[C]
+
+  type K[A] = FreeK[lang.Vocabulary, A]
+  type S = lang.State[K]
 
   implicit val orderByCost: Order[S] = Order.orderBy(s => lang.cost.get(s))
 

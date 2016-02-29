@@ -10,7 +10,7 @@ import nutcracker.util.free._
 
 import scalaz.Monoid
 
-final class PropRelCost[C: Monoid] extends Language {
+final class PropRelCost[C: Monoid] {
   type CostL[K[_], A] = CostLang[C, K, A]
   type CostS[K[_]] = ConstK[C, K]
 
