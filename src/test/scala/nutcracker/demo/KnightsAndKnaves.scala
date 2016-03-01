@@ -17,8 +17,7 @@ import scala.language.higherKinds
 // the inhabitants' type from their statements.
 
 class KnightsAndKnaves extends FreeSpec {
-  val solver = DFSSolver()
-  type Lang[K[_], A] = solver.lang.Vocabulary[K, A]
+  val solver = PropagationStore.dfsSolver
 
   "Problem 1" - {
     // The visitor meets three inhabitants referred to as A, B and C.
@@ -36,7 +35,7 @@ class KnightsAndKnaves extends FreeSpec {
       // c says knave(b)
       _ <- presume(c =?= neg(b))
 
-    } yield (a, b, c)) >>>= { case (a, b, c) => promiseResults(a, b, c).inject[Lang] }
+    } yield (a, b, c)) >>>= { case (a, b, c) => promiseResults(a, b, c) }
 
     val solutions = solver.solutions(problem).toStream.toList
 
@@ -63,7 +62,7 @@ class KnightsAndKnaves extends FreeSpec {
       // a says (knave(a) ∨ knave(b))
       _ <- presume(a =?= (neg(a) ∨ neg(b)))
 
-    } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b).inject[Lang] }
+    } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b) }
 
     val solutions = solver.solutions(problem).toStream.toList
 
@@ -88,7 +87,7 @@ class KnightsAndKnaves extends FreeSpec {
       // a says (knave(a) ∧ knave(b))
       _ <- presume(a =?= (neg(a) ∧ neg(b)))
 
-    } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b).inject[Lang] }
+    } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b) }
 
     val solutions = solver.solutions(problem).toStream.toList
 
@@ -118,7 +117,7 @@ class KnightsAndKnaves extends FreeSpec {
       // b says (kind(a) ≠ kind(b)
       _ <- presume(b =?= neg(a =?= b))
 
-    } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b).inject[Lang] }
+    } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b) }
 
     val solutions = solver.solutions(problem).toStream.toList
 

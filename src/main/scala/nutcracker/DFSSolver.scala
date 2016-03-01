@@ -2,42 +2,45 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.Assessment._
-import nutcracker.util.free.FreeK
+import nutcracker.util.free.{Interpreter, FreeK}
 
 import scala.annotation.tailrec
 import scalaz.Free.Trampoline
 import scalaz.Id._
-import scalaz.{Monoid, StreamT, ~>}
+import scalaz.{StreamT, ~>}
 import scalaz.syntax.applicative._
 
-class DFSSolver[C: Monoid] {
+class DFSSolver[F[_[_], _], St[_[_]], P[_]](
+  interpreter: Interpreter[F] { type State[K[_]] = St[K] },
+  assess: St[FreeK[F, ?]] => Assessment[List[FreeK[F, Unit]]],
+  fetch: P ~> (St[FreeK[F, ?]] => ?)
+) {
 
-  val lang: PropRelCost[C] = new PropRelCost[C]
+  type K[A] = FreeK[F, A]
+  type S = St[K]
 
-  type K[A] = FreeK[lang.Vocabulary, A]
-  type S = lang.State[K]
-
-  def solutions[A](p: K[Promised[A]]): StreamT[Id, A] = {
+  def solutions[A](p: K[P[A]]): StreamT[Id, A] = {
     val (s, pr) = init(p)
-    solutions(s) map { s => lang.propStore.get(s).fetchResult(pr).get }
+    val fetch = this.fetch(pr)
+    solutions(s) map fetch
   }
 
-  def solutions1[A](p: K[Promised[A]]): StreamT[Id, (Option[A], Int)] = {
+  def solutions1[A](p: K[P[A]]): StreamT[Id, (Option[A], Int)] = {
     val (s, pr) = init(p)
-    solutions1(s) map { case (so, n) => (so map { lang.propStore.get(_).fetchResult(pr).get }, n) }
+    val fetch = this.fetch(pr)
+    solutions1(s) map { case (so, n) => (so map { fetch(_) }, n) }
   }
 
-  def allSolutions1[A](p: K[Promised[A]]): (List[A], Int) = {
+  def allSolutions1[A](p: K[P[A]]): (List[A], Int) = {
     solutions1(p).foldLeft((List[A](), 0)) {
       case ((sols, n), (Some(sol), i)) => (sol :: sols, n+i)
       case ((sols, n), (None, i)) => (sols, n+i)
     }
   }
 
-  def assess: S => Assessment[List[K[Unit]]] = lang.naiveAssess
 
-  private def init[A](p: K[Promised[A]]): (S, Promised[A]) = {
-    lang.interpreter.runFree(p)
+  private def init[A](p: K[A]): (S, A) = {
+    interpreter.runFree(p)
   }
 
   private def solutions(s: S): StreamT[Id, S] =
@@ -75,7 +78,7 @@ class DFSSolver[C: Monoid] {
       case Stuck => failed.trans(trampolineId) // TODO: Don't treat as failed.
       case Done => done(s).trans(trampolineId)
       case Incomplete(branches) =>
-        StreamT.fromIterable(branches).trans(trampolineId) flatMap { k => solutionsT(lang.interpreter.runFreeUnit(s, k), failed, done) }
+        StreamT.fromIterable(branches).trans(trampolineId) flatMap { k => solutionsT(interpreter.runFreeUnit(s, k), failed, done) }
     }
 
   private def hideTrampoline[A](stream: StreamT[Trampoline, A]): StreamT[Id, A] =
@@ -84,13 +87,4 @@ class DFSSolver[C: Monoid] {
   private object trampolineId extends (Id ~> Trampoline) {
     def apply[A](i: A): Trampoline[A] = i.point[Trampoline]
   }
-}
-
-object DFSSolver {
-  private implicit def unitMonoid: Monoid[Unit] = new Monoid[Unit] {
-    def zero: Unit = ()
-    def append(f1: Unit, f2: => Unit): Unit = ()
-  }
-
-  def apply(): DFSSolver[Unit] = new DFSSolver[Unit]
 }

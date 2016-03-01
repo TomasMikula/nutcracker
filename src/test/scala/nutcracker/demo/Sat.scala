@@ -10,8 +10,7 @@ import scala.language.higherKinds
 import scalaz.std.vector._
 
 class Sat extends FunSpec {
-  val solver = DFSSolver()
-  type Lang[K[_], A] = solver.lang.Vocabulary[K, A]
+  val solver = PropagationStore.dfsSolver
 
   describe("A simple 3-SAT problem") {
 
@@ -28,7 +27,7 @@ class Sat extends FunSpec {
       _ <- atLeastOneTrue(a(0), a(2), a(3))
       _ <- atLeastOneTrue(ā(0), a(1), ā(2))
 
-    } yield a) >>>= { promiseResults(_).inject[Lang] }
+    } yield a) >>>= { promiseResults(_) }
 
     val solutions = solver.solutions(problem).toStream.toList
 

@@ -1,6 +1,6 @@
 package nutcracker.demo
 
-import nutcracker.{PropagationLang, BFSSolver, Promised}
+import nutcracker.{PropCost, PropagationLang, Promised}
 import nutcracker.CostLang._
 import nutcracker.PropagationLang._
 import nutcracker.algebraic.NonDecreasingMonoid
@@ -18,13 +18,15 @@ class PathSearch extends FunSuite {
     def append(a: Int, b: => Int): Int = a + b
     def order(x: Int, y: Int): Ordering = Ordering.fromInt(x - y)
   }
+
+  val lang = new PropCost[Int]
+  val solver = lang.bfsSolver
+
+  type Lang[K[_], A] = lang.Vocabulary[K, A]
+
   // not sure why scalac is not able to find these itself
   implicit val injP = implicitly[InjectK[PropagationLang, Lang]]
   implicit val injC = implicitly[InjectK[solver.lang.CostL, Lang]]
-
-  val solver: BFSSolver[Int] = new BFSSolver[Int]
-
-  type Lang[K[_], A] = solver.lang.Vocabulary[K, A]
 
   type Vertex = Symbol
 
@@ -88,7 +90,7 @@ class PathSearch extends FunSuite {
 
   def zeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Promised[Path]): FreeK[Lang, Unit] = {
     if(u == v) completeF(pr, revPath(u::visited)).inject[Lang]
-    else branchAndExec[Lang]()
+    else branchAndExec()
   }
 
   def nonZeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Promised[Path]): FreeK[Lang, Unit] = {

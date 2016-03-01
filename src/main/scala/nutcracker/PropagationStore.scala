@@ -282,4 +282,11 @@ object PropagationStore {
     tr: FreeK[PropagationLang, ?] ~> K
   ): S[K] => Assessment[List[K[Unit]]] =
     s => (naiveAssess[K](Applicative[K], tr))(lens.get(s))
+
+
+  private def fetch: Promised ~> (PropagationStore[FreeK[PropagationLang, ?]] => ?) = new ~>[Promised, PropagationStore[FreeK[PropagationLang, ?]] => ?] {
+    def apply[A](pa: Promised[A]): (PropagationStore[FreeK[PropagationLang, ?]] => A) = s => s.fetchResult(pa).get
+  }
+  def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Promised] =
+    new DFSSolver[PropagationLang, PropagationStore, Promised](interpreter, naiveAssess[FreeK[PropagationLang, ?]], fetch)
 }

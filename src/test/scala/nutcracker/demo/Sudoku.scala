@@ -10,8 +10,7 @@ import org.scalatest.FunSuite
 import scala.language.higherKinds
 
 class Sudoku extends FunSuite {
-  val solver = DFSSolver()
-  type Lang[K[_], A] = solver.lang.Vocabulary[K, A]
+  val solver = PropagationStore.dfsSolver
 
   type Cell = DomRef[Int, Set[Int]]
   type Cells = Vector[Cell]
@@ -117,7 +116,7 @@ class Sudoku extends FunSuite {
     // we test both the simple and the advanced sudoku program
     val problems = Seq(sudoku0, sudoku1) map { sudoku =>
       for {
-        cells <- sudoku.inject[Lang]
+        cells <- sudoku
 
         _ <- concat(Seq(
           set(0, 2, 3), set(0, 6, 6), set(0, 7, 1),
@@ -131,9 +130,9 @@ class Sudoku extends FunSuite {
           set(8, 0, 8), set(8, 1, 4), set(8, 2, 6), set(8, 6, 1)
         ) map {
           _ (cells)
-        }).inject[Lang]
+        })
 
-        solution <- promiseResults(cells).inject[Lang]
+        solution <- promiseResults(cells)
       } yield solution
     }
 
