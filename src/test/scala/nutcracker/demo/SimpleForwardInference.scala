@@ -9,6 +9,7 @@ import nutcracker.PropagationLang._
 import nutcracker.rel.{Pattern, RelDB, RelLang}
 import nutcracker.rel.RelLang._
 import nutcracker.util.free._
+import nutcracker.util.free.ProductK._
 import org.scalatest.{Matchers, FunSpec}
 import scalaz.NonEmptyList
 import shapeless.{::, HNil}
@@ -24,6 +25,9 @@ class SimpleForwardInference extends FunSpec with Matchers {
 
   // summon an interpreter for the above language
   val interpreter: Interpreter.Aux[Lang, State, Dirty] = implicitly[Interpreter.Aux[Lang, State, Dirty]]
+
+  private type Q[A] = FreeK[Lang, A]
+  private val initialState: State[Q] = RelDB.empty[Q] :*: PropagationStore.empty[Q]
 
   // lens into state to pull out the PromiseStore
   def propStore0[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
@@ -86,7 +90,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
       } yield pr)
 
     it("should follow that a < e") {
-      val (s, promise) = interpreter.runFree(problem)
+      val (s, promise) = interpreter.runFree(initialState, problem)
       propStore.get(s).fetchResult(promise) should be (Some(()))
     }
   }

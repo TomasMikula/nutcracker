@@ -251,7 +251,6 @@ object PropagationStore {
         }
       }
 
-      def emptyState[K[_]]: PropagationStore[K] = PropagationStore.empty
       def dirtyMonoidK: MonoidK[Dirty] = DirtyThings.monoidK
     }
 
@@ -288,5 +287,5 @@ object PropagationStore {
     def apply[A](pa: Promised[A]): (PropagationStore[FreeK[PropagationLang, ?]] => A) = s => s.fetchResult(pa).get
   }
   def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Promised] =
-    new DFSSolver[PropagationLang, PropagationStore, Promised](interpreter, naiveAssess[FreeK[PropagationLang, ?]], fetch)
+    new DFSSolver[PropagationLang, PropagationStore, Promised](interpreter, empty[FreeK[PropagationLang, ?]], naiveAssess[FreeK[PropagationLang, ?]], fetch)
 }

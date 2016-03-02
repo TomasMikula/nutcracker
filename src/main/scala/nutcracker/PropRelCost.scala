@@ -7,6 +7,7 @@ import nutcracker.algebraic.NonDecreasingMonoid
 import nutcracker.rel.{RelDB, RelLang}
 import nutcracker.util.free.Interpreter._
 import nutcracker.util.free._
+import nutcracker.util.free.ProductK._
 
 import scalaz.~>
 
@@ -33,7 +34,8 @@ final class PropRelCost[C: NonDecreasingMonoid] {
     def apply[A](pa: Promised[A]): (State[Q] => A) = s => propStore[Q].get(s).fetchResult(pa).get
   }
   private def getCost: State[Q] => C = s => cost[Q].get(s)
+  private def emptyState: State[Q] = PropagationStore.empty[Q] :*: RelDB.empty[Q] :*: (NonDecreasingMonoid[C].zero: CostS[Q])
 
-  def dfsSolver: DFSSolver[Vocabulary, State, Promised] = new DFSSolver[Vocabulary, State, Promised](interpreter, naiveAssess, fetch)
-  def bfsSolver: BFSSolver[Vocabulary, State, Promised, C] = new BFSSolver[Vocabulary, State, Promised, C](interpreter, naiveAssess, fetch, getCost)
+  def dfsSolver: DFSSolver[Vocabulary, State, Promised] = new DFSSolver[Vocabulary, State, Promised](interpreter, emptyState, naiveAssess, fetch)
+  def bfsSolver: BFSSolver[Vocabulary, State, Promised, C] = new BFSSolver[Vocabulary, State, Promised, C](interpreter, emptyState, naiveAssess, fetch, getCost)
 }

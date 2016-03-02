@@ -12,6 +12,7 @@ import scalaz.syntax.applicative._
 
 class DFSSolver[F[_[_], _], St[_[_]], P[_]](
   interpreter: Interpreter[F] { type State[K[_]] = St[K] },
+  initialState: St[FreeK[F, ?]],
   assess: St[FreeK[F, ?]] => Assessment[List[FreeK[F, Unit]]],
   fetch: P ~> (St[FreeK[F, ?]] => ?)
 ) {
@@ -40,7 +41,7 @@ class DFSSolver[F[_[_], _], St[_[_]], P[_]](
 
 
   private def init[A](p: K[A]): (S, A) = {
-    interpreter.runFree(p)
+    interpreter.runFree(initialState, p)
   }
 
   private def solutions(s: S): StreamT[Id, S] =

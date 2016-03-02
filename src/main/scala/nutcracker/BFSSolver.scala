@@ -12,6 +12,7 @@ import scalaz.std.list._
 
 class BFSSolver[F[_[_], _], St[_[_]], P[_], C: NonDecreasingMonoid](
   interpreter: Interpreter[F] { type State[K[_]] = St[K] },
+  initialState: St[FreeK[F, ?]],
   assess: St[FreeK[F, ?]] => Assessment[List[FreeK[F, Unit]]],
   fetch: P ~> (St[FreeK[F, ?]] => ?),
   getCost: St[FreeK[F, ?]] => C
@@ -24,7 +25,7 @@ class BFSSolver[F[_[_], _], St[_[_]], P[_], C: NonDecreasingMonoid](
   implicit val orderByCost: Order[S] = Order.orderBy(getCost)
 
   def solutions[A](p: K[P[A]]): StreamT[Id, (A, C)] = {
-    val (s, pr) = interpreter.runFree(p)
+    val (s, pr) = interpreter.runFree(initialState, p)
     val fetch = this.fetch(pr)
     solutions(s) map { s => (fetch(s), getCost(s)) }
   }

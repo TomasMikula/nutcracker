@@ -35,7 +35,5 @@ object CostLang {
         case GetCost() => (c0, c0.asInstanceOf[A]) // XXX is there a way to convince scalac that C =:= A?
       }
 
-      def emptyState[K[_]]: State[K] = Monoid[C].zero
-
     }
 }

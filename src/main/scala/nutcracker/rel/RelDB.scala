@@ -164,7 +164,6 @@ object RelDB {
       case h::t => Some((h, t, s))
     }
 
-    def emptyState[K[_]]: RelDB[K] = RelDB.empty
     def dirtyMonoidK: MonoidK[Dirty] = new MonoidK[Dirty] {
       def zero[K[_]]: Dirty[K] = Nil
       def append[K[_]](d1: Dirty[K], d2: Dirty[K]): Dirty[K] = if(d1.size < d2.size) d1 ++ d2 else d2 ++ d1
