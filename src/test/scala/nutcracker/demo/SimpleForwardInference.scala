@@ -2,14 +2,12 @@ package nutcracker.demo
 
 import algebra.Order
 import algebra.std.string._
-import monocle._
 import nutcracker.rel.Rel.Rel2
-import nutcracker.{PropagationLang, PropagationStore}
+import nutcracker.PropRel
 import nutcracker.PropagationLang._
-import nutcracker.rel.{Pattern, RelDB, RelLang}
+import nutcracker.rel.Pattern
 import nutcracker.rel.RelLang._
 import nutcracker.util.free._
-import nutcracker.util.free.ProductK._
 import org.scalatest.{Matchers, FunSpec}
 import scalaz.NonEmptyList
 import shapeless.{::, HNil}
@@ -18,20 +16,8 @@ import scala.language.higherKinds
 
 class SimpleForwardInference extends FunSpec with Matchers {
 
-  // à la carte composition of the desired instruction set and the state it operates on
-  type Lang[K[_], A] = CoproductK[RelLang, PropagationLang, K, A]
-  type State[K[_]] = ProductK[RelDB, PropagationStore, K]
-  type Dirty[K[_]] = ProductK[RelDB.Dirty, PropagationStore.DirtyThings, K]
-
-  // summon an interpreter for the above language
-  val interpreter: Interpreter.Aux[Lang, State, Dirty] = implicitly[Interpreter.Aux[Lang, State, Dirty]]
-
-  private type Q[A] = FreeK[Lang, A]
-  private val initialState: State[Q] = RelDB.empty[Q] :*: PropagationStore.empty[Q]
-
-  // lens into state to pull out the PromiseStore
-  def propStore0[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
-  val propStore = propStore0[FreeK[Lang, ?]]
+  // our instruction sets will be propagation and relations
+  type Lang[K[_], A] = PropRel.Vocabulary[K, A]
 
 
   // Define some relations.
@@ -90,8 +76,8 @@ class SimpleForwardInference extends FunSpec with Matchers {
       } yield pr)
 
     it("should follow that a < e") {
-      val (s, promise) = interpreter.runFree(initialState, problem)
-      propStore.get(s).fetchResult(promise) should be (Some(()))
+      val (s, promise) = PropRel.interpreter.runFree(PropRel.emptyState, problem)
+      PropRel.propStore.get(s).fetchResult(promise) should be (Some(()))
     }
   }
 }

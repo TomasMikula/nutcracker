@@ -16,14 +16,14 @@ object PropRel {
   type Dirty[K[_]] = ProductK[PropagationStore.DirtyThings, RelDB.Dirty, K]
 
   val interpreter: Interpreter.Aux[Vocabulary, State, Dirty] = implicitly[Interpreter.Aux[Vocabulary, State, Dirty]]
-  def propStore[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
 
   private[PropRel] type Q[A] = FreeK[Vocabulary, A]
-  private def naiveAssess: State[Q] => Assessment[List[Q[Unit]]] = PropagationStore.naiveAssess(propStore[Q])
+  def propStore: Lens[State[Q], PropagationStore[Q]] = implicitly[Lens[State[Q], PropagationStore[Q]]]
+  private def naiveAssess: State[Q] => Assessment[List[Q[Unit]]] = PropagationStore.naiveAssess(propStore)
   private def fetch: Promised ~> (State[Q] => ?) = new ~>[Promised, State[Q] => ?] {
-    def apply[A](pa: Promised[A]): (State[Q] => A) = s => propStore[Q].get(s).fetchResult(pa).get
+    def apply[A](pa: Promised[A]): (State[Q] => A) = s => propStore.get(s).fetchResult(pa).get
   }
-  private def emptyState: State[Q] = PropagationStore.empty[Q] :*: RelDB.empty[Q]
+  def emptyState: State[Q] = PropagationStore.empty[Q] :*: RelDB.empty[Q]
 
   def dfsSolver: DFSSolver[Vocabulary, State, Promised] = new DFSSolver[Vocabulary, State, Promised](interpreter, emptyState, naiveAssess, fetch)
 }
