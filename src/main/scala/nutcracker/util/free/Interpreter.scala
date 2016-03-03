@@ -64,21 +64,22 @@ object Interpreter {
 
     new Interpreter[F] {
       type State[K[_]] = ProductK[i1.State, i2.State, K]
-      def step[K[_] : Applicative]: F[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]] = new (F[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]]) {
-        override def apply[A](f: F[K, A]): scalaz.State[State[K], K[A]] = f.run match {
-          case -\/(g) => scalaz.State(s => i1.step[K].apply(g)(s._1) match {
-            case (t, a) => (s.update_1(t), a)
-          })
-          case \/-(h) => scalaz.State(s => i2.step[K].apply(h)(s._2) match {
-            case (u, a) => (s.update_2(u), a)
-          })
+      def step[K[_] : Applicative]: F[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]] = {
+        val gLens = ProductK.leftLensZ[i1.State, i2.State, K]
+        val hLens = ProductK.rightLensZ[i1.State, i2.State, K]
+        new (F[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]]) {
+          override def apply[A](f: F[K, A]): scalaz.State[State[K], K[A]] = f.run match {
+            case -\/(g) => i1.step[K].apply(g).zoom(gLens)
+            case \/-(h) => i2.step[K].apply(h).zoom(hLens)
+          }
         }
       }
 
-      def uncons[K[_] : Applicative]: StateT[Option, State[K], K[Unit]] = StateT(s =>
-        i1.uncons[K].apply(s._1).map({ case (t, k) => (s.update_1(t), k) }).orElse(
-        i2.uncons[K].apply(s._2).map({ case (u, k) => (s.update_2(u), k) }))
-      )
+      def uncons[K[_] : Applicative]: StateT[Option, State[K], K[Unit]] = {
+        val uncons1 = i1.uncons[K].zoom(ProductK.leftLensZ[i1.State, i2.State, K])
+        val uncons2 = i2.uncons[K].zoom(ProductK.rightLensZ[i1.State, i2.State, K])
+        StateT(s => uncons1(s).orElse(uncons2(s)))
+      }
     }
   }
 
