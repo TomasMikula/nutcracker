@@ -17,7 +17,8 @@ import RelDB._
 case class RelDB[K[_]] private (
   private val tables: Map[Rel[_], RelTable[_]],
   private val patternTriggers: Map[PartiallyAssignedPattern[_], List[_ => K[Unit]]],
-  private val relToPatterns: TransformedIndex[Rel[_ <: HList], PartiallyAssignedPattern[_ <: HList], PartiallyAssignedOrientedPattern[_ <: HList, _ <: HList]]
+  private val relToPatterns: TransformedIndex[Rel[_ <: HList], PartiallyAssignedPattern[_ <: HList], PartiallyAssignedOrientedPattern[_ <: HList, _ <: HList]],
+  private val triggered: List[K[Unit]]
 ) {
 
   case class Inserter[L <: HList, OS <: HList] private[RelDB] (rel: Rel[L])(implicit m: Mapped.Aux[L, Order, OS]) {
@@ -145,28 +146,21 @@ object RelDB {
   def empty[K[_]]: RelDB[K] = RelDB(
     Map.empty,
     Map.empty,
-    TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel))
+    TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel)),
+    Nil
   )
 
-  type Dirty[K[_]] = List[K[Unit]]
-
-  implicit def interpreter: Interpreter.Aux[RelLang, RelDB, Dirty] = new Interpreter[RelLang] {
+  implicit def interpreter: Interpreter.Aux[RelLang, RelDB] = new Interpreter[RelLang] {
     type State[K[_]] = RelDB[K]
-    type Dirty[K[_]] = List[K[Unit]]
 
-    def step[K[_] : Applicative, A](f: RelLang[K, A])(db: RelDB[K]): (RelDB[K], List[K[Unit]], A) = f match {
-      case r @ Relate(rel, values) => db.into(rel)(r.ordersWitness).insert(values)(r.orders, Applicative[K]) match { case (s, k) => (s, List(k), ()) }
-      case OnPatternMatch(p, a, h) => db.addOnPatternMatch(p, a)(h) match { case (s, k) => (s, List(k), ()) }
+    def step[K[_] : Applicative, A](f: RelLang[K, A])(db: RelDB[K]): (RelDB[K], A) = f match {
+      case r @ Relate(rel, values) => db.into(rel)(r.ordersWitness).insert(values)(r.orders, Applicative[K]) match { case (s, k) => (s.copy(triggered = k :: s.triggered), ()) }
+      case OnPatternMatch(p, a, h) => db.addOnPatternMatch(p, a)(h) match { case (s, k) => (s.copy(triggered = k :: s.triggered), ()) }
     }
 
-    def uncons[K[_]: Applicative](d: Dirty[K])(s: State[K]): Option[(K[Unit], Dirty[K], State[K])] = d match {
+    def uncons[K[_]: Applicative](s: State[K]): Option[(K[Unit], State[K])] = s.triggered match {
       case Nil => None
-      case h::t => Some((h, t, s))
-    }
-
-    def dirtyMonoidK: MonoidK[Dirty] = new MonoidK[Dirty] {
-      def zero[K[_]]: Dirty[K] = Nil
-      def append[K[_]](d1: Dirty[K], d2: Dirty[K]): Dirty[K] = if(d1.size < d2.size) d1 ++ d2 else d2 ++ d1
+      case h::t => Some((h, s.copy(triggered = t)))
     }
   }
 }

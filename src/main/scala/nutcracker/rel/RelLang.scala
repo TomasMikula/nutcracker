@@ -45,6 +45,6 @@ object RelLang {
     }
   }
 
-  implicit def interpreter: Interpreter.Aux[RelLang, RelDB, RelDB.Dirty] = RelDB.interpreter
+  implicit def interpreter: Interpreter.Aux[RelLang, RelDB] = RelDB.interpreter
 
 }

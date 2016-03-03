@@ -21,10 +21,7 @@ final class PropRelCost[C: NonDecreasingMonoid] {
   type State0[K[_]] = ProductK[RelDB, CostS, K]
   type State[K[_]] = ProductK[PropagationStore, State0, K]
 
-  type Dirty0[K[_]] = ProductK[RelDB.Dirty, AlwaysClean, K]
-  type Dirty[K[_]] = ProductK[PropagationStore.DirtyThings, Dirty0, K]
-
-  val interpreter: Interpreter.Aux[Vocabulary, State, Dirty] = implicitly[Interpreter.Aux[Vocabulary, State, Dirty]]
+  val interpreter: Interpreter.Aux[Vocabulary, State] = implicitly[Interpreter.Aux[Vocabulary, State]]
   def propStore[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
