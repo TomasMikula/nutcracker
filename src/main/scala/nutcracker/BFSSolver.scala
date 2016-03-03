@@ -25,7 +25,7 @@ class BFSSolver[F[_[_], _], St[_[_]], P[_], C: NonDecreasingMonoid](
   implicit val orderByCost: Order[S] = Order.orderBy(getCost)
 
   def solutions[A](p: K[P[A]]): StreamT[Id, (A, C)] = {
-    val (s, pr) = interpreter.runFree(initialState, p)
+    val (s, pr) = interpreter.runFree(p)(initialState)
     val fetch = this.fetch(pr)
     solutions(s) map { s => (fetch(s), getCost(s)) }
   }
@@ -43,7 +43,7 @@ class BFSSolver[F[_[_], _], St[_[_]], P[_], C: NonDecreasingMonoid](
       case Stuck => unfold(heap1) // not done, but we don't know how to proceed. TODO: Don't treat as failed
       case Done => Some((s, heap1))
       case Incomplete(sks) =>
-        val newStates = sks map { k => interpreter.runFreeUnit(s, k) }
+        val newStates = sks map { k => interpreter.runFree(k)(s)._1 }
         val heap2 = heap1.insertAllF[List](newStates)
         unfold(heap2)
     }

@@ -31,9 +31,11 @@ object CostLang {
   implicit def interpreter[C: Monoid]: Interpreter.Aux[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] =
     new CleanInterpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] {
 
-      def step[K[_] : Applicative, A](f: CostLang[C, K, A])(c0: C): (ConstK[C, K], K[A]) = f match {
-        case Cost(c1) => (Monoid[C].append(c0, c1), ().point[K])
-        case GetCost() => (c0, c0.asInstanceOf[A].point[K]) // XXX is there a way to convince scalac that C =:= A?
+      def step[K[_] : Applicative]: CostLang[C, K, ?] ~> λ[A => scalaz.State[C, K[A]]] = new (CostLang[C, K, ?] ~> λ[A => scalaz.State[C, K[A]]]) {
+        override def apply[A](f: CostLang[C, K, A]): scalaz.State[C, K[A]] = f match {
+          case Cost(c1) => scalaz.State(c0 => (Monoid[C].append(c0, c1), ().point[K]))
+          case GetCost() => scalaz.State(c0 => (c0, c0.asInstanceOf[A].point[K])) // XXX is there a way to convince scalac that C =:= A?
+        }
       }
 
     }

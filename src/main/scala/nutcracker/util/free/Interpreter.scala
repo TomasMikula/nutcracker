@@ -4,41 +4,38 @@ import scala.language.higherKinds
 
 import scala.annotation.tailrec
 import scalaz._
+import scalaz.std.option._
 import scalaz.syntax.applicative._
 
 trait Interpreter[F[_[_], _]] {
   type State[K[_]]
 
-  def step[K[_]: Applicative, A](f: F[K, A])(s: State[K]): (State[K], K[A])
-  def uncons[K[_]: Applicative](s: State[K]): Option[(K[Unit], State[K])]
+  def step[K[_]: Applicative]: F[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]]
+  def uncons[K[_]: Applicative]: StateT[Option, State[K], K[Unit]]
 
-  @tailrec final def runFree[A](
-    s: State[FreeK[F, ?]],
-    p: FreeK[F, A]
-  ): (State[FreeK[F, ?]], A) = p match {
-    case FreeK.Pure(a) => (runFreeUnit(s, FreeK.Pure(())), a)
-    case FreeK.Suspend(ffa) => step[FreeK[F, ?], A](ffa)(s) match {
-      case (s1, ka) => (runFree(s1, ka))
-    }
-    case bnd: FreeK.Bind[F, a1, A] => step[FreeK[F, ?], a1](bnd.a)(s) match {
-      case (s1, kx) => runFree(s1, kx >>= bnd.f)
-    }
+  def stepF: F[FreeK[F, ?], ?] ~> λ[A => scalaz.State[State[FreeK[F, ?]], FreeK[F, A]]] = step[FreeK[F, ?]]
+  def unconsF: StateT[Option, State[FreeK[F, ?]], FreeK[F, Unit]] = uncons[FreeK[F, ?]]
+
+  def runFree[A](p: FreeK[F, A]): scalaz.State[State[FreeK[F, ?]], A] = scalaz.State(runUntilClean(p))
+
+  private def runUntilClean[A](p: FreeK[F, A])(s: State[FreeK[F, ?]]): (State[FreeK[F, ?]], A) = {
+    val (s1, a) = runToCompletion(p)(s)
+    (runUntilClean1(s1), a)
   }
 
-  @tailrec final def runFreeUnit(
-    s: State[FreeK[F, ?]],
-    p: FreeK[F, Unit]
-  ): State[FreeK[F, ?]] = p match {
-    case FreeK.Pure(()) => uncons[FreeK[F, ?]](s) match {
-      case Some((cont, s1)) => runFreeUnit(s1, cont)
-      case None => s
-    }
-    case FreeK.Suspend(ffu) => step[FreeK[F, ?], Unit](ffu)(s) match {
-      case (s1, ku) => runFreeUnit(s1, ku)
-    }
-    case bnd: FreeK.Bind[F, a1, Unit] => step[FreeK[F, ?], a1](bnd.a)(s) match {
-      case (s1, kx) => runFreeUnit(s1, kx >>= bnd.f)
-    }
+  @tailrec private def runUntilClean1(s: State[FreeK[F, ?]]): State[FreeK[F, ?]] = unconsF(s) match {
+    case None => s
+    case Some((s1, ku)) => runUntilClean1(runToCompletion(ku)(s1)._1)
+  }
+
+  @tailrec private def runToCompletion[A](p: FreeK[F, A])(s: State[FreeK[F, ?]]): (State[FreeK[F, ?]], A) = p match {
+    case FreeK.Pure(a) => (s, a)
+    case FreeK.Suspend(ffa) =>
+      val (s1, ka) = stepF(ffa)(s)
+      runToCompletion(ka)(s1)
+    case bnd: FreeK.Bind[F, a1, A] =>
+      val (s1, kx) = stepF(bnd.a)(s)
+      runToCompletion(kx >>= bnd.f)(s1)
   }
 }
 
@@ -55,7 +52,7 @@ object Interpreter {
   trait CleanInterpreter[F[_[_], _], S[_[_]]] extends Interpreter[F] {
     type State[K[_]] = S[K]
 
-    final def uncons[K[_]: Applicative](s: S[K]): Option[(K[Unit], S[K])] = None
+    final def uncons[K[_]: Applicative]: StateT[Option, S[K], K[Unit]] = StateT[Option, S[K], K[Unit]](s => None)
   }
 
   implicit def coproductInterpreter[G[_[_], _], H[_[_], _]](implicit
@@ -67,24 +64,21 @@ object Interpreter {
 
     new Interpreter[F] {
       type State[K[_]] = ProductK[i1.State, i2.State, K]
-      def step[K[_] : Applicative, A](f: F[K, A])(s: State[K]): (State[K], K[A]) = f.run match {
-        case -\/(g) => i1.step(g)(s._1) match {
-          case (t, a) => (s.update_1(t), a)
-        }
-        case \/-(h) => i2.step(h)(s._2) match {
-          case (u, a) => (s.update_2(u), a)
+      def step[K[_] : Applicative]: F[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]] = new (F[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]]) {
+        override def apply[A](f: F[K, A]): scalaz.State[State[K], K[A]] = f.run match {
+          case -\/(g) => scalaz.State(s => i1.step[K].apply(g)(s._1) match {
+            case (t, a) => (s.update_1(t), a)
+          })
+          case \/-(h) => scalaz.State(s => i2.step[K].apply(h)(s._2) match {
+            case (u, a) => (s.update_2(u), a)
+          })
         }
       }
 
-      def uncons[K[_] : Applicative](s: State[K]): Option[(K[Unit], State[K])] = {
-        i1.uncons(s._1) match {
-          case Some((k, t)) => Some((k, s.update_1(t)))
-          case None => i2.uncons(s._2) match {
-            case Some((k, u)) => Some((k, s.update_2(u)))
-            case None => None
-          }
-        }
-      }
+      def uncons[K[_] : Applicative]: StateT[Option, State[K], K[Unit]] = StateT(s =>
+        i1.uncons[K].apply(s._1).map({ case (t, k) => (s.update_1(t), k) }).orElse(
+        i2.uncons[K].apply(s._2).map({ case (u, k) => (s.update_2(u), k) }))
+      )
     }
   }
 
@@ -92,12 +86,13 @@ object Interpreter {
     new Interpreter[CoyonedaK[F, ?[_], ?]] {
       type State[K[_]] = S[K]
 
-      def step[K[_] : Applicative, A](c: CoyonedaK[F, K, A])(s: S[K]): (S[K], K[A]) = c match {
-        case CoyonedaK.Pure(fa) => i.step(fa)(s)
-        case CoyonedaK.Map(fx, f) => i.step(fx)(s) match { case (s1, kx) => (s1, kx map f) }
+      def step[K[_] : Applicative]: CoyonedaK[F, K, ?] ~> λ[A => scalaz.State[S[K], K[A]]] = new (CoyonedaK[F, K, ?] ~> λ[A => scalaz.State[S[K], K[A]]]) {
+        override def apply[A](c: CoyonedaK[F, K, A]): scalaz.State[S[K], K[A]] = c match {
+          case CoyonedaK.Pure(fa) => i.step[K].apply(fa)
+          case CoyonedaK.Map(fx, f) => i.step[K].apply(fx) map { kx => kx map f }
+        }
       }
 
-      def uncons[K[_] : Applicative](s: S[K]): Option[(K[Unit], S[K])] = i.uncons(s)
-
+      def uncons[K[_] : Applicative]: StateT[Option, S[K], K[Unit]] = i.uncons[K]
     }
 }

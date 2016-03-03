@@ -76,7 +76,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
       } yield pr)
 
     it("should follow that a < e") {
-      val (s, promise) = PropRel.interpreter.runFree(PropRel.emptyState, problem)
+      val (s, promise) = PropRel.interpreter.runFree(problem)(PropRel.emptyState)
       PropRel.propStore.get(s).fetchResult(promise) should be (Some(()))
     }
   }

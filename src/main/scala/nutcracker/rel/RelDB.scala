@@ -10,7 +10,7 @@ import nutcracker.util.{TransformedIndex, Mapped}
 import nutcracker.util.free.Interpreter
 
 import algebra.Order
-import scalaz.{Foldable, Applicative}
+import scalaz.{~>, Foldable, Applicative}
 import scalaz.std.list._
 import shapeless.HList
 
@@ -151,9 +151,11 @@ object RelDB {
   )
 
   implicit def interpreter: Interpreter.Aux[RelLang, RelDB] = new CleanInterpreter[RelLang, RelDB] {
-    def step[K[_] : Applicative, A](f: RelLang[K, A])(db: RelDB[K]): (RelDB[K], K[A]) = f match {
-      case r @ Relate(rel, values) => db.into(rel)(r.ordersWitness).insert(values)(r.orders, Applicative[K])
-      case OnPatternMatch(p, a, h) => db.addOnPatternMatch(p, a)(h)
+    def step[K[_] : Applicative]: RelLang[K, ?] ~> λ[A => scalaz.State[RelDB[K], K[A]]] = new (RelLang[K, ?] ~> λ[A => scalaz.State[RelDB[K], K[A]]]) {
+      override def apply[A](f: RelLang[K, A]): scalaz.State[RelDB[K], K[A]] = f match {
+        case r @ Relate(rel, values) => scalaz.State(db => db.into(rel)(r.ordersWitness).insert(values)(r.orders, Applicative[K]))
+        case OnPatternMatch(p, a, h) => scalaz.State(db => db.addOnPatternMatch(p, a)(h))
+      }
     }
   }
 }

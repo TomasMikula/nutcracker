@@ -41,7 +41,7 @@ class DFSSolver[F[_[_], _], St[_[_]], P[_]](
 
 
   private def init[A](p: K[A]): (S, A) = {
-    interpreter.runFree(initialState, p)
+    interpreter.runFree(p)(initialState)
   }
 
   private def solutions(s: S): StreamT[Id, S] =
@@ -79,7 +79,7 @@ class DFSSolver[F[_[_], _], St[_[_]], P[_]](
       case Stuck => failed.trans(trampolineId) // TODO: Don't treat as failed.
       case Done => done(s).trans(trampolineId)
       case Incomplete(branches) =>
-        StreamT.fromIterable(branches).trans(trampolineId) flatMap { k => solutionsT(interpreter.runFreeUnit(s, k), failed, done) }
+        StreamT.fromIterable(branches).trans(trampolineId) flatMap { k => solutionsT(interpreter.runFree(k)(s)._1, failed, done) }
     }
 
   private def hideTrampoline[A](stream: StreamT[Trampoline, A]): StreamT[Id, A] =
