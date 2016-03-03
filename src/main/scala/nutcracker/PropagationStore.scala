@@ -6,11 +6,10 @@ import monocle.Lens
 import nutcracker.Assessment.{Stuck, Incomplete, Done, Failed}
 import nutcracker.PropagationStore.DirtyThings
 import nutcracker.util.Index
-import nutcracker.util.free.{FreeK, MonoidK, Interpreter}
-import scalaz.{Applicative, Foldable, Monoid}
+import nutcracker.util.free.{FreeK, Interpreter}
+import scalaz.{Applicative, Foldable}
 import scalaz.std.list._
 import scalaz.syntax.applicative._
-import scalaz.syntax.monoid._
 import shapeless.{HList, Nat, Sized}
 import shapeless.PolyDefns.~>
 
@@ -173,17 +172,14 @@ object PropagationStore {
   )
 
   case class DirtyThings[K[_]](
-    continuations: List[K[Unit]],
     domains: Set[CellRef[D] forSome { type D }],
     selections: Set[Sel[_ <: HList]]
   ) {
     def uncons: Option[(DirtyThing[K], DirtyThings[K])] =
-      if(continuations.nonEmpty) Some((Continuation(continuations.head), this.copy(continuations = continuations.tail)))
-      else if(domains.nonEmpty) Some((DirtyDomain(domains.head), this.copy(domains = domains.tail)))
+      if(domains.nonEmpty) Some((DirtyDomain(domains.head), this.copy(domains = domains.tail)))
       else if(selections.nonEmpty) Some((DirtySel(selections.head), this.copy(selections = selections.tail)))
       else None
 
-    def +(k: K[Unit]): DirtyThings[K] = copy(continuations = k :: continuations)
     def +[D](d: CellRef[D]): DirtyThings[K] = copy(domains = domains + d)
     def ++[D](ds: Iterable[CellRef[D]]): DirtyThings[K] = copy(domains = domains ++ ds)
     def +[L <: HList](sel: Sel[L]): DirtyThings[K] = copy(selections = selections + sel)
@@ -191,11 +187,10 @@ object PropagationStore {
   }
 
   object DirtyThings {
-    def empty[K[_]]: DirtyThings[K] = DirtyThings(Nil, Set(), Set())
+    def empty[K[_]]: DirtyThings[K] = DirtyThings(Set(), Set())
   }
 
   sealed trait DirtyThing[K[_]]
-  case class Continuation[K[_]](k: K[Unit]) extends DirtyThing[K]
   case class DirtyDomain[K[_], D](ref: CellRef[D]) extends DirtyThing[K]
   case class DirtySel[K[_]](sel: Sel[_ <: HList]) extends DirtyThing[K]
 
@@ -203,28 +198,28 @@ object PropagationStore {
     new Interpreter[PropagationLang] {
       type State[K[_]] = PropagationStore[K]
 
-      def step[K[_]: Applicative, A](p: PropagationLang[K, A])(s: PropagationStore[K]): (PropagationStore[K], A) = {
+      def step[K[_]: Applicative, A](p: PropagationLang[K, A])(s: PropagationStore[K]): (PropagationStore[K], K[A]) = {
         p match {
           case Variable(d, dom) => s.addVariable(d, dom) match {
-            case (s1, ref) => (s1, ref)
+            case (s1, ref) => (s1, ref.point[K])
           }
           case VarTrigger(ref, f) => s.addDomainTrigger(ref, f) match {
-            case (s1, ok) => (ok.map(k => s1.copy(dirtyThings = s1.dirtyThings + k)).getOrElse(s1), ())
+            case (s1, ok) => (s1, ok.getOrElse(().point[K]))
           }
           case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
-            case (s1, ok) => (ok.map(k => s1.copy(dirtyThings = s1.dirtyThings + k)).getOrElse(s1), ())
+            case (s1, ok) => (s1, ok.getOrElse(().point[K]))
           }
           case Intersect(ref, d) => s.intersect(ref, d) match {
-            case Some(s1) => (s1.copy(dirtyThings = s1.dirtyThings + ref), ())
-            case None => (s, ())
+            case Some(s1) => (s1.copy(dirtyThings = s1.dirtyThings + ref), ().point[K])
+            case None => (s, ().point[K])
           }
           case IntersectVector(refs, values) => s.intersectVector(refs, values) match {
-            case (s1, dirtyCells) => (s1.copy(dirtyThings = s1.dirtyThings ++ dirtyCells), ())
+            case (s1, dirtyCells) => (s1.copy(dirtyThings = s1.dirtyThings ++ dirtyCells), ().point[K])
           }
-          case Fetch(ref) => (s, s.fetch(ref))
-          case FetchVector(refs) => (s, s.fetchVector(refs))
+          case Fetch(ref) => (s, s.fetch(ref).point[K])
+          case FetchVector(refs) => (s, s.fetchVector(refs).point[K])
           case WhenResolved(ref, f) => s.addDomainResolutionTrigger(ref, f) match {
-            case (s1, ok) => (ok.map(k => s1.copy(dirtyThings = s1.dirtyThings + k)).getOrElse(s1), ())
+            case (s1, ok) => (s1, ok.getOrElse(().point[K]))
           }
         }
       }
@@ -232,7 +227,6 @@ object PropagationStore {
       def uncons[K[_]: Applicative](s: PropagationStore[K]): Option[(K[Unit], PropagationStore[K])] = s.dirtyThings.uncons match {
         case None => None
         case Some((dt, dts)) => dt match {
-          case Continuation(k) => Some((k, s.copy(dirtyThings = dts)))
           case DirtyDomain(ref) => s.triggersForDomain(ref) match {
             case (s1, ks) => Some((Foldable[List].sequence_(ks), s1.copy(dirtyThings = dts ++ s.getSelsForCell(ref))))
           }

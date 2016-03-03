@@ -4,11 +4,12 @@ import scala.language.higherKinds
 
 import scala.annotation.tailrec
 import scalaz._
+import scalaz.syntax.applicative._
 
 trait Interpreter[F[_[_], _]] {
   type State[K[_]]
 
-  def step[K[_]: Applicative, A](f: F[K, A])(s: State[K]): (State[K], A)
+  def step[K[_]: Applicative, A](f: F[K, A])(s: State[K]): (State[K], K[A])
   def uncons[K[_]: Applicative](s: State[K]): Option[(K[Unit], State[K])]
 
   @tailrec final def runFree[A](
@@ -17,10 +18,10 @@ trait Interpreter[F[_[_], _]] {
   ): (State[FreeK[F, ?]], A) = p match {
     case FreeK.Pure(a) => (runFreeUnit(s, FreeK.Pure(())), a)
     case FreeK.Suspend(ffa) => step[FreeK[F, ?], A](ffa)(s) match {
-      case (s1, a) => (runFreeUnit(s1, FreeK.Pure(())), a)
+      case (s1, ka) => (runFree(s1, ka))
     }
     case bnd: FreeK.Bind[F, a1, A] => step[FreeK[F, ?], a1](bnd.a)(s) match {
-      case (s1, x) => runFree(s1, bnd.f(x))
+      case (s1, kx) => runFree(s1, kx >>= bnd.f)
     }
   }
 
@@ -33,10 +34,10 @@ trait Interpreter[F[_[_], _]] {
       case None => s
     }
     case FreeK.Suspend(ffu) => step[FreeK[F, ?], Unit](ffu)(s) match {
-      case (s1, ()) => runFreeUnit(s1, FreeK.Pure(()))
+      case (s1, ku) => runFreeUnit(s1, ku)
     }
     case bnd: FreeK.Bind[F, a1, Unit] => step[FreeK[F, ?], a1](bnd.a)(s) match {
-      case (s1, x) => runFreeUnit(s1, bnd.f(x))
+      case (s1, kx) => runFreeUnit(s1, kx >>= bnd.f)
     }
   }
 }
@@ -66,7 +67,7 @@ object Interpreter {
 
     new Interpreter[F] {
       type State[K[_]] = ProductK[i1.State, i2.State, K]
-      def step[K[_] : Applicative, A](f: F[K, A])(s: State[K]): (State[K], A) = f.run match {
+      def step[K[_] : Applicative, A](f: F[K, A])(s: State[K]): (State[K], K[A]) = f.run match {
         case -\/(g) => i1.step(g)(s._1) match {
           case (t, a) => (s.update_1(t), a)
         }
@@ -91,9 +92,9 @@ object Interpreter {
     new Interpreter[CoyonedaK[F, ?[_], ?]] {
       type State[K[_]] = S[K]
 
-      def step[K[_] : Applicative, A](c: CoyonedaK[F, K, A])(s: S[K]): (S[K], A) = c match {
+      def step[K[_] : Applicative, A](c: CoyonedaK[F, K, A])(s: S[K]): (S[K], K[A]) = c match {
         case CoyonedaK.Pure(fa) => i.step(fa)(s)
-        case CoyonedaK.Map(fx, f) => i.step(fx)(s) match { case (s1, x) => (s1, f(x)) }
+        case CoyonedaK.Map(fx, f) => i.step(fx)(s) match { case (s1, kx) => (s1, kx map f) }
       }
 
       def uncons[K[_] : Applicative](s: S[K]): Option[(K[Unit], S[K])] = i.uncons(s)

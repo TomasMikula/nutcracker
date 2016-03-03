@@ -1,11 +1,13 @@
 package nutcracker.rel
 
+import nutcracker.util.free.Interpreter.CleanInterpreter
+
 import scala.language.existentials
 import scala.language.higherKinds
 
 import nutcracker.rel.RelLang._
 import nutcracker.util.{TransformedIndex, Mapped}
-import nutcracker.util.free.{MonoidK, Interpreter}
+import nutcracker.util.free.Interpreter
 
 import algebra.Order
 import scalaz.{Foldable, Applicative}
@@ -17,8 +19,7 @@ import RelDB._
 case class RelDB[K[_]] private (
   private val tables: Map[Rel[_], RelTable[_]],
   private val patternTriggers: Map[PartiallyAssignedPattern[_], List[_ => K[Unit]]],
-  private val relToPatterns: TransformedIndex[Rel[_ <: HList], PartiallyAssignedPattern[_ <: HList], PartiallyAssignedOrientedPattern[_ <: HList, _ <: HList]],
-  private val triggered: List[K[Unit]]
+  private val relToPatterns: TransformedIndex[Rel[_ <: HList], PartiallyAssignedPattern[_ <: HList], PartiallyAssignedOrientedPattern[_ <: HList, _ <: HList]]
 ) {
 
   case class Inserter[L <: HList, OS <: HList] private[RelDB] (rel: Rel[L])(implicit m: Mapped.Aux[L, Order, OS]) {
@@ -146,21 +147,13 @@ object RelDB {
   def empty[K[_]]: RelDB[K] = RelDB(
     Map.empty,
     Map.empty,
-    TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel)),
-    Nil
+    TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel))
   )
 
-  implicit def interpreter: Interpreter.Aux[RelLang, RelDB] = new Interpreter[RelLang] {
-    type State[K[_]] = RelDB[K]
-
-    def step[K[_] : Applicative, A](f: RelLang[K, A])(db: RelDB[K]): (RelDB[K], A) = f match {
-      case r @ Relate(rel, values) => db.into(rel)(r.ordersWitness).insert(values)(r.orders, Applicative[K]) match { case (s, k) => (s.copy(triggered = k :: s.triggered), ()) }
-      case OnPatternMatch(p, a, h) => db.addOnPatternMatch(p, a)(h) match { case (s, k) => (s.copy(triggered = k :: s.triggered), ()) }
-    }
-
-    def uncons[K[_]: Applicative](s: State[K]): Option[(K[Unit], State[K])] = s.triggered match {
-      case Nil => None
-      case h::t => Some((h, s.copy(triggered = t)))
+  implicit def interpreter: Interpreter.Aux[RelLang, RelDB] = new CleanInterpreter[RelLang, RelDB] {
+    def step[K[_] : Applicative, A](f: RelLang[K, A])(db: RelDB[K]): (RelDB[K], K[A]) = f match {
+      case r @ Relate(rel, values) => db.into(rel)(r.ordersWitness).insert(values)(r.orders, Applicative[K])
+      case OnPatternMatch(p, a, h) => db.addOnPatternMatch(p, a)(h)
     }
   }
 }

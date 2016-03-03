@@ -6,6 +6,7 @@ import nutcracker.util.free.{FunctorKA, FreeK, Interpreter}
 import nutcracker.util.free.Interpreter.{ConstK, CleanInterpreter}
 
 import scalaz.{~>, Monoid, Applicative}
+import scalaz.syntax.applicative._
 
 sealed trait CostLang[C, K[_], A]
 
@@ -30,9 +31,9 @@ object CostLang {
   implicit def interpreter[C: Monoid]: Interpreter.Aux[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] =
     new CleanInterpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] {
 
-      def step[K[_] : Applicative, A](f: CostLang[C, K, A])(c0: C): (ConstK[C, K], A) = f match {
-        case Cost(c1) => (Monoid[C].append(c0, c1), ())
-        case GetCost() => (c0, c0.asInstanceOf[A]) // XXX is there a way to convince scalac that C =:= A?
+      def step[K[_] : Applicative, A](f: CostLang[C, K, A])(c0: C): (ConstK[C, K], K[A]) = f match {
+        case Cost(c1) => (Monoid[C].append(c0, c1), ().point[K])
+        case GetCost() => (c0, c0.asInstanceOf[A].point[K]) // XXX is there a way to convince scalac that C =:= A?
       }
 
     }
