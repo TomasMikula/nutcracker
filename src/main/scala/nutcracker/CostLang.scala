@@ -2,8 +2,8 @@ package nutcracker
 
 import scala.language.higherKinds
 
-import nutcracker.util.free.{FunctorKA, FreeK, Interpreter}
-import nutcracker.util.free.Interpreter.{ConstK, CleanInterpreter}
+import nutcracker.util.free.{ConstK, FreeK, FunctorKA, Interpreter}
+import nutcracker.util.free.Interpreter.CleanInterpreter
 
 import scalaz.{~>, Monoid, Applicative}
 import scalaz.syntax.applicative._

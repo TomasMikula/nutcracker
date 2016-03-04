@@ -20,8 +20,6 @@ object Interpreter {
 
   type Aux[F0[_[_], _], S[_[_]]] = Interpreter[F0] { type State[K[_]] = S[K] }
 
-  type ConstK[T, K[_]] = T
-
   def apply[F[_[_], _], S[_[_]]](
     step: F[FreeK[F, ?], ?] ~> λ[A => scalaz.State[S[FreeK[F, ?]], FreeK[F, A]]],
     uncons: StateT[Option, S[FreeK[F, ?]], FreeK[F, Unit]]
