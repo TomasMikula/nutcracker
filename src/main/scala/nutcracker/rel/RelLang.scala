@@ -3,7 +3,7 @@ package nutcracker.rel
 import algebra.Order
 import nutcracker.rel.RelDB.PartiallyAssignedPattern
 import nutcracker.util.{SummonHList, Mapped}
-import nutcracker.util.free.{Interpreter, FunctorKA, InjectK, FreeK}
+import nutcracker.util.free.{StateInterpreter, FunctorKA, InjectK, FreeK}
 
 import scala.language.higherKinds
 
@@ -45,6 +45,6 @@ object RelLang {
     }
   }
 
-  implicit def interpreter: Interpreter.Aux[RelLang, RelDB] = RelDB.interpreter
+  implicit def interpreter: StateInterpreter.Aux[RelLang, RelDB] = RelDB.interpreter
 
 }

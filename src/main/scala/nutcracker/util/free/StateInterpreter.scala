@@ -7,18 +7,18 @@ import scalaz._
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 
-trait Interpreter[F[_[_], _]] {
+trait StateInterpreter[F[_[_], _]] {
   type State[K[_]]
 
   def step[K[_]: Applicative]: F[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]]
   def uncons[K[_]: Applicative]: StateT[Option, State[K], K[Unit]]
 
-  def get(): FreeK[F, ?] ~> scalaz.State[State[FreeK[F, ?]], ?] = Interpreter(step[FreeK[F, ?]], uncons[FreeK[F, ?]])
+  def get(): FreeK[F, ?] ~> scalaz.State[State[FreeK[F, ?]], ?] = StateInterpreter(step[FreeK[F, ?]], uncons[FreeK[F, ?]])
 }
 
-object Interpreter {
+object StateInterpreter {
 
-  type Aux[F0[_[_], _], S[_[_]]] = Interpreter[F0] { type State[K[_]] = S[K] }
+  type Aux[F0[_[_], _], S[_[_]]] = StateInterpreter[F0] { type State[K[_]] = S[K] }
 
   def apply[F[_[_], _], S[_[_]]](
     step: F[FreeK[F, ?], ?] ~> λ[A => scalaz.State[S[FreeK[F, ?]], FreeK[F, A]]],
@@ -50,20 +50,20 @@ object Interpreter {
     }
   }
 
-  trait CleanInterpreter[F[_[_], _], S[_[_]]] extends Interpreter[F] {
+  trait CleanStateInterpreter[F[_[_], _], S[_[_]]] extends StateInterpreter[F] {
     type State[K[_]] = S[K]
 
     final def uncons[K[_]: Applicative]: StateT[Option, S[K], K[Unit]] = StateT[Option, S[K], K[Unit]](s => None)
   }
 
   implicit def coproductInterpreter[G[_[_], _], H[_[_], _]](implicit
-    i1: Interpreter[G],
-    i2: Interpreter[H]
-  ): Interpreter.Aux[CoproductK[G, H, ?[_], ?], ProductK[i1.State, i2.State, ?[_]]] = {
+    i1: StateInterpreter[G],
+    i2: StateInterpreter[H]
+  ): StateInterpreter.Aux[CoproductK[G, H, ?[_], ?], ProductK[i1.State, i2.State, ?[_]]] = {
 
     type F[K[_], A] = CoproductK[G, H, K, A]
 
-    new Interpreter[F] {
+    new StateInterpreter[F] {
       type State[K[_]] = ProductK[i1.State, i2.State, K]
       def step[K[_] : Applicative]: F[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]] = {
         val gLens = ProductK.leftLensZ[i1.State, i2.State, K]
@@ -84,8 +84,8 @@ object Interpreter {
     }
   }
 
-  implicit def coyonedaInterpreter[F[_[_], _], S[_[_]]](implicit i: Interpreter.Aux[F, S]): Interpreter.Aux[CoyonedaK[F, ?[_], ?], S] =
-    new Interpreter[CoyonedaK[F, ?[_], ?]] {
+  implicit def coyonedaInterpreter[F[_[_], _], S[_[_]]](implicit i: StateInterpreter.Aux[F, S]): StateInterpreter.Aux[CoyonedaK[F, ?[_], ?], S] =
+    new StateInterpreter[CoyonedaK[F, ?[_], ?]] {
       type State[K[_]] = S[K]
 
       def step[K[_] : Applicative]: CoyonedaK[F, K, ?] ~> λ[A => scalaz.State[S[K], K[A]]] = new (CoyonedaK[F, K, ?] ~> λ[A => scalaz.State[S[K], K[A]]]) {

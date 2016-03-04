@@ -5,7 +5,7 @@ import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Stuck, Incomplete, Done, Failed}
 import nutcracker.util.Index
-import nutcracker.util.free.{FreeK, Interpreter}
+import nutcracker.util.free.{FreeK, StateInterpreter}
 import scalaz.{StateT, Applicative, Foldable}
 import scalaz.std.list._
 import scalaz.std.option._
@@ -186,8 +186,8 @@ object PropagationStore {
     dirtySelections = Set()
   )
 
-  implicit def interpreter: Interpreter.Aux[PropagationLang, PropagationStore] =
-    new Interpreter[PropagationLang] {
+  implicit def interpreter: StateInterpreter.Aux[PropagationLang, PropagationStore] =
+    new StateInterpreter[PropagationLang] {
       type State[K[_]] = PropagationStore[K]
 
       def step[K[_]: Applicative]: PropagationLang[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]] = new (PropagationLang[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]]) {

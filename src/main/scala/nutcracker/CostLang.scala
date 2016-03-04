@@ -2,8 +2,8 @@ package nutcracker
 
 import scala.language.higherKinds
 
-import nutcracker.util.free.{ConstK, FreeK, FunctorKA, Interpreter}
-import nutcracker.util.free.Interpreter.CleanInterpreter
+import nutcracker.util.free.{ConstK, FreeK, FunctorKA, StateInterpreter}
+import nutcracker.util.free.StateInterpreter.CleanStateInterpreter
 
 import scalaz.{~>, Monoid, Applicative}
 import scalaz.syntax.applicative._
@@ -28,8 +28,8 @@ object CostLang {
     }
   }
 
-  implicit def interpreter[C: Monoid]: Interpreter.Aux[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] =
-    new CleanInterpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] {
+  implicit def interpreter[C: Monoid]: StateInterpreter.Aux[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] =
+    new CleanStateInterpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] {
 
       def step[K[_] : Applicative]: CostLang[C, K, ?] ~> λ[A => scalaz.State[C, K[A]]] = new (CostLang[C, K, ?] ~> λ[A => scalaz.State[C, K[A]]]) {
         override def apply[A](f: CostLang[C, K, A]): scalaz.State[C, K[A]] = f match {
