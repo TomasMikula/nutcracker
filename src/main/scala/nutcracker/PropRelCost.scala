@@ -5,7 +5,6 @@ import scala.language.higherKinds
 import monocle.Lens
 import nutcracker.algebraic.NonDecreasingMonoid
 import nutcracker.rel.{RelDB, RelLang}
-import nutcracker.util.free.Interpreter._
 import nutcracker.util.free._
 import nutcracker.util.free.ProductK._
 
@@ -21,7 +20,7 @@ final class PropRelCost[C: NonDecreasingMonoid] {
   type State0[K[_]] = ProductK[RelDB, CostS, K]
   type State[K[_]] = ProductK[PropagationStore, State0, K]
 
-  val interpreter: Interpreter.Aux[Vocabulary, State] = implicitly[Interpreter.Aux[Vocabulary, State]]
+  val interpreter = implicitly[Interpreter.Aux[Vocabulary, State]].get()
   def propStore[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 

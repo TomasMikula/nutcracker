@@ -14,7 +14,7 @@ object PropRel {
   type Vocabulary[K[_], A] = CoproductK[PropagationLang, RelLang, K, A]
   type State[K[_]] = ProductK[PropagationStore, RelDB, K]
 
-  val interpreter: Interpreter.Aux[Vocabulary, State] = implicitly[Interpreter.Aux[Vocabulary, State]]
+  val interpreter = implicitly[Interpreter.Aux[Vocabulary, State]].get()
 
   private[PropRel] type Q[A] = FreeK[Vocabulary, A]
   def propStore: Lens[State[Q], PropagationStore[Q]] = implicitly[Lens[State[Q], PropagationStore[Q]]]

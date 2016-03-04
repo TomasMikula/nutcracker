@@ -2,7 +2,7 @@ package nutcracker
 
 import nutcracker.Assessment._
 import nutcracker.algebraic.NonDecreasingMonoid
-import nutcracker.util.free.{Interpreter, FreeK}
+import nutcracker.util.free.FreeK
 
 import scala.annotation.tailrec
 import scala.language.higherKinds
@@ -11,7 +11,7 @@ import scalaz.Id._
 import scalaz.std.list._
 
 class BFSSolver[F[_[_], _], St[_[_]], P[_], C: NonDecreasingMonoid](
-  interpreter: Interpreter[F] { type State[K[_]] = St[K] },
+  interpreter: FreeK[F, ?] ~> scalaz.State[St[FreeK[F, ?]], ?],
   initialState: St[FreeK[F, ?]],
   assess: St[FreeK[F, ?]] => Assessment[List[FreeK[F, Unit]]],
   fetch: P ~> (St[FreeK[F, ?]] => ?),
@@ -25,7 +25,7 @@ class BFSSolver[F[_[_], _], St[_[_]], P[_], C: NonDecreasingMonoid](
   implicit val orderByCost: Order[S] = Order.orderBy(getCost)
 
   def solutions[A](p: K[P[A]]): StreamT[Id, (A, C)] = {
-    val (s, pr) = interpreter.runFree(p)(initialState)
+    val (s, pr) = interpreter(p)(initialState)
     val fetch = this.fetch(pr)
     solutions(s) map { s => (fetch(s), getCost(s)) }
   }
@@ -43,7 +43,7 @@ class BFSSolver[F[_[_], _], St[_[_]], P[_], C: NonDecreasingMonoid](
       case Stuck => unfold(heap1) // not done, but we don't know how to proceed. TODO: Don't treat as failed
       case Done => Some((s, heap1))
       case Incomplete(sks) =>
-        val newStates = sks map { k => interpreter.runFree(k)(s)._1 }
+        val newStates = sks map { k => interpreter(k)(s)._1 }
         val heap2 = heap1.insertAllF[List](newStates)
         unfold(heap2)
     }

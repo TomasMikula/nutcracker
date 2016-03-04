@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.Assessment._
-import nutcracker.util.free.{Interpreter, FreeK}
+import nutcracker.util.free.FreeK
 
 import scala.annotation.tailrec
 import scalaz.Free.Trampoline
@@ -11,7 +11,7 @@ import scalaz.{StreamT, ~>}
 import scalaz.syntax.applicative._
 
 class DFSSolver[F[_[_], _], St[_[_]], P[_]](
-  interpreter: Interpreter[F] { type State[K[_]] = St[K] },
+  interpreter: FreeK[F, ?] ~> scalaz.State[St[FreeK[F, ?]], ?],
   initialState: St[FreeK[F, ?]],
   assess: St[FreeK[F, ?]] => Assessment[List[FreeK[F, Unit]]],
   fetch: P ~> (St[FreeK[F, ?]] => ?)
@@ -41,7 +41,7 @@ class DFSSolver[F[_[_], _], St[_[_]], P[_]](
 
 
   private def init[A](p: K[A]): (S, A) = {
-    interpreter.runFree(p)(initialState)
+    interpreter(p)(initialState)
   }
 
   private def solutions(s: S): StreamT[Id, S] =
@@ -79,7 +79,7 @@ class DFSSolver[F[_[_], _], St[_[_]], P[_]](
       case Stuck => failed.trans(trampolineId) // TODO: Don't treat as failed.
       case Done => done(s).trans(trampolineId)
       case Incomplete(branches) =>
-        StreamT.fromIterable(branches).trans(trampolineId) flatMap { k => solutionsT(interpreter.runFree(k)(s)._1, failed, done) }
+        StreamT.fromIterable(branches).trans(trampolineId) flatMap { k => solutionsT(interpreter(k)(s)._1, failed, done) }
     }
 
   private def hideTrampoline[A](stream: StreamT[Trampoline, A]): StreamT[Id, A] =

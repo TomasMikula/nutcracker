@@ -13,30 +13,7 @@ trait Interpreter[F[_[_], _]] {
   def step[K[_]: Applicative]: F[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]]
   def uncons[K[_]: Applicative]: StateT[Option, State[K], K[Unit]]
 
-  def stepF: F[FreeK[F, ?], ?] ~> λ[A => scalaz.State[State[FreeK[F, ?]], FreeK[F, A]]] = step[FreeK[F, ?]]
-  def unconsF: StateT[Option, State[FreeK[F, ?]], FreeK[F, Unit]] = uncons[FreeK[F, ?]]
-
-  def runFree[A](p: FreeK[F, A]): scalaz.State[State[FreeK[F, ?]], A] = scalaz.State(runUntilClean(p))
-
-  private def runUntilClean[A](p: FreeK[F, A])(s: State[FreeK[F, ?]]): (State[FreeK[F, ?]], A) = {
-    val (s1, a) = runToCompletion(p)(s)
-    (runUntilClean1(s1), a)
-  }
-
-  @tailrec private def runUntilClean1(s: State[FreeK[F, ?]]): State[FreeK[F, ?]] = unconsF(s) match {
-    case None => s
-    case Some((s1, ku)) => runUntilClean1(runToCompletion(ku)(s1)._1)
-  }
-
-  @tailrec private def runToCompletion[A](p: FreeK[F, A])(s: State[FreeK[F, ?]]): (State[FreeK[F, ?]], A) = p match {
-    case FreeK.Pure(a) => (s, a)
-    case FreeK.Suspend(ffa) =>
-      val (s1, ka) = stepF(ffa)(s)
-      runToCompletion(ka)(s1)
-    case bnd: FreeK.Bind[F, a1, A] =>
-      val (s1, kx) = stepF(bnd.a)(s)
-      runToCompletion(kx >>= bnd.f)(s1)
-  }
+  def get(): FreeK[F, ?] ~> scalaz.State[State[FreeK[F, ?]], ?] = Interpreter(step[FreeK[F, ?]], uncons[FreeK[F, ?]])
 }
 
 object Interpreter {
@@ -44,9 +21,35 @@ object Interpreter {
   type Aux[F0[_[_], _], S[_[_]]] = Interpreter[F0] { type State[K[_]] = S[K] }
 
   type ConstK[T, K[_]] = T
-  implicit def constMonoidK[T: Monoid]: MonoidK[ConstK[T, ?[_]]] = new MonoidK[ConstK[T, ?[_]]] {
-    def zero[K[_]]: ConstK[T, K] = Monoid[T].zero
-    def append[K[_]](f1: ConstK[T, K], f2: ConstK[T, K]): ConstK[T, K] = Monoid[T].append(f1, f2)
+
+  def apply[F[_[_], _], S[_[_]]](
+    step: F[FreeK[F, ?], ?] ~> λ[A => scalaz.State[S[FreeK[F, ?]], FreeK[F, A]]],
+    uncons: StateT[Option, S[FreeK[F, ?]], FreeK[F, Unit]]
+  ): FreeK[F, ?] ~> scalaz.State[S[FreeK[F, ?]], ?] = {
+
+    def runUntilClean[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): (S[FreeK[F, ?]], A) = {
+      val (s1, a) = runToCompletion(p)(s)
+      (runUntilClean1(s1), a)
+    }
+
+    @tailrec def runUntilClean1(s: S[FreeK[F, ?]]): S[FreeK[F, ?]] = uncons(s) match {
+      case None => s
+      case Some((s1, ku)) => runUntilClean1(runToCompletion(ku)(s1)._1)
+    }
+
+    @tailrec def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): (S[FreeK[F, ?]], A) = p match {
+      case FreeK.Pure(a) => (s, a)
+      case FreeK.Suspend(ffa) =>
+        val (s1, ka) = step(ffa)(s)
+        runToCompletion(ka)(s1)
+      case bnd: FreeK.Bind[F, a1, A] =>
+        val (s1, kx) = step(bnd.a)(s)
+        runToCompletion(kx >>= bnd.f)(s1)
+    }
+
+    new (FreeK[F, ?] ~> scalaz.State[S[FreeK[F, ?]], ?]) {
+      def apply[A](fa: FreeK[F, A]): scalaz.State[S[FreeK[F, ?]], A] = scalaz.State(runUntilClean(fa))
+    }
   }
 
   trait CleanInterpreter[F[_[_], _], S[_[_]]] extends Interpreter[F] {
