@@ -2,7 +2,6 @@ package nutcracker.util.free
 
 import scala.language.higherKinds
 
-import scala.annotation.tailrec
 import scalaz._
 import scalaz.std.option._
 import scalaz.syntax.applicative._
@@ -13,40 +12,66 @@ trait StateInterpreter[F[_[_], _]] {
   def step[K[_]: Applicative]: F[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]]
   def uncons[K[_]: Applicative]: StateT[Option, State[K], K[Unit]]
 
-  def get(): FreeK[F, ?] ~> scalaz.State[State[FreeK[F, ?]], ?] = StateInterpreter(step[FreeK[F, ?]], uncons[FreeK[F, ?]])
+  final def stepM[K[_]: Applicative, M[_]: Monad]: F[K, ?] ~> λ[A => StateT[M, State[K], K[A]]] =
+    new (F[K, ?] ~> λ[A => StateT[M, State[K], K[A]]]) {
+      val stepK = step[K]
+      def apply[A](fa: F[K, A]): StateT[M, State[K], K[A]] = {
+        val st = stepK(fa)
+        StateT(s => st(s).point[M])
+      }
+    }
+
+  def get[M[_]: Monad](): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] = StateInterpreter(stepM[FreeK[F, ?], M], uncons[FreeK[F, ?]])
+
+  def get[G[_[_], _], M[_]: Monad](
+    ig: G ~>> M
+  ): FreeK[CoproductK[G, F, ?[_], ?], ?] ~> StateT[M, State[FreeK[CoproductK[G, F, ?[_], ?], ?]], ?] = {
+    type H[K[_], A] = CoproductK[G, F, K, A]
+    implicit val fm: Monad[FreeK[H, ?]] = FreeK.freeKMonad[H]
+    val trG: G[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], FreeK[H, A]]] =
+      new (G[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], FreeK[H, A]]]) {
+        def apply[A](ga: G[FreeK[H, ?], A]): StateT[M, State[FreeK[H, ?]], FreeK[H, A]] = {
+          val ma = ig.apply[FreeK[H, ?], A](ga) map { FreeK.pure[H, A](_) }
+          MonadTrans[StateT[?[_], State[FreeK[H, ?]], ?]].liftM(ma)
+        }
+      }
+    val trF: F[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], FreeK[H, A]]] = stepM[FreeK[H, ?], M]
+    val trH: H[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], FreeK[H, A]]] =
+      CoproductK.transform[G, F, FreeK[H, ?], λ[A => StateT[M, State[FreeK[H, ?]], FreeK[H, A]]]](trG, trF)
+    StateInterpreter[H, State, M](trH, uncons[FreeK[H, ?]])
+  }
 }
 
 object StateInterpreter {
 
   type Aux[F0[_[_], _], S[_[_]]] = StateInterpreter[F0] { type State[K[_]] = S[K] }
 
-  def apply[F[_[_], _], S[_[_]]](
-    step: F[FreeK[F, ?], ?] ~> λ[A => scalaz.State[S[FreeK[F, ?]], FreeK[F, A]]],
+  def apply[F[_[_], _], S[_[_]], M[_]](
+    step: F[FreeK[F, ?], ?] ~> λ[A => StateT[M, S[FreeK[F, ?]], FreeK[F, A]]],
     uncons: StateT[Option, S[FreeK[F, ?]], FreeK[F, Unit]]
-  ): FreeK[F, ?] ~> scalaz.State[S[FreeK[F, ?]], ?] = {
+  )(implicit
+    M: Monad[M]
+  ): FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?] = {
 
-    def runUntilClean[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): (S[FreeK[F, ?]], A) = {
-      val (s1, a) = runToCompletion(p)(s)
-      (runUntilClean1(s1), a)
+    def runUntilClean[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] = {
+      M.bind(runToCompletion(p)(s)){ case (s1, a) => M.map(runUntilClean1(s1)) {(_, a)} }
     }
 
-    @tailrec def runUntilClean1(s: S[FreeK[F, ?]]): S[FreeK[F, ?]] = uncons(s) match {
-      case None => s
-      case Some((s1, ku)) => runUntilClean1(runToCompletion(ku)(s1)._1)
+    def runUntilClean1(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = uncons(s) match {
+      case None => s.point[M]
+      case Some((s1, ku)) => M.bind(runToCompletion(ku)(s1)){ su => runUntilClean1(su._1) }
     }
 
-    @tailrec def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): (S[FreeK[F, ?]], A) = p match {
-      case FreeK.Pure(a) => (s, a)
+    def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] = p match {
+      case FreeK.Pure(a) => (s, a).point[M]
       case FreeK.Suspend(ffa) =>
-        val (s1, ka) = step(ffa)(s)
-        runToCompletion(ka)(s1)
+        M.bind(step(ffa)(s)){ case (s1, ka) => runToCompletion(ka)(s1) }
       case bnd: FreeK.Bind[F, a1, A] =>
-        val (s1, kx) = step(bnd.a)(s)
-        runToCompletion(kx >>= bnd.f)(s1)
+        M.bind(step(bnd.a)(s)){ case (s1, kx) => runToCompletion(kx >>= bnd.f)(s1) }
     }
 
-    new (FreeK[F, ?] ~> scalaz.State[S[FreeK[F, ?]], ?]) {
-      def apply[A](fa: FreeK[F, A]): scalaz.State[S[FreeK[F, ?]], A] = scalaz.State(runUntilClean(fa))
+    new (FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?]) {
+      def apply[A](fa: FreeK[F, A]): StateT[M, S[FreeK[F, ?]], A] = StateT(runUntilClean(fa))
     }
   }
 

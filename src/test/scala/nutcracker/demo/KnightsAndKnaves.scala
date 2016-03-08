@@ -37,7 +37,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b, c)) >>>= { case (a, b, c) => promiseResults(a, b, c) }
 
-    val solutions = solver.solutions(problem).toStream.toList
+    val solutions = solver.solutions(problem).toStream.run.toList
 
     "should have 2 solutions" in {
       assertResult(2)(solutions.size)
@@ -64,7 +64,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b) }
 
-    val solutions = solver.solutions(problem).toStream.toList
+    val solutions = solver.solutions(problem).toStream.run.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
@@ -89,7 +89,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b) }
 
-    val solutions = solver.solutions(problem).toStream.toList
+    val solutions = solver.solutions(problem).toStream.run.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
@@ -119,7 +119,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b) }
 
-    val solutions = solver.solutions(problem).toStream.toList
+    val solutions = solver.solutions(problem).toStream.run.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }

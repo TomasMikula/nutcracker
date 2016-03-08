@@ -136,7 +136,7 @@ class Sudoku extends FunSuite {
       } yield solution
     }
 
-    val solutions = problems map { solver.allSolutions1(_) }
+    val solutions = problems map { solver.allSolutions1(_).run }
 
     // both programs should produce a unique and correct solution
     solutions foreach { case (sols, failureCount) =>

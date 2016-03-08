@@ -12,6 +12,14 @@ object CoproductK {
   def rightc[F[_[_], _], G[_[_], _], K[_], A](ga: G[K, A]): CoproductK[F, G, K, A] =
     CoproductK(\/-(ga))
 
+  def transform[F[_[_], _], G[_[_], _], K[_], M[_]](fm: F[K, ?] ~> M, gm: G[K, ?] ~> M): CoproductK[F, G, K, ?] ~> M =
+    new (CoproductK[F, G, K, ?] ~> M) {
+      def apply[A](ca: CoproductK[F, G, K, A]): M[A] = ca.run match {
+        case -\/(fa) => fm(fa)
+        case \/-(ga) => gm(ga)
+      }
+    }
+
   implicit def functorKInstance[F[_[_], _], G[_[_], _]](implicit
     FK: FunctorKA[F],
     GK: FunctorKA[G]

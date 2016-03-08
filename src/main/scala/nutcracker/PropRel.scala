@@ -7,6 +7,7 @@ import nutcracker.rel.{RelDB, RelLang}
 import nutcracker.util.free._
 import nutcracker.util.free.ProductK._
 
+import scalaz.Free.Trampoline
 import scalaz.~>
 
 object PropRel {
@@ -14,7 +15,7 @@ object PropRel {
   type Vocabulary[K[_], A] = CoproductK[PropagationLang, RelLang, K, A]
   type State[K[_]] = ProductK[PropagationStore, RelDB, K]
 
-  val interpreter = implicitly[StateInterpreter.Aux[Vocabulary, State]].get()
+  val interpreter = implicitly[StateInterpreter.Aux[Vocabulary, State]].get[Trampoline]()
 
   private[PropRel] type Q[A] = FreeK[Vocabulary, A]
   def propStore: Lens[State[Q], PropagationStore[Q]] = implicitly[Lens[State[Q], PropagationStore[Q]]]
@@ -24,5 +25,5 @@ object PropRel {
   }
   def emptyState: State[Q] = PropagationStore.empty[Q] :*: RelDB.empty[Q]
 
-  def dfsSolver: DFSSolver[Vocabulary, State, Promised] = new DFSSolver[Vocabulary, State, Promised](interpreter, emptyState, naiveAssess, fetch)
+  def dfsSolver: DFSSolver[Vocabulary, State, Trampoline, Promised] = new DFSSolver[Vocabulary, State, Trampoline, Promised](interpreter, emptyState, naiveAssess, fetch)
 }

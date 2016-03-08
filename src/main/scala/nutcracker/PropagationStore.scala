@@ -6,6 +6,7 @@ import monocle.Lens
 import nutcracker.Assessment.{Stuck, Incomplete, Done, Failed}
 import nutcracker.util.Index
 import nutcracker.util.free.{FreeK, StateInterpreter}
+import scalaz.Free.Trampoline
 import scalaz.{StateT, Applicative, Foldable}
 import scalaz.std.list._
 import scalaz.std.option._
@@ -247,6 +248,10 @@ object PropagationStore {
   private def fetch: Promised ~> (PropagationStore[FreeK[PropagationLang, ?]] => ?) = new ~>[Promised, PropagationStore[FreeK[PropagationLang, ?]] => ?] {
     def apply[A](pa: Promised[A]): (PropagationStore[FreeK[PropagationLang, ?]] => A) = s => s.fetchResult(pa).get
   }
-  def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Promised] =
-    new DFSSolver[PropagationLang, PropagationStore, Promised](interpreter.get(), empty[FreeK[PropagationLang, ?]], naiveAssess[FreeK[PropagationLang, ?]], fetch)
+  def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Trampoline, Promised] =
+    new DFSSolver[PropagationLang, PropagationStore, Trampoline, Promised](
+      interpreter.get[Trampoline](),
+      empty[FreeK[PropagationLang, ?]],
+      naiveAssess[FreeK[PropagationLang, ?]],
+      fetch)
 }
