@@ -7,10 +7,8 @@ import nutcracker.Assessment.{Stuck, Incomplete, Done, Failed}
 import nutcracker.util.Index
 import nutcracker.util.free.{FreeK, StateInterpreter}
 import scalaz.Free.Trampoline
-import scalaz.{StateT, Applicative, Foldable}
-import scalaz.std.list._
+import scalaz.StateT
 import scalaz.std.option._
-import scalaz.syntax.applicative._
 import shapeless.{HList, Nat, Sized}
 
 import Domain._
@@ -155,18 +153,16 @@ case class PropagationStore[K[_]] private(
         }
     }
 
-  private def uncons(implicit K: Applicative[K]): Option[(PropagationStore[K], K[Unit])] =
+  private def uncons: Option[(PropagationStore[K], List[K[Unit]])] =
     if(dirtyDomains.nonEmpty) {
       val d = dirtyDomains.head
       val dirtySels = dirtySelections union getSelsForCell(d)
       val (s1, ks) = triggersForDomain(d)
-      val k = Foldable[List].sequence_(ks)
-      Some((s1.copy(dirtyDomains = dirtyDomains.tail, dirtySelections = dirtySels), k))
+      Some((s1.copy(dirtyDomains = dirtyDomains.tail, dirtySelections = dirtySels), ks))
     } else if(dirtySelections.nonEmpty) {
       val sel = dirtySelections.head
       val (s1, ks) = triggersForSel(sel)
-      val k = Foldable[List].sequence_(ks)
-      Some((s1.copy(dirtySelections = dirtySelections.tail), k))
+      Some((s1.copy(dirtySelections = dirtySelections.tail), ks))
     }
     else None
 }
@@ -191,44 +187,44 @@ object PropagationStore {
     new StateInterpreter[PropagationLang] {
       type State[K[_]] = PropagationStore[K]
 
-      def step[K[_]: Applicative]: PropagationLang[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]] = new (PropagationLang[K, ?] ~> λ[A => scalaz.State[State[K], K[A]]]) {
-        override def apply[A](p: PropagationLang[K, A]): scalaz.State[PropagationStore[K], K[A]] = scalaz.State(s =>
-          p match {
-            case Variable(d, dom) => s.addVariable(d, dom) match {
-              case (s1, ref) => (s1, ref.point[K])
+      def step[K[_]]: PropagationLang[K, ?] ~> λ[A => scalaz.State[State[K], (A, List[K[Unit]])]] =
+        new (PropagationLang[K, ?] ~> λ[A => scalaz.State[State[K], (A, List[K[Unit]])]]) {
+          override def apply[A](p: PropagationLang[K, A]): scalaz.State[PropagationStore[K], (A, List[K[Unit]])] = scalaz.State(s =>
+            p match {
+              case Variable(d, dom) => s.addVariable(d, dom) match {
+                case (s1, ref) => (s1, (ref, Nil))
+              }
+              case VarTrigger(ref, f) => s.addDomainTrigger(ref, f) match {
+                case (s1, ok) => (s1, ((), ok.toList))
+              }
+              case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
+                case (s1, ok) => (s1, ((), ok.toList))
+              }
+              case Intersect(ref, d) => (s.intersect(ref, d), ((), Nil))
+              case IntersectVector(refs, values) => (s.intersectVector(refs, values), ((), Nil))
+              case Fetch(ref) => (s, (s.fetch(ref), Nil))
+              case FetchVector(refs) => (s, (s.fetchVector(refs), Nil))
+              case WhenResolved(ref, f) => s.addDomainResolutionTrigger(ref, f) match {
+                case (s1, ok) => (s1, ((), ok.toList))
+              }
             }
-            case VarTrigger(ref, f) => s.addDomainTrigger(ref, f) match {
-              case (s1, ok) => (s1, ok.getOrElse(().point[K]))
-            }
-            case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
-              case (s1, ok) => (s1, ok.getOrElse(().point[K]))
-            }
-            case Intersect(ref, d) => (s.intersect(ref, d), ().point[K])
-            case IntersectVector(refs, values) => (s.intersectVector(refs, values), ().point[K])
-            case Fetch(ref) => (s, s.fetch(ref).point[K])
-            case FetchVector(refs) => (s, s.fetchVector(refs).point[K])
-            case WhenResolved(ref, f) => s.addDomainResolutionTrigger(ref, f) match {
-              case (s1, ok) => (s1, ok.getOrElse(().point[K]))
-            }
-          }
-        )
-      }
+          )
+        }
 
-      def uncons[K[_]: Applicative]: StateT[Option, PropagationStore[K], K[Unit]] = StateT(_.uncons)
+      def uncons[K[_]]: StateT[Option, PropagationStore[K], List[K[Unit]]] = StateT(_.uncons)
     }
 
-  def naiveAssess[K[_]: Applicative](implicit tr: FreeK[PropagationLang, ?] ~> K): PropagationStore[K] => Assessment[List[K[Unit]]] = s => {
+  def naiveAssess[K[_]](implicit tr: FreeK[PropagationLang, ?] ~> K): PropagationStore[K] => Assessment[List[K[Unit]]] = s => {
     if(s.failedVars.nonEmpty) Failed
     else if(s.unresolvedVars.isEmpty) Done
     else {
       def splitDomain[A, D](ref: DomRef[A, D]): Option[List[K[Unit]]] = {
         val (d, domain) = s.getDomain(ref)
         domain.values(d) match {
-          case Domain.Empty() => Some(Nil)
-          case Domain.Just(a) => Some(().pure[K] :: Nil)
           case Domain.Many(branchings) =>
             if(branchings.isEmpty) None
             else Some(branchings.head map { d => tr(intersectF(ref)(d)) })
+          case _ => sys.error("splitDomain should be called on unresolved variables only.")
         }
       }
 
@@ -238,11 +234,11 @@ object PropagationStore {
     }
   }
 
-  def naiveAssess[K[_]: Applicative, S[_[_]]](
+  def naiveAssess[K[_], S[_[_]]](
     lens: Lens[S[K], PropagationStore[K]])(implicit
     tr: FreeK[PropagationLang, ?] ~> K
   ): S[K] => Assessment[List[K[Unit]]] =
-    s => (naiveAssess[K](Applicative[K], tr))(lens.get(s))
+    s => (naiveAssess[K](tr))(lens.get(s))
 
 
   private def fetch: Promised ~> (PropagationStore[FreeK[PropagationLang, ?]] => ?) = new ~>[Promised, PropagationStore[FreeK[PropagationLang, ?]] => ?] {

@@ -9,8 +9,7 @@ import nutcracker.util.free.StateInterpreter
 import nutcracker.util.free.StateInterpreter.CleanStateInterpreter
 
 import algebra.Order
-import scalaz.{~>, Foldable, Applicative}
-import scalaz.std.list._
+import scalaz.~>
 import shapeless.HList
 
 import RelDB._
@@ -23,34 +22,34 @@ case class RelDB[K[_]] private (
 
   case class Inserter[L <: HList, OS <: HList] private[RelDB] (rel: Rel[L])(implicit m: Mapped.Aux[L, Order, OS]) {
 
-    def insert(row: L)(implicit orders: OS, K: Applicative[K]): (RelDB[K], K[Unit]) =  {
+    def insert(row: L)(implicit orders: OS): (RelDB[K], List[K[Unit]]) =  {
 
       // insert the row to the corresponding table
       table(rel).insert(row) match {
 
         case None => // row was already present, no additional actions necessary
-          (RelDB.this, K.point(()))
+          (RelDB.this, Nil)
 
         case Some(tbl1) => // successfully inserted
 
           // search for pattern matches before including the new relation
           val ks: List[K[Unit]] = collectTriggers(rel, row)
 
-          (replaceTable(rel)(tbl1), Foldable[List].sequence_(ks))
+          (replaceTable(rel)(tbl1), ks)
       }
     }
   }
 
   def into[L <: HList](rel: Rel[L])(implicit m: Mapped[L, Order]): Inserter[L, m.Out] = Inserter(rel)(m)
 
-  def addOnPatternMatch[V <: HList](p: Pattern[V], ass: Assignment[V])(h: V => K[Unit])(implicit K: Applicative[K]): (RelDB[K], K[Unit]) = {
+  def addOnPatternMatch[V <: HList](p: Pattern[V], ass: Assignment[V])(h: V => K[Unit]): (RelDB[K], List[K[Unit]]) = {
     require(p.isCovered, "The domain of the pattern is not fully covered by its relations. These positions are not covered: " + ((0 until p.vertexCount).toSet -- p.vertexSet))
 
     val matches: List[V] = search(p, ass)
 
-    val k = Foldable[List].traverse_(matches)(h(_))
+    val ks = matches map h
 
-    (addTrigger(PartiallyAssignedPattern(p, ass), h), k)
+    (addTrigger(PartiallyAssignedPattern(p, ass), h), ks)
   }
 
   private def collectTriggers[L <: HList](rel: Rel[L], row: L): List[K[Unit]] =
@@ -150,11 +149,12 @@ object RelDB {
   )
 
   implicit def interpreter: StateInterpreter.Aux[RelLang, RelDB] = new CleanStateInterpreter[RelLang, RelDB] {
-    def step[K[_] : Applicative]: RelLang[K, ?] ~> λ[A => scalaz.State[RelDB[K], K[A]]] = new (RelLang[K, ?] ~> λ[A => scalaz.State[RelDB[K], K[A]]]) {
-      override def apply[A](f: RelLang[K, A]): scalaz.State[RelDB[K], K[A]] = f match {
-        case r @ Relate(rel, values) => scalaz.State(db => db.into(rel)(r.ordersWitness).insert(values)(r.orders, Applicative[K]))
-        case OnPatternMatch(p, a, h) => scalaz.State(db => db.addOnPatternMatch(p, a)(h))
+    def step[K[_]]: RelLang[K, ?] ~> λ[A => scalaz.State[RelDB[K], (A, List[K[Unit]])]] =
+      new (RelLang[K, ?] ~> λ[A => scalaz.State[RelDB[K], (A, List[K[Unit]])]]) {
+        override def apply[A](f: RelLang[K, A]): scalaz.State[RelDB[K], (A, List[K[Unit]])] = f match {
+          case r @ Relate(rel, values) => scalaz.State(db => db.into(rel)(r.ordersWitness).insert(values)(r.orders) match { case (db1, ks) => (db1, ((), ks)) })
+          case OnPatternMatch(p, a, h) => scalaz.State(db => db.addOnPatternMatch(p, a)(h) match { case (db1, ks) => (db1, ((), ks)) })
+        }
       }
-    }
   }
 }
