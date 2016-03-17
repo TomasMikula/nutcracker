@@ -9,14 +9,13 @@ import scalaz.syntax.applicative._
 trait StateInterpreter[F[_[_], _]] {
   type State[K[_]]
 
-  def step[K[_]]: F[K, ?] ~> λ[A => scalaz.State[State[K], (A, List[K[Unit]])]]
+  def step: F ~~> λ[(K[_], A) => scalaz.State[State[K], (A, List[K[Unit]])]]
   def uncons[K[_]]: StateT[Option, State[K], List[K[Unit]]]
 
-  final def stepM[K[_], M[_]: Monad]: F[K, ?] ~> λ[A => StateT[M, State[K], (A, List[K[Unit]])]] =
-    new (F[K, ?] ~> λ[A => StateT[M, State[K], (A, List[K[Unit]])]]) {
-      val stepK = step[K]
-      def apply[A](fa: F[K, A]): StateT[M, State[K], (A, List[K[Unit]])] = {
-        val st = stepK(fa)
+  final def stepM[M[_]: Monad]: F[?[_], ?] ~~> λ[(K[_], A) => StateT[M, State[K], (A, List[K[Unit]])]] =
+    new (F[?[_], ?] ~~> λ[(K[_], A) => StateT[M, State[K], (A, List[K[Unit]])]]) {
+      def apply[K[_], A](fa: F[K, A]): StateT[M, State[K], (A, List[K[Unit]])] = {
+        val st = step(fa)
         StateT(s => st(s).point[M])
       }
     }
@@ -26,7 +25,7 @@ trait StateInterpreter[F[_[_], _]] {
 
   final def :+:[G[_[_], _]](i2: StateInterpreter[G]) = compose(i2)
 
-  def get[M[_]: Monad](): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] = StateInterpreter(stepM[FreeK[F, ?], M], uncons[FreeK[F, ?]])
+  def get[M[_]: Monad](): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] = StateInterpreter(stepM[M].papply[FreeK[F, ?]], uncons[FreeK[F, ?]])
 
   def get[G[_[_], _], M[_]: Monad](
     ig: G ~>> M
@@ -40,7 +39,7 @@ trait StateInterpreter[F[_[_], _]] {
           MonadTrans[StateT[?[_], State[FreeK[H, ?]], ?]].liftM(ma)
         }
       }
-    val trF: F[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]] = stepM[FreeK[H, ?], M]
+    val trF: F[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]] = stepM[M].papply[FreeK[H, ?]]
     val trH: H[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]] =
       CoproductK.transform[G, F, FreeK[H, ?], λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]]](trG, trF)
     StateInterpreter[H, State, M](trH, uncons[FreeK[H, ?]])
@@ -100,13 +99,13 @@ object StateInterpreter {
 
     new StateInterpreter[F] {
       type State[K[_]] = ProductK[i1.State, i2.State, K]
-      def step[K[_]]: F[K, ?] ~> λ[A => scalaz.State[State[K], (A, List[K[Unit]])]] = {
-        val gLens = ProductK.leftLensZ[i1.State, i2.State, K]
-        val hLens = ProductK.rightLensZ[i1.State, i2.State, K]
-        new (F[K, ?] ~> λ[A => scalaz.State[State[K], (A, List[K[Unit]])]]) {
-          override def apply[A](f: F[K, A]): scalaz.State[State[K], (A, List[K[Unit]])] = f.run match {
-            case -\/(g) => i1.step[K].apply(g).zoom(gLens)
-            case \/-(h) => i2.step[K].apply(h).zoom(hLens)
+      def step: F ~~> λ[(K[_], A) => scalaz.State[State[K], (A, List[K[Unit]])]] = {
+        val gLens = ProductK.leftLensZK[i1.State, i2.State]
+        val hLens = ProductK.rightLensZK[i1.State, i2.State]
+        new (F ~~> λ[(K[_], A) => scalaz.State[State[K], (A, List[K[Unit]])]]) {
+          override def apply[K[_], A](f: F[K, A]): scalaz.State[State[K], (A, List[K[Unit]])] = f.run match {
+            case -\/(g) => i1.step.apply(g).zoom(gLens[K])
+            case \/-(h) => i2.step.apply(h).zoom(hLens[K])
           }
         }
       }
@@ -123,11 +122,11 @@ object StateInterpreter {
     new StateInterpreter[CoyonedaK[F, ?[_], ?]] {
       type State[K[_]] = S[K]
 
-      def step[K[_]]: CoyonedaK[F, K, ?] ~> λ[A => scalaz.State[S[K], (A, List[K[Unit]])]] =
-        new (CoyonedaK[F, K, ?] ~> λ[A => scalaz.State[S[K], (A, List[K[Unit]])]]) {
-          override def apply[A](c: CoyonedaK[F, K, A]): scalaz.State[S[K], (A, List[K[Unit]])] = c match {
-            case CoyonedaK.Pure(fa) => i.step[K].apply(fa)
-            case CoyonedaK.Map(fx, f) => i.step[K].apply(fx) map { case (x, ku) => (f(x), ku) }
+      def step: CoyonedaK[F, ?[_], ?] ~~> λ[(K[_], A) => scalaz.State[S[K], (A, List[K[Unit]])]] =
+        new (CoyonedaK[F, ?[_], ?] ~~> λ[(K[_], A) => scalaz.State[S[K], (A, List[K[Unit]])]]) {
+          override def apply[K[_], A](c: CoyonedaK[F, K, A]): scalaz.State[S[K], (A, List[K[Unit]])] = c match {
+            case CoyonedaK.Pure(fa) => i.step.apply(fa)
+            case CoyonedaK.Map(fx, f) => i.step.apply(fx) map { case (x, ku) => (f(x), ku) }
           }
         }
 

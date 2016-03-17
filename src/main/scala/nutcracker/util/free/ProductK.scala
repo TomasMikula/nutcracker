@@ -1,6 +1,7 @@
 package nutcracker.util.free
 
 import monocle.Lens
+import nutcracker.util.ValK
 
 import scala.language.higherKinds
 import scalaz.Monoid
@@ -22,11 +23,23 @@ object ProductK {
   implicit def leftLensZ[F[_[_]], G[_[_]], K[_]]: scalaz.Lens[ProductK[F, G, K], F[K]] =
     scalaz.Lens[ProductK[F, G, K], F[K]](pk => scalaz.Store(fk => pk.update_1(fk), pk._1))
 
+  implicit def leftLensZK[F[_[_]], G[_[_]]]: ValK[λ[K[_] => scalaz.Lens[ProductK[F, G, K], F[K]]]] =
+    new ValK[λ[K[_] => scalaz.Lens[ProductK[F, G, K], F[K]]]] {
+      def compute[K[_]]: scalaz.Lens[ProductK[F, G, K], F[K]] =
+        scalaz.Lens[ProductK[F, G, K], F[K]] (pk => scalaz.Store (fk => pk.update_1 (fk), pk._1) )
+    }
+
   implicit def rightLens[F[_[_]], G[_[_]], K[_]]: Lens[ProductK[F, G, K], G[K]] =
     Lens[ProductK[F, G, K], G[K]](_._2)(gk => pk => pk.update_2(gk))
 
   implicit def rightLensZ[F[_[_]], G[_[_]], K[_]]: scalaz.Lens[ProductK[F, G, K], G[K]] =
     scalaz.Lens[ProductK[F, G, K], G[K]](pk => scalaz.Store(gk => pk.update_2(gk), pk._2))
+
+  implicit def rightLensZK[F[_[_]], G[_[_]]]: ValK[λ[K[_] => scalaz.Lens[ProductK[F, G, K], G[K]]]] =
+    new ValK[λ[K[_] => scalaz.Lens[ProductK[F, G, K], G[K]]]] {
+      def compute[K[_]]: scalaz.Lens[ProductK[F, G, K], G[K]] =
+        scalaz.Lens[ProductK[F, G, K], G[K]](pk => scalaz.Store(gk => pk.update_2(gk), pk._2))
+    }
 
   implicit def leftComposedLens[F[_[_]], G[_[_]], K[_], A](implicit lfa: Lens[F[K], A]): Lens[ProductK[F, G, K], A] =
     leftLens[F, G, K].composeLens(lfa)

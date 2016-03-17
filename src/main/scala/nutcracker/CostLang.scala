@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 
-import nutcracker.util.free.{ConstK, FreeK, FunctorKA, StateInterpreter}
+import nutcracker.util.free.{~~>, ConstK, FreeK, FunctorKA, StateInterpreter}
 import nutcracker.util.free.StateInterpreter.CleanStateInterpreter
 
 import scalaz.{~>, Monoid}
@@ -30,9 +30,9 @@ object CostLang {
   def interpreter[C: Monoid]: StateInterpreter.Aux[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] =
     new CleanStateInterpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] {
 
-      def step[K[_]]: CostLang[C, K, ?] ~> λ[A => scalaz.State[C, (A, List[K[Unit]])]] =
-        new (CostLang[C, K, ?] ~> λ[A => scalaz.State[C, (A, List[K[Unit]])]]) {
-          override def apply[A](f: CostLang[C, K, A]): scalaz.State[C, (A, List[K[Unit]])] = f match {
+      def step: CostLang[C, ?[_], ?] ~~> λ[(K[_], A) => scalaz.State[C, (A, List[K[Unit]])]] =
+        new (CostLang[C, ?[_], ?] ~~> λ[(K[_], A) => scalaz.State[C, (A, List[K[Unit]])]]) {
+          override def apply[K[_], A](f: CostLang[C, K, A]): scalaz.State[C, (A, List[K[Unit]])] = f match {
             case Cost(c1) => scalaz.State(c0 => (Monoid[C].append(c0, c1), ((), Nil)))
             case GetCost() => scalaz.State(c0 => (c0, (c0.asInstanceOf[A], Nil))) // XXX is there a way to convince scalac that C =:= A?
           }

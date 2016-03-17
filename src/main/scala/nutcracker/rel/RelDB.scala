@@ -5,7 +5,7 @@ import scala.language.higherKinds
 
 import nutcracker.rel.RelLang._
 import nutcracker.util.{TransformedIndex, Mapped}
-import nutcracker.util.free.StateInterpreter
+import nutcracker.util.free.{~~>, StateInterpreter}
 import nutcracker.util.free.StateInterpreter.CleanStateInterpreter
 
 import algebra.Order
@@ -149,9 +149,9 @@ object RelDB {
   )
 
   def interpreter: StateInterpreter.Aux[RelLang, RelDB] = new CleanStateInterpreter[RelLang, RelDB] {
-    def step[K[_]]: RelLang[K, ?] ~> λ[A => scalaz.State[RelDB[K], (A, List[K[Unit]])]] =
-      new (RelLang[K, ?] ~> λ[A => scalaz.State[RelDB[K], (A, List[K[Unit]])]]) {
-        override def apply[A](f: RelLang[K, A]): scalaz.State[RelDB[K], (A, List[K[Unit]])] = f match {
+    def step: RelLang ~~> λ[(K[_], A) => scalaz.State[RelDB[K], (A, List[K[Unit]])]] =
+      new (RelLang ~~> λ[(K[_], A) => scalaz.State[RelDB[K], (A, List[K[Unit]])]]) {
+        override def apply[K[_], A](f: RelLang[K, A]): scalaz.State[RelDB[K], (A, List[K[Unit]])] = f match {
           case r @ Relate(rel, values) => scalaz.State(db => db.into(rel)(r.ordersWitness).insert(values)(r.orders) match { case (db1, ks) => (db1, ((), ks)) })
           case OnPatternMatch(p, a, h) => scalaz.State(db => db.addOnPatternMatch(p, a)(h) match { case (db1, ks) => (db1, ((), ks)) })
         }

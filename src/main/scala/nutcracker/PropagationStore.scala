@@ -5,7 +5,7 @@ import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Stuck, Incomplete, Done, Failed}
 import nutcracker.util.Index
-import nutcracker.util.free.{FreeK, StateInterpreter}
+import nutcracker.util.free.{~~>, FreeK, StateInterpreter}
 import scalaz.Free.Trampoline
 import scalaz.StateT
 import scalaz.std.option._
@@ -187,9 +187,9 @@ object PropagationStore {
     new StateInterpreter[PropagationLang] {
       type State[K[_]] = PropagationStore[K]
 
-      def step[K[_]]: PropagationLang[K, ?] ~> λ[A => scalaz.State[State[K], (A, List[K[Unit]])]] =
-        new (PropagationLang[K, ?] ~> λ[A => scalaz.State[State[K], (A, List[K[Unit]])]]) {
-          override def apply[A](p: PropagationLang[K, A]): scalaz.State[PropagationStore[K], (A, List[K[Unit]])] = scalaz.State(s =>
+      def step: PropagationLang ~~> λ[(K[_], A) => scalaz.State[State[K], (A, List[K[Unit]])]] =
+        new (PropagationLang ~~> λ[(K[_], A) => scalaz.State[State[K], (A, List[K[Unit]])]]) {
+          override def apply[K[_], A](p: PropagationLang[K, A]): scalaz.State[PropagationStore[K], (A, List[K[Unit]])] = scalaz.State(s =>
             p match {
               case Variable(d, dom) => s.addVariable(d, dom) match {
                 case (s1, ref) => (s1, (ref, Nil))
