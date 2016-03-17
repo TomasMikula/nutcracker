@@ -148,7 +148,7 @@ object RelDB {
     TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel))
   )
 
-  implicit def interpreter: StateInterpreter.Aux[RelLang, RelDB] = new CleanStateInterpreter[RelLang, RelDB] {
+  def interpreter: StateInterpreter.Aux[RelLang, RelDB] = new CleanStateInterpreter[RelLang, RelDB] {
     def step[K[_]]: RelLang[K, ?] ~> λ[A => scalaz.State[RelDB[K], (A, List[K[Unit]])]] =
       new (RelLang[K, ?] ~> λ[A => scalaz.State[RelDB[K], (A, List[K[Unit]])]]) {
         override def apply[A](f: RelLang[K, A]): scalaz.State[RelDB[K], (A, List[K[Unit]])] = f match {

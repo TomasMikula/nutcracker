@@ -21,6 +21,11 @@ trait StateInterpreter[F[_[_], _]] {
       }
     }
 
+  final def compose[G[_[_], _]](i2: StateInterpreter[G]): StateInterpreter.Aux[CoproductK[G, F, ?[_], ?], ProductK[i2.State, State, ?[_]]] =
+    StateInterpreter.coproductInterpreter(i2, this)
+
+  final def :+:[G[_[_], _]](i2: StateInterpreter[G]) = compose(i2)
+
   def get[M[_]: Monad](): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] = StateInterpreter(stepM[FreeK[F, ?], M], uncons[FreeK[F, ?]])
 
   def get[G[_[_], _], M[_]: Monad](
@@ -86,7 +91,7 @@ object StateInterpreter {
     final def uncons[K[_]]: StateT[Option, S[K], List[K[Unit]]] = StateT[Option, S[K], List[K[Unit]]](s => None)
   }
 
-  implicit def coproductInterpreter[G[_[_], _], H[_[_], _]](implicit
+  def coproductInterpreter[G[_[_], _], H[_[_], _]](
     i1: StateInterpreter[G],
     i2: StateInterpreter[H]
   ): StateInterpreter.Aux[CoproductK[G, H, ?[_], ?], ProductK[i1.State, i2.State, ?[_]]] = {

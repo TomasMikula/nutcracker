@@ -27,7 +27,7 @@ object CostLang {
     }
   }
 
-  implicit def interpreter[C: Monoid]: StateInterpreter.Aux[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] =
+  def interpreter[C: Monoid]: StateInterpreter.Aux[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] =
     new CleanStateInterpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] {
 
       def step[K[_]]: CostLang[C, K, ?] ~> λ[A => scalaz.State[C, (A, List[K[Unit]])]] =

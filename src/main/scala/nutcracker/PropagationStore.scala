@@ -183,7 +183,7 @@ object PropagationStore {
     dirtySelections = Set()
   )
 
-  implicit def interpreter: StateInterpreter.Aux[PropagationLang, PropagationStore] =
+  val interpreter: StateInterpreter.Aux[PropagationLang, PropagationStore] =
     new StateInterpreter[PropagationLang] {
       type State[K[_]] = PropagationStore[K]
 

@@ -21,7 +21,7 @@ final class PropRelCost[C: NonDecreasingMonoid] {
   type State0[K[_]] = ProductK[RelDB, CostS, K]
   type State[K[_]] = ProductK[PropagationStore, State0, K]
 
-  val interpreter = implicitly[StateInterpreter.Aux[Vocabulary, State]].get[Trampoline]()
+  val interpreter = (PropagationStore.interpreter :+: RelDB.interpreter :+: CostLang.interpreter).get[Trampoline]()
   def propStore[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 

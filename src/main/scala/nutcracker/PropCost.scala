@@ -17,7 +17,7 @@ final class PropCost[C: NonDecreasingMonoid] {
   type Vocabulary[K[_], A] = CoproductK[PropagationLang, CostL, K, A]
   type State[K[_]] = ProductK[PropagationStore, CostS, K]
 
-  val interpreter = implicitly[StateInterpreter.Aux[Vocabulary, State]].get[Trampoline]()
+  val interpreter = (PropagationStore.interpreter :+: CostLang.interpreter).get[Trampoline]()
   def propStore[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
