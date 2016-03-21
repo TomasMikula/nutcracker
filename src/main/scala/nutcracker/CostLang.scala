@@ -1,11 +1,9 @@
 package nutcracker
 
 import scala.language.higherKinds
+import nutcracker.util.free._
 
-import nutcracker.util.free.{~~>, ConstK, FreeK, FunctorKA, StateInterpreter}
-import nutcracker.util.free.StateInterpreter.CleanStateInterpreter
-
-import scalaz.{~>, Monoid}
+import scalaz.{Monoid, State, ~>}
 
 sealed trait CostLang[C, K[_], A]
 
@@ -27,15 +25,11 @@ object CostLang {
     }
   }
 
-  def interpreter[C: Monoid]: StateInterpreter.Aux[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] =
-    new CleanStateInterpreter[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] {
-
-      def step: CostLang[C, ?[_], ?] ~~> λ[(K[_], A) => scalaz.State[C, (A, List[K[Unit]])]] =
-        new (CostLang[C, ?[_], ?] ~~> λ[(K[_], A) => scalaz.State[C, (A, List[K[Unit]])]]) {
-          override def apply[K[_], A](f: CostLang[C, K, A]): scalaz.State[C, (A, List[K[Unit]])] = f match {
-            case Cost(c1) => scalaz.State(c0 => (Monoid[C].append(c0, c1), ((), Nil)))
-            case GetCost() => scalaz.State(c0 => (c0, (c0.asInstanceOf[A], Nil))) // XXX is there a way to convince scalac that C =:= A?
-          }
-        }
-    }
+  def interpreter[C: Monoid]: StepT.Step[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] =
+    StepT.Step[CostLang[C, ?[_], ?], ConstK[C, ?[_]]](new (CostLang[C, ?[_], ?] ~~> λ[(K[_], A) => State[ConstK[C, K], (A, List[K[Unit]])]]) {
+      override def apply[K[_], A](f: CostLang[C, K, A]): State[C, (A, List[K[Unit]])] = f match {
+        case Cost(c1) => State(c0 => (Monoid[C].append(c0, c1), ((), Nil)))
+        case GetCost() => State(c0 => (c0, (c0.asInstanceOf[A], Nil))) // XXX is there a way to convince scalac that C =:= A?
+      }
+    })
 }

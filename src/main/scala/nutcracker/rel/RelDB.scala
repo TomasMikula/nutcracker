@@ -5,11 +5,11 @@ import scala.language.higherKinds
 
 import nutcracker.rel.RelLang._
 import nutcracker.util.{TransformedIndex, Mapped}
-import nutcracker.util.free.{~~>, StateInterpreter}
-import nutcracker.util.free.StateInterpreter.CleanStateInterpreter
+import nutcracker.util.free.~~>
+import nutcracker.util.free.StepT.Step
 
 import algebra.Order
-import scalaz.~>
+import scalaz.State
 import shapeless.HList
 
 import RelDB._
@@ -148,13 +148,10 @@ object RelDB {
     TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel))
   )
 
-  def interpreter: StateInterpreter.Aux[RelLang, RelDB] = new CleanStateInterpreter[RelLang, RelDB] {
-    def step: RelLang ~~> λ[(K[_], A) => scalaz.State[RelDB[K], (A, List[K[Unit]])]] =
-      new (RelLang ~~> λ[(K[_], A) => scalaz.State[RelDB[K], (A, List[K[Unit]])]]) {
-        override def apply[K[_], A](f: RelLang[K, A]): scalaz.State[RelDB[K], (A, List[K[Unit]])] = f match {
-          case r @ Relate(rel, values) => scalaz.State(db => db.into(rel)(r.ordersWitness).insert(values)(r.orders) match { case (db1, ks) => (db1, ((), ks)) })
-          case OnPatternMatch(p, a, h) => scalaz.State(db => db.addOnPatternMatch(p, a)(h) match { case (db1, ks) => (db1, ((), ks)) })
-        }
-      }
-  }
+  def interpreter: Step[RelLang, RelDB] = Step(new (RelLang ~~> λ[(K[_], A) => State[RelDB[K], (A, List[K[Unit]])]]) {
+    override def apply[K[_], A](f: RelLang[K, A]): State[RelDB[K], (A, List[K[Unit]])] = f match {
+      case r @ Relate(rel, values) => State(db => db.into(rel)(r.ordersWitness).insert(values)(r.orders) match { case (db1, ks) => (db1, ((), ks)) })
+      case OnPatternMatch(p, a, h) => State(db => db.addOnPatternMatch(p, a)(h) match { case (db1, ks) => (db1, ((), ks)) })
+    }
+  })
 }

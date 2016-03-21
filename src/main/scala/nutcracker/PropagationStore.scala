@@ -1,17 +1,18 @@
 package nutcracker
 
 import scala.language.{existentials, higherKinds}
-
 import monocle.Lens
-import nutcracker.Assessment.{Stuck, Incomplete, Done, Failed}
+import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
 import nutcracker.util.Index
-import nutcracker.util.free.{~~>, FreeK, StateInterpreter}
+import nutcracker.util.free.{FreeK, StateInterpreterT, ~~>}
+
 import scalaz.Free.Trampoline
+import scalaz.Id._
 import scalaz.StateT
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
-
 import Domain._
+import nutcracker.util.free.StepT.Step
 
 case class PropagationStore[K[_]] private(
   nextId: Long,
@@ -183,12 +184,12 @@ object PropagationStore {
     dirtySelections = Set()
   )
 
-  val interpreter: StateInterpreter.Aux[PropagationLang, PropagationStore] =
-    new StateInterpreter[PropagationLang] {
+  val interpreter: StateInterpreterT.StateInterpreter.Aux[PropagationLang, PropagationStore] =
+    new StateInterpreterT.StateInterpreter[PropagationLang] {
       type State[K[_]] = PropagationStore[K]
 
-      def step: PropagationLang ~~> λ[(K[_], A) => scalaz.State[State[K], (A, List[K[Unit]])]] =
-        new (PropagationLang ~~> λ[(K[_], A) => scalaz.State[State[K], (A, List[K[Unit]])]]) {
+      def step: Step[PropagationLang, State] =
+        Step(new (PropagationLang ~~> λ[(K[_], A) => scalaz.State[State[K], (A, List[K[Unit]])]]) {
           override def apply[K[_], A](p: PropagationLang[K, A]): scalaz.State[PropagationStore[K], (A, List[K[Unit]])] = scalaz.State(s =>
             p match {
               case Variable(d, dom) => s.addVariable(d, dom) match {
@@ -209,7 +210,7 @@ object PropagationStore {
               }
             }
           )
-        }
+        })
 
       def uncons[K[_]]: StateT[Option, PropagationStore[K], List[K[Unit]]] = StateT(_.uncons)
     }
@@ -244,9 +245,9 @@ object PropagationStore {
   private def fetch: Promised ~> (PropagationStore[FreeK[PropagationLang, ?]] => ?) = new ~>[Promised, PropagationStore[FreeK[PropagationLang, ?]] => ?] {
     def apply[A](pa: Promised[A]): (PropagationStore[FreeK[PropagationLang, ?]] => A) = s => s.fetchResult(pa).get
   }
-  def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Trampoline, Promised] =
-    new DFSSolver[PropagationLang, PropagationStore, Trampoline, Promised](
-      interpreter.get[Trampoline](),
+  def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Id, Promised] =
+    new DFSSolver[PropagationLang, PropagationStore, Id, Promised](
+      interpreter.get,
       empty[FreeK[PropagationLang, ?]],
       naiveAssess[FreeK[PropagationLang, ?]],
       fetch)

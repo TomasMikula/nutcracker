@@ -106,7 +106,7 @@ class PathSearch extends FunSuite {
 
     type Stream[A] = StreamT[Id, A]
 
-    val paths = solver.solutions(findPath('A, 'K)).toStream.run.toList
+    val paths = solver.solutions(findPath('A, 'K)).toStream.toList
 
     assertResult(List(
       (path('A, 'B, 'D, 'H, 'K), 15),

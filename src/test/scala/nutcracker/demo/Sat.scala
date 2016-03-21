@@ -29,7 +29,7 @@ class Sat extends FunSpec {
 
     } yield a) >>>= { promiseResults(_) }
 
-    val solutions = solver.solutions(problem).toStream.run.toList
+    val solutions = solver.solutions(problem).toStream.toList
 
     it("should have 4 solutions") {
       assertResult(4)(solutions.size)

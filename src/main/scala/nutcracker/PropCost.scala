@@ -7,7 +7,7 @@ import nutcracker.algebraic.NonDecreasingMonoid
 import nutcracker.util.free._
 import nutcracker.util.free.ProductK._
 
-import scalaz.Free.Trampoline
+import scalaz.Id._
 import scalaz.~>
 
 final class PropCost[C: NonDecreasingMonoid] {
@@ -17,7 +17,7 @@ final class PropCost[C: NonDecreasingMonoid] {
   type Vocabulary[K[_], A] = CoproductK[PropagationLang, CostL, K, A]
   type State[K[_]] = ProductK[PropagationStore, CostS, K]
 
-  val interpreter = (PropagationStore.interpreter :+: CostLang.interpreter).get[Trampoline]()
+  val interpreter = (PropagationStore.interpreter :+: CostLang.interpreter[C]).get
   def propStore[K[_]]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
@@ -29,6 +29,6 @@ final class PropCost[C: NonDecreasingMonoid] {
   private def getCost: State[Q] => C = s => cost[Q].get(s)
   private def emptyState: State[Q] = PropagationStore.empty[Q] :*: (NonDecreasingMonoid[C].zero: CostS[Q])
 
-  def dfsSolver: DFSSolver[Vocabulary, State, Trampoline, Promised] = new DFSSolver[Vocabulary, State, Trampoline, Promised](interpreter, emptyState, naiveAssess, fetch)
-  def bfsSolver: BFSSolver[Vocabulary, State, Trampoline, Promised, C] = new BFSSolver[Vocabulary, State, Trampoline, Promised, C](interpreter, emptyState, naiveAssess, fetch, getCost)
+  def dfsSolver: DFSSolver[Vocabulary, State, Id, Promised] = new DFSSolver[Vocabulary, State, Id, Promised](interpreter, emptyState, naiveAssess, fetch)
+  def bfsSolver: BFSSolver[Vocabulary, State, Id, Promised, C] = new BFSSolver[Vocabulary, State, Id, Promised, C](interpreter, emptyState, naiveAssess, fetch, getCost)
 }

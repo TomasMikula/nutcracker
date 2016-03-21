@@ -173,5 +173,5 @@ object PropagationLang {
     }
   }
 
-  implicit def interpreter: StateInterpreter.Aux[PropagationLang, PropagationStore] = PropagationStore.interpreter
+  implicit def interpreter: StateInterpreterT.StateInterpreter.Aux[PropagationLang, PropagationStore] = PropagationStore.interpreter
 }
