@@ -4,7 +4,7 @@ version := "0.1-SNAPSHOT"
 
 organization := "com.github.tomasmikula"
 
-scalaVersion := "2.11.7"
+scalaVersion := "2.11.8"
 
 
 resolvers += "bintray/non" at "http://dl.bintray.com/non/maven"
@@ -13,7 +13,7 @@ resolvers += Resolver.sonatypeRepo("releases")
 autoCompilerPlugins := true
 addCompilerPlugin("com.lihaoyi" %% "acyclic" % "0.1.3")
 addCompilerPlugin("org.spire-math" % "kind-projector" % "0.6.0" cross CrossVersion.binary)
-addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0-M5" cross CrossVersion.full)
+addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.12")
 
 scalastyleFailOnError := true
