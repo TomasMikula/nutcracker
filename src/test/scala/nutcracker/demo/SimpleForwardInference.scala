@@ -7,7 +7,7 @@ import nutcracker.PropRel
 import nutcracker.PropagationLang._
 import nutcracker.rel.Pattern
 import nutcracker.rel.RelLang._
-import nutcracker.util.free._
+import nutcracker.util.FreeK
 import org.scalatest.{Matchers, FunSpec}
 import scalaz.NonEmptyList
 import shapeless.{::, HNil}

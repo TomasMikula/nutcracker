@@ -4,9 +4,11 @@ import scala.language.existentials
 import scala.language.higherKinds
 
 import shapeless._
-import shapeless.poly.{~>, ~>>}
+import shapeless.poly.~>
 
 trait Mapped[L <: HList, F[_]] extends Serializable {
+  import shapeless.poly.~>>
+
   type Out <: HList
 
   def extract(l: Out, f: F ~> Id): L
@@ -16,6 +18,8 @@ trait Mapped[L <: HList, F[_]] extends Serializable {
 }
 
 object Mapped {
+  import shapeless.poly.~>>
+
   def apply[L <: HList, F[_]](implicit mapped: Mapped[L, F]): Aux[L, F, mapped.Out] = mapped
 
   type Aux[L <: HList, F[_], Out0 <: HList] = Mapped[L, F] { type Out = Out0 }

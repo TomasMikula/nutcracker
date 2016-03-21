@@ -1,11 +1,11 @@
-package nutcracker.util.free
+package nutcracker.util
 
 import scala.language.higherKinds
 
 import scalaz.~>
 
 trait TransformKA[F[_[_], _], G[_[_], _]] {
-  import nutcracker.util.free.TransformKA._
+  import nutcracker.util.TransformKA._
 
   def apply[K[_], A](f: F[K, A]): G[K, A]
   def papply[K[_]]: F[K, ?] ~> G[K, ?] = PAppliedTransformKA(this)

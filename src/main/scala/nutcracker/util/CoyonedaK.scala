@@ -1,7 +1,7 @@
-package nutcracker.util.free
+package nutcracker.util
 
 import scala.language.higherKinds
-import scalaz.{~>, Functor}
+import scalaz.{Functor, ~>}
 
 sealed trait CoyonedaK[F[_[_], _], K[_], A] {
 

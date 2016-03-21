@@ -4,9 +4,8 @@ import scala.language.existentials
 import scala.language.higherKinds
 
 import nutcracker.rel.RelLang._
-import nutcracker.util.{TransformedIndex, Mapped}
-import nutcracker.util.free.~~>
-import nutcracker.util.free.StepT.Step
+import nutcracker.util.{~~>, TransformedIndex, Mapped}
+import nutcracker.util.StepT.Step
 
 import algebra.Order
 import scalaz.State

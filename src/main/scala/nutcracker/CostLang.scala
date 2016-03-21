@@ -1,7 +1,7 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.util.free._
+import nutcracker.util.{~~>, ConstK, FreeK, FunctorKA, StepT}
 
 import scalaz.{Monoid, State, ~>}
 

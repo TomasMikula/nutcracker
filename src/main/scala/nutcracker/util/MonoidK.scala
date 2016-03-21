@@ -1,7 +1,6 @@
-package nutcracker.util.free
+package nutcracker.util
 
 import scala.language.higherKinds
-
 import scalaz.Monoid
 
 /** This is similar to `cats.MonoidK`,

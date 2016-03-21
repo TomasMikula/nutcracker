@@ -1,7 +1,6 @@
-package nutcracker.util.free
+package nutcracker.util
 
 import scala.language.higherKinds
-
 import scalaz.~>
 
 trait FunctorK[F[_[_]]] {

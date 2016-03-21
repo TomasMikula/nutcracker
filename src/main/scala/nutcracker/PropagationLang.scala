@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 
 import algebra.lattice.{BoundedMeetSemilattice, GenBool}
-import nutcracker.util.free._
+import nutcracker.util.{FreeK, FunctorK, FunctorKA, InjectK, StateInterpreterT}
 import shapeless.{::, HNil, Sized, Nat, HList}
 import scalaz._
 import scalaz.std.vector._

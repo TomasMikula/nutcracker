@@ -5,7 +5,7 @@ import cats.std.vector._
 import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolDomain
 import nutcracker.lib.bool.BoolDomain._
-import nutcracker.util.free._
+import nutcracker.util.FreeK
 
 import algebra.lattice.GenBool
 import scalaz.Traverse

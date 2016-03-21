@@ -2,7 +2,7 @@ package nutcracker.lib
 
 import scala.language.higherKinds
 
-import nutcracker.util.free.{InjectK, FreeK}
+import nutcracker.util.{InjectK, FreeK}
 import nutcracker.{PropagationLang, DomRef}
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._

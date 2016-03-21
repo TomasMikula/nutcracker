@@ -4,7 +4,7 @@ import nutcracker.{PropCost, PropagationLang, Promised}
 import nutcracker.CostLang._
 import nutcracker.PropagationLang._
 import nutcracker.algebraic.NonDecreasingMonoid
-import nutcracker.util.free.{FreeK, InjectK}
+import nutcracker.util.{FreeK, InjectK}
 import org.scalatest.FunSuite
 
 import scala.annotation.tailrec

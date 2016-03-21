@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.util.free.{FreeK, FunctorK}
+import nutcracker.util.{FreeK, FunctorK}
 
 import scala.language.higherKinds
 import scalaz.~>

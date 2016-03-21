@@ -3,16 +3,14 @@ package nutcracker
 import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.Index
-import nutcracker.util.free.{FreeK, StateInterpreterT, ~~>}
+import nutcracker.util.{FreeK, Index, StateInterpreterT, ~~>}
+import nutcracker.util.StepT.Step
 
-import scalaz.Free.Trampoline
 import scalaz.Id._
 import scalaz.StateT
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
 import Domain._
-import nutcracker.util.free.StepT.Step
 
 case class PropagationStore[K[_]] private(
   nextId: Long,

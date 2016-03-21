@@ -2,9 +2,8 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.Assessment._
-import nutcracker.util.free.FreeK
+import nutcracker.util.FreeK
 
-import scalaz.Free.Trampoline
 import scalaz.Id._
 import scalaz.{Monad, StateT, StreamT, ~>}
 import scalaz.syntax.monad._

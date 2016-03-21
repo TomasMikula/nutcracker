@@ -1,7 +1,6 @@
-package nutcracker.util.free
+package nutcracker.util
 
 import monocle.Lens
-import nutcracker.util.ValK
 
 import scala.language.higherKinds
 import scalaz.Monoid

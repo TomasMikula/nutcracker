@@ -2,8 +2,7 @@ package nutcracker.rel
 
 import algebra.Order
 import nutcracker.rel.RelDB.PartiallyAssignedPattern
-import nutcracker.util.{Mapped, SummonHList}
-import nutcracker.util.free._
+import nutcracker.util.{FreeK, FunctorKA, InjectK, Mapped, StepT, SummonHList}
 
 import scala.language.higherKinds
 import shapeless.HList

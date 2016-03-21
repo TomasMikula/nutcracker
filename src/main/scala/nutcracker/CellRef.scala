@@ -5,7 +5,7 @@ import scala.language.implicitConversions
 
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._
-import nutcracker.util.free.{InjectK, FreeK}
+import nutcracker.util.{InjectK, FreeK}
 
 import scalaz.Cont
 

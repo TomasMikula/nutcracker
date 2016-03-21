@@ -5,8 +5,8 @@ import scala.language.higherKinds
 import monocle.Lens
 import nutcracker.algebraic.NonDecreasingMonoid
 import nutcracker.rel.{RelDB, RelLang}
-import nutcracker.util.free._
-import nutcracker.util.free.ProductK._
+import nutcracker.util.{ConstK, CoproductK, FreeK, ProductK}
+import nutcracker.util.ProductK._
 
 import scalaz.Id._
 import scalaz.~>

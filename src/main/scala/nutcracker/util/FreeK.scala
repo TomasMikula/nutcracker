@@ -1,4 +1,4 @@
-package nutcracker.util.free
+package nutcracker.util
 
 import scala.language.{higherKinds, implicitConversions}
 import scalaz._

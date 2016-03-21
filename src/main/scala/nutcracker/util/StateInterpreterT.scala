@@ -1,7 +1,7 @@
-package nutcracker.util.free
+package nutcracker.util
 
 import scala.language.higherKinds
-import scalaz._
+import scalaz.{Id => _, _}
 import scalaz.Id._
 import scalaz.std.option._
 import scalaz.syntax.applicative._

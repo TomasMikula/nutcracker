@@ -2,7 +2,7 @@ package nutcracker
 
 import nutcracker.Assessment._
 import nutcracker.algebraic.NonDecreasingMonoid
-import nutcracker.util.free.FreeK
+import nutcracker.util.FreeK
 
 import scala.annotation.tailrec
 import scala.language.higherKinds
