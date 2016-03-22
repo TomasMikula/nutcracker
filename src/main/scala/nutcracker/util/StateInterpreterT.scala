@@ -12,10 +12,10 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
   def step: StepT[M, F, State]
   def uncons: Uncons[State]
 
-  final def :+:[G[_[_], _]](i2: StateInterpreterT[M, G])(implicit M: Functor[M]): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], ProductK[i2.State, State, ?[_]]] =
+  final def :*:[G[_[_], _]](i2: StateInterpreterT[M, G])(implicit M: Functor[M]): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], ProductK[i2.State, State, ?[_]]] =
     StateInterpreterT.coproductInterpreter(i2, this)
 
-  final def :+:[G[_[_], _], S[_[_]]](
+  final def :*:[G[_[_], _], S[_[_]]](
     i2: StepT[M, G, S]
   )(implicit
     M: Functor[M]
@@ -23,7 +23,7 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
     type H[K[_], A] = CoproductK[G, F, K, A]
     new StateInterpreterT[M, H] {
       type State[K[_]] = ProductK[S, self.State, K]
-      def step: StepT[M, H, State] = i2 :+: self.step
+      def step: StepT[M, H, State] = i2 :*: self.step
       def uncons: Uncons[State] = self.uncons.zoomOut[State](ProductK.rightLensZK[S, self.State])
     }
   }
@@ -112,7 +112,7 @@ object StateInterpreterT {
 
     new StateInterpreterT[M, F] {
       type State[K[_]] = ProductK[i1.State, i2.State, K]
-      def step: StepT[M, F, State] = i1.step :+: i2.step
+      def step: StepT[M, F, State] = i1.step :*: i2.step
 
       def uncons: Uncons[State] = {
         val uncons1 = i1.uncons.zoomOut[State](ProductK.leftLensZK[i1.State, i2.State])
@@ -148,7 +148,7 @@ final case class StepT[M[_], F[_[_], _], S[_[_]]](
 
   final def apply[K[_], A](f: F[K, A]): StateT[M, S[K], (A, List[K[Unit]])] = run(f)
 
-  def :+:[G[_[_], _], T[_[_]]](
+  def :*:[G[_[_], _], T[_[_]]](
     that: StepT[M, G, T]
   )(implicit
     M: Functor[M]
@@ -166,7 +166,7 @@ final case class StepT[M[_], F[_[_], _], S[_[_]]](
     })
   }
 
-  final def :+:[G[_[_], _]](
+  final def :*:[G[_[_], _]](
     ig: StateInterpreterT[M, G]
   )(implicit
     M: Functor[M]
@@ -174,7 +174,7 @@ final case class StepT[M[_], F[_[_], _], S[_[_]]](
     type H[K[_], A] = CoproductK[G, F, K, A]
     new StateInterpreterT[M, H] {
       type State[K[_]] = ProductK[ig.State, S, K]
-      def step: StepT[M, H, State] = ig.step :+: self
+      def step: StepT[M, H, State] = ig.step :*: self
       def uncons: Uncons[State] =
         ig.uncons.zoomOut[State](ProductK.leftLensZK[ig.State, S])
     }
