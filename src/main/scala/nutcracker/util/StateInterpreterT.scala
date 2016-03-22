@@ -28,20 +28,17 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
     }
   }
 
-  def get(implicit M: Monad[M]): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] =
-    StateInterpreterT(step, uncons)
-
-  def get[G[_[_], _]](
+  def :+:[G[_[_], _]](
     ig: G ~>> M
   )(implicit
     M: Monad[M]
-  ): FreeK[CoproductK[G, F, ?[_], ?], ?] ~> StateT[M, State[FreeK[CoproductK[G, F, ?[_], ?], ?]], ?] = {
-    type H[K[_], A] = CoproductK[G, F, K, A]
-    implicit val fm: Monad[FreeK[H, ?]] = FreeK.freeKMonad[H]
+  ): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], State] = {
     val stepG: StepT[M, G, State] = StepT.lift[M, G, State](ig)
-    val stepH: StepT[M, H, State] =
-      StepT[M, H, State](CoproductK.transformKA[G, F, λ[(K[_], A) => StateT[M, State[K], (A, List[K[Unit]])]]](stepG.run, step.run))
-    StateInterpreterT[M, H, State](stepH, uncons)
+    new StateInterpreterT[M, CoproductK[G, F, ?[_], ?]] {
+      type State[K[_]] = self.State[K]
+      def step = stepG :+: self.step
+      def uncons = self.uncons
+    }
   }
 
   def hoist[N[_]](mn: M ~> N)(implicit M: Monad[M], N: Monad[N]): StateInterpreterT.Aux[N, F, State] =
@@ -54,6 +51,9 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
       })
       def uncons: Uncons[State] = self.uncons
     }
+
+  def get(implicit M: Monad[M]): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] =
+    StateInterpreterT(step, uncons)
 }
 
 object StateInterpreterT {
@@ -179,6 +179,11 @@ final case class StepT[M[_], F[_[_], _], S[_[_]]](
         ig.uncons.zoomOut[State](ProductK.leftLensZK[ig.State, S])
     }
   }
+
+  def :+:[G[_[_], _]](that: StepT[M, G, S]): StepT[M, CoproductK[G, F, ?[_], ?], S] =
+    StepT[M, CoproductK[G, F, ?[_], ?], S](
+      CoproductK.transformKA[G, F, λ[(K[_], A) => StateT[M, S[K], (A, List[K[Unit]])]]](that.run, self.run)
+    )
 }
 
 object StepT {
