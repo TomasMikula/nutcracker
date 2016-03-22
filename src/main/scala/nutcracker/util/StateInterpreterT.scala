@@ -39,17 +39,23 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
     type H[K[_], A] = CoproductK[G, F, K, A]
     implicit val fm: Monad[FreeK[H, ?]] = FreeK.freeKMonad[H]
     val trG: G[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]] =
-      new (G[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]]) {
-        def apply[A](ga: G[FreeK[H, ?], A]): StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])] = {
-          val ma = ig.apply[FreeK[H, ?], A](ga) map { (_, List.empty[FreeK[H, Unit]]) }
-          MonadTrans[StateT[?[_], State[FreeK[H, ?]], ?]].liftM(ma)
-        }
-      }
-    val trF: F[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]] = step.run.papply[FreeK[H, ?]]
+      StepT.lift[M, G, State](ig).run.papply[FreeK[H, ?]]
+    val trF: F[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]] =
+      step.run.papply[FreeK[H, ?]]
     val trH: H[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]] =
       CoproductK.transform[G, F, FreeK[H, ?], λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]]](trG, trF)
     StateInterpreterT[M, H, State](trH, uncons[FreeK[H, ?]])
   }
+
+  def hoist[N[_]](mn: M ~> N): StateInterpreterT.Aux[N, F, State] =
+    new StateInterpreterT[N, F] {
+      type State[K[_]] = self.State[K]
+
+      def step: StepT[N, F, State] = StepT(new (F ~~> λ[(K[_], A) => StateT[N, State[K], (A, List[K[Unit]])]]) {
+        override def apply[K[_], A](f: F[K, A]): StateT[N, State[K], (A, List[K[Unit]])] = ???
+      })
+      def uncons[K[_]]: StateT[Option, State[K], List[K[Unit]]] = self.uncons[K]
+    }
 }
 
 object StateInterpreterT {
@@ -136,7 +142,9 @@ object StateInterpreterT {
 }
 
 
-final case class StepT[M[_], F[_[_], _], S[_[_]]](run: F ~~> λ[(K[_], A) => StateT[M, S[K], (A, List[K[Unit]])]]) extends AnyVal { self =>
+final case class StepT[M[_], F[_[_], _], S[_[_]]](
+  run: F ~~> λ[(K[_], A) => StateT[M, S[K], (A, List[K[Unit]])]]
+) extends AnyVal { self =>
 
   final def apply[K[_], A](f: F[K, A]): StateT[M, S[K], (A, List[K[Unit]])] = run(f)
 
@@ -174,6 +182,13 @@ final case class StepT[M[_], F[_[_], _], S[_[_]]](run: F ~~> λ[(K[_], A) => Sta
 }
 
 object StepT {
+
+  def lift[M[_]: Monad, F[_[_], _], S[_[_]]](fm: F ~>> M): StepT[M, F, S] =
+    StepT(new (F ~~> λ[(K[_], A) => StateT[M, S[K], (A, List[K[Unit]])]]) {
+      override def apply[K[_], A](f: F[K, A]): StateT[M, S[K], (A, List[K[Unit]])] =
+        MonadTrans[StateT[?[_], S[K], ?]].liftM(fm(f)).map(a => (a, List.empty[K[Unit]]))
+    })
+
   type Step[F[_[_], _], S[_[_]]] = StepT[Id, F, S]
   object Step {
     def apply[F[_[_], _], S[_[_]]](run: F ~~> λ[(K[_], A) => State[S[K], (A, List[K[Unit]])]]): Step[F, S] = StepT[Id, F, S](run)
