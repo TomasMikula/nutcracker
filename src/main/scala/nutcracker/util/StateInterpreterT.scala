@@ -52,8 +52,8 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
       def uncons: Uncons[State] = self.uncons
     }
 
-  def get(implicit M: Monad[M]): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] =
-    StateInterpreterT(step, uncons)
+  def freeInstance(implicit M: Monad[M]): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] =
+    StateInterpreterT.freeInstance(step, uncons)
 }
 
 object StateInterpreterT {
@@ -65,7 +65,7 @@ object StateInterpreterT {
     type Aux[F[_[_], _], S[_[_]]] = StateInterpreterT.Aux[Id, F, S]
   }
 
-  def apply[M[_], F[_[_], _], S[_[_]]](
+  def freeInstance[M[_], F[_[_], _], S[_[_]]](
     step: StepT[M, F, S],
     uncons: Uncons[S]
   )(implicit

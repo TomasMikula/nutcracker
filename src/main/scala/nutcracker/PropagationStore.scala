@@ -249,7 +249,7 @@ object PropagationStore {
   }
   def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Id, Promised] =
     new DFSSolver[PropagationLang, PropagationStore, Id, Promised](
-      interpreter.get,
+      interpreter.freeInstance,
       empty[FreeK[PropagationLang, ?]],
       naiveAssess[FreeK[PropagationLang, ?]],
       fetch)
