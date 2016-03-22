@@ -29,7 +29,7 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
   }
 
   def get(implicit M: Monad[M]): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] =
-    StateInterpreterT(step.run.papply[FreeK[F, ?]], uncons)
+    StateInterpreterT(step, uncons)
 
   def get[G[_[_], _]](
     ig: G ~>> M
@@ -38,13 +38,10 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
   ): FreeK[CoproductK[G, F, ?[_], ?], ?] ~> StateT[M, State[FreeK[CoproductK[G, F, ?[_], ?], ?]], ?] = {
     type H[K[_], A] = CoproductK[G, F, K, A]
     implicit val fm: Monad[FreeK[H, ?]] = FreeK.freeKMonad[H]
-    val trG: G[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]] =
-      StepT.lift[M, G, State](ig).run.papply[FreeK[H, ?]]
-    val trF: F[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]] =
-      step.run.papply[FreeK[H, ?]]
-    val trH: H[FreeK[H, ?], ?] ~> λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]] =
-      CoproductK.transform[G, F, FreeK[H, ?], λ[A => StateT[M, State[FreeK[H, ?]], (A, List[FreeK[H, Unit]])]]](trG, trF)
-    StateInterpreterT[M, H, State](trH, uncons)
+    val stepG: StepT[M, G, State] = StepT.lift[M, G, State](ig)
+    val stepH: StepT[M, H, State] =
+      StepT[M, H, State](CoproductK.transformKA[G, F, λ[(K[_], A) => StateT[M, State[K], (A, List[K[Unit]])]]](stepG.run, step.run))
+    StateInterpreterT[M, H, State](stepH, uncons)
   }
 
   def hoist[N[_]](mn: M ~> N)(implicit M: Monad[M], N: Monad[N]): StateInterpreterT.Aux[N, F, State] =
@@ -69,11 +66,12 @@ object StateInterpreterT {
   }
 
   def apply[M[_], F[_[_], _], S[_[_]]](
-    step: F[FreeK[F, ?], ?] ~> λ[A => StateT[M, S[FreeK[F, ?]], (A, List[FreeK[F, Unit]])]],
+    step: StepT[M, F, S],
     uncons: Uncons[S]
   )(implicit
     M: Monad[M]
   ): FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?] = {
+    val step1 = step.run.papply[FreeK[F, ?]]
     val uncons1 = uncons[FreeK[F, ?]]
 
     def runUntilClean[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] = {
@@ -88,9 +86,9 @@ object StateInterpreterT {
     def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] = p match {
       case FreeK.Pure(a) => (s, a).point[M]
       case FreeK.Suspend(ffa) =>
-        M.bind(step(ffa)(s)){ case (s1, (a, ku)) => runToCompletionU(ku)(s1) map { (_, a) } }
+        M.bind(step1(ffa)(s)){ case (s1, (a, ku)) => runToCompletionU(ku)(s1) map { (_, a) } }
       case bnd: FreeK.Bind[F, a1, A] =>
-        M.bind(step(bnd.a)(s)){ case (s1, (x, ku)) => M.bind(runToCompletion(bnd.f(x))(s1)) { case (s2, a) => runToCompletionU(ku)(s2) map { (_, a) } } }
+        M.bind(step1(bnd.a)(s)){ case (s1, (x, ku)) => M.bind(runToCompletion(bnd.f(x))(s1)) { case (s2, a) => runToCompletionU(ku)(s2) map { (_, a) } } }
     }
 
     def runToCompletionU(ps: List[FreeK[F, Unit]])(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = ps match {

@@ -20,6 +20,14 @@ object CoproductK {
       }
     }
 
+  def transformKA[F[_[_], _], G[_[_], _], M[_[_], _]](fm: F ~~> M, gm: G ~~> M): CoproductK[F, G, ?[_], ?] ~~> M =
+    new (CoproductK[F, G, ?[_], ?] ~~> M) {
+      def apply[K[_], A](ca: CoproductK[F, G, K, A]): M[K, A] = ca.run match {
+        case -\/(fa) => fm(fa)
+        case \/-(ga) => gm(ga)
+      }
+    }
+
   implicit def functorKInstance[F[_[_], _], G[_[_], _]](implicit
     FK: FunctorKA[F],
     GK: FunctorKA[G]
