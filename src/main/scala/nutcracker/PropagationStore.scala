@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, Index, StateInterpreterT, ~~>}
+import nutcracker.util.{FreeK, Index, StateInterpreterT, Uncons, ValK, ~~>}
 import nutcracker.util.StepT.Step
 
 import scalaz.Id._
@@ -210,7 +210,11 @@ object PropagationStore {
           )
         })
 
-      def uncons[K[_]]: StateT[Option, PropagationStore[K], List[K[Unit]]] = StateT(_.uncons)
+      def uncons: Uncons[PropagationStore] = Uncons[PropagationStore](
+        new ValK[λ[K[_] => StateT[Option, PropagationStore[K], List[K[Unit]]]]] {
+          override def compute[K[_]]: StateT[Option, PropagationStore[K], List[K[Unit]]] =
+            StateT(_.uncons)
+        })
     }
 
   def naiveAssess[K[_]](implicit tr: FreeK[PropagationLang, ?] ~> K): PropagationStore[K] => Assessment[List[K[Unit]]] = s => {

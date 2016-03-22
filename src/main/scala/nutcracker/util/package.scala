@@ -5,6 +5,7 @@ import scala.language.higherKinds
 package object util {
   type ConstK[A, K[_]] = A
 
+  type ≈>[F[_[_]], G[_[_]]] = TransformK[F, G]
   type ~~>[F[_[_], _], G[_[_], _]] = TransformKA[F, G]
   type ~>>[F[_[_], _], G[_]] = F ~~> λ[(K[_], A) => G[A]]
 
