@@ -21,7 +21,6 @@ object PropagationLang {
   case class FetchVector[K[_], D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]) extends PropagationLang[K, Sized[Vector[D], N]]
   case class VarTrigger[K[_], D](ref: CellRef[D], f: D => Trigger[K]) extends PropagationLang[K, Unit]
   case class SelTrigger[K[_], L <: HList](sel: Sel[L], f: L => Trigger[K]) extends PropagationLang[K, Unit]
-  case class WhenResolved[K[_], A, D](ref: DomRef[A, D], f: A => K[Unit]) extends PropagationLang[K, Unit]
 
   // builder API for Variables
   def variable[A]: VarBuilder[A] = new VarBuilder[A]
@@ -52,7 +51,12 @@ object PropagationLang {
   def fetchVector[K[_], D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): PropagationLang[K, Sized[Vector[D], N]] = FetchVector(refs)
   def varTrigger[K[_], D](ref: CellRef[D])(f: D => Trigger[K]): PropagationLang[K, Unit] = VarTrigger(ref, f)
   def selTrigger[K[_], L <: HList](sel: Sel[L])(f: L => Trigger[K]): PropagationLang[K, Unit] = SelTrigger(sel, f)
-  def whenResolved[K[_], A, D](ref: DomRef[A, D])(f: A => K[Unit]): PropagationLang[K, Unit] = WhenResolved(ref, f)
+  def whenResolved[K[_], A, D](ref: DomRef[A, D])(f: A => K[Unit])(implicit dom: Domain[A, D]): PropagationLang[K, Unit] =
+    varTrigger[K, D](ref)(d => dom.values(d) match {
+      case Domain.Empty() => Discard()
+      case Domain.Just(a) => Fire(f(a))
+      case Domain.Many(_) => Sleep()
+    })
 
   // constructors lifted to free programs
   def intersectF[D](ref: CellRef[D])(d: D): FP[Unit] =
@@ -67,7 +71,7 @@ object PropagationLang {
     FreeK.lift(varTrigger[FreeK[F, ?], D](ref)(f))
   def selTriggerF[F[_[_], _], L <: HList](sel: Sel[L])(f: L => Trigger[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     FreeK.lift(selTrigger[FreeK[F, ?], L](sel)(f))
-  def whenResolvedF[F[_[_], _], A, D](ref: DomRef[A, D])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+  def whenResolvedF[F[_[_], _], A, D](ref: DomRef[A, D])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], dom: Domain[A, D]): FreeK[F, Unit] =
     FreeK.lift(whenResolved[FreeK[F, ?], A, D](ref)(f))
 
 
@@ -157,12 +161,11 @@ object PropagationLang {
 
   implicit def functorKInstance: FunctorKA[PropagationLang] = new FunctorKA[PropagationLang] {
 
-    def transform[K[_], L[_], A](pk: PropagationLang[K, A])(tr: ~>[K, L]): PropagationLang[L, A] = pk match {
+    def transform[K[_], L[_], A](pk: PropagationLang[K, A])(tr: K ~> L): PropagationLang[L, A] = pk match {
 
       // the interesting cases
       case VarTrigger(ref, f)   => varTrigger(ref){ d => FunctorK[Trigger].transform(f(d))(tr) }
       case SelTrigger(sel, f)   => selTrigger(sel){ l => FunctorK[Trigger].transform(f(l))(tr) }
-      case WhenResolved(ref, f) => whenResolved(ref){ x => tr(f(x)) }
 
       // the boring cases
       case Variable(d, dom)            => Variable(d, dom)

@@ -43,7 +43,7 @@ package object nutcracker {
       _ <- whenResolvedF(d1) { a1 => whenResolvedF(d2) { a2 => set(res, Eq[A].neqv(a1, a2)) } }
     } yield res
 
-  def promiseResults[A, D](cells: Vector[DomRef[A, D]]): FreeK[PropagationLang, Promised[Vector[A]]] = {
+  def promiseResults[A, D](cells: Vector[DomRef[A, D]])(implicit dom: Domain[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] = {
 
     def go(pr: Promised[Vector[A]], tail: List[A], i: Int): FreeK[PropagationLang, Unit] = {
       if(i < 0) {
@@ -59,6 +59,6 @@ package object nutcracker {
     } yield pr
   }
 
-  def promiseResults[A, D](cells: DomRef[A, D]*): FreeK[PropagationLang, Promised[Vector[A]]] =
+  def promiseResults[A, D](cells: DomRef[A, D]*)(implicit dom: Domain[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] =
     promiseResults(cells.toVector)
 }

@@ -113,15 +113,6 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  def addDomainResolutionTrigger[A, D](ref: DomRef[A, D], f: A => K[Unit]): (PropagationStore[K], Option[K[Unit]]) = {
-    val domain = getDomain(ref)._2
-    addDomainTrigger(ref, (d: D) => domain.values(d) match {
-      case Domain.Empty() => Discard()
-      case Domain.Just(a) => Fire(f(a))
-      case Domain.Many(_) => Sleep()
-    })
-  }
-
   def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], List[K[Unit]]) = {
     val d = sel.fetch(cellFetcher)
     collectTriggers(d, selTriggers.getOrElse(sel, Nil).asInstanceOf[List[L => Trigger[K]]]) match {
@@ -203,9 +194,6 @@ object PropagationStore {
               case IntersectVector(refs, values) => (s.intersectVector(refs, values), ((), Nil))
               case Fetch(ref) => (s, (s.fetch(ref), Nil))
               case FetchVector(refs) => (s, (s.fetchVector(refs), Nil))
-              case WhenResolved(ref, f) => s.addDomainResolutionTrigger(ref, f) match {
-                case (s1, ok) => (s1, ((), ok.toList))
-              }
             }
           )
         })
