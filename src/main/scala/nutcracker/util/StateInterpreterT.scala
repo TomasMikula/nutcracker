@@ -52,6 +52,11 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
       def uncons: Uncons[State] = self.uncons
     }
 
+  def hoistId[N[_]](implicit N: Monad[N], ev: this.type <:< StateInterpreterT.Aux[Id, F, State]): StateInterpreterT.Aux[N, F, State] =
+    ev(this).hoist(new (Id ~> N) {
+      def apply[A](a: Id[A]): N[A] = N.point(a)
+    })
+
   def freeInstance(implicit M: Monad[M]): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] =
     StateInterpreterT.freeInstance(step, uncons)
 }
