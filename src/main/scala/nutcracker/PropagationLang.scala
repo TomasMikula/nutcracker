@@ -17,9 +17,9 @@ object PropagationLang {
   case class Variable[K[_], A, D](d: D, dom: Domain[A, D]) extends PropagationLang[K, LRef[D]]
   case class Update[K[_], D, U, Δ](ref: DRef[D, U, Δ], u: U) extends PropagationLang[K, Unit]
   case class Intersect[K[_], D](ref: LRef[D], d: D) extends PropagationLang[K, Unit]
-  case class IntersectVector[K[_], D, N <: Nat](refs: Sized[Vector[CellRef[D]], N], values: Sized[Vector[D], N]) extends PropagationLang[K, Unit]
+  case class IntersectVector[K[_], D, N <: Nat](refs: Sized[Vector[LRef[D]], N], values: Sized[Vector[D], N]) extends PropagationLang[K, Unit]
   case class Fetch[K[_], D](ref: VRef[D]) extends PropagationLang[K, D]
-  case class FetchVector[K[_], D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]) extends PropagationLang[K, Sized[Vector[D], N]]
+  case class FetchVector[K[_], D, N <: Nat](refs: Sized[Vector[VRef[D]], N]) extends PropagationLang[K, Sized[Vector[D], N]]
   case class VarTrigger[K[_], D](ref: VRef[D], f: D => Trigger[K]) extends PropagationLang[K, Unit]
   case class SelTrigger[K[_], L <: HList](sel: Sel[L], f: L => Trigger[K]) extends PropagationLang[K, Unit]
 
@@ -48,9 +48,9 @@ object PropagationLang {
   // constructors returning less specific types, and curried to help with type inference
   def update[K[_], D, U](ref: DRef[D, U, _])(u: U): PropagationLang[K, Unit] = Update(ref, u)
   def intersect[K[_], D](ref: LRef[D])(d: D): PropagationLang[K, Unit] = Intersect(ref, d)
-  def intersectVector[K[_], D, N <: Nat](refs: Sized[Vector[CellRef[D]], N])(values: Sized[Vector[D], N]): PropagationLang[K, Unit] = IntersectVector(refs, values)
+  def intersectVector[K[_], D, N <: Nat](refs: Sized[Vector[LRef[D]], N])(values: Sized[Vector[D], N]): PropagationLang[K, Unit] = IntersectVector(refs, values)
   def fetch[K[_], D](ref: VRef[D]): PropagationLang[K, D] = Fetch(ref)
-  def fetchVector[K[_], D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): PropagationLang[K, Sized[Vector[D], N]] = FetchVector(refs)
+  def fetchVector[K[_], D, N <: Nat](refs: Sized[Vector[VRef[D]], N]): PropagationLang[K, Sized[Vector[D], N]] = FetchVector(refs)
   def varTrigger[K[_], D](ref: VRef[D])(f: D => Trigger[K]): PropagationLang[K, Unit] = VarTrigger(ref, f)
   def selTrigger[K[_], L <: HList](sel: Sel[L])(f: L => Trigger[K]): PropagationLang[K, Unit] = SelTrigger(sel, f)
   def whenResolved[K[_], A, D](ref: VRef[D])(f: A => K[Unit])(implicit dom: Domain[A, D]): PropagationLang[K, Unit] =
@@ -65,11 +65,11 @@ object PropagationLang {
     FreeK.suspend(update[FP, D, U](ref)(u))
   def intersectF[D](ref: LRef[D])(d: D): FP[Unit] =
     FreeK.suspend(intersect[FP, D](ref)(d))
-  def intersectVectorF[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N])(values: Sized[Vector[D], N]): FP[Unit] =
+  def intersectVectorF[D, N <: Nat](refs: Sized[Vector[LRef[D]], N])(values: Sized[Vector[D], N]): FP[Unit] =
     FreeK.suspend(intersectVector[FP, D, N](refs)(values))
   def fetchF[D](ref: VRef[D]): FP[D] =
     FreeK.suspend(fetch[FP, D](ref))
-  def fetchVectorF[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): FP[Sized[Vector[D], N]] =
+  def fetchVectorF[D, N <: Nat](refs: Sized[Vector[VRef[D]], N]): FP[Sized[Vector[D], N]] =
     FreeK.suspend(fetchVector[FP, D, N](refs))
   def varTriggerF[F[_[_], _], D](ref: DRef[D, _, _])(f: D => Trigger[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     FreeK.lift(varTrigger[FreeK[F, ?], D](ref)(f))

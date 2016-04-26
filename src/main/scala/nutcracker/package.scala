@@ -24,7 +24,7 @@ package object nutcracker {
   def traverse[F[_[_], _], C[_]: Traverse, A, B](ps: C[A])(f: A => FreeK[F, B]): FreeK[F, C[B]] =
     Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)
 
-  def different[A, D: Domain[A, ?] : GenBool](d1: DomRef[A, D], d2: DomRef[A, D]): FreeK[PropagationLang, Unit] = {
+  def different[A, D: Domain[A, ?] : GenBool](d1: LRef[D], d2: LRef[D]): FreeK[PropagationLang, Unit] = {
     whenResolvedF(d1){ (a: A) => remove(d2, a) } >>
     whenResolvedF(d2){ (a: A) => remove(d1, a) }
   }
@@ -37,7 +37,7 @@ package object nutcracker {
     })
   }
 
-  def isDifferent[A: Eq, D: Domain[A, ?] : GenBool](d1: DomRef[A, D], d2: DomRef[A, D]): FreeK[PropagationLang, LRef[BoolDomain]] =
+  def isDifferent[A: Eq, D: Domain[A, ?] : GenBool](d1: LRef[D], d2: LRef[D]): FreeK[PropagationLang, LRef[BoolDomain]] =
     for {
       res <- variable[Boolean]()
       _ <- whenResolvedF(res) { (r: Boolean) => if(r) different(d1, d2) else d1 <=> d2 }

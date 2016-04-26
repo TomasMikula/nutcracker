@@ -51,12 +51,12 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  def fetchVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): Sized[Vector[D], N] =
+  def fetchVector[D, N <: Nat](refs: Sized[Vector[VRef[D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))
 
   def intersect[D](ref: LRef[D], d: D): PropagationStore[K] = update[D, D, D](ref, d)
 
-  def intersectVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N], values: Sized[Vector[D], N]): PropagationStore[K] =
+  def intersectVector[D, N <: Nat](refs: Sized[Vector[LRef[D]], N], values: Sized[Vector[D], N]): PropagationStore[K] =
     (refs zip values).foldLeft[PropagationStore[K]](this)((s, rv) => s.intersect(rv._1, rv._2))
 
   private def update[D, U, Δ](ref: DRef[D, U, Δ], u: U): PropagationStore[K] = {
