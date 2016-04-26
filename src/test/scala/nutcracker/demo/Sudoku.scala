@@ -12,7 +12,7 @@ import scala.language.higherKinds
 class Sudoku extends FunSuite {
   val solver = PropagationStore.dfsSolver
 
-  type Cell = DomRef[Int, Set[Int]]
+  type Cell = LRef[Set[Int]]
   type Cells = Vector[Cell]
 
   /** A program that sets up an empty Sudoku, that is 81 integer variables
@@ -50,7 +50,7 @@ class Sudoku extends FunSuite {
           else if(ys.size == 1) fire(PropagationLang.set(xPos, cell))
           else sleep[PropagationLang]
         } })
-        _ <- whenResolvedF(xPos) { cell => PropagationLang.set(cell, x) }
+        _ <- whenResolvedF(xPos) { (cell: Cell) => PropagationLang.set(cell, x) }
       } yield ()
     }
 

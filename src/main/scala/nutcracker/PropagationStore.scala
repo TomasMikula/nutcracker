@@ -14,38 +14,38 @@ import Domain._
 
 case class PropagationStore[K[_]] private(
   nextId: Long,
-  domains: Map[Long, (D, Domain[A, D]) forSome { type A; type D }],
-  domainTriggers: Map[CellRef[_], List[_ => Trigger[K]]],
+  domains: Map[Long, (D, Dom[D, U, Δ], Option[Δ]) forSome { type D; type U; type Δ }],
+  domainTriggers: Map[VRef[_], List[_ => Trigger[K]]],
   selTriggers: Map[Sel[_], List[_ => Trigger[K]]],
-  cellsToSels: Index[CellRef[_], Sel[_ <: HList]],
-  unresolvedVars: Set[DomRef[A, D] forSome { type A; type D }],
+  cellsToSels: Index[VRef[_], Sel[_ <: HList]],
+  unresolvedVars: Set[DRef[D, U, Δ] forSome { type D; type U; type Δ }],
   failedVars: Set[Long],
-  dirtyDomains: Set[CellRef[D] forSome { type D }],
+  dirtyDomains: Set[DRef[D, U, Δ] forSome { type D; type U; type Δ }],
   dirtySelections: Set[Sel[_ <: HList]]
 ) {
   import shapeless.PolyDefns.~>
 
-  private val cellFetcher: CellRef ~> shapeless.Id = new ~>[CellRef, shapeless.Id] {
-    def apply[D](cell: CellRef[D]): D = fetch(cell)
+  private val cellFetcher: VRef ~> shapeless.Id = new ~>[VRef, shapeless.Id] {
+    def apply[D](cell: VRef[D]): D = fetch(cell)
   }
 
-  def addVariable[A, D](d: D, ev: Domain[A, D]): (PropagationStore[K], DomRef[A, D]) = {
-    val domains1 = domains + ((nextId, (d, ev)))
-    val ref = DomRef[A, D](nextId)
-    val (unresolvedVars1, failedVars1) = ev.values(d) match {
-      case Empty() => (unresolvedVars, failedVars + nextId)
-      case Just(a) => (unresolvedVars, failedVars)
-      case Many(_) => (unresolvedVars + ref, failedVars)
+  def addVariable[D, U, Δ](d: D, ev: Dom[D, U, Δ]): (PropagationStore[K], DRef[D, U, Δ]) = {
+    val domains1 = domains + ((nextId, (d, ev, Option.empty)))
+    val ref = DRef[D, U, Δ](nextId)
+    val (unresolvedVars1, failedVars1) = ev.assess(d) match {
+      case Dom.Failed => (unresolvedVars, failedVars + nextId)
+      case Dom.Refined => (unresolvedVars, failedVars)
+      case Dom.Unrefined(_) => (unresolvedVars + ref, failedVars)
     }
     (copy(nextId = nextId + 1, domains = domains1, unresolvedVars = unresolvedVars1, failedVars = failedVars1), ref)
   }
 
-  def fetch[D](ref: CellRef[D]): D = ref match {
-    case dr@DomRef(_) => getDomain(dr)._1
+  def fetch[D](ref: VRef[D]): D = ref match {
+    case dr @ DRef(_) =>  getDomain(dr)._1
   }
 
-  def fetchResult[A, D](ref: DomRef[A, D]): Option[A] = getDomain(ref) match {
-    case (d, dom) => dom.values(d) match {
+  def fetchResult[A, D](ref: DRef[D, _, _])(implicit dom: Domain[A, D]): Option[A] = getDomain(ref) match {
+    case (d, _, _) => dom.values(d) match {
       case Just(a) => Some(a)
       case _ => None
     }
@@ -54,30 +54,29 @@ case class PropagationStore[K[_]] private(
   def fetchVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))
 
-  def intersect[D](ref: CellRef[D], d: D): PropagationStore[K] = ref match {
-    case dr @ DomRef(_) => intersect(dr, d)
-  }
+  def intersect[D](ref: LRef[D], d: D): PropagationStore[K] = update[D, D, D](ref, d)
 
   def intersectVector[D, N <: Nat](refs: Sized[Vector[CellRef[D]], N], values: Sized[Vector[D], N]): PropagationStore[K] =
     (refs zip values).foldLeft[PropagationStore[K]](this)((s, rv) => s.intersect(rv._1, rv._2))
 
-  private def intersect[A, D](ref: DomRef[A, D], d: D): PropagationStore[K] = {
-    val (d0, dom) = getDomain(ref)
-    dom.refine(d0, d) match {
+  private def update[D, U, Δ](ref: DRef[D, U, Δ], u: U): PropagationStore[K] = {
+    val (d0, dom, diff0) = getDomain(ref)
+    dom.update(d0, u) match {
       case None => this
-      case Some(d1) =>
-        val (unresolvedVars1, failedVars1) = dom.values(d1) match {
-          case Empty() => (unresolvedVars - ref, failedVars + ref.domainId)
-          case Just(_) => (unresolvedVars - ref, failedVars)
-          case Many(_) => (unresolvedVars, failedVars)
+      case Some((d1, diff1)) =>
+        val (unresolvedVars1, failedVars1) = dom.assess(d1) match {
+          case Dom.Failed => (unresolvedVars - ref, failedVars + ref.domainId)
+          case Dom.Refined => (unresolvedVars - ref, failedVars)
+          case Dom.Unrefined(_) => (unresolvedVars, failedVars)
         }
-        val domains1 = domains + ((ref.domainId, (d1, dom)))
+        val diff = Option(diff0.fold(diff1)(dom.combineDiffs(_, diff1)))
+        val domains1 = domains + ((ref.domainId, (d1, dom, diff)))
         val dirtyDomains1 = dirtyDomains + ref
         copy(domains = domains1, unresolvedVars = unresolvedVars1, failedVars = failedVars1, dirtyDomains = dirtyDomains1)
     }
   }
 
-  def addDomainTrigger[D](ref: CellRef[D], t: D => Trigger[K]): (PropagationStore[K], Option[K[Unit]]) = {
+  def addDomainTrigger[D](ref: VRef[D], t: D => Trigger[K]): (PropagationStore[K], Option[K[Unit]]) = {
     t(fetch(ref)) match {
       case Discard() => (this, None)
       case Sleep() => (addDomainTrigger0(ref, t), None)
@@ -95,7 +94,7 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  private def addDomainTrigger0[D](ref: CellRef[D], t: D => Trigger[K]): PropagationStore[K] =
+  private def addDomainTrigger0[D](ref: VRef[D], t: D => Trigger[K]): PropagationStore[K] =
     copy(domainTriggers = domainTriggers + ((ref, t :: domainTriggers.getOrElse(ref, Nil))))
 
   private def addSelTrigger0[L <: HList](sel: Sel[L], t: L => Trigger[K]): PropagationStore[K] = {
@@ -105,7 +104,7 @@ case class PropagationStore[K[_]] private(
     )
   }
 
-  def triggersForDomain[D](ref: CellRef[D]): (PropagationStore[K], List[K[Unit]]) = {
+  def triggersForDomain[D](ref: DRef[D, _, _]): (PropagationStore[K], List[K[Unit]]) = {
     val d = fetch(ref)
     collectTriggers(d, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[D => Trigger[K]]]) match {
       case (Nil, fired) => (copy(domainTriggers = domainTriggers - ref), fired)
@@ -121,14 +120,14 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  def getSelsForCell(ref: CellRef[_]): Set[Sel[_ <: HList]] = cellsToSels.get(ref)
+  def getSelsForCell(ref: DRef[_, _, _]): Set[Sel[_ <: HList]] = cellsToSels.get(ref)
 
 
-  private[nutcracker] def getDomain[A, D](ref: DomRef[A, D]): (D, Domain[A, D]) =
-    domains(ref.domainId).asInstanceOf[(D, Domain[A, D])]
+  private[nutcracker] def getDomain[D, U, Δ](ref: DRef[D, U, Δ]): (D, Dom[D, U, Δ], Option[Δ]) =
+    domains(ref.domainId).asInstanceOf[(D, Dom[D, U, Δ], Option[Δ])]
 
-  private def setDomain[A, D](ref: DomRef[A, D], d: D, dom: Domain[A, D]): PropagationStore[K] =
-    copy(domains = domains + ((ref.domainId, (d, dom))))
+//  private def setDomain[A, D](ref: DomRef[A, D], d: D, dom: Domain[A, D]): PropagationStore[K] =
+//    copy(domains = domains + ((ref.domainId, (d, dom))))
 
   private def collectTriggers[D](d: D, triggers: List[D => Trigger[K]]): (List[D => Trigger[K]], List[K[Unit]]) =
     triggers match {
@@ -190,6 +189,7 @@ object PropagationStore {
               case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
                 case (s1, ok) => (s1, ((), ok.toList))
               }
+              case Update(ref, u) => (s.update(ref, u), ((), Nil))
               case Intersect(ref, d) => (s.intersect(ref, d), ((), Nil))
               case IntersectVector(refs, values) => (s.intersectVector(refs, values), ((), Nil))
               case Fetch(ref) => (s, (s.fetch(ref), Nil))
@@ -209,12 +209,10 @@ object PropagationStore {
     if(s.failedVars.nonEmpty) Failed
     else if(s.unresolvedVars.isEmpty) Done
     else {
-      def splitDomain[A, D](ref: DomRef[A, D]): Option[List[K[Unit]]] = {
-        val (d, domain) = s.getDomain(ref)
-        domain.values(d) match {
-          case Domain.Many(branchings) =>
-            if(branchings.isEmpty) None
-            else Some(branchings.head map { d => tr(intersectF(ref)(d)) })
+      def splitDomain[D, U](ref: DRef[D, U, _]): Option[List[K[Unit]]] = {
+        val (d, domain, _) = s.getDomain(ref)
+        domain.assess(d) match {
+          case Dom.Unrefined(choices) => choices() map { _ map { ui => tr(updateF(ref)(ui)) } }
           case _ => sys.error("splitDomain should be called on unresolved variables only.")
         }
       }

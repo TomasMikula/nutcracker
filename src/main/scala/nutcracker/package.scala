@@ -1,7 +1,6 @@
 import scala.language.higherKinds
 
 import algebra.Eq
-import cats.std.vector._
 import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolDomain
 import nutcracker.lib.bool.BoolDomain._
@@ -12,7 +11,9 @@ import scalaz.Traverse
 
 package object nutcracker {
 
-  type Promised[A] = DomRef[A, nutcracker.Promise[A]]
+  type LRef[D] = DRef[D, D, D]
+
+  type Promised[A] = LRef[nutcracker.Promise[A]]
 
   def concat[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
     ps.foldLeft[FreeK[F, Unit]](FreeK.Pure(())) { _ >> _ }
@@ -24,32 +25,32 @@ package object nutcracker {
     Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)
 
   def different[A, D: Domain[A, ?] : GenBool](d1: DomRef[A, D], d2: DomRef[A, D]): FreeK[PropagationLang, Unit] = {
-    whenResolvedF(d1){ a => remove(d2, a) } >>
-    whenResolvedF(d2){ a => remove(d1, a) }
+    whenResolvedF(d1){ (a: A) => remove(d2, a) } >>
+    whenResolvedF(d2){ (a: A) => remove(d1, a) }
   }
 
-  def allDifferent[A, D: Domain[A, ?] : GenBool](doms: DomRef[A, D]*): FreeK[PropagationLang, Unit] = {
+  def allDifferent[A, D: Domain[A, ?] : GenBool](doms: LRef[D]*): FreeK[PropagationLang, Unit] = {
     val n = doms.size
-    concat((0 until n) map { i => whenResolvedF(doms(i)){ a =>
+    concat((0 until n) map { i => whenResolvedF(doms(i)){ (a: A) =>
       concat((0 until i) map { j => remove(doms(j), a) }) >>
       concat((i+1 until n) map { j => remove(doms(j), a) }) }
     })
   }
 
-  def isDifferent[A: Eq, D: Domain[A, ?] : GenBool](d1: DomRef[A, D], d2: DomRef[A, D]): FreeK[PropagationLang, DomRef[Boolean, BoolDomain]] =
+  def isDifferent[A: Eq, D: Domain[A, ?] : GenBool](d1: DomRef[A, D], d2: DomRef[A, D]): FreeK[PropagationLang, LRef[BoolDomain]] =
     for {
       res <- variable[Boolean]()
-      _ <- whenResolvedF(res) { if(_) different(d1, d2) else d1 <=> d2 }
-      _ <- whenResolvedF(d1) { a1 => whenResolvedF(d2) { a2 => set(res, Eq[A].neqv(a1, a2)) } }
+      _ <- whenResolvedF(res) { (r: Boolean) => if(r) different(d1, d2) else d1 <=> d2 }
+      _ <- whenResolvedF(d1) { (a1: A) => whenResolvedF(d2) { (a2: A) => set(res, Eq[A].neqv(a1, a2)) } }
     } yield res
 
-  def promiseResults[A, D](cells: Vector[DomRef[A, D]])(implicit dom: Domain[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] = {
+  def promiseResults[A, D](cells: Vector[VRef[D]])(implicit dom: Domain[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] = {
 
     def go(pr: Promised[Vector[A]], tail: List[A], i: Int): FreeK[PropagationLang, Unit] = {
       if(i < 0) {
         completeF(pr, tail.toVector)
       } else {
-        whenResolvedF(cells(i)){ a => go(pr, a :: tail, i-1) }
+        whenResolvedF(cells(i)){ (a: A) => go(pr, a :: tail, i-1) }
       }
     }
 
@@ -59,6 +60,6 @@ package object nutcracker {
     } yield pr
   }
 
-  def promiseResults[A, D](cells: DomRef[A, D]*)(implicit dom: Domain[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] =
+  def promiseResults[A, D](cells: VRef[D]*)(implicit dom: Domain[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] =
     promiseResults(cells.toVector)
 }

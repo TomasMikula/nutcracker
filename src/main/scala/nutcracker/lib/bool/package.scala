@@ -1,29 +1,28 @@
 package nutcracker.lib
 
 import scala.language.higherKinds
-
-import nutcracker.util.{InjectK, FreeK}
-import nutcracker.{PropagationLang, DomRef}
+import nutcracker.util.{FreeK, InjectK}
+import nutcracker.{LRef, PropagationLang}
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._
 import nutcracker.lib.bool.BoolDomain._
 
 package object bool {
 
-  type Ref = DomRef[Boolean, BoolDomain]
+  type Ref = LRef[BoolDomain]
 
   def and(x: Ref, y: Ref): FreeK[PropagationLang, Ref] = {
     variable[Boolean]() >>= { res =>
-      whenResolvedF(x)({
-        if (_) y <=> res
+      whenResolvedF(x)({ (r: Boolean) =>
+        if (r) y <=> res
         else set(res, false)
       }) >>
-      whenResolvedF(y)({
-        if (_) x <=> res
+      whenResolvedF(y)({ (r: Boolean) =>
+        if (r) x <=> res
         else set(res, false)
       }) >>
-      whenResolvedF(res)({
-        if (_) set(x, true) >> set(y, true)
+      whenResolvedF(res)({ (r: Boolean) =>
+        if (r) set(x, true) >> set(y, true)
         else FreeK.Pure(())
       }) >>
       FreeK.Pure(res)
@@ -66,12 +65,12 @@ package object bool {
 
   def neg(x: Ref): FreeK[PropagationLang, Ref] = {
     variable[Boolean]() >>= { res =>
-      whenResolvedF(x)({
-        if (_) set(res, false)
+      whenResolvedF(x)({ (r: Boolean) =>
+        if (r) set(res, false)
         else set(res, true)
       }) >>
-        whenResolvedF(res)({
-        if (_) set(x, false)
+        whenResolvedF(res)({ (r: Boolean) =>
+        if (r) set(x, false)
         else set(x, true)
       }) >>
       FreeK.Pure(res)
@@ -84,12 +83,12 @@ package object bool {
     set(x, false)
 
   def imp(x: Ref, y: Ref): FreeK[PropagationLang, Unit] = {
-    whenResolvedF(x)({
-      if (_) set(y, true)
+    whenResolvedF(x)({ (r: Boolean) =>
+      if (r) set(y, true)
       else FreeK.Pure[PropagationLang, Unit](())
     }) >>
-    whenResolvedF(y)({
-      if (_) FreeK.Pure(())
+    whenResolvedF(y)({ (r: Boolean) =>
+      if (r) FreeK.Pure(())
       else set(x, false)
     })
   }
@@ -109,21 +108,21 @@ package object bool {
   implicit class BoolOps(self: Ref) {
 
     def ===(that: Ref): FreeK[PropagationLang, Unit] = {
-      (self >>= { set(that, _) }) >>
-        (that >>= { set(self, _) })
+      (self >>= { (x: Boolean) => set(that, x) }) >>
+      (that >>= { (x: Boolean) => set(self, x) })
     }
 
     def =!=(that: Ref): FreeK[PropagationLang, Unit] = {
-      (self >>= { x => set(that, !x) }) >>
-        (that >>= { x => set(self, !x) })
+      (self >>= { (x: Boolean) => set(that, !x) }) >>
+      (that >>= { (x: Boolean) => set(self, !x) })
     }
 
     def =?=(that: Ref): FreeK[PropagationLang, Ref] = {
       variable[Boolean]() >>= { res =>
-        (res >>= { if(_) (self === that) else (self =!= that) }) >>
-          (self >>= { if(_) (res === that) else (res  =!= that) }) >>
-          (that >>= { if(_) (res === self) else (res  =!= self) }) >>
-          FreeK.Pure(res)
+        (res  >>= { (x: Boolean) => if(x) (self === that) else (self =!= that) }) >>
+        (self >>= { (x: Boolean) => if(x) (res  === that) else (res  =!= that) }) >>
+        (that >>= { (x: Boolean) => if(x) (res  === self) else (res  =!= self) }) >>
+        FreeK.Pure(res)
       }
     }
 

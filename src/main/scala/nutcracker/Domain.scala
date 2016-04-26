@@ -2,7 +2,7 @@ package nutcracker
 
 import algebra.lattice.{GenBool, MeetSemilattice}
 
-trait Domain[A, D] extends MeetSemilattice[D] {
+trait Domain[A, D] extends Dom[D, D, D] with MeetSemilattice[D] {
   def values(d: D): Domain.Values[A, D]
   def sizeUpperBound(d: D): Option[Long]
   def singleton(a: A): D
@@ -15,6 +15,14 @@ trait Domain[A, D] extends MeetSemilattice[D] {
     * @return `Some(d ∧ by)` if `d ∧ by < d`, `None` otherwise.
     */
   def refine(d: D, by: D): Option[D]
+
+  override def update(d: D, by: D) = refine(d, by) map (d => (d, d))
+  override def combineDiffs(d1: D, d2: D) = d2
+  override def assess(d: D): Dom.Status[D] = values(d) match {
+    case Domain.Empty() => Dom.Failed
+    case Domain.Just(_) => Dom.Refined
+    case Domain.Many(branchings) => Dom.Unrefined(() => branchings.headOption)
+  }
 
   def isEmpty(d: D): Boolean = sizeUpperBound(d).map(_ == 0).getOrElse(false)
 }
