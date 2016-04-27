@@ -54,8 +54,6 @@ case class PropagationStore[K[_]] private(
   def fetchVector[D, N <: Nat](refs: Sized[Vector[VRef[D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))
 
-  def intersect[D](ref: LRef[D], d: D): PropagationStore[K] = update[D, D, D](ref, d)
-
   private def update[D, U, Δ](ref: DRef[D, U, Δ], u: U): PropagationStore[K] = {
     val (d0, dom, diff0) = getDomain(ref)
     dom.update(d0, u) match {
@@ -187,7 +185,6 @@ object PropagationStore {
                 case (s1, ok) => (s1, ((), ok.toList))
               }
               case Update(ref, u) => (s.update(ref, u), ((), Nil))
-              case Intersect(ref, d) => (s.intersect(ref, d), ((), Nil))
               case Fetch(ref) => (s, (s.fetch(ref), Nil))
               case FetchVector(refs) => (s, (s.fetchVector(refs), Nil))
             }

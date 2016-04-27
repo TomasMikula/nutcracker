@@ -16,7 +16,6 @@ object PropagationLang {
 
   case class Variable[K[_], A, D](d: D, dom: Domain[A, D]) extends PropagationLang[K, LRef[D]]
   case class Update[K[_], D, U, Δ](ref: DRef[D, U, Δ], u: U) extends PropagationLang[K, Unit]
-  case class Intersect[K[_], D](ref: LRef[D], d: D) extends PropagationLang[K, Unit]
   case class Fetch[K[_], D](ref: VRef[D]) extends PropagationLang[K, D]
   case class FetchVector[K[_], D, N <: Nat](refs: Sized[Vector[VRef[D]], N]) extends PropagationLang[K, Sized[Vector[D], N]]
   case class VarTrigger[K[_], D](ref: VRef[D], f: D => Trigger[K]) extends PropagationLang[K, Unit]
@@ -46,7 +45,7 @@ object PropagationLang {
 
   // constructors returning less specific types, and curried to help with type inference
   def update[K[_], D, U](ref: DRef[D, U, _])(u: U): PropagationLang[K, Unit] = Update(ref, u)
-  def intersect[K[_], D](ref: LRef[D])(d: D): PropagationLang[K, Unit] = Intersect(ref, d)
+  def intersect[K[_], D](ref: LRef[D])(d: D): PropagationLang[K, Unit] = update(ref)(d)
   def fetch[K[_], D](ref: VRef[D]): PropagationLang[K, D] = Fetch(ref)
   def fetchVector[K[_], D, N <: Nat](refs: Sized[Vector[VRef[D]], N]): PropagationLang[K, Sized[Vector[D], N]] = FetchVector(refs)
   def varTrigger[K[_], D](ref: VRef[D])(f: D => Trigger[K]): PropagationLang[K, Unit] = VarTrigger(ref, f)
@@ -170,7 +169,6 @@ object PropagationLang {
       // the boring cases
       case Variable(d, dom)  => Variable(d, dom)
       case Update(ref, u)    => Update(ref, u)
-      case Intersect(ref, d) => Intersect(ref, d)
       case Fetch(ref)        => Fetch(ref)
       case FetchVector(refs) => FetchVector(refs)
     }
