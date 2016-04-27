@@ -1,19 +1,19 @@
 import scala.language.higherKinds
-
 import algebra.Eq
 import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolDomain
 import nutcracker.lib.bool.BoolDomain._
-import nutcracker.util.FreeK
+import nutcracker.util.{FreeK, Inject}
+import nutcracker.Dom.{Diff, Meet, Res}
 
-import algebra.lattice.GenBool
-import scalaz.Traverse
+import scalaz.{Traverse, \/}
 
 package object nutcracker {
 
-  type LRef[D] = DRef[D, D, D]
+  type CMRef[D] = DRef[D, Meet[D] \/ Diff[D], Res[D] \/ Diff[D]]
+  type CMURef[D] = DRef[D, Meet[D] \/ Diff[D], Unit]
 
-  type Promised[A] = LRef[nutcracker.Promise[A]]
+  type Promised[A] = DRef[Promise[A], Promise.Complete[A], Unit]
 
   def concat[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
     ps.foldLeft[FreeK[F, Unit]](FreeK.Pure(())) { _ >> _ }
@@ -24,27 +24,37 @@ package object nutcracker {
   def traverse[F[_[_], _], C[_]: Traverse, A, B](ps: C[A])(f: A => FreeK[F, B]): FreeK[F, C[B]] =
     Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)
 
-  def different[A, D: Domain[A, ?] : GenBool](d1: LRef[D], d2: LRef[D]): FreeK[PropagationLang, Unit] = {
-    whenResolvedF(d1){ (a: A) => remove(d2, a) } >>
-    whenResolvedF(d2){ (a: A) => remove(d1, a) }
+  def different[D, U, Δ](d1: DRef[D, U, Δ], d2: DRef[D, U, Δ])(implicit
+    dom: Dom[D, U, Δ],
+    inj: Inject[Diff[D], U]
+  ): FreeK[PropagationLang, Unit] = {
+    whenRefinedF(d1){ d => remove(d2, d) } >>
+    whenRefinedF(d2){ d => remove(d1, d) }
   }
 
-  def allDifferent[A, D: Domain[A, ?] : GenBool](doms: LRef[D]*): FreeK[PropagationLang, Unit] = {
+  def allDifferent[D, U, Δ](doms: DRef[D, U, Δ]*)(implicit
+    dom: Dom[D, U, Δ],
+    inj: Inject[Diff[D], U]
+  ): FreeK[PropagationLang, Unit] = {
     val n = doms.size
-    concat((0 until n) map { i => whenResolvedF(doms(i)){ (a: A) =>
-      concat((0 until i) map { j => remove(doms(j), a) }) >>
-      concat((i+1 until n) map { j => remove(doms(j), a) }) }
+    concat((0 until n) map { i => whenRefinedF(doms(i)){ d =>
+      concat((0 until i) map { j => remove(doms(j), d) }) >>
+      concat((i+1 until n) map { j => remove(doms(j), d) }) }
     })
   }
 
-  def isDifferent[A: Eq, D: Domain[A, ?] : GenBool](d1: LRef[D], d2: LRef[D]): FreeK[PropagationLang, LRef[BoolDomain]] =
+  def isDifferent[D: Eq, U, Δ](d1: DRef[D, U, Δ], d2: DRef[D, U, Δ])(implicit
+    dom: Dom[D, U, Δ],
+    injd: Inject[Diff[D], U],
+    injm: Inject[Meet[D], U]
+  ): FreeK[PropagationLang, CMURef[BoolDomain]] =
     for {
       res <- variable[Boolean]()
       _ <- whenResolvedF(res) { (r: Boolean) => if(r) different(d1, d2) else d1 <=> d2 }
-      _ <- whenResolvedF(d1) { (a1: A) => whenResolvedF(d2) { (a2: A) => set(res, Eq[A].neqv(a1, a2)) } }
+      _ <- whenRefinedF(d1) { r1 => whenRefinedF(d2) { r2 => set[Boolean, BoolDomain, Meet[BoolDomain] \/ Diff[BoolDomain]](res, Eq[D].neqv(r1, r2)) } }
     } yield res
 
-  def promiseResults[A, D](cells: Vector[VRef[D]])(implicit dom: Domain[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] = {
+  def promiseResults[A, D](cells: Vector[VRef[D]])(implicit ee: EmbedExtract[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] = {
 
     def go(pr: Promised[Vector[A]], tail: List[A], i: Int): FreeK[PropagationLang, Unit] = {
       if(i < 0) {
@@ -60,6 +70,6 @@ package object nutcracker {
     } yield pr
   }
 
-  def promiseResults[A, D](cells: VRef[D]*)(implicit dom: Domain[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] =
+  def promiseResults[A, D](cells: VRef[D]*)(implicit ee: EmbedExtract[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] =
     promiseResults(cells.toVector)
 }

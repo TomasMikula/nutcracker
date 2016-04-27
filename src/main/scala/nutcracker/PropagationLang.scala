@@ -1,11 +1,12 @@
 package nutcracker
 
 import scala.language.higherKinds
+import algebra.lattice.BoundedMeetSemilattice
+import nutcracker.Dom.{Diff, Meet}
+import nutcracker.util.{FreeK, FunctorK, FunctorKA, Inject, InjectK, StateInterpreterT}
+import shapeless.{::, HList, HNil, Nat, Sized}
 
-import algebra.lattice.{BoundedMeetSemilattice, GenBool}
-import nutcracker.util.{FreeK, FunctorK, FunctorKA, InjectK, StateInterpreterT}
-import shapeless.{::, HNil, Sized, Nat, HList}
-import scalaz._
+import scalaz.{Apply, Cont, Traverse, ~>}
 import scalaz.std.vector._
 
 sealed trait PropagationLang[K[_], A]
@@ -14,7 +15,7 @@ object PropagationLang {
 
   private type FP[A] = FreeK[PropagationLang, A]
 
-  case class Variable[K[_], A, D](d: D, dom: Domain[A, D]) extends PropagationLang[K, LRef[D]]
+  case class Cell[K[_], D, U, Δ](d: D, dom: Dom[D, U, Δ]) extends PropagationLang[K, DRef[D, U, Δ]]
   case class Update[K[_], D, U, Δ](ref: DRef[D, U, Δ], u: U) extends PropagationLang[K, Unit]
   case class Fetch[K[_], D](ref: VRef[D]) extends PropagationLang[K, D]
   case class FetchVector[K[_], D, N <: Nat](refs: Sized[Vector[VRef[D]], N]) extends PropagationLang[K, Sized[Vector[D], N]]
@@ -24,44 +25,67 @@ object PropagationLang {
   // builder API for Variables
   def variable[A]: VarBuilder[A] = new VarBuilder[A]
   final class VarBuilder[A] private[PropagationLang] {
-    def apply[D: Domain[A, ?] : BoundedMeetSemilattice](): FP[LRef[D]] = any()
-    def any[D: Domain[A, ?] : BoundedMeetSemilattice](): FP[LRef[D]] = init(BoundedMeetSemilattice[D].one)
-    def init[D: Domain[A, ?]](d: D): FP[LRef[D]] = FreeK.suspend(Variable[FP, A, D](d, implicitly[Domain[A, D]]))
+    def apply[D, U, Δ]()(implicit
+      ee: EmbedExtract[A, D],
+      dom: Dom[D, U, Δ],
+      l: BoundedMeetSemilattice[D]
+    ): FP[DRef[D, U, Δ]] = any()
+    def any[D, U, Δ]()(implicit
+      ee: EmbedExtract[A, D],
+      dom: Dom[D, U, Δ],
+      l: BoundedMeetSemilattice[D]
+    ): FP[DRef[D, U, Δ]] = cellF(l.one)
 
-    def oneOf(as: Set[A]): FP[LRef[Set[A]]] = FreeK.suspend(Variable[FP, A, Set[A]](as, implicitly[Domain[A, Set[A]]]))
-    def oneOf(as: A*): FP[LRef[Set[A]]] = oneOf(as.toSet)
+    def oneOf(as: Set[A]): FP[CMRef[Set[A]]] = cellF(as)
+    def oneOf(as: A*): FP[CMRef[Set[A]]] = oneOf(as.toSet)
 
     def count(n: Int): VarsBuilder[A] = new VarsBuilder(n)
   }
   final class VarsBuilder[A] private[PropagationLang](n: Int) {
-    def apply[D: Domain[A, ?] : BoundedMeetSemilattice](): FP[Vector[LRef[D]]] = any()
-    def any[D: Domain[A, ?] : BoundedMeetSemilattice](): FP[Vector[LRef[D]]] = init[D](BoundedMeetSemilattice[D].one)
-    def init[D: Domain[A, ?]](d: D): FP[Vector[LRef[D]]] =
-      Traverse[Vector].sequenceU(Vector.fill(n)(variable[A].init(d)))
+    def apply[D, U, Δ]()(implicit
+      ee: EmbedExtract[A, D],
+      dom: Dom[D, U, Δ],
+      l: BoundedMeetSemilattice[D]
+    ): FP[Vector[DRef[D, U, Δ]]] = any()
+    def any[D, U, Δ]()(implicit
+      ee: EmbedExtract[A, D],
+      dom: Dom[D, U, Δ],
+      l: BoundedMeetSemilattice[D]
+    ): FP[Vector[DRef[D, U, Δ]]] = cellsF(l.one, n)
 
-    def oneOf(as: Set[A]): FP[Vector[LRef[Set[A]]]] = init(as)
-    def oneOf(as: A*): FP[Vector[LRef[Set[A]]]] = oneOf(as.toSet)
+    def oneOf(as: Set[A]): FP[Vector[CMRef[Set[A]]]] = cellsF(as, n)
+    def oneOf(as: A*): FP[Vector[CMRef[Set[A]]]] = oneOf(as.toSet)
   }
 
   // constructors returning less specific types, and curried to help with type inference
+  def cell[K[_], D, U, Δ](d: D)(implicit dom: Dom[D, U, Δ]): PropagationLang[K, DRef[D, U, Δ]] = Cell(d, dom)
   def update[K[_], D, U](ref: DRef[D, U, _])(u: U): PropagationLang[K, Unit] = Update(ref, u)
-  def intersect[K[_], D](ref: LRef[D])(d: D): PropagationLang[K, Unit] = update(ref)(d)
+  def intersect[K[_], D, U](ref: DRef[D, U, _])(d: D)(implicit inj: Inject[Meet[D], U]): PropagationLang[K, Unit] =
+    update(ref)(inj(Meet(d)))
   def fetch[K[_], D](ref: VRef[D]): PropagationLang[K, D] = Fetch(ref)
   def fetchVector[K[_], D, N <: Nat](refs: Sized[Vector[VRef[D]], N]): PropagationLang[K, Sized[Vector[D], N]] = FetchVector(refs)
   def varTrigger[K[_], D](ref: VRef[D])(f: D => Trigger[K]): PropagationLang[K, Unit] = VarTrigger(ref, f)
   def selTrigger[K[_], L <: HList](sel: Sel[L])(f: L => Trigger[K]): PropagationLang[K, Unit] = SelTrigger(sel, f)
-  def whenResolved[K[_], A, D](ref: VRef[D])(f: A => K[Unit])(implicit dom: Domain[A, D]): PropagationLang[K, Unit] =
-    varTrigger[K, D](ref)(d => dom.values(d) match {
-      case Domain.Empty() => Discard()
-      case Domain.Just(a) => Fire(f(a))
-      case Domain.Many(_) => Sleep()
+  def whenRefined[K[_], D](ref: VRef[D])(f: D => K[Unit])(implicit dom: Dom[D, _, _]): PropagationLang[K, Unit] =
+    varTrigger[K, D](ref)(d => dom.assess(d) match {
+      case Dom.Refined => Fire(f(d))
+      case _ => Sleep()
+    })
+  def whenResolved[K[_], A, D](ref: VRef[D])(f: A => K[Unit])(implicit ee: EmbedExtract[A, D]): PropagationLang[K, Unit] =
+    varTrigger[K, D](ref)(d => ee.extract(d) match {
+      case Some(a) => Fire(f(a))
+      case None => Sleep()
     })
 
   // constructors lifted to free programs
+  def cellF[D, U, Δ](d: D)(implicit dom: Dom[D, U, Δ]): FP[DRef[D, U, Δ]] =
+    FreeK.suspend(cell[FP, D, U, Δ](d))
+  def cellsF[D, U, Δ](d: D, n: Int)(implicit dom: Dom[D, U, Δ]): FP[Vector[DRef[D, U, Δ]]] =
+    Traverse[Vector].sequenceU(Vector.fill(n)(cellF(d)))
   def updateF[D, U](ref: DRef[D, U, _])(u: U): FP[Unit] =
     FreeK.suspend(update[FP, D, U](ref)(u))
-  def intersectF[D](ref: LRef[D])(d: D): FP[Unit] =
-    FreeK.suspend(intersect[FP, D](ref)(d))
+  def intersectF[D, U](ref: DRef[D, U, _])(d: D)(implicit inj: Inject[Meet[D], U]): FP[Unit] =
+    FreeK.suspend(intersect[FP, D, U](ref)(d))
   def fetchF[D](ref: VRef[D]): FP[D] =
     FreeK.suspend(fetch[FP, D](ref))
   def fetchVectorF[D, N <: Nat](refs: Sized[Vector[VRef[D]], N]): FP[Sized[Vector[D], N]] =
@@ -70,17 +94,19 @@ object PropagationLang {
     FreeK.lift(varTrigger[FreeK[F, ?], D](ref)(f))
   def selTriggerF[F[_[_], _], L <: HList](sel: Sel[L])(f: L => Trigger[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     FreeK.lift(selTrigger[FreeK[F, ?], L](sel)(f))
-  def whenResolvedF[F[_[_], _], A, D](ref: VRef[D])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], dom: Domain[A, D]): FreeK[F, Unit] =
+  def whenRefinedF[F[_[_], _], D](ref: VRef[D])(f: D => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D, _, _]): FreeK[F, Unit] =
+    FreeK.lift(whenRefined[FreeK[F, ?], D](ref)(f))
+  def whenResolvedF[F[_[_], _], A, D](ref: VRef[D])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ee: EmbedExtract[A, D]): FreeK[F, Unit] =
     FreeK.lift(whenResolved[FreeK[F, ?], A, D](ref)(f))
 
 
   // convenience API
-  def set[A, D: Domain[A, ?]](ref: LRef[D], a: A): FP[Unit] =
-    intersectF(ref)(Domain[A, D].singleton(a))
-  def remove[A, D: Domain[A, ?] : GenBool](ref: LRef[D], a: A): FP[Unit] = {
-    val d = Domain[A, D].singleton(a)
-    fetchF(ref) >>= { d0 => intersectF(ref)(GenBool[D].without(d0, d)) }
-  }
+  def set[A, D, U](ref: DRef[D, U, _], a: A)(implicit ee: EmbedExtract[A, D], inj: Inject[Meet[D], U]): FP[Unit] =
+    intersectF(ref)(EmbedExtract[A, D].embed(a))
+  def remove[D, U, Δ](ref: DRef[D, U, Δ], d: D)(implicit inj: Inject[Diff[D], U]): FP[Unit] =
+    updateF[D, U](ref)(inj(Diff(d)))
+  def exclude[A, D, U, Δ](ref: DRef[D, U, Δ], a: A)(implicit ee: EmbedExtract[A, D], inj: Inject[Diff[D], U]): FP[Unit] =
+    remove(ref, ee.embed(a))
   def selTrigger2[K[_], D1, D2](ref1: VRef[D1], ref2: VRef[D2])(f: (D1, D2) => Trigger[K]): PropagationLang[K, Unit] =
     selTrigger[K, D1 :: D2 :: HNil](Sel(ref1, ref2))(l => f(l.head, l.tail.head))
   def selTrigger2F[F[_[_], _], D1, D2](ref1: VRef[D1], ref2: VRef[D2])(f: (D1, D2) => Trigger[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
@@ -94,8 +120,8 @@ object PropagationLang {
     * of finite sets of elements of type A, initialized to the given set of
     * elements.
     */
-  def branch[A](as: Set[A]): FP[LRef[Set[A]]] = variable[A].oneOf(as)
-  def branch[A](as: A*): FP[LRef[Set[A]]] = branch(as.toSet)
+  def branch[A](as: Set[A]): FP[CMRef[Set[A]]] = variable[A].oneOf(as)
+  def branch[A](as: A*): FP[CMRef[Set[A]]] = branch(as.toSet)
 
   /** Convenience method to add an exclusive choice of arbitrary free programs
     * to continue. When the choice is made, the chosen program is executed.
@@ -122,8 +148,8 @@ object PropagationLang {
   // Convenience API for promises as special kind of lattices
 
   import nutcracker.Promise._
-  def promiseF[A]: FreeK[PropagationLang, Promised[A]] = variable[A].any[nutcracker.Promise[A]]
-  def completeF[A](p: Promised[A], a: A): FreeK[PropagationLang, Unit] = set[A, nutcracker.Promise[A]](p, a)
+  def promiseF[A]: FreeK[PropagationLang, Promised[A]] = cellF(Promise.empty[A])
+  def completeF[A](p: Promised[A], a: A): FreeK[PropagationLang, Unit] = updateF(p)(Promise.Complete(a))
 
   def promiseC[F[_[_], _], A](cont: Cont[FreeK[F, Unit], A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[A]] = for {
     pa <- promiseF[A].inject[F]
@@ -167,7 +193,7 @@ object PropagationLang {
       case SelTrigger(sel, f)   => selTrigger(sel){ l => FunctorK[Trigger].transform(f(l))(tr) }
 
       // the boring cases
-      case Variable(d, dom)  => Variable(d, dom)
+      case Cell(d, dom)      => Cell(d, dom)
       case Update(ref, u)    => Update(ref, u)
       case Fetch(ref)        => Fetch(ref)
       case FetchVector(refs) => FetchVector(refs)

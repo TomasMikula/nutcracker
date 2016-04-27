@@ -1,7 +1,11 @@
 package nutcracker.lib.bool
 
 import algebra.lattice.Bool
-import nutcracker.Domain
+import nutcracker.Dom.{CMUDom, Diff, Meet}
+import nutcracker.{Dom, EmbedExtract}
+
+import scalaz.{-\/, \/, \/-}
+import scalaz.syntax.either._
 
 sealed trait BoolDomain
 
@@ -12,48 +16,53 @@ object BoolDomain {
   case object MustBeTrue extends BoolDomain
   case object MustBeFalse extends BoolDomain
 
-  implicit val boolDomain: Domain[Boolean, BoolDomain] with Bool[BoolDomain] =
-    new Domain[Boolean, BoolDomain] with Bool[BoolDomain] {
-      def zero: BoolDomain = Bottom
-      def one: BoolDomain = Top
-      def and(a: BoolDomain, b: BoolDomain): BoolDomain = (a, b) match {
+  implicit val embedExtractInstance: EmbedExtract[Boolean, BoolDomain] = new EmbedExtract[Boolean, BoolDomain] {
+
+    def embed(b: Boolean): BoolDomain =
+      if(b) MustBeTrue
+      else  MustBeFalse
+
+    def extract(d: BoolDomain): Option[Boolean] = d match {
+      case MustBeTrue => Some(true)
+      case MustBeFalse => Some(false)
+      case _ => None
+    }
+  }
+
+  implicit val boolDomain: CMUDom[BoolDomain] with Bool[BoolDomain] =
+    new CMUDom[BoolDomain] with Bool[BoolDomain] {
+      override def zero: BoolDomain = Bottom
+      override def one: BoolDomain = Top
+      override def and(a: BoolDomain, b: BoolDomain): BoolDomain = (a, b) match {
         case (Top, x) => x
         case (x, Top) => x
         case (x, y) if x == y => x
         case _ => Bottom
       }
-      def refine(a: BoolDomain, b: BoolDomain): Option[BoolDomain] = (a, b) match {
-        case (_, Top) => None
-        case (Top, y) => Some(y)
-        case (Bottom, _) => None
-        case (x, y) => if(x == y) None else Some(Bottom)
-      }
-      def or(a: BoolDomain, b: BoolDomain): BoolDomain = (a, b) match {
+      override def or(a: BoolDomain, b: BoolDomain): BoolDomain = (a, b) match {
         case (Bottom, x) => x
         case (x, Bottom) => x
         case (x, y) if x == y => x
         case _ => Top
       }
-      def complement(a: BoolDomain): BoolDomain = a match {
+      override def complement(a: BoolDomain): BoolDomain = a match {
         case Top => Bottom
         case Bottom => Top
         case MustBeTrue => MustBeFalse
         case MustBeFalse => MustBeTrue
       }
-      def values(d: BoolDomain): Domain.Values[Boolean, BoolDomain] = d match {
-        case Bottom => Domain.Empty()
-        case MustBeTrue => Domain.Just(true)
-        case MustBeFalse => Domain.Just(false)
-        case Top => Domain.Many(Stream(List(MustBeTrue, MustBeFalse)))
+      override def assess(d: BoolDomain): Dom.Status[Meet[BoolDomain] \/ Diff[BoolDomain]] = d match {
+        case Top => Dom.Unrefined(() => Some(List(Meet(MustBeTrue).left, Meet(MustBeFalse).left)))
+        case Bottom => Dom.Failed
+        case _ => Dom.Refined
       }
-      def singleton(b: Boolean): BoolDomain =
-        if(b) MustBeTrue
-        else  MustBeFalse
-      def sizeUpperBound(d: BoolDomain): Option[Long] = Some(d match {
-        case Top => 2
-        case Bottom => 0
-        case _ => 1
-      })
-      override def isEmpty(d: BoolDomain): Boolean = d == Bottom
+      override def update(d: BoolDomain, u: Meet[BoolDomain] \/ Diff[BoolDomain]): Option[(BoolDomain, Unit)] = {
+        val res = u match {
+          case -\/(m) => and(d, m.value)
+          case \/-(x) => and(d, complement(x.value))
+        }
+        if(res == d) None else Some((res, ()))
+      }
+      override def combineDiffs(d1: Unit, d2: Unit): Unit = ()
     }
 }

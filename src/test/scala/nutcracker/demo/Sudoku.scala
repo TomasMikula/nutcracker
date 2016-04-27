@@ -1,6 +1,5 @@
 package nutcracker.demo
 
-import nutcracker.Domain._
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._
 import nutcracker._
@@ -12,7 +11,7 @@ import scala.language.higherKinds
 class Sudoku extends FunSuite {
   val solver = PropagationStore.dfsSolver
 
-  type Cell = LRef[Set[Int]]
+  type Cell = CMRef[Set[Int]]
   type Cells = Vector[Cell]
 
   /** A program that sets up an empty Sudoku, that is 81 integer variables
@@ -46,7 +45,7 @@ class Sudoku extends FunSuite {
       for {
         xPos <- variable[Cell].oneOf(seg.toSet)
         _ <- concat(seg map { cell => varTriggerF(cell) { ys =>
-          if(!ys.contains(x)) fire(remove(xPos, cell))
+          if(!ys.contains(x)) fire(exclude(xPos, cell))
           else if(ys.size == 1) fire(PropagationLang.set(xPos, cell))
           else sleep[PropagationLang]
         } })

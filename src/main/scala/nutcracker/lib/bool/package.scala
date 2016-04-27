@@ -2,14 +2,14 @@ package nutcracker.lib
 
 import scala.language.higherKinds
 import nutcracker.util.{FreeK, InjectK}
-import nutcracker.{LRef, PropagationLang}
+import nutcracker.{CMURef, PropagationLang}
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._
 import nutcracker.lib.bool.BoolDomain._
 
 package object bool {
 
-  type Ref = LRef[BoolDomain]
+  type Ref = CMURef[BoolDomain]
 
   def and(x: Ref, y: Ref): FreeK[PropagationLang, Ref] = {
     variable[Boolean]() >>= { res =>

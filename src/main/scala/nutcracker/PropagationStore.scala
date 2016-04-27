@@ -10,7 +10,6 @@ import scalaz.Id._
 import scalaz.StateT
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
-import Domain._
 
 case class PropagationStore[K[_]] private(
   nextId: Long,
@@ -44,11 +43,8 @@ case class PropagationStore[K[_]] private(
     case dr @ DRef(_) =>  getDomain(dr)._1
   }
 
-  def fetchResult[A, D](ref: DRef[D, _, _])(implicit dom: Domain[A, D]): Option[A] = getDomain(ref) match {
-    case (d, _, _) => dom.values(d) match {
-      case Just(a) => Some(a)
-      case _ => None
-    }
+  def fetchResult[A, D](ref: DRef[D, _, _])(implicit ee: EmbedExtract[A, D]): Option[A] = getDomain(ref) match {
+    case (d, _, _) => ee.extract(d)
   }
 
   def fetchVector[D, N <: Nat](refs: Sized[Vector[VRef[D]], N]): Sized[Vector[D], N] =
@@ -175,7 +171,7 @@ object PropagationStore {
         Step(new (PropagationLang ~~> λ[(K[_], A) => scalaz.State[State[K], (A, List[K[Unit]])]]) {
           override def apply[K[_], A](p: PropagationLang[K, A]): scalaz.State[PropagationStore[K], (A, List[K[Unit]])] = scalaz.State(s =>
             p match {
-              case Variable(d, dom) => s.addVariable(d, dom) match {
+              case Cell(d, dom) => s.addVariable(d, dom) match {
                 case (s1, ref) => (s1, (ref, Nil))
               }
               case VarTrigger(ref, f) => s.addDomainTrigger(ref, f) match {
