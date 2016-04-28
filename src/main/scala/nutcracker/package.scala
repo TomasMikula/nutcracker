@@ -54,7 +54,7 @@ package object nutcracker {
       _ <- whenRefinedF(d1) { r1 => whenRefinedF(d2) { r2 => set[Boolean, BoolDomain, Meet[BoolDomain] \/ Diff[BoolDomain]](res, Eq[D].neqv(r1, r2)) } }
     } yield res
 
-  def promiseResults[A, D](cells: Vector[VRef[D]])(implicit ee: EmbedExtract[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] = {
+  def promiseResults[A, D, U, Δ](cells: Vector[DRef[D, U, Δ]])(implicit ee: EmbedExtract[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] = {
 
     def go(pr: Promised[Vector[A]], tail: List[A], i: Int): FreeK[PropagationLang, Unit] = {
       if(i < 0) {
@@ -70,6 +70,6 @@ package object nutcracker {
     } yield pr
   }
 
-  def promiseResults[A, D](cells: VRef[D]*)(implicit ee: EmbedExtract[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] =
+  def promiseResults[A, D, U, Δ](cells: DRef[D, U, Δ]*)(implicit ee: EmbedExtract[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] =
     promiseResults(cells.toVector)
 }

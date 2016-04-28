@@ -14,7 +14,7 @@ import shapeless.{HList, Nat, Sized}
 case class PropagationStore[K[_]] private(
   nextId: Long,
   domains: Map[Long, (D, Dom[D, U, Δ], Option[Δ]) forSome { type D; type U; type Δ }],
-  domainTriggers: Map[VRef[_], List[_ => Trigger[K]]],
+  domainTriggers: Map[VRef[_], List[(_, _) => Trigger[K]]],
   selTriggers: Map[Sel[_], List[_ => Trigger[K]]],
   cellsToSels: Index[VRef[_], Sel[_ <: HList]],
   unresolvedVars: Set[DRef[D, U, Δ] forSome { type D; type U; type Δ }],
@@ -67,12 +67,11 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  def addDomainTrigger[D](ref: VRef[D], t: D => Trigger[K]): (PropagationStore[K], Option[K[Unit]]) = {
-    t(fetch(ref)) match {
-      case Discard() => (this, None)
-      case Sleep() => (addDomainTrigger0(ref, t), None)
-      case Fire(cont) => (this, Some(cont))
-      case FireReload(cont) => (addDomainTrigger0(ref, t), Some(cont))
+  def addDomainTrigger[D, U, Δ](ref: DRef[D, U, Δ], t: D => (Option[K[Unit]], Option[(D, Δ) => Trigger[K]])): (PropagationStore[K], Option[K[Unit]]) = {
+    val (now, onChange) = t(fetch(ref))
+    onChange match {
+      case Some(action) => (addDomainTrigger0(ref, action), now)
+      case None => (this, now)
     }
   }
 
@@ -85,7 +84,7 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  private def addDomainTrigger0[D](ref: VRef[D], t: D => Trigger[K]): PropagationStore[K] =
+  private def addDomainTrigger0[D, U, Δ](ref: DRef[D, U, Δ], t: (D, Δ) => Trigger[K]): PropagationStore[K] =
     copy(domainTriggers = domainTriggers + ((ref, t :: domainTriggers.getOrElse(ref, Nil))))
 
   private def addSelTrigger0[L <: HList](sel: Sel[L], t: L => Trigger[K]): PropagationStore[K] = {
@@ -95,9 +94,9 @@ case class PropagationStore[K[_]] private(
     )
   }
 
-  def triggersForDomain[D](ref: DRef[D, _, _]): (PropagationStore[K], List[K[Unit]]) = {
-    val d = fetch(ref)
-    collectTriggers(d, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[D => Trigger[K]]]) match {
+  private def triggersForDomain[D, U, Δ](ref: DRef[D, U, Δ]): (PropagationStore[K], List[K[Unit]]) = {
+    val (d, _, Some(δ)) = getDomain(ref) // we assert there _is_ some δ
+    collectDomTriggers(d, δ, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[(D, Δ) => Trigger[K]]]) match {
       case (Nil, fired) => (copy(domainTriggers = domainTriggers - ref), fired)
       case (forLater, fired) => (copy(domainTriggers = domainTriggers + ((ref, forLater))), fired)
     }
@@ -105,7 +104,7 @@ case class PropagationStore[K[_]] private(
 
   def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], List[K[Unit]]) = {
     val d = sel.fetch(cellFetcher)
-    collectTriggers(d, selTriggers.getOrElse(sel, Nil).asInstanceOf[List[L => Trigger[K]]]) match {
+    collectSelTriggers(d, selTriggers.getOrElse(sel, Nil).asInstanceOf[List[L => Trigger[K]]]) match {
       case (Nil, fired) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), fired)
       case (forLater, fired) => (copy(selTriggers = selTriggers + ((sel, forLater))), fired)
     }
@@ -117,15 +116,25 @@ case class PropagationStore[K[_]] private(
   private[nutcracker] def getDomain[D, U, Δ](ref: DRef[D, U, Δ]): (D, Dom[D, U, Δ], Option[Δ]) =
     domains(ref.domainId).asInstanceOf[(D, Dom[D, U, Δ], Option[Δ])]
 
-//  private def setDomain[A, D](ref: DomRef[A, D], d: D, dom: Domain[A, D]): PropagationStore[K] =
-//    copy(domains = domains + ((ref.domainId, (d, dom))))
-
-  private def collectTriggers[D](d: D, triggers: List[D => Trigger[K]]): (List[D => Trigger[K]], List[K[Unit]]) =
+  private def collectDomTriggers[D, Δ](d: D, δ: Δ, triggers: List[(D, Δ) => Trigger[K]]): (List[(D, Δ) => Trigger[K]], List[K[Unit]]) =
     triggers match {
       case Nil => (Nil, Nil)
       case t :: ts =>
-        val (ts1, conts) = collectTriggers(d, ts)
-        t(d) match {
+        val (ts1, conts) = collectDomTriggers(d, δ, ts)
+        t(d, δ) match {
+          case Discard() => (ts1, conts)
+          case Sleep() => (t :: ts1, conts)
+          case Fire(cont) => (ts1, cont :: conts)
+          case FireReload(cont) => (t :: ts1, cont :: conts)
+        }
+    }
+
+  private def collectSelTriggers[L <: HList](l: L, triggers: List[L => Trigger[K]]): (List[L => Trigger[K]], List[K[Unit]]) =
+    triggers match {
+      case Nil => (Nil, Nil)
+      case t :: ts =>
+        val (ts1, conts) = collectSelTriggers(l, ts)
+        t(l) match {
           case Discard() => (ts1, conts)
           case Sleep() => (t :: ts1, conts)
           case Fire(cont) => (ts1, cont :: conts)
@@ -174,7 +183,7 @@ object PropagationStore {
               case Cell(d, dom) => s.addVariable(d, dom) match {
                 case (s1, ref) => (s1, (ref, Nil))
               }
-              case VarTrigger(ref, f) => s.addDomainTrigger(ref, f) match {
+              case DomTrigger(ref, f) => s.addDomainTrigger(ref, f) match {
                 case (s1, ok) => (s1, ((), ok.toList))
               }
               case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {

@@ -44,7 +44,7 @@ class Sudoku extends FunSuite {
     def segNumConstraint(seg: Seq[Cell], x: Int): FreeK[PropagationLang, Unit] = {
       for {
         xPos <- variable[Cell].oneOf(seg.toSet)
-        _ <- concat(seg map { cell => varTriggerF(cell) { ys =>
+        _ <- concat(seg map { cell => valTriggerF(cell) { ys =>
           if(!ys.contains(x)) fire(exclude(xPos, cell))
           else if(ys.size == 1) fire(PropagationLang.set(xPos, cell))
           else sleep[PropagationLang]
