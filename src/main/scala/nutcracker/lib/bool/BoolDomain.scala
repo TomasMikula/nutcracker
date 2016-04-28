@@ -7,14 +7,14 @@ import nutcracker.{Dom, EmbedExtract}
 import scalaz.{-\/, \/, \/-}
 import scalaz.syntax.either._
 
-sealed trait BoolDomain
+final case class BoolDomain private(intValue: Int) extends AnyVal
 
 object BoolDomain {
 
-  case object Top extends BoolDomain
-  case object Bottom extends BoolDomain
-  case object MustBeTrue extends BoolDomain
-  case object MustBeFalse extends BoolDomain
+  val Bottom = BoolDomain(0)
+  val MustBeTrue = BoolDomain(1)
+  val MustBeFalse = BoolDomain(2)
+  val Top = BoolDomain(3)
 
   implicit val embedExtractInstance: EmbedExtract[Boolean, BoolDomain] = new EmbedExtract[Boolean, BoolDomain] {
 
@@ -33,24 +33,12 @@ object BoolDomain {
     new CMUDom[BoolDomain] with Bool[BoolDomain] {
       override def zero: BoolDomain = Bottom
       override def one: BoolDomain = Top
-      override def and(a: BoolDomain, b: BoolDomain): BoolDomain = (a, b) match {
-        case (Top, x) => x
-        case (x, Top) => x
-        case (x, y) if x == y => x
-        case _ => Bottom
-      }
-      override def or(a: BoolDomain, b: BoolDomain): BoolDomain = (a, b) match {
-        case (Bottom, x) => x
-        case (x, Bottom) => x
-        case (x, y) if x == y => x
-        case _ => Top
-      }
-      override def complement(a: BoolDomain): BoolDomain = a match {
-        case Top => Bottom
-        case Bottom => Top
-        case MustBeTrue => MustBeFalse
-        case MustBeFalse => MustBeTrue
-      }
+      override def and(a: BoolDomain, b: BoolDomain): BoolDomain =
+        BoolDomain(a.intValue & b.intValue)
+      override def or(a: BoolDomain, b: BoolDomain): BoolDomain =
+        BoolDomain(a.intValue | b.intValue)
+      override def complement(a: BoolDomain): BoolDomain =
+        BoolDomain(~a.intValue & Top.intValue)
       override def assess(d: BoolDomain): Dom.Status[Meet[BoolDomain] \/ Diff[BoolDomain]] = d match {
         case Top => Dom.Unrefined(() => Some(List(Meet(MustBeTrue).left, Meet(MustBeFalse).left)))
         case Bottom => Dom.Failed
