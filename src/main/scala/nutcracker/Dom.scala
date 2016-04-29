@@ -65,7 +65,7 @@ object Dom {
     @inline
     private def diff(a: Set[A], b: Set[A]): Option[(Set[A], Res[Set[A]] \/ Diff[Set[A]])] = {
       val res = a diff b
-      if(res.size < a.size) Some((res, Diff(b diff a).right))
+      if(res.size < a.size) Some((res, Diff(a intersect b).right))
       else None
     }
   }
