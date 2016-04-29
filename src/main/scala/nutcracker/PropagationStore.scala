@@ -11,9 +11,11 @@ import scalaz.StateT
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
 
+import PropagationStore._
+
 case class PropagationStore[K[_]] private(
   nextId: Long,
-  domains: Map[Long, (D, Dom[D, U, Δ], Option[Δ]) forSome { type D; type U; type Δ }],
+  domains: Domains,
   domainTriggers: Map[VRef[_], List[(_, _) => Trigger[K]]],
   selTriggers: Map[Sel[_], List[_ => Trigger[K]]],
   cellsToSels: Index[VRef[_], Sel[_ <: HList]],
@@ -94,15 +96,17 @@ case class PropagationStore[K[_]] private(
     )
   }
 
-  private def triggersForDomain[D, U, Δ](ref: DRef[D, U, Δ]): (PropagationStore[K], List[K[Unit]]) = {
-    val (d, _, Some(δ)) = getDomain(ref) // we assert there _is_ some δ
-    collectDomTriggers(d, δ, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[(D, Δ) => Trigger[K]]]) match {
-      case (Nil, fired) => (copy(domainTriggers = domainTriggers - ref), fired)
-      case (forLater, fired) => (copy(domainTriggers = domainTriggers + ((ref, forLater))), fired)
+  private def triggersForDomain[D, U, Δ](ref: DRef[D, U, Δ]): (PropagationStore[K], List[K[Unit]]) =
+    clearDelta(ref) match {
+      case Some((domains1, d, δ)) =>
+        collectDomTriggers(d, δ, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[(D, Δ) => Trigger[K]]]) match {
+          case (Nil, fired) => (copy(domains = domains1, domainTriggers = domainTriggers - ref), fired)
+          case (forLater, fired) => (copy(domains = domains1, domainTriggers = domainTriggers + ((ref, forLater))), fired)
+        }
+      case None => (this, Nil)
     }
-  }
 
-  def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], List[K[Unit]]) = {
+  private def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], List[K[Unit]]) = {
     val d = sel.fetch(cellFetcher)
     collectSelTriggers(d, selTriggers.getOrElse(sel, Nil).asInstanceOf[List[L => Trigger[K]]]) match {
       case (Nil, fired) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), fired)
@@ -110,11 +114,19 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  def getSelsForCell(ref: DRef[_, _, _]): Set[Sel[_ <: HList]] = cellsToSels.get(ref)
+  private def getSelsForCell(ref: DRef[_, _, _]): Set[Sel[_ <: HList]] = cellsToSels.get(ref)
 
 
   private[nutcracker] def getDomain[D, U, Δ](ref: DRef[D, U, Δ]): (D, Dom[D, U, Δ], Option[Δ]) =
     domains(ref.domainId).asInstanceOf[(D, Dom[D, U, Δ], Option[Δ])]
+
+  private def clearDelta[D, U, Δ](ref: DRef[D, U, Δ]): Option[(Domains, D, Δ)] = {
+    val (d, dom, delta) = getDomain(ref)
+    delta match {
+      case Some(δ) => Some((domains + ((ref.domainId, (d, dom, None))), d, δ))
+      case None => None
+    }
+  }
 
   private def collectDomTriggers[D, Δ](d: D, δ: Δ, triggers: List[(D, Δ) => Trigger[K]]): (List[(D, Δ) => Trigger[K]], List[K[Unit]]) =
     triggers match {
@@ -159,6 +171,8 @@ case class PropagationStore[K[_]] private(
 object PropagationStore {
   import PropagationLang._
   import scalaz.~>
+
+  type Domains = Map[Long, (D, Dom[D, U, Δ], Option[Δ]) forSome { type D; type U; type Δ }]
 
   def empty[K[_]] = PropagationStore[K](
     nextId = 0L,
