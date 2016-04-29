@@ -10,8 +10,18 @@ import scalaz.{Traverse, \/}
 
 package object nutcracker {
 
-  type CMRef[D] = DRef[D, Meet[D] \/ Diff[D], Res[D] \/ Diff[D]]
-  type CMURef[D] = DRef[D, Meet[D] \/ Diff[D], Unit]
+  /** Monotonic update of a Complemented Meet lattice:
+    * either meet or diff (relative complement)
+    */
+  type CMUpdate[D] = Meet[D] \/ Diff[D]
+
+  /** Published changes to a Complemented Meet lattice:
+    * either the new value (Res), or the difference to previous value (Diff).
+    */
+  type CMDelta[D] = Res[D] \/ Diff[D]
+
+  type CMRef[D] = DRef[D, CMUpdate[D], CMDelta[D]]
+  type CMURef[D] = DRef[D, CMUpdate[D], Unit]
 
   type Promised[A] = DRef[Promise[A], Promise.Complete[A], Unit]
 
