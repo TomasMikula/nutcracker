@@ -67,11 +67,13 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  def addDomainTrigger[D, U, Δ](ref: DRef[D, U, Δ], t: D => (Option[K[Unit]], Option[(D, Δ) => Trigger[K]])): (PropagationStore[K], Option[K[Unit]]) = {
+  def addDomainTrigger[D, U, Δ](ref: DRef[D, U, Δ], t: D => (Option[K[Unit]], Option[(D, Δ) => Trigger[K]])): (PropagationStore[K], List[K[Unit]]) = {
     val (now, onChange) = t(fetch(ref))
     onChange match {
-      case Some(action) => (addDomainTrigger0(ref, action), now)
-      case None => (this, now)
+      case Some(action) =>
+        val (s1, ks) = addDomainTrigger0(ref, action)
+        (s1, now.toList ::: ks)
+      case None => (this, now.toList)
     }
   }
 
@@ -84,8 +86,20 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  private def addDomainTrigger0[D, U, Δ](ref: DRef[D, U, Δ], t: (D, Δ) => Trigger[K]): PropagationStore[K] =
-    copy(domainTriggers = domainTriggers + ((ref, t :: domainTriggers.getOrElse(ref, Nil))))
+  private def addDomainTrigger0[D, U, Δ](ref: DRef[D, U, Δ], t: (D, Δ) => Trigger[K]): (PropagationStore[K], List[K[Unit]]) = {
+    val triggers = domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[(D, Δ) => Trigger[K]]]
+    val (remainingTriggers, firedTriggers) = dirtyDomains.get(ref) match {
+      case Some(δ) => collectDomTriggers(fetch(ref), δ, triggers)
+      case None => (triggers, Nil)
+    }
+    (
+      copy(
+        domainTriggers = domainTriggers + ((ref, t :: remainingTriggers)),
+        dirtyDomains = dirtyDomains - ref
+      ),
+      firedTriggers
+    )
+  }
 
   private def addSelTrigger0[L <: HList](sel: Sel[L], t: L => Trigger[K]): PropagationStore[K] = {
     copy(
@@ -184,7 +198,7 @@ object PropagationStore {
                 case (s1, ref) => (s1, (ref, Nil))
               }
               case DomTrigger(ref, f) => s.addDomainTrigger(ref, f) match {
-                case (s1, ok) => (s1, ((), ok.toList))
+                case (s1, ks) => (s1, ((), ks))
               }
               case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
                 case (s1, ok) => (s1, ((), ok.toList))
