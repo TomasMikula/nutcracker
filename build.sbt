@@ -11,7 +11,6 @@ resolvers += "bintray/non" at "http://dl.bintray.com/non/maven"
 resolvers += Resolver.sonatypeRepo("releases")
 
 autoCompilerPlugins := true
-addCompilerPlugin("com.lihaoyi" %% "acyclic" % "0.1.3")
 addCompilerPlugin("org.spire-math" % "kind-projector" % "0.6.0" cross CrossVersion.binary)
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.12")
@@ -37,11 +36,8 @@ javacOptions ++= Seq(
   "-Xlint:deprecation")
 
 libraryDependencies ++= Seq(
-  "com.lihaoyi" %% "acyclic" % "0.1.3" % "provided",
-  "com.github.mpilquist" %% "simulacrum" % "0.7.0",
   "org.spire-math" %% "algebra" % "0.3.2-SNAPSHOT",
   "org.spire-math" %% "algebra-std" % "0.3.2-SNAPSHOT",
-  "org.typelevel" %% "cats" % "0.4.1",
   "org.scalaz" %% "scalaz-core" % "7.3.0-M2",
   "com.chuusai" %% "shapeless" % "2.3.0",
   "com.github.julien-truffaut"  %%  "monocle-core" % "1.2.0",
