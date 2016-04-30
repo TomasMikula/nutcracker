@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, Index, K2Map, KMap, StateInterpreterT, Uncons, ValK, ~~>}
+import nutcracker.util.{FreeK, Index, K2Map, KMap, KMapB, StateInterpreterT, Uncons, ValK, ~~>}
 import nutcracker.util.StepT.Step
 
 import scalaz.Id._
@@ -16,7 +16,7 @@ case class PropagationStore[K[_]] private(
   nextId: Long,
   domains: Domains,
   domainTriggers: K2Map[DRef[?, Nothing, ?], λ[(D, Δ) => List[(D, Δ) => Trigger[K]]]],
-  selTriggers: Map[Sel[_], List[_ => Trigger[K]]],
+  selTriggers: KMapB[Sel, λ[L => List[L => Trigger[K]]], HList],
   cellsToSels: Index[VRef[_], Sel[_ <: HList]],
   unresolvedVars: Set[DRef[D, U, Δ] forSome { type D; type U; type Δ }],
   failedVars: Set[Long],
@@ -103,7 +103,7 @@ case class PropagationStore[K[_]] private(
 
   private def addSelTrigger0[L <: HList](sel: Sel[L], t: L => Trigger[K]): PropagationStore[K] = {
     copy(
-      selTriggers = selTriggers + ((sel, t :: selTriggers.getOrElse(sel, Nil))),
+      selTriggers = selTriggers.updated(sel, t :: selTriggers.getOrElse(sel, Nil)),
       cellsToSels = cellsToSels.add(sel)
     )
   }
@@ -116,9 +116,9 @@ case class PropagationStore[K[_]] private(
 
   private def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], List[K[Unit]]) = {
     val d = sel.fetch(cellFetcher)
-    collectSelTriggers(d, selTriggers.getOrElse(sel, Nil).asInstanceOf[List[L => Trigger[K]]]) match {
+    collectSelTriggers(d, selTriggers.getOrElse(sel, Nil)) match {
       case (Nil, fired) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), fired)
-      case (forLater, fired) => (copy(selTriggers = selTriggers + ((sel, forLater))), fired)
+      case (forLater, fired) => (copy(selTriggers = selTriggers.updated(sel, forLater)), fired)
     }
   }
 
@@ -178,7 +178,7 @@ object PropagationStore {
     nextId = 0L,
     domains = Map(),
     domainTriggers = K2Map[DRef[?, Nothing, ?], λ[(D, Δ) => List[(D, Δ) => Trigger[K]]]](),
-    selTriggers = Map(),
+    selTriggers = KMapB[Sel, λ[L => List[L => Trigger[K]]], HList](),
     cellsToSels = Index.empty(sel => sel.cells),
     unresolvedVars = Set(),
     failedVars = Set(),
