@@ -1,7 +1,5 @@
 package nutcracker
 
-import scalaz.\/
-
 trait Dom[D, U, Δ] {
 
   /** Applies the monotonic update `u` to `d`, obtaining `d1 ≥ d`
@@ -23,12 +21,4 @@ object Dom {
   case class Unrefined[U](xor: () => Option[List[U]]) extends Status[U]
   case object Refined extends Status[Nothing]
   case object Failed extends Status[Nothing]
-
-  final case class Res[+D](value: D) extends AnyVal
-  final case class Meet[+D](value: D) extends AnyVal
-  final case class Diff[+D](value: D) extends AnyVal
-
-  type MDom[D] = Dom[D, Meet[D], Unit]
-  type CMDom[D] = Dom[D, Meet[D] \/ Diff[D], Res[D] \/ Diff[D]]
-  type CMUDom[D] = Dom[D, Meet[D] \/ Diff[D], Unit]
 }

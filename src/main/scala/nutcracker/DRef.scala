@@ -1,7 +1,5 @@
 package nutcracker
 
-import nutcracker.Dom.Meet
-
 import scala.language.higherKinds
 import scala.language.implicitConversions
 import nutcracker.PropagationLang._

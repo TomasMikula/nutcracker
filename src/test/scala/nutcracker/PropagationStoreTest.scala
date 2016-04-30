@@ -1,6 +1,5 @@
 package nutcracker
 
-import nutcracker.Dom.Diff
 import org.scalatest.FunSuite
 import nutcracker.log._
 import nutcracker.PropagationLang._

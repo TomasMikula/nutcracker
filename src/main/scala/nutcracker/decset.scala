@@ -1,7 +1,5 @@
 package nutcracker
 
-import nutcracker.Dom.{CMDom, Diff, Meet, Res}
-
 import scalaz.{-\/, \/, \/-}
 import scalaz.syntax.either._
 

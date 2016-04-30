@@ -1,8 +1,7 @@
 package nutcracker.lib.bool
 
 import algebra.lattice.Bool
-import nutcracker.Dom.{CMUDom, Diff, Meet}
-import nutcracker.{Dom, EmbedExtract}
+import nutcracker.{CMUDom, Diff, Dom, EmbedExtract, Meet}
 
 import scalaz.{-\/, \/, \/-}
 import scalaz.syntax.either._

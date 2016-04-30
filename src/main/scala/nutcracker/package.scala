@@ -1,16 +1,23 @@
 import scala.language.higherKinds
 import algebra.Eq
 import algebra.lattice.BoundedMeetSemilattice
+import nutcracker.PropagationLang
 import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolDomain
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.util.{FreeK, Inject, InjectK}
-import nutcracker.Dom.{Diff, Meet, Res}
-import nutcracker.PropagationLang
 
 import scalaz.{Cont, _}
 
 package object nutcracker {
+
+  final case class Res[+D](value: D) extends AnyVal
+  final case class Meet[+D](value: D) extends AnyVal
+  final case class Diff[+D](value: D) extends AnyVal
+
+  type MDom[D] = Dom[D, Meet[D], Unit]
+  type CMDom[D] = Dom[D, Meet[D] \/ Diff[D], Res[D] \/ Diff[D]]
+  type CMUDom[D] = Dom[D, Meet[D] \/ Diff[D], Unit]
 
   /** Monotonic update of a Complemented Meet lattice:
     * either meet or diff (relative complement)
