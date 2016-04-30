@@ -36,8 +36,8 @@ javacOptions ++= Seq(
   "-Xlint:deprecation")
 
 libraryDependencies ++= Seq(
-  "org.spire-math" %% "algebra" % "0.3.2-SNAPSHOT",
-  "org.spire-math" %% "algebra-std" % "0.3.2-SNAPSHOT",
+  "org.spire-math" %% "algebra" % "0.4.2",
+  "org.spire-math" %% "algebra-std" % "0.4.2",
   "org.scalaz" %% "scalaz-core" % "7.3.0-M2",
   "com.chuusai" %% "shapeless" % "2.3.0",
   "com.github.julien-truffaut"  %%  "monocle-core" % "1.2.0",
