@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, Index, K2Map, KMap, KMapB, StateInterpreterT, Uncons, ValK, ~~>}
+import nutcracker.util.{FreeK, Index, K2Map, K3Map, KMap, KMapB, StateInterpreterT, Uncons, ValK, ~~>}
 import nutcracker.util.StepT.Step
 
 import scalaz.Id._
@@ -14,7 +14,7 @@ import PropagationStore._
 
 case class PropagationStore[K[_]] private(
   nextId: Long,
-  domains: Domains,
+  domains: K3Map[DRef, λ[(D, U, Δ) => (D, Dom[D, U, Δ])]],
   domainTriggers: K2Map[DRef[?, Nothing, ?], λ[(D, Δ) => List[(D, Δ) => Trigger[K]]]],
   selTriggers: KMapB[Sel, λ[L => List[L => Trigger[K]]], HList],
   cellsToSels: Index[VRef[_], Sel[_ <: HList]],
@@ -30,8 +30,8 @@ case class PropagationStore[K[_]] private(
   }
 
   def addVariable[D, U, Δ](d: D, ev: Dom[D, U, Δ]): (PropagationStore[K], DRef[D, U, Δ]) = {
-    val domains1 = domains + ((nextId, (d, ev)))
     val ref = DRef[D, U, Δ](nextId)
+    val domains1 = domains.updated(ref, (d, ev))
     val (unresolvedVars1, failedVars1) = ev.assess(d) match {
       case Dom.Failed => (unresolvedVars, failedVars + nextId)
       case Dom.Refined => (unresolvedVars, failedVars)
@@ -41,10 +41,10 @@ case class PropagationStore[K[_]] private(
   }
 
   def fetch[D](ref: VRef[D]): D = ref match {
-    case dr @ DRef(_) =>  getDomain(dr)._1
+    case dr @ DRef(_) =>  domains(dr)._1
   }
 
-  def fetchResult[A, D](ref: DRef[D, _, _])(implicit ee: EmbedExtract[A, D]): Option[A] = getDomain(ref) match {
+  def fetchResult[A, D](ref: DRef[D, _, _])(implicit ee: EmbedExtract[A, D]): Option[A] = domains(ref) match {
     case (d, _) => ee.extract(d)
   }
 
@@ -52,7 +52,7 @@ case class PropagationStore[K[_]] private(
     refs.map(ref => fetch(ref))
 
   private def update[D, U, Δ](ref: DRef[D, U, Δ], u: U): PropagationStore[K] = {
-    val (d0, dom) = getDomain(ref)
+    val (d0, dom) = domains(ref)
     dom.update(d0, u) match {
       case None => this
       case Some((d1, diff1)) =>
@@ -61,7 +61,7 @@ case class PropagationStore[K[_]] private(
           case Dom.Refined => (unresolvedVars - ref, failedVars)
           case Dom.Unrefined(_) => (unresolvedVars, failedVars)
         }
-        val domains1 = domains + ((ref.domainId, (d1, dom)))
+        val domains1 = domains.updated(ref, (d1, dom))
         val dirtyDomains1 = dirtyDomains.updated(ref, diff1, dom.combineDiffs)
         copy(domains = domains1, unresolvedVars = unresolvedVars1, failedVars = failedVars1, dirtyDomains = dirtyDomains1)
     }
@@ -124,10 +124,6 @@ case class PropagationStore[K[_]] private(
 
   private def getSelsForCell(ref: DRef[_, _, _]): Set[Sel[_ <: HList]] = cellsToSels.get(ref)
 
-
-  private[nutcracker] def getDomain[D, U, Δ](ref: DRef[D, U, Δ]): (D, Dom[D, U, Δ]) =
-    domains(ref.domainId).asInstanceOf[(D, Dom[D, U, Δ])]
-
   private def collectDomTriggers[D, Δ](d: D, δ: Δ, triggers: List[(D, Δ) => Trigger[K]]): (List[(D, Δ) => Trigger[K]], List[K[Unit]]) =
     triggers match {
       case Nil => (Nil, Nil)
@@ -172,11 +168,9 @@ object PropagationStore {
   import PropagationLang._
   import scalaz.~>
 
-  type Domains = Map[Long, (D, Dom[D, U, Δ]) forSome { type D; type U; type Δ }]
-
   def empty[K[_]] = PropagationStore[K](
     nextId = 0L,
-    domains = Map(),
+    domains = K3Map[DRef, λ[(D, U, Δ) => (D, Dom[D, U, Δ])]](),
     domainTriggers = K2Map[DRef[?, Nothing, ?], λ[(D, Δ) => List[(D, Δ) => Trigger[K]]]](),
     selTriggers = KMapB[Sel, λ[L => List[L => Trigger[K]]], HList](),
     cellsToSels = Index.empty(sel => sel.cells),
@@ -222,7 +216,7 @@ object PropagationStore {
     else if(s.unresolvedVars.isEmpty) Done
     else {
       def splitDomain[D, U](ref: DRef[D, U, _]): Option[List[K[Unit]]] = {
-        val (d, domain) = s.getDomain(ref)
+        val (d, domain) = s.domains(ref)
         domain.assess(d) match {
           case Dom.Unrefined(choices) => choices() map { _ map { ui => tr(updateF(ref)(ui)) } }
           case _ => sys.error("splitDomain should be called on unresolved variables only.")
