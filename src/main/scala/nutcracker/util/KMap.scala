@@ -67,3 +67,25 @@ final case class K2Map[K[_, _], V[_, _]](map: Map[K[_, _], V[_, _]]) extends Any
 object K2Map {
   def apply[K[_, _], V[_, _]](): K2Map[K, V] = K2Map[K, V](Map[K[_, _], V[_, _]]())
 }
+
+
+final case class K3Map[K[_, _, _], V[_, _, _]](map: Map[K[_, _, _], V[_, _, _]]) extends AnyVal {
+  def isEmpty: Boolean = map.isEmpty
+  def nonEmpty: Boolean = map.nonEmpty
+  def head: (K[A, B, C], V[A, B, C]) forSome { type A; type B; type C } = map.head.asInstanceOf[(K[A, B, C], V[A, B, C]) forSome { type A; type B; type C }]
+  def tail: K3Map[K, V] = K3Map[K, V](map.tail)
+  def apply[A, B, C](k: K[A, B, C]): V[A, B, C] = map(k).asInstanceOf[V[A, B, C]]
+  def get[A, B, C](k: K[A, B, C]): Option[V[A, B, C]] = map.get(k).asInstanceOf[Option[V[A, B, C]]]
+  def getOrElse[A, B, C](k: K[A, B, C], default: => V[A, B, C]): V[A, B, C] = get(k).getOrElse(default)
+  def updated[A, B, C](k: K[A, B, C], v: V[A, B, C]): K3Map[K, V] = K3Map[K, V](map.updated(k, v))
+  def updated[A, B, C](k: K[A, B, C], v: V[A, B, C], combineIfPresent: (V[A, B, C], V[A, B, C]) => V[A, B, C]): K3Map[K, V] =
+    get(k) match {
+      case None => updated(k, v)
+      case Some(v0) => updated(k, combineIfPresent(v0, v))
+    }
+  def -(k: K[_, _, _]): K3Map[K, V] = K3Map[K, V](map - k)
+}
+
+object K3Map {
+  def apply[K[_, _, _], V[_, _, _]](): K3Map[K, V] = K3Map[K, V](Map[K[_, _, _], V[_, _, _]]())
+}
