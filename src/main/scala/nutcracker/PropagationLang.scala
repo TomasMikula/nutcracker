@@ -50,15 +50,13 @@ object PropagationLang {
   def cellsF[D, U, Δ](d: D, n: Int)(implicit dom: Dom[D, U, Δ]): FP[Vector[DRef[D, U, Δ]]] =
     Traverse[Vector].sequenceU(Vector.fill(n)(cellF(d)))
 
-  def valTrigger[K[_], D](ref: DRef[D, _, _])(f: D => Trigger[K]): PropagationLang[K, Unit] =
-    domTrigger(ref)(d => f(d) match {
+  def valTriggerF[F[_[_], _], D](ref: DRef[D, _, _])(f: D => Trigger[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+    domTriggerF(ref)(d => f(d) match {
       case FireReload(k) => (Some(k), Some((d, δ) => f(d)))
       case Fire(k) => (Some(k), None)
       case Sleep() => (None, Some((d, δ) => f(d)))
       case Discard() => (None, None)
     })
-  def valTriggerF[F[_[_], _], D](ref: DRef[D, _, _])(f: D => Trigger[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    FreeK.lift(valTrigger[FreeK[F, ?], D](ref)(f))
 
   def whenRefinedF[F[_[_], _], D](ref: DRef[D, _, _])(f: D => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D, _, _]): FreeK[F, Unit] =
     valTriggerF[F, D](ref)(d => dom.assess(d) match {
