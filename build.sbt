@@ -35,13 +35,15 @@ javacOptions ++= Seq(
   "-Xlint:unchecked",
   "-Xlint:deprecation")
 
+lazy val root = (project in file(".")).
+  dependsOn(RootProject(uri("https://github.com/TomasMikula/Principled.git")))
+
 libraryDependencies ++= Seq(
   "org.spire-math" %% "algebra" % "0.4.2",
   "org.spire-math" %% "algebra-std" % "0.4.2",
   "org.scalaz" %% "scalaz-core" % "7.3.0-M2",
   "com.chuusai" %% "shapeless" % "2.3.0",
   "com.github.julien-truffaut"  %%  "monocle-core" % "1.2.0",
-  "org.principled" %% "principled" % "0.1-SNAPSHOT",
   "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
   "org.scalacheck" %% "scalacheck" % "1.12.4"
 )
