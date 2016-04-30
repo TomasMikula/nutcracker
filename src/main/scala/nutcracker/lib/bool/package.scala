@@ -7,11 +7,14 @@ import nutcracker.PropagationLang._
 import nutcracker.Trigger._
 import nutcracker.lib.bool.BoolDomain._
 
+import scalaz.\/
+
 package object bool {
 
-  type Ref = CMURef[BoolDomain]
+  type BoolDom = Dom [BoolDomain, Meet[BoolDomain] \/ Diff[BoolDomain], Unit]
+  type BoolRef = DRef[BoolDomain, Meet[BoolDomain] \/ Diff[BoolDomain], Unit]
 
-  def and(x: Ref, y: Ref): FreeK[PropagationLang, Ref] = {
+  def and(x: BoolRef, y: BoolRef): FreeK[PropagationLang, BoolRef] = {
     variable[Boolean]() >>= { res =>
       whenResolvedF(x)({ (r: Boolean) =>
         if (r) y <=> res
@@ -29,7 +32,7 @@ package object bool {
     }
   }
 
-  def or(x: Ref*): FreeK[PropagationLang, Ref] = {
+  def or(x: BoolRef*): FreeK[PropagationLang, BoolRef] = {
     variable[Boolean]() >>= { res =>
       def watch(i: Int, j: Int): FreeK[PropagationLang, Unit] = {
         require(i < j)
@@ -63,7 +66,7 @@ package object bool {
     }
   }
 
-  def neg(x: Ref): FreeK[PropagationLang, Ref] = {
+  def neg(x: BoolRef): FreeK[PropagationLang, BoolRef] = {
     variable[Boolean]() >>= { res =>
       whenResolvedF(x)({ (r: Boolean) =>
         if (r) set(res, false)
@@ -77,12 +80,12 @@ package object bool {
     }
   }
 
-  def neg[F[_[_], _]](x: FreeK[F, Ref])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Ref] = x >>= { neg(_) }
+  def neg[F[_[_], _]](x: FreeK[F, BoolRef])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, BoolRef] = x >>= { neg(_) }
 
-  def not(x: Ref): FreeK[PropagationLang, Unit] =
+  def not(x: BoolRef): FreeK[PropagationLang, Unit] =
     set(x, false)
 
-  def imp(x: Ref, y: Ref): FreeK[PropagationLang, Unit] = {
+  def imp(x: BoolRef, y: BoolRef): FreeK[PropagationLang, Unit] = {
     whenResolvedF(x)({ (r: Boolean) =>
       if (r) set(y, true)
       else FreeK.Pure[PropagationLang, Unit](())
@@ -93,31 +96,31 @@ package object bool {
     })
   }
 
-  def atLeastOneTrue(x: Ref*): FreeK[PropagationLang, Unit] = {
+  def atLeastOneTrue(x: BoolRef*): FreeK[PropagationLang, Unit] = {
     presume(or(x: _*))
   }
 
-  def presume(x: Ref): FreeK[PropagationLang, Unit] = {
+  def presume(x: BoolRef): FreeK[PropagationLang, Unit] = {
     set(x, true)
   }
 
-  def presume[F[_[_], _]](x: FreeK[F, Ref])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] = {
+  def presume[F[_[_], _]](x: FreeK[F, BoolRef])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] = {
     x >>= { set(_, true) }
   }
 
-  implicit class BoolOps(self: Ref) {
+  implicit class BoolOps(self: BoolRef) {
 
-    def ===(that: Ref): FreeK[PropagationLang, Unit] = {
+    def ===(that: BoolRef): FreeK[PropagationLang, Unit] = {
       (self >>= { (x: Boolean) => set(that, x) }) >>
       (that >>= { (x: Boolean) => set(self, x) })
     }
 
-    def =!=(that: Ref): FreeK[PropagationLang, Unit] = {
+    def =!=(that: BoolRef): FreeK[PropagationLang, Unit] = {
       (self >>= { (x: Boolean) => set(that, !x) }) >>
       (that >>= { (x: Boolean) => set(self, !x) })
     }
 
-    def =?=(that: Ref): FreeK[PropagationLang, Ref] = {
+    def =?=(that: BoolRef): FreeK[PropagationLang, BoolRef] = {
       variable[Boolean]() >>= { res =>
         (res  >>= { (x: Boolean) => if(x) (self === that) else (self =!= that) }) >>
         (self >>= { (x: Boolean) => if(x) (res  === that) else (res  =!= that) }) >>
@@ -126,26 +129,26 @@ package object bool {
       }
     }
 
-    def =?=[F[_[_], _]](that: FreeK[F, Ref])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Ref] =
+    def =?=[F[_[_], _]](that: FreeK[F, BoolRef])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, BoolRef] =
       that >>= { self =?= _ }
 
-    def ∨(that: Ref): FreeK[PropagationLang, Ref] = or(self, that)
-    def ∨[F[_[_], _]](that: FreeK[F, Ref])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Ref] =
+    def ∨(that: BoolRef): FreeK[PropagationLang, BoolRef] = or(self, that)
+    def ∨[F[_[_], _]](that: FreeK[F, BoolRef])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, BoolRef] =
       that >>= { self ∨ _ }
 
-    def ∧(that: Ref): FreeK[PropagationLang, Ref] = and(self, that)
-    def ∧[F[_[_], _]](that: FreeK[F, Ref])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Ref] =
+    def ∧(that: BoolRef): FreeK[PropagationLang, BoolRef] = and(self, that)
+    def ∧[F[_[_], _]](that: FreeK[F, BoolRef])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, BoolRef] =
       that >>= { self ∧ _ }
   }
 
-  implicit class BoolOps1[F[_[_], _]](self: FreeK[F, Ref]) {
-    def ===(that: Ref)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] = self >>= { _ === that }
-    def =!=(that: Ref)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] = self >>= { _ =!= that }
-    def =?=(that: Ref)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Ref] = self >>= { _ =?= that }
-    def =?=(that: FreeK[F, Ref])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Ref] = self >>= { _ =?= that }
-    def ∨(that: Ref)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Ref] = self >>= { _ ∨ that }
-    def ∨(that: FreeK[F, Ref])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Ref] = self >>= { _ ∨ that }
-    def ∧(that: Ref)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Ref] = self >>= { _ ∧ that }
-    def ∧(that: FreeK[F, Ref])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Ref] = self >>= { _ ∧ that }
+  implicit class BoolOps1[F[_[_], _]](self: FreeK[F, BoolRef]) {
+    def ===(that: BoolRef)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] = self >>= { _ === that }
+    def =!=(that: BoolRef)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] = self >>= { _ =!= that }
+    def =?=(that: BoolRef)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, BoolRef] = self >>= { _ =?= that }
+    def =?=(that: FreeK[F, BoolRef])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, BoolRef] = self >>= { _ =?= that }
+    def ∨(that: BoolRef)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, BoolRef] = self >>= { _ ∨ that }
+    def ∨(that: FreeK[F, BoolRef])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, BoolRef] = self >>= { _ ∨ that }
+    def ∧(that: BoolRef)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, BoolRef] = self >>= { _ ∧ that }
+    def ∧(that: FreeK[F, BoolRef])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, BoolRef] = self >>= { _ ∧ that }
   }
 }

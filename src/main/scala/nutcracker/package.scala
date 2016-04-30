@@ -1,9 +1,10 @@
 import scala.language.higherKinds
 import algebra.Eq
 import algebra.lattice.BoundedMeetSemilattice
+import nutcracker.DecSet.DecSetRef
 import nutcracker.PropagationLang
 import nutcracker.PropagationLang._
-import nutcracker.lib.bool.BoolDomain
+import nutcracker.lib.bool.{BoolDomain, BoolRef}
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.util.{FreeK, Inject, InjectK}
 
@@ -11,26 +12,17 @@ import scalaz.{Cont, _}
 
 package object nutcracker {
 
-  final case class Res[+D](value: D) extends AnyVal
+  /** Used as a monotonic update on domain D:
+    * represents the operation of meet with the given value.
+    */
   final case class Meet[+D](value: D) extends AnyVal
+
+  /** When used as a monotonic update, represents the operation of relative complement.
+    * When used as a delta, represents the part that was removed.
+    * An operation `Diff(d)` applied to value `d0` will result in the new value being
+    * `d0 \ d` and the published delta being `Diff(d0 ∧ d)`.
+    */
   final case class Diff[+D](value: D) extends AnyVal
-
-  type MDom[D] = Dom[D, Meet[D], Unit]
-  type CMDom[D] = Dom[D, Meet[D] \/ Diff[D], Res[D] \/ Diff[D]]
-  type CMUDom[D] = Dom[D, Meet[D] \/ Diff[D], Unit]
-
-  /** Monotonic update of a Complemented Meet lattice:
-    * either meet or diff (relative complement)
-    */
-  type CMUpdate[D] = Meet[D] \/ Diff[D]
-
-  /** Published changes to a Complemented Meet lattice:
-    * either the new value (Res), or the difference to previous value (Diff).
-    */
-  type CMDelta[D] = Res[D] \/ Diff[D]
-
-  type CMRef[D] = DRef[D, CMUpdate[D], CMDelta[D]]
-  type CMURef[D] = DRef[D, CMUpdate[D], Unit]
 
   type Promised[A] = DRef[Promise[A], Promise.Complete[A], Unit]
 
@@ -62,8 +54,8 @@ package object nutcracker {
       l: BoundedMeetSemilattice[D]
     ): FreeK[PropagationLang, DRef[D, U, Δ]] = cellF(l.one)
 
-    def oneOf(as: Set[A]): FreeK[PropagationLang, CMRef[DecSet[A]]] = cellF(DecSet.wrap(as))
-    def oneOf(as: A*): FreeK[PropagationLang, CMRef[DecSet[A]]] = oneOf(as.toSet)
+    def oneOf(as: Set[A]): FreeK[PropagationLang, DecSetRef[A]] = cellF(DecSet.wrap(as))
+    def oneOf(as: A*): FreeK[PropagationLang, DecSetRef[A]] = oneOf(as.toSet)
 
     def count(n: Int): VarsBuilder[A] = new VarsBuilder(n)
   }
@@ -79,8 +71,8 @@ package object nutcracker {
       l: BoundedMeetSemilattice[D]
     ): FreeK[PropagationLang, Vector[DRef[D, U, Δ]]] = cellsF(l.one, n)
 
-    def oneOf(as: Set[A]): FreeK[PropagationLang, Vector[CMRef[DecSet[A]]]] = cellsF(DecSet.wrap(as), n)
-    def oneOf(as: A*): FreeK[PropagationLang, Vector[CMRef[DecSet[A]]]] = oneOf(as.toSet)
+    def oneOf(as: Set[A]): FreeK[PropagationLang, Vector[DecSetRef[A]]] = cellsF(DecSet.wrap(as), n)
+    def oneOf(as: A*): FreeK[PropagationLang, Vector[DecSetRef[A]]] = oneOf(as.toSet)
   }
 
 
@@ -123,7 +115,7 @@ package object nutcracker {
     dom: Dom[D, U, Δ],
     injd: Inject[Diff[D], U],
     injm: Inject[Meet[D], U]
-  ): FreeK[PropagationLang, CMURef[BoolDomain]] =
+  ): FreeK[PropagationLang, BoolRef] =
     for {
       res <- variable[Boolean]()
       _ <- whenResolvedF(res) { (r: Boolean) => if(r) different(d1, d2) else d1 <=> d2 }
@@ -177,8 +169,8 @@ package object nutcracker {
     * of finite sets of elements of type A, initialized to the given set of
     * elements.
     */
-  def branch[A](as: Set[A]): FreeK[PropagationLang, CMRef[DecSet[A]]] = variable[A].oneOf(as)
-  def branch[A](as: A*): FreeK[PropagationLang, CMRef[DecSet[A]]] = branch(as.toSet)
+  def branch[A](as: Set[A]): FreeK[PropagationLang, DecSetRef[A]] = variable[A].oneOf(as)
+  def branch[A](as: A*): FreeK[PropagationLang, DecSetRef[A]] = branch(as.toSet)
 
   /** Convenience method to add an exclusive choice of arbitrary free programs
     * to continue. When the choice is made, the chosen program is executed.

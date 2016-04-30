@@ -1,7 +1,7 @@
 package nutcracker.lib.bool
 
 import algebra.lattice.Bool
-import nutcracker.{CMUDom, Diff, Dom, EmbedExtract, Meet}
+import nutcracker.{Diff, Dom, EmbedExtract, Meet}
 
 import scalaz.{-\/, \/, \/-}
 import scalaz.syntax.either._
@@ -28,8 +28,8 @@ object BoolDomain {
     }
   }
 
-  implicit val boolDomain: CMUDom[BoolDomain] with Bool[BoolDomain] =
-    new CMUDom[BoolDomain] with Bool[BoolDomain] {
+  implicit val boolDomain: BoolDom with Bool[BoolDomain] =
+    new BoolDom with Bool[BoolDomain] {
       override def zero: BoolDomain = Bottom
       override def one: BoolDomain = Top
       override def and(a: BoolDomain, b: BoolDomain): BoolDomain =
