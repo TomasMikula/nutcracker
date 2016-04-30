@@ -2,10 +2,9 @@ package nutcracker.demo
 
 import algebra.Order
 import algebra.std.string._
-import nutcracker.rel.Rel.Rel2
-import nutcracker.PropRel
-import nutcracker.PropagationLang._
+import nutcracker._
 import nutcracker.rel.Pattern
+import nutcracker.rel.Rel.Rel2
 import nutcracker.rel.RelLang._
 import nutcracker.util.FreeK
 import org.scalatest.{Matchers, FunSpec}
@@ -69,10 +68,10 @@ class SimpleForwardInference extends FunSpec with Matchers {
       LtLteRules >>
       // observe when a < e is inferred
       (for {
-        pr <- promiseF[Unit].inject[Lang]
+        pr <- promise[Unit].inject[Lang]
         _ <- onPatternMatchF(
           Pattern[Pair].where({ case (x :: y :: HNil) => (x -> 'a) :: (y -> 'e) :: HNil }).build({ case (x :: y :: HNil) => NonEmptyList(LT(x, y)) }))(
-          { _ => completeF(pr, ()).inject[Lang] })
+          { _ => complete(pr, ()).inject[Lang] })
       } yield pr)
 
     it("should follow that a < e") {

@@ -46,10 +46,10 @@ class Sudoku extends FunSuite {
         xPos <- variable[Cell].oneOf(seg.toSet)
         _ <- concat(seg map { cell => valTriggerF(cell) { ys =>
           if(!ys.contains(x)) fire(exclude(xPos, cell))
-          else if(ys.size == 1) fire(PropagationLang.set(xPos, cell))
+          else if(ys.size == 1) fire(nutcracker.set(xPos, cell))
           else sleep[PropagationLang]
         } })
-        _ <- whenResolvedF(xPos) { (cell: Cell) => PropagationLang.set(cell, x) }
+        _ <- whenResolvedF(xPos) { (cell: Cell) => nutcracker.set(cell, x) }
       } yield ()
     }
 
@@ -69,7 +69,7 @@ class Sudoku extends FunSuite {
     * to enter the given number to the specified cell.
     */
   def set(i: Int, j: Int, value: Int): Cells => FreeK[PropagationLang, Unit] =
-    cells => PropagationLang.set(cells(i*9 + j), value)
+    cells => nutcracker.set(cells(i*9 + j), value)
 
 
   // technicalities

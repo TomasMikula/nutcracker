@@ -2,7 +2,7 @@ package nutcracker.lib
 
 import scala.language.higherKinds
 import nutcracker.util.{FreeK, InjectK}
-import nutcracker.{CMURef, PropagationLang}
+import nutcracker._
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._
 import nutcracker.lib.bool.BoolDomain._

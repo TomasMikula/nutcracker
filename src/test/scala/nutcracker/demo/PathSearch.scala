@@ -1,6 +1,6 @@
 package nutcracker.demo
 
-import nutcracker.{PropCost, PropagationLang, Promised}
+import nutcracker._
 import nutcracker.CostLang._
 import nutcracker.PropagationLang._
 import nutcracker.algebraic.NonDecreasingMonoid
@@ -77,7 +77,7 @@ class PathSearch extends FunSuite {
   def successors(v: Vertex): List[(Int, Vertex)] = edges filter { _._1 == v } map { _._2 }
 
   def findPath(u: Vertex, v: Vertex): FreeK[Lang, Promised[Path]] = for {
-    pr <- promiseF[Path].inject[Lang]
+    pr <- promise[Path].inject[Lang]
     _ <- findPath(Nil, u, v, pr)
   } yield pr
 
@@ -89,7 +89,7 @@ class PathSearch extends FunSuite {
   }
 
   def zeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Promised[Path]): FreeK[Lang, Unit] = {
-    if(u == v) completeF(pr, revPath(u::visited)).inject[Lang]
+    if(u == v) complete(pr, revPath(u::visited)).inject[Lang]
     else branchAndExec()
   }
 

@@ -20,7 +20,7 @@ object DRef {
 
   final case class DRefOps[D, U, Δ](ref: DRef[D, U, Δ]) extends AnyVal {
     def ==>[U1](target: DRef[D, U1, _])(implicit inj: Inject[Meet[D], U1]): FreeK[PropagationLang, Unit] =
-      valTriggerF(ref){ d => fireReload(intersectF(target)(d)) }
+      valTriggerF(ref){ d => fireReload(meet(target)(d)) }
     def <=>(target: DRef[D, U, _])(implicit inj: Inject[Meet[D], U]): FreeK[PropagationLang, Unit] =
       (ref ==> target) >> (target ==> ref)
     def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ee: EmbedExtract[A, D]): FreeK[F, Unit] =
