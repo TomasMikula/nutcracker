@@ -1,7 +1,6 @@
 package nutcracker
 
-import scalaz.{-\/, \/, \/-}
-import scalaz.syntax.either._
+import scalaz.\/
 
 trait Dom[D, U, Δ] {
 
@@ -32,41 +31,4 @@ object Dom {
   type MDom[D] = Dom[D, Meet[D], Unit]
   type CMDom[D] = Dom[D, Meet[D] \/ Diff[D], Res[D] \/ Diff[D]]
   type CMUDom[D] = Dom[D, Meet[D] \/ Diff[D], Unit]
-
-  implicit def finiteSetDomain[A]: CMDom[Set[A]] = new CMDom[Set[A]] {
-
-    override def assess(d: Set[A]): Dom.Status[Meet[Set[A]] \/ Diff[Set[A]]] = d.size match {
-      case 0 => Dom.Failed
-      case 1 => Dom.Refined
-      case _ => Dom.Unrefined(() => Some(d.toList map (x => Meet(Set(x)).left))) // split into singleton sets
-    }
-
-    override def update(s: Set[A], u: Meet[Set[A]] \/ Diff[Set[A]]): Option[(Set[A], Res[Set[A]] \/ Diff[Set[A]])] = u match {
-      case -\/(m) => intersect(s, m.value);
-      case \/-(d) => diff(s, d.value);
-    }
-
-    override def combineDiffs(d1: Res[Set[A]] \/ Diff[Set[A]], d2: Res[Set[A]] \/ Diff[Set[A]]): Res[Set[A]] \/ Diff[Set[A]] =
-      d2 match {
-        case -\/(res2) => d2
-        case \/-(diff2) => d1 match {
-          case \/-(diff1) => Diff(diff1.value union diff2.value).right
-          case -\/(res1) => Res(res1.value diff diff2.value).left
-        }
-      }
-
-    @inline
-    private def intersect(a: Set[A], b: Set[A]): Option[(Set[A], Res[Set[A]] \/ Diff[Set[A]])] = {
-      val res = a intersect b
-      if(res.size < a.size) Some((res, Res(res).left))
-      else None
-    }
-
-    @inline
-    private def diff(a: Set[A], b: Set[A]): Option[(Set[A], Res[Set[A]] \/ Diff[Set[A]])] = {
-      val res = a diff b
-      if(res.size < a.size) Some((res, Diff(a intersect b).right))
-      else None
-    }
-  }
 }

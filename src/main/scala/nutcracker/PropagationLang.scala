@@ -36,8 +36,8 @@ object PropagationLang {
       l: BoundedMeetSemilattice[D]
     ): FP[DRef[D, U, Δ]] = cellF(l.one)
 
-    def oneOf(as: Set[A]): FP[CMRef[Set[A]]] = cellF(as)
-    def oneOf(as: A*): FP[CMRef[Set[A]]] = oneOf(as.toSet)
+    def oneOf(as: Set[A]): FP[CMRef[DecSet[A]]] = cellF(DecSet.wrap(as))
+    def oneOf(as: A*): FP[CMRef[DecSet[A]]] = oneOf(as.toSet)
 
     def count(n: Int): VarsBuilder[A] = new VarsBuilder(n)
   }
@@ -53,8 +53,8 @@ object PropagationLang {
       l: BoundedMeetSemilattice[D]
     ): FP[Vector[DRef[D, U, Δ]]] = cellsF(l.one, n)
 
-    def oneOf(as: Set[A]): FP[Vector[CMRef[Set[A]]]] = cellsF(as, n)
-    def oneOf(as: A*): FP[Vector[CMRef[Set[A]]]] = oneOf(as.toSet)
+    def oneOf(as: Set[A]): FP[Vector[CMRef[DecSet[A]]]] = cellsF(DecSet.wrap(as), n)
+    def oneOf(as: A*): FP[Vector[CMRef[DecSet[A]]]] = oneOf(as.toSet)
   }
 
   // constructors returning less specific types, and curried to help with type inference
@@ -129,8 +129,8 @@ object PropagationLang {
     * of finite sets of elements of type A, initialized to the given set of
     * elements.
     */
-  def branch[A](as: Set[A]): FP[CMRef[Set[A]]] = variable[A].oneOf(as)
-  def branch[A](as: A*): FP[CMRef[Set[A]]] = branch(as.toSet)
+  def branch[A](as: Set[A]): FP[CMRef[DecSet[A]]] = variable[A].oneOf(as)
+  def branch[A](as: A*): FP[CMRef[DecSet[A]]] = branch(as.toSet)
 
   /** Convenience method to add an exclusive choice of arbitrary free programs
     * to continue. When the choice is made, the chosen program is executed.

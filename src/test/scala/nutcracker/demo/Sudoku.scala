@@ -11,7 +11,7 @@ import scala.language.higherKinds
 class Sudoku extends FunSuite {
   val solver = PropagationStore.dfsSolver
 
-  type Cell = CMRef[Set[Int]]
+  type Cell = CMRef[DecSet[Int]]
   type Cells = Vector[Cell]
 
   /** A program that sets up an empty Sudoku, that is 81 integer variables
