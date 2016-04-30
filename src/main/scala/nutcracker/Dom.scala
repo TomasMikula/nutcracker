@@ -4,7 +4,9 @@ trait Dom[D, U, Δ] {
 
   /** Applies the monotonic update `u` to `d`, obtaining `d1 ≥ d`
     * and a description of the diff. If the update doesn't have any
-    * effect on `d`, returns `None`.
+    * effect on `d`, returns `None`. In addition to being monotonic,
+    * updates also have to be _commutative_ and _idempotent_ (when
+    * the deltas are combined using [[combineDiffs()]]).
     */
   def update(d: D, u: U): Option[(D, Δ)]
 

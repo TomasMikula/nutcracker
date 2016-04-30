@@ -9,6 +9,10 @@ import nutcracker.util.FreeK
 /** Convenience methods to work with a list as a prepend-only log.
   * Monotonic update is prepending an element to the list.
   * A diff is a list of appended elements.
+  *
+  * **Note:** updates to log are neither idempotent nor commutative,
+  * as is required by [[Dom.update()]], so don't base any business
+  * logic on it.
   */
 object log {
 
