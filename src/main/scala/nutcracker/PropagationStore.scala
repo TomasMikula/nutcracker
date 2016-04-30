@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, Index, KMap, StateInterpreterT, Uncons, ValK, ~~>}
+import nutcracker.util.{FreeK, Index, K2Map, KMap, StateInterpreterT, Uncons, ValK, ~~>}
 import nutcracker.util.StepT.Step
 
 import scalaz.Id._
@@ -15,7 +15,7 @@ import PropagationStore._
 case class PropagationStore[K[_]] private(
   nextId: Long,
   domains: Domains,
-  domainTriggers: Map[VRef[_], List[(_, _) => Trigger[K]]],
+  domainTriggers: K2Map[DRef[?, Nothing, ?], λ[(D, Δ) => List[(D, Δ) => Trigger[K]]]],
   selTriggers: Map[Sel[_], List[_ => Trigger[K]]],
   cellsToSels: Index[VRef[_], Sel[_ <: HList]],
   unresolvedVars: Set[DRef[D, U, Δ] forSome { type D; type U; type Δ }],
@@ -87,14 +87,14 @@ case class PropagationStore[K[_]] private(
   }
 
   private def addDomainTrigger0[D, U, Δ](ref: DRef[D, U, Δ], t: (D, Δ) => Trigger[K]): (PropagationStore[K], List[K[Unit]]) = {
-    val triggers = domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[(D, Δ) => Trigger[K]]]
+    val triggers = domainTriggers.getOrElse(ref, Nil)
     val (remainingTriggers, firedTriggers) = dirtyDomains.get(ref) match {
       case Some(δ) => collectDomTriggers(fetch(ref), δ, triggers)
       case None => (triggers, Nil)
     }
     (
       copy(
-        domainTriggers = domainTriggers + ((ref, t :: remainingTriggers)),
+        domainTriggers = domainTriggers.updated(ref, t :: remainingTriggers),
         dirtyDomains = dirtyDomains - ref
       ),
       firedTriggers
@@ -109,9 +109,9 @@ case class PropagationStore[K[_]] private(
   }
 
   private def triggersForDomain[D, U, Δ](ref: DRef[D, U, Δ], δ: Δ): (PropagationStore[K], List[K[Unit]]) =
-    collectDomTriggers(fetch(ref), δ, domainTriggers.getOrElse(ref, Nil).asInstanceOf[List[(D, Δ) => Trigger[K]]]) match {
+    collectDomTriggers(fetch(ref), δ, domainTriggers.getOrElse(ref, Nil)) match {
       case (Nil, fired) => (copy(domainTriggers = domainTriggers - ref), fired)
-      case (forLater, fired) => (copy(domainTriggers = domainTriggers + ((ref, forLater))), fired)
+      case (forLater, fired) => (copy(domainTriggers = domainTriggers.updated(ref, forLater)), fired)
     }
 
   private def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], List[K[Unit]]) = {
@@ -177,7 +177,7 @@ object PropagationStore {
   def empty[K[_]] = PropagationStore[K](
     nextId = 0L,
     domains = Map(),
-    domainTriggers = Map(),
+    domainTriggers = K2Map[DRef[?, Nothing, ?], λ[(D, Δ) => List[(D, Δ) => Trigger[K]]]](),
     selTriggers = Map(),
     cellsToSels = Index.empty(sel => sel.cells),
     unresolvedVars = Set(),
