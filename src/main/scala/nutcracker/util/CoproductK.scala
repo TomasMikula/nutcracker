@@ -3,7 +3,7 @@ package nutcracker.util
 import scala.language.higherKinds
 import scalaz.{-\/, \/, \/-, ~>}
 
-final case class CoproductK[F[_[_], _], G[_[_], _], K[_], A](run: F[K, A] \/ G[K, A])
+final case class CoproductK[F[_[_], _], G[_[_], _], K[_], A](run: F[K, A] \/ G[K, A]) extends AnyVal
 
 object CoproductK {
   def leftc[F[_[_], _], G[_[_], _], K[_], A](fa: F[K, A]): CoproductK[F, G, K, A] =
@@ -11,22 +11,6 @@ object CoproductK {
 
   def rightc[F[_[_], _], G[_[_], _], K[_], A](ga: G[K, A]): CoproductK[F, G, K, A] =
     CoproductK(\/-(ga))
-
-  def transform[F[_[_], _], G[_[_], _], K[_], M[_]](fm: F[K, ?] ~> M, gm: G[K, ?] ~> M): CoproductK[F, G, K, ?] ~> M =
-    new (CoproductK[F, G, K, ?] ~> M) {
-      def apply[A](ca: CoproductK[F, G, K, A]): M[A] = ca.run match {
-        case -\/(fa) => fm(fa)
-        case \/-(ga) => gm(ga)
-      }
-    }
-
-  def transformKA[F[_[_], _], G[_[_], _], M[_[_], _]](fm: F ~~> M, gm: G ~~> M): CoproductK[F, G, ?[_], ?] ~~> M =
-    new (CoproductK[F, G, ?[_], ?] ~~> M) {
-      def apply[K[_], A](ca: CoproductK[F, G, K, A]): M[K, A] = ca.run match {
-        case -\/(fa) => fm(fa)
-        case \/-(ga) => gm(ga)
-      }
-    }
 
   implicit def functorKInstance[F[_[_], _], G[_[_], _]](implicit
     FK: FunctorKA[F],
