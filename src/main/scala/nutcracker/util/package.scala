@@ -2,6 +2,8 @@ package nutcracker
 
 import scala.language.higherKinds
 
+import scalaz.Id.Id
+
 package object util {
   type ConstK[A, K[_]] = A
 
@@ -12,7 +14,13 @@ package object util {
   type Index[K, V] = TransformedIndex[K, V, V]
 
   object Index {
-    def empty[K, V](f: V => Seq[K]): Index[K, V] = TransformedIndex.empty(f, (v, k) => v)
+    def empty[K, V](f: V => Seq[K]): Index[K, V] =
+      TransformedIndex.empty(f, (v, k) => v)
   }
 
+  type WriterState[W, S, A] = WriterStateT[Id, W, S, A]
+  object WriterState {
+    def apply[W, S, A](run: S => (W, S, A)): WriterState[W, S, A] =
+      WriterStateT[Id, W, S, A](run)
+  }
 }
