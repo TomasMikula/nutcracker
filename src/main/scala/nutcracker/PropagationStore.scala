@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, Index, K2Map, K3Map, KMap, KMapB, StateInterpreterT, Uncons, ValK, WriterState, ~~>}
+import nutcracker.util.{FreeK, Index, K2Map, K3Map, KMap, KMapB, StateInterpreterT, Uncons, ValK, WriterState}
 import nutcracker.util.StepT.Step
 
 import scalaz.Id._
@@ -184,7 +184,7 @@ object PropagationStore {
       type State[K[_]] = PropagationStore[K]
 
       def step: Step[PropagationLang, State] =
-        Step(new (PropagationLang ~~> λ[(K[_], A) => WriterState[List[K[Unit]], State[K], A]]) {
+        new Step[PropagationLang, State] {
           override def apply[K[_], A](p: PropagationLang[K, A]): WriterState[List[K[Unit]], State[K], A] = WriterState(s =>
             p match {
               case Cell(d, dom) => s.addVariable(d, dom) match {
@@ -201,7 +201,7 @@ object PropagationStore {
               case FetchVector(refs) => (Nil, s, s.fetchVector(refs))
             }
           )
-        })
+        }
 
       def uncons: Uncons[PropagationStore] = Uncons[PropagationStore](
         new ValK[λ[K[_] => StateT[Option, PropagationStore[K], List[K[Unit]]]]] {

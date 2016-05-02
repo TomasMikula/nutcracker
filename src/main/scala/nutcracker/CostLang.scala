@@ -1,7 +1,7 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.util.{ConstK, FreeK, FunctorKA, StepT, WriterState, ~~>}
+import nutcracker.util.{ConstK, FreeK, FunctorKA, StepT, WriterState}
 
 import scalaz.{Monoid, ~>}
 
@@ -26,10 +26,10 @@ object CostLang {
   }
 
   def interpreter[C: Monoid]: StepT.Step[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] =
-    StepT.Step[CostLang[C, ?[_], ?], ConstK[C, ?[_]]](new (CostLang[C, ?[_], ?] ~~> λ[(K[_], A) => WriterState[List[K[Unit]], ConstK[C, K], A]]) {
+    new StepT.Step[CostLang[C, ?[_], ?], ConstK[C, ?[_]]] {
       override def apply[K[_], A](f: CostLang[C, K, A]): WriterState[List[K[Unit]], ConstK[C, K], A] = f match {
         case Cost(c1) => WriterState(c0 => (Nil, Monoid[C].append(c0, c1), ()))
         case GetCost() => WriterState(c0 => (Nil, c0, c0.asInstanceOf[A])) // XXX is there a way to convince scalac that C =:= A?
       }
-    })
+    }
 }

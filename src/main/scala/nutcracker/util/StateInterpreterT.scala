@@ -1,7 +1,7 @@
 package nutcracker.util
 
 import scala.language.higherKinds
-import scalaz.{Id => _, _}
+import scalaz.{Functor, Lens, Monad, StateT, -\/, \/-, ~>}
 import scalaz.Id._
 import scalaz.std.list._
 import scalaz.std.option._
@@ -46,10 +46,10 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
     new StateInterpreterT[N, F] {
       type State[K[_]] = self.State[K]
 
-      def step: StepT[N, F, State] = StepT(new (F ~~> λ[(K[_], A) => WriterStateT[N, List[K[Unit]], State[K], A]]) {
+      def step: StepT[N, F, State] = new StepT[N, F, State] {
         override def apply[K[_], A](f: F[K, A]): WriterStateT[N, List[K[Unit]], State[K], A] =
           WriterStateT(s => mn(self.step[K, A](f)(s)))
-      })
+      }
       def uncons: Uncons[State] = self.uncons
     }
 
@@ -77,7 +77,7 @@ object StateInterpreterT {
   )(implicit
     M: Monad[M]
   ): FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?] = {
-    val step1 = step.run.papply[FreeK[F, ?]]
+    val step1 = step.papply[FreeK[F, ?]]
     val uncons1 = uncons[FreeK[F, ?]]
 
     def runUntilClean[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] = {
@@ -136,23 +136,26 @@ object StateInterpreterT {
       type State[K[_]] = S[K]
 
       def step: StepT[M, CoyonedaK[F, ?[_], ?], S] =
-        StepT[M, CoyonedaK[F, ?[_], ?], S](new (CoyonedaK[F, ?[_], ?] ~~> λ[(K[_], A) => WriterStateT[M, List[K[Unit]], S[K], A]]) {
+        new StepT[M, CoyonedaK[F, ?[_], ?], S] {
           override def apply[K[_], A](c: CoyonedaK[F, K, A]): WriterStateT[M, List[K[Unit]], S[K], A] = c match {
             case CoyonedaK.Pure(fa) => i.step.apply(fa)
             case CoyonedaK.Map(fx, f) => i.step.apply(fx) map f
           }
-        })
+        }
 
       def uncons: Uncons[S] = i.uncons
     }
 }
 
 
-final case class StepT[M[_], F[_[_], _], S[_[_]]](
-  run: F ~~> λ[(K[_], A) => WriterStateT[M, List[K[Unit]], S[K], A]]
-) extends AnyVal { self =>
+abstract class StepT[M[_], F[_[_], _], S[_[_]]] { self =>
 
-  final def apply[K[_], A](f: F[K, A]): WriterStateT[M, List[K[Unit]], S[K], A] = run(f)
+  def apply[K[_], A](f: F[K, A]): WriterStateT[M, List[K[Unit]], S[K], A]
+
+  def papply[K[_]]: F[K, ?] ~> WriterStateT[M, List[K[Unit]], S[K], ?] =
+    new (F[K, ?] ~> WriterStateT[M, List[K[Unit]], S[K], ?]) {
+      def apply[A](fa: F[K, A]): WriterStateT[M, List[K[Unit]], S[K], A] = self(fa)
+    }
 
   def :*:[G[_[_], _], T[_[_]]](
     that: StepT[M, G, T]
@@ -163,13 +166,13 @@ final case class StepT[M[_], F[_[_], _], S[_[_]]](
     type U[K[_]] = ProductK[T, S, K]
     val gLens = ProductK.leftLensZK[T, S]
     val fLens = ProductK.rightLensZK[T, S]
-    StepT[M, H, U](new (H ~~> λ[(K[_], A) => WriterStateT[M, List[K[Unit]], ProductK[T, S, K], A]]) {
-      override def apply[K[_], A](h: H[K, A]): WriterStateT[M, List[K[Unit]], ProductK[T, S, K], A] =
+    new StepT[M, H, U] {
+      override def apply[K[_], A](h: H[K, A]): WriterStateT[M, List[K[Unit]], U[K], A] =
         h.run match {
           case -\/(g) => that(g).zoomOut(gLens[K])
           case \/-(f) => self(f).zoomOut(fLens[K])
         }
-    })
+    }
   }
 
   final def :*:[G[_[_], _]](
@@ -187,23 +190,21 @@ final case class StepT[M[_], F[_[_], _], S[_[_]]](
   }
 
   def :+:[G[_[_], _]](that: StepT[M, G, S]): StepT[M, CoproductK[G, F, ?[_], ?], S] =
-    StepT[M, CoproductK[G, F, ?[_], ?], S](
-      CoproductK.transformKA[G, F, λ[(K[_], A) => WriterStateT[M, List[K[Unit]], S[K], A]]](that.run, self.run)
-    )
+    new StepT[M, CoproductK[G, F, ?[_], ?], S] {
+      def apply[K[_], A](ca: CoproductK[G, F, K, A]): WriterStateT[M, List[K[Unit]], S[K], A] =
+        WriterStateT(s => ca.run.fold(that(_), self(_))(s))
+    }
 }
 
 object StepT {
 
   def lift[M[_]: Monad, F[_[_], _], S[_[_]]](fm: F ~>> M): StepT[M, F, S] =
-    StepT(new (F ~~> λ[(K[_], A) => WriterStateT[M, List[K[Unit]], S[K], A]]) {
+    new StepT[M, F, S] {
       override def apply[K[_], A](f: F[K, A]): WriterStateT[M, List[K[Unit]], S[K], A] =
         WriterStateT.monadTrans[List[K[Unit]], S[K]].liftM(fm(f))
-    })
+    }
 
   type Step[F[_[_], _], S[_[_]]] = StepT[Id, F, S]
-  object Step {
-    def apply[F[_[_], _], S[_[_]]](run: F ~~> λ[(K[_], A) => WriterState[List[K[Unit]], S[K], A]]): Step[F, S] = StepT[Id, F, S](run)
-  }
 }
 
 final case class Uncons[S[_[_]]](run: ValK[λ[K[_] => StateT[Option, S[K], List[K[Unit]]]]]) extends AnyVal { self =>

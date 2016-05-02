@@ -3,7 +3,7 @@ package nutcracker.rel
 import scala.language.existentials
 import scala.language.higherKinds
 import nutcracker.rel.RelLang._
-import nutcracker.util.{Mapped, TransformedIndex, WriterState, ~~>}
+import nutcracker.util.{Mapped, TransformedIndex, WriterState}
 import nutcracker.util.StepT.Step
 import algebra.Order
 
@@ -144,10 +144,10 @@ object RelDB {
     TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel))
   )
 
-  def interpreter: Step[RelLang, RelDB] = Step(new (RelLang ~~> λ[(K[_], A) => WriterState[List[K[Unit]], RelDB[K], A]]) {
+  def interpreter: Step[RelLang, RelDB] = new Step[RelLang, RelDB] {
     override def apply[K[_], A](f: RelLang[K, A]): WriterState[List[K[Unit]], RelDB[K], A] = f match {
       case r @ Relate(rel, values) => WriterState(db => db.into(rel)(r.ordersWitness).insert(values)(r.orders) match { case (db1, ks) => (ks, db1, ()) })
       case OnPatternMatch(p, a, h) => WriterState(db => db.addOnPatternMatch(p, a)(h) match { case (db1, ks) => (ks, db1, ()) })
     }
-  })
+  }
 }
