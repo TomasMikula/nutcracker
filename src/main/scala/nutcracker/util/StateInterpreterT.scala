@@ -1,11 +1,12 @@
 package nutcracker.util
 
 import scala.language.higherKinds
-import scalaz.{Functor, Lens, Monad, StateT, -\/, \/-, ~>}
+import scalaz.{BindRec, Functor, Lens, Monad, StateT, \/, -\/, \/-, ~>}
 import scalaz.Id._
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.syntax.applicative._
+import scalaz.syntax.either._
 
 trait StateInterpreterT[M[_], F[_[_], _]] { self =>
   type State[K[_]]
@@ -58,7 +59,7 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
       def apply[A](a: Id[A]): N[A] = N.point(a)
     })
 
-  def freeInstance(implicit M: Monad[M]): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] =
+  def freeInstance(implicit M0: Monad[M], M1: BindRec[M]): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] =
     StateInterpreterT.freeInstance(step, uncons)
 }
 
@@ -75,28 +76,37 @@ object StateInterpreterT {
     step: StepT[M, F, S],
     uncons: Uncons[S]
   )(implicit
-    M: Monad[M]
+    M0: Monad[M],
+    M1: BindRec[M]
   ): FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?] = {
     val step1 = step.papply[FreeK[F, ?]]
     val uncons1 = uncons[FreeK[F, ?]]
 
     def runUntilClean[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] = {
-      M.bind(runToCompletion(p)(s)){ case (s1, a) => M.map(runUntilClean1(s1)) {(_, a)} }
+      M0.bind(runToCompletion(p)(s)){ case (s1, a) => M0.map(runUntilClean1(s1)) {(_, a)} }
     }
 
-    def runUntilClean1(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = uncons1(s) match {
-      case None => s.point[M]
-      case Some((s1, ku)) => M.bind(runToCompletionU(ku)(s1)){ s2 => runUntilClean1(s2) }
+    def runUntilClean1(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = {
+      def go(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]] \/ S[FreeK[F, ?]]] =
+        uncons1(s) match {
+          case None => s.right.point[M]
+          case Some((s1, ku)) => M0.map(runToCompletionU(ku)(s1)){ _.left }
+        }
+      M1.tailrecM(go)(s)
     }
 
     def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] =
-      M.bind(p.foldMap(step1).apply(s)) {
-        case (ku, s1, a) => runToCompletionU(ku)(s1) map { (_, a)}
+      M0.bind(p.foldMap(step1).apply(s)) {
+        case (ku, s1, a) => M0.map(runToCompletionU(ku)(s1)) { (_, a) }
       }
 
-    def runToCompletionU(ps: List[FreeK[F, Unit]])(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = ps match {
-      case Nil => s.point[M]
-      case k::ks => M.bind(k.foldMap(step1).apply(s)) { case (ks1, s1, u) => runToCompletionU(ks1 ::: ks)(s1) }
+    def runToCompletionU(ps: List[FreeK[F, Unit]])(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = {
+      def go(a: (List[FreeK[F, Unit]], S[FreeK[F, ?]])): M[(List[FreeK[F, Unit]], S[FreeK[F, ?]]) \/ S[FreeK[F, ?]]] =
+        a match {
+          case (Nil, s) => s.right.point[M]
+          case (k :: ks, s) => M0.map(k.foldMap(step1).apply(s)) { case (ks1, s1, ()) => (ks1 ::: ks, s1).left }
+        }
+      M1.tailrecM(go)((ps, s))
     }
 
     new (FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?]) {
