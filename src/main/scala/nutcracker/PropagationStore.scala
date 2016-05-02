@@ -3,14 +3,13 @@ package nutcracker
 import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, Index, K2Map, K3Map, KMap, KMapB, StateInterpreterT, Uncons, ValK, ~~>}
+import nutcracker.util.{FreeK, Index, K2Map, K3Map, KMap, KMapB, StateInterpreterT, Uncons, ValK, WriterState, ~~>}
 import nutcracker.util.StepT.Step
 
 import scalaz.Id._
 import scalaz.StateT
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
-import PropagationStore._
 
 case class PropagationStore[K[_]] private(
   nextId: Long,
@@ -185,21 +184,21 @@ object PropagationStore {
       type State[K[_]] = PropagationStore[K]
 
       def step: Step[PropagationLang, State] =
-        Step(new (PropagationLang ~~> λ[(K[_], A) => scalaz.State[State[K], (A, List[K[Unit]])]]) {
-          override def apply[K[_], A](p: PropagationLang[K, A]): scalaz.State[PropagationStore[K], (A, List[K[Unit]])] = scalaz.State(s =>
+        Step(new (PropagationLang ~~> λ[(K[_], A) => WriterState[List[K[Unit]], State[K], A]]) {
+          override def apply[K[_], A](p: PropagationLang[K, A]): WriterState[List[K[Unit]], State[K], A] = WriterState(s =>
             p match {
               case Cell(d, dom) => s.addVariable(d, dom) match {
-                case (s1, ref) => (s1, (ref, Nil))
+                case (s1, ref) => (Nil, s1, ref)
               }
               case DomTrigger(ref, f) => s.addDomainTrigger(ref, f) match {
-                case (s1, ks) => (s1, ((), ks))
+                case (s1, ks) => (ks, s1, ())
               }
               case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
-                case (s1, ok) => (s1, ((), ok.toList))
+                case (s1, ok) => (ok.toList, s1, ())
               }
-              case Update(ref, u) => (s.update(ref, u), ((), Nil))
-              case Fetch(ref) => (s, (s.fetch(ref), Nil))
-              case FetchVector(refs) => (s, (s.fetchVector(refs), Nil))
+              case Update(ref, u) => (Nil, s.update(ref, u), ())
+              case Fetch(ref) => (Nil, s, s.fetch(ref))
+              case FetchVector(refs) => (Nil, s, s.fetchVector(refs))
             }
           )
         })
