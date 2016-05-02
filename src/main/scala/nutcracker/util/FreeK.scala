@@ -29,11 +29,11 @@ sealed trait FreeK[F[_[_], _], A] {
 
   type K[T] = FreeK[F, T]
 
-  final def resume(implicit F: Functor[F[K, ?]]): (F[K, FreeK[F, A]] \/ A) =
+  final def foldMap[M[_]](tr: F[K, ?] ~> M)(implicit M: Monad[M]): M[A] =
     this match {
-      case Pure(a) => \/-(a)
-      case Suspend(fa) => -\/(F.map(fa)(Pure(_)))
-      case Bind(fx, f) => -\/(F.map(fx)(f))
+      case Pure(a) => M.point(a)
+      case Suspend(fa) => tr(fa)
+      case Bind(fx, f) => M.bind(tr(fx))(f(_).foldMap(tr))
     }
 }
 

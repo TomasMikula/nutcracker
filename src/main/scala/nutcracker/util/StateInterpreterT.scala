@@ -89,17 +89,14 @@ object StateInterpreterT {
       case Some((s1, ku)) => M.bind(runToCompletionU(ku)(s1)){ s2 => runUntilClean1(s2) }
     }
 
-    def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] = p match {
-      case FreeK.Pure(a) => (s, a).point[M]
-      case FreeK.Suspend(ffa) =>
-        M.bind(step1(ffa)(s)){ case (ku, s1, a) => runToCompletionU(ku)(s1) map { (_, a) } }
-      case bnd: FreeK.Bind[F, a1, A] =>
-        M.bind(step1(bnd.a)(s)){ case (ku, s1, x) => M.bind(runToCompletion(bnd.f(x))(s1)) { case (s2, a) => runToCompletionU(ku)(s2) map { (_, a) } } }
-    }
+    def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] =
+      M.bind(p.foldMap(step1).apply(s)) {
+        case (ku, s1, a) => runToCompletionU(ku)(s1) map { (_, a)}
+      }
 
     def runToCompletionU(ps: List[FreeK[F, Unit]])(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = ps match {
       case Nil => s.point[M]
-      case k::ks => M.bind(runToCompletion(k)(s)) { case (s1, u) => runToCompletionU(ks)(s1) }
+      case k::ks => M.bind(k.foldMap(step1).apply(s)) { case (ks1, s1, u) => runToCompletionU(ks1 ::: ks)(s1) }
     }
 
     new (FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?]) {
