@@ -26,9 +26,9 @@ package object bool {
       }) >>
       whenResolvedF(res)({ (r: Boolean) =>
         if (r) set(x, true) >> set(y, true)
-        else FreeK.Pure(())
+        else FreeK.pure(())
       }) >>
-      FreeK.Pure(res)
+      FreeK.pure(res)
     }
   }
 
@@ -62,7 +62,7 @@ package object bool {
           })
         }
       }
-      watch(x.size - 2, x.size - 1) >> FreeK.Pure(res)
+      watch(x.size - 2, x.size - 1) >> FreeK.pure(res)
     }
   }
 
@@ -76,7 +76,7 @@ package object bool {
         if (r) set(x, false)
         else set(x, true)
       }) >>
-      FreeK.Pure(res)
+      FreeK.pure(res)
     }
   }
 
@@ -88,10 +88,10 @@ package object bool {
   def imp(x: BoolRef, y: BoolRef): FreeK[PropagationLang, Unit] = {
     whenResolvedF(x)({ (r: Boolean) =>
       if (r) set(y, true)
-      else FreeK.Pure[PropagationLang, Unit](())
+      else FreeK.pure[PropagationLang, Unit](())
     }) >>
     whenResolvedF(y)({ (r: Boolean) =>
-      if (r) FreeK.Pure(())
+      if (r) FreeK.pure(())
       else set(x, false)
     })
   }
@@ -125,7 +125,7 @@ package object bool {
         (res  >>= { (x: Boolean) => if(x) (self === that) else (self =!= that) }) >>
         (self >>= { (x: Boolean) => if(x) (res  === that) else (res  =!= that) }) >>
         (that >>= { (x: Boolean) => if(x) (res  === self) else (res  =!= self) }) >>
-        FreeK.Pure(res)
+        FreeK.pure(res)
       }
     }
 

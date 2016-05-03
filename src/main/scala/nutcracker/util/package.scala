@@ -1,8 +1,8 @@
 package nutcracker
 
 import scala.language.higherKinds
-
 import scalaz.Id.Id
+import scalaz.{Applicative, ~>}
 
 package object util {
   type ConstK[A, K[_]] = A
@@ -22,5 +22,9 @@ package object util {
   object WriterState {
     def apply[W, S, A](run: S => (W, S, A)): WriterState[W, S, A] =
       WriterStateT[Id, W, S, A](run)
+  }
+
+  def idToM[M[_]](implicit M: Applicative[M]): Id ~> M = new (Id ~> M) {
+    def apply[A](a: Id[A]): M[A] = M.point(a)
   }
 }

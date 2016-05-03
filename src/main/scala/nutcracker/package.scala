@@ -1,4 +1,5 @@
 import scala.language.higherKinds
+
 import algebra.Eq
 import algebra.lattice.BoundedMeetSemilattice
 import nutcracker.DecSet.DecSetRef
@@ -7,8 +8,7 @@ import nutcracker.PropagationLang._
 import nutcracker.lib.bool.{BoolDomain, BoolRef}
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.util.{FreeK, Inject, InjectK}
-
-import scalaz.{Cont, _}
+import scalaz.{Apply, Cont, Traverse, \/}
 
 package object nutcracker {
 
@@ -27,7 +27,7 @@ package object nutcracker {
   type Promised[A] = DRef[Promise[A], Promise.Complete[A], Unit]
 
   def concat[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
-    ps.foldLeft[FreeK[F, Unit]](FreeK.Pure(())) { _ >> _ }
+    ps.foldLeft[FreeK[F, Unit]](FreeK.pure(())) { _ >> _ }
 
   def sequence[F[_[_], _], C[_]: Traverse, A](ps: C[FreeK[F, A]]): FreeK[F, C[A]] =
     Traverse[C].sequence[FreeK[F, ?], A](ps)
