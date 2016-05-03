@@ -45,7 +45,7 @@ class BFSSolver[F[_[_], _], St[_[_]], M[_], P[_], C: NonDecreasingMonoid](
       case Stuck => unfold(heap1) // not done, but we don't know how to proceed. TODO: Don't treat as failed
       case Done => M.point(Some((s, heap1)))
       case Incomplete(sks) =>
-        val newStates = sks traverse { k => M.map(interpreter(k)(s))(_._1) }
+        val newStates = sks traverse { k => interpreter(k).exec(s) }
         val heap2: M[Heap[S]] = M.map(newStates) { heap1.insertAllF[List](_) }
         heap2 flatMap { unfold1(_) }
     }

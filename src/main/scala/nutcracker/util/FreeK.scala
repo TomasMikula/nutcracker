@@ -46,7 +46,7 @@ object FreeK {
     FreeK(fa.run.flatMap(f(_).run))
 
   def lift[F[_[_], _], G[_[_], _], A](a: F[FreeK[G, ?], A])(implicit inj: InjectK[F, G]): FreeK[G, A] =
-    suspend(inj.inj[FreeK[G, ?], A](a))
+    suspend(inj(a))
 
   implicit def freeKMonad[F[_[_], _]]: Monad[FreeK[F, ?]] = new Monad[FreeK[F, ?]] {
     def point[A](a: => A): FreeK[F, A] = FreeK.pure(a)

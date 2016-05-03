@@ -3,7 +3,8 @@ package nutcracker.util
 import scala.language.{higherKinds, implicitConversions}
 import scalaz.{-\/, \/-}
 
-trait InjectK[F[_[_], _], H[_[_], _]] {
+trait InjectK[F[_[_], _], H[_[_], _]] extends (F ~~> H) {
+  def apply[K[_], A](fa: F[K, A]): H[K, A] = inj(fa)
   def inj[K[_], A](fa: F[K, A]): H[K, A]
   def prj[K[_], A](ha: H[K, A]): Option[F[K, A]]
 }

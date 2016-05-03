@@ -3,9 +3,9 @@ package nutcracker
 import scala.language.higherKinds
 import nutcracker.Assessment._
 import nutcracker.util.FreeK
+import nutcracker.util.idToM
 
-import scalaz.Id._
-import scalaz.{-\/, Applicative, BindRec, Monad, StateT, StreamT, \/, \/-, ~>}
+import scalaz.{-\/, BindRec, Monad, StateT, StreamT, \/, \/-, ~>}
 import scalaz.syntax.monad._
 
 class DFSSolver[F[_[_], _], St[_[_]], M[_], P[_]](
@@ -80,12 +80,8 @@ class DFSSolver[F[_[_], _], St[_[_]], M[_], P[_]](
       case Stuck => failed // TODO: Don't treat as failed.
       case Done => done(s)
       case Incomplete(branches) =>
-        StreamT.fromIterable(branches).trans(IdToM()) flatMap { k =>
+        StreamT.fromIterable(branches).trans(idToM) flatMap { k =>
           StreamT.wrapEffect[M, B](interpreter(k)(s) map { (su: (S, Unit)) => solutions(su._1, failed, done) })
         }
     }
-
-  private case class IdToM()(implicit M: Applicative[M]) extends (Id ~> M) {
-    def apply[A](a: A): M[A] = a.point[M]
-  }
 }
