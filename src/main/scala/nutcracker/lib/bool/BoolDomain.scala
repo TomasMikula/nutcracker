@@ -21,7 +21,9 @@ object BoolDomain {
       else  MustBeFalse
   }
 
-  implicit val extractInstance: Extract[BoolDomain, Boolean] = new Extract[BoolDomain, Boolean] {
+  implicit val extractInstance: Extract.Aux[BoolDomain, Boolean] = new Extract[BoolDomain] {
+    type Out = Boolean
+
     def extract(d: BoolDomain): Option[Boolean] = d match {
       case MustBeTrue => Some(true)
       case MustBeFalse => Some(false)

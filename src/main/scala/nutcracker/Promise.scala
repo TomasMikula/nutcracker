@@ -16,7 +16,9 @@ object Promise {
     def embed(a: A): Promise[A] = Completed(a)
   }
 
-  implicit def extractInstance[A]: Extract[Promise[A], A] = new Extract[Promise[A], A] {
+  implicit def extractInstance[A]: Extract.Aux[Promise[A], A] = new Extract[Promise[A]] {
+    type Out = A
+
     def extract(pa: Promise[A]): Option[A] = pa match {
       case Completed(a) => Some(a)
       case _ => None

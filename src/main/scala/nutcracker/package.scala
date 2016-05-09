@@ -44,12 +44,12 @@ package object nutcracker {
   def variable[A]: VarBuilder[A] = new VarBuilder[A]
   final class VarBuilder[A] private[nutcracker] {
     def apply[D, U, Δ]()(implicit
-      ex: Extract[D, A],
+      ex: Extract.Aux[D, A],
       dom: Dom[D, U, Δ],
       l: BoundedMeetSemilattice[D]
     ): FreeK[PropagationLang, DRef[D, U, Δ]] = any()
     def any[D, U, Δ]()(implicit
-      ex: Extract[D, A],
+      ex: Extract.Aux[D, A],
       dom: Dom[D, U, Δ],
       l: BoundedMeetSemilattice[D]
     ): FreeK[PropagationLang, DRef[D, U, Δ]] = cellF(l.one)
@@ -62,12 +62,12 @@ package object nutcracker {
 
   final class VarsBuilder[A] private[nutcracker](n: Int) {
     def apply[D, U, Δ]()(implicit
-      ee: Extract[D, A],
+      ee: Extract.Aux[D, A],
       dom: Dom[D, U, Δ],
       l: BoundedMeetSemilattice[D]
     ): FreeK[PropagationLang, Vector[DRef[D, U, Δ]]] = any()
     def any[D, U, Δ]()(implicit
-      ee: Extract[D, A],
+      ee: Extract.Aux[D, A],
       dom: Dom[D, U, Δ],
       l: BoundedMeetSemilattice[D]
     ): FreeK[PropagationLang, Vector[DRef[D, U, Δ]]] = cellsF(l.one, n)
@@ -76,7 +76,7 @@ package object nutcracker {
     def oneOf(as: A*): FreeK[PropagationLang, Vector[DecSetRef[A]]] = oneOf(as.toSet)
   }
 
-  def whenResolved[F[_[_], _], A, D](ref: DRef[D, _, _])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ex: Extract[D, A]): FreeK[F, Unit] =
+  def whenResolved[F[_[_], _], A, D](ref: DRef[D, _, _])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ex: Extract.Aux[D, A]): FreeK[F, Unit] =
     valTriggerF[F, D](ref)(d => ex.extract(d) match {
       case Some(a) => Fire[FreeK[F, ?]](f(a))
       case None => Sleep[FreeK[F, ?]]()
@@ -146,23 +146,23 @@ package object nutcracker {
   // so we provide this API for convenience.
   def promiseC[F[_[_], _]]: PromiseContBuilder[F] = PromiseContBuilder()
 
-  def promiseResults[A, D, U, Δ](cells: Vector[DRef[D, U, Δ]])(implicit ex: Extract[D, A]): FreeK[PropagationLang, Promised[Vector[A]]] = {
+  def promiseResults[D, U, Δ](cells: Vector[DRef[D, U, Δ]])(implicit ex: Extract[D]): FreeK[PropagationLang, Promised[Vector[ex.Out]]] = {
 
-    def go(pr: Promised[Vector[A]], tail: List[A], i: Int): FreeK[PropagationLang, Unit] = {
+    def go(pr: Promised[Vector[ex.Out]], tail: List[ex.Out], i: Int): FreeK[PropagationLang, Unit] = {
       if(i < 0) {
         complete(pr, tail.toVector)
       } else {
-        whenResolved(cells(i)){ (a: A) => go(pr, a :: tail, i-1) }
+        whenResolved(cells(i))((a: ex.Out) => go(pr, a :: tail, i-1))(implicitly, ex)
       }
     }
 
     for {
-      pr <- promise[Vector[A]]
+      pr <- promise[Vector[ex.Out]]
       _ <- go(pr, Nil, cells.size - 1)
     } yield pr
   }
 
-  def promiseResults[A, D, U, Δ](cells: DRef[D, U, Δ]*)(implicit ex: Extract[D, A]): FreeK[PropagationLang, Promised[Vector[A]]] =
+  def promiseResults[D, U, Δ](cells: DRef[D, U, Δ]*)(implicit ex: Extract[D]): FreeK[PropagationLang, Promised[Vector[ex.Out]]] =
     promiseResults(cells.toVector)
 
 

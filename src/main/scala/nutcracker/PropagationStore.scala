@@ -43,7 +43,7 @@ case class PropagationStore[K[_]] private(
     case dr @ DRef(_) =>  domains(dr)._1
   }
 
-  def fetchResult[A, D](ref: DRef[D, _, _])(implicit ex: Extract[D, A]): Option[A] = domains(ref) match {
+  def fetchResult[D](ref: DRef[D, _, _])(implicit ex: Extract[D]): Option[ex.Out] = domains(ref) match {
     case (d, _) => ex.extract(d)
   }
 
