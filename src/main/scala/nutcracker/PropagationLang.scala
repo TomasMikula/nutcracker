@@ -64,12 +64,6 @@ object PropagationLang {
       case _ => Sleep[FreeK[F, ?]]()
     })
 
-  def whenResolvedF[F[_[_], _], A, D](ref: DRef[D, _, _])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ee: EmbedExtract[A, D]): FreeK[F, Unit] =
-    valTriggerF[F, D](ref)(d => ee.extract(d) match {
-      case Some(a) => Fire[FreeK[F, ?]](f(a))
-      case None => Sleep[FreeK[F, ?]]()
-    })
-
   def selTrigger2F[F[_[_], _], D1, D2](ref1: VRef[D1], ref2: VRef[D2])(f: (D1, D2) => Trigger[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     selTriggerF[F, D1 :: D2 :: HNil](Sel(ref1, ref2))(l => f(l.head, l.tail.head))
 

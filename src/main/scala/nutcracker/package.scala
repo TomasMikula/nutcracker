@@ -36,10 +36,10 @@ package object nutcracker {
     Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)
 
 
-  /* ************************************************** *
-   * Convenience API to define domains that in the end  *
-   * resolve to a value of a different ("smaller") type *
-   * ************************************************** */
+  /* **************************************************** *
+   * Convenience API to work with domains that in the end *
+   * resolve to a value of a different ("smaller") type.  *
+   * **************************************************** */
 
   def variable[A]: VarBuilder[A] = new VarBuilder[A]
   final class VarBuilder[A] private[nutcracker] {
@@ -59,6 +59,7 @@ package object nutcracker {
 
     def count(n: Int): VarsBuilder[A] = new VarsBuilder(n)
   }
+
   final class VarsBuilder[A] private[nutcracker](n: Int) {
     def apply[D, U, Δ]()(implicit
       ee: EmbedExtract[A, D],
@@ -74,6 +75,12 @@ package object nutcracker {
     def oneOf(as: Set[A]): FreeK[PropagationLang, Vector[DecSetRef[A]]] = cellsF(DecSet.wrap(as), n)
     def oneOf(as: A*): FreeK[PropagationLang, Vector[DecSetRef[A]]] = oneOf(as.toSet)
   }
+
+  def whenResolved[F[_[_], _], A, D](ref: DRef[D, _, _])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ee: EmbedExtract[A, D]): FreeK[F, Unit] =
+    valTriggerF[F, D](ref)(d => ee.extract(d) match {
+      case Some(a) => Fire[FreeK[F, ?]](f(a))
+      case None => Sleep[FreeK[F, ?]]()
+    })
 
 
   /* ****************************************************** *
@@ -118,7 +125,7 @@ package object nutcracker {
   ): FreeK[PropagationLang, BoolRef] =
     for {
       res <- variable[Boolean]()
-      _ <- whenResolvedF(res) { (r: Boolean) => if(r) different(d1, d2) else d1 <=> d2 }
+      _ <- whenResolved(res) { (r: Boolean) => if(r) different(d1, d2) else d1 <=> d2 }
       _ <- whenRefinedF(d1) { r1 => whenRefinedF(d2) { r2 => set[Boolean, BoolDomain, Meet[BoolDomain] \/ Diff[BoolDomain], Unit](res, Eq[D].neqv(r1, r2)) } }
     } yield res
 
@@ -127,7 +134,6 @@ package object nutcracker {
    * Convenience methods to work with promises *
    * ***************************************** */
 
-//  import nutcracker.Promise._
   def promise[A]: FreeK[PropagationLang, Promised[A]] = cellF(Promise.empty[A])
   def complete[A](p: Promised[A], a: A): FreeK[PropagationLang, Unit] = updateF(p)(Promise.Complete(a))
 
@@ -146,7 +152,7 @@ package object nutcracker {
       if(i < 0) {
         complete(pr, tail.toVector)
       } else {
-        whenResolvedF(cells(i)){ (a: A) => go(pr, a :: tail, i-1) }
+        whenResolved(cells(i)){ (a: A) => go(pr, a :: tail, i-1) }
       }
     }
 
@@ -176,7 +182,7 @@ package object nutcracker {
     * to continue. When the choice is made, the chosen program is executed.
     */
   def branchAndExec[F[_[_], _]](conts: Set[FreeK[F, Unit]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    branch(conts) >>>= { whenResolvedF(_)((k: FreeK[F, Unit]) => k) }
+    branch(conts) >>>= { whenResolved(_)((k: FreeK[F, Unit]) => k) }
   def branchAndExec[F[_[_], _]](conts: FreeK[F, Unit]*)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     branchAndExec(conts.toSet)
 

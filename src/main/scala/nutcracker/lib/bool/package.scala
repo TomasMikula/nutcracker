@@ -16,15 +16,15 @@ package object bool {
 
   def and(x: BoolRef, y: BoolRef): FreeK[PropagationLang, BoolRef] = {
     variable[Boolean]() >>= { res =>
-      whenResolvedF(x)({ (r: Boolean) =>
+      whenResolved(x)({ (r: Boolean) =>
         if (r) y <=> res
         else set(res, false)
       }) >>
-      whenResolvedF(y)({ (r: Boolean) =>
+      whenResolved(y)({ (r: Boolean) =>
         if (r) x <=> res
         else set(res, false)
       }) >>
-      whenResolvedF(res)({ (r: Boolean) =>
+      whenResolved(res)({ (r: Boolean) =>
         if (r) set(x, true) >> set(y, true)
         else FreeK.pure(())
       }) >>
@@ -68,11 +68,11 @@ package object bool {
 
   def neg(x: BoolRef): FreeK[PropagationLang, BoolRef] = {
     variable[Boolean]() >>= { res =>
-      whenResolvedF(x)({ (r: Boolean) =>
+      whenResolved(x)({ (r: Boolean) =>
         if (r) set(res, false)
         else set(res, true)
       }) >>
-        whenResolvedF(res)({ (r: Boolean) =>
+        whenResolved(res)({ (r: Boolean) =>
         if (r) set(x, false)
         else set(x, true)
       }) >>
@@ -86,11 +86,11 @@ package object bool {
     set(x, false)
 
   def imp(x: BoolRef, y: BoolRef): FreeK[PropagationLang, Unit] = {
-    whenResolvedF(x)({ (r: Boolean) =>
+    whenResolved(x)({ (r: Boolean) =>
       if (r) set(y, true)
       else FreeK.pure[PropagationLang, Unit](())
     }) >>
-    whenResolvedF(y)({ (r: Boolean) =>
+    whenResolved(y)({ (r: Boolean) =>
       if (r) FreeK.pure(())
       else set(x, false)
     })
