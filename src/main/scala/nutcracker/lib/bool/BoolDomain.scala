@@ -1,7 +1,7 @@
 package nutcracker.lib.bool
 
 import algebra.lattice.Bool
-import nutcracker.{Diff, Dom, EmbedExtract, Meet}
+import nutcracker.{Diff, Dom, Embed, Extract, Meet}
 
 import scalaz.{-\/, \/, \/-}
 import scalaz.syntax.either._
@@ -15,12 +15,13 @@ object BoolDomain {
   val MustBeFalse = BoolDomain(2)
   val Top = BoolDomain(3)
 
-  implicit val embedExtractInstance: EmbedExtract[Boolean, BoolDomain] = new EmbedExtract[Boolean, BoolDomain] {
-
+  implicit val embedInstance: Embed[Boolean, BoolDomain] = new Embed[Boolean, BoolDomain] {
     def embed(b: Boolean): BoolDomain =
       if(b) MustBeTrue
       else  MustBeFalse
+  }
 
+  implicit val extractInstance: Extract[BoolDomain, Boolean] = new Extract[BoolDomain, Boolean] {
     def extract(d: BoolDomain): Option[Boolean] = d match {
       case MustBeTrue => Some(true)
       case MustBeFalse => Some(false)

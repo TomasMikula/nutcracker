@@ -57,8 +57,11 @@ object DecSet {
     }
   }
 
-  implicit def embedExtractInstance[A]: EmbedExtract[A, DecSet[A]] = new EmbedExtract[A, DecSet[A]] {
+  implicit def embedInstance[A]: Embed[A, DecSet[A]] = new Embed[A, DecSet[A]] {
     def embed(a: A): DecSet[A] = singleton(a)
+  }
+
+  implicit def extractInstance[A]: Extract[DecSet[A], A] = new Extract[DecSet[A], A] {
     def extract(d: DecSet[A]): Option[A] = if(d.size == 1) Some(d.head) else None
   }
 

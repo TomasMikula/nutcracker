@@ -12,8 +12,11 @@ object Promise {
 
   def empty[A]: Promise[A] = Empty
 
-  implicit def embedExtractInstance[A]: EmbedExtract[A, Promise[A]] = new EmbedExtract[A, Promise[A]] {
+  implicit def embedInstance[A]: Embed[A, Promise[A]] = new Embed[A, Promise[A]] {
     def embed(a: A): Promise[A] = Completed(a)
+  }
+
+  implicit def extractInstance[A]: Extract[Promise[A], A] = new Extract[Promise[A], A] {
     def extract(pa: Promise[A]): Option[A] = pa match {
       case Completed(a) => Some(a)
       case _ => None

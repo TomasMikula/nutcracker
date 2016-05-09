@@ -44,12 +44,12 @@ package object nutcracker {
   def variable[A]: VarBuilder[A] = new VarBuilder[A]
   final class VarBuilder[A] private[nutcracker] {
     def apply[D, U, Δ]()(implicit
-      ee: EmbedExtract[A, D],
+      ex: Extract[D, A],
       dom: Dom[D, U, Δ],
       l: BoundedMeetSemilattice[D]
     ): FreeK[PropagationLang, DRef[D, U, Δ]] = any()
     def any[D, U, Δ]()(implicit
-      ee: EmbedExtract[A, D],
+      ex: Extract[D, A],
       dom: Dom[D, U, Δ],
       l: BoundedMeetSemilattice[D]
     ): FreeK[PropagationLang, DRef[D, U, Δ]] = cellF(l.one)
@@ -62,12 +62,12 @@ package object nutcracker {
 
   final class VarsBuilder[A] private[nutcracker](n: Int) {
     def apply[D, U, Δ]()(implicit
-      ee: EmbedExtract[A, D],
+      ee: Extract[D, A],
       dom: Dom[D, U, Δ],
       l: BoundedMeetSemilattice[D]
     ): FreeK[PropagationLang, Vector[DRef[D, U, Δ]]] = any()
     def any[D, U, Δ]()(implicit
-      ee: EmbedExtract[A, D],
+      ee: Extract[D, A],
       dom: Dom[D, U, Δ],
       l: BoundedMeetSemilattice[D]
     ): FreeK[PropagationLang, Vector[DRef[D, U, Δ]]] = cellsF(l.one, n)
@@ -76,8 +76,8 @@ package object nutcracker {
     def oneOf(as: A*): FreeK[PropagationLang, Vector[DecSetRef[A]]] = oneOf(as.toSet)
   }
 
-  def whenResolved[F[_[_], _], A, D](ref: DRef[D, _, _])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ee: EmbedExtract[A, D]): FreeK[F, Unit] =
-    valTriggerF[F, D](ref)(d => ee.extract(d) match {
+  def whenResolved[F[_[_], _], A, D](ref: DRef[D, _, _])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ex: Extract[D, A]): FreeK[F, Unit] =
+    valTriggerF[F, D](ref)(d => ex.extract(d) match {
       case Some(a) => Fire[FreeK[F, ?]](f(a))
       case None => Sleep[FreeK[F, ?]]()
     })
@@ -90,14 +90,14 @@ package object nutcracker {
   def meet[D, U, Δ](ref: DRef[D, U, Δ])(d: D)(implicit inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
     updateF(ref)(inj(Meet(d)))
 
-  def set[A, D, U, Δ](ref: DRef[D, U, Δ], a: A)(implicit ee: EmbedExtract[A, D], inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
-    meet(ref)(EmbedExtract[A, D].embed(a))
+  def set[A, D, U, Δ](ref: DRef[D, U, Δ], a: A)(implicit em: Embed[A, D], inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
+    meet(ref)(em.embed(a))
 
   def remove[D, U, Δ](ref: DRef[D, U, Δ], d: D)(implicit inj: Inject[Diff[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
     updateF[D, U, Δ](ref)(inj(Diff(d)))
 
-  def exclude[A, D, U, Δ](ref: DRef[D, U, Δ], a: A)(implicit ee: EmbedExtract[A, D], inj: Inject[Diff[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
-    remove(ref, ee.embed(a))
+  def exclude[A, D, U, Δ](ref: DRef[D, U, Δ], a: A)(implicit em: Embed[A, D], inj: Inject[Diff[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
+    remove(ref, em.embed(a))
 
   def different[D, U, Δ](d1: DRef[D, U, Δ], d2: DRef[D, U, Δ])(implicit
     dom: Dom[D, U, Δ],
@@ -146,7 +146,7 @@ package object nutcracker {
   // so we provide this API for convenience.
   def promiseC[F[_[_], _]]: PromiseContBuilder[F] = PromiseContBuilder()
 
-  def promiseResults[A, D, U, Δ](cells: Vector[DRef[D, U, Δ]])(implicit ee: EmbedExtract[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] = {
+  def promiseResults[A, D, U, Δ](cells: Vector[DRef[D, U, Δ]])(implicit ex: Extract[D, A]): FreeK[PropagationLang, Promised[Vector[A]]] = {
 
     def go(pr: Promised[Vector[A]], tail: List[A], i: Int): FreeK[PropagationLang, Unit] = {
       if(i < 0) {
@@ -162,7 +162,7 @@ package object nutcracker {
     } yield pr
   }
 
-  def promiseResults[A, D, U, Δ](cells: DRef[D, U, Δ]*)(implicit ee: EmbedExtract[A, D]): FreeK[PropagationLang, Promised[Vector[A]]] =
+  def promiseResults[A, D, U, Δ](cells: DRef[D, U, Δ]*)(implicit ex: Extract[D, A]): FreeK[PropagationLang, Promised[Vector[A]]] =
     promiseResults(cells.toVector)
 
 

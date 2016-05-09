@@ -21,14 +21,14 @@ object DRef {
       valTriggerF(ref){ d => fireReload(meet(target)(d)) }
     def <=>(target: DRef[D, U, Δ])(implicit inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
       (ref ==> target) >> (target ==> ref)
-    def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ee: EmbedExtract[A, D], dom: Dom[D, U, Δ]): FreeK[F, Unit] =
+    def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ee: Extract[D, A], dom: Dom[D, U, Δ]): FreeK[F, Unit] =
       whenResolved(ref)(f)
 
-    def asCont[F[_[_], _], A](implicit inj: InjectK[PropagationLang, F], ee: EmbedExtract[A, D]): Cont[FreeK[F, Unit], A] =
+    def asCont[F[_[_], _], A](implicit inj: InjectK[PropagationLang, F], ex: Extract[D, A]): Cont[FreeK[F, Unit], A] =
       Cont { whenResolved(ref)(_) }
 
   }
 
-  implicit def toCont[F[_[_], _], A, D](ref: DRef[D, _, _])(implicit inj: InjectK[PropagationLang, F], ee: EmbedExtract[A, D]): Cont[FreeK[F, Unit], A] =
+  implicit def toCont[F[_[_], _], A, D](ref: DRef[D, _, _])(implicit inj: InjectK[PropagationLang, F], ee: Extract[D, A]): Cont[FreeK[F, Unit], A] =
     ref.asCont
 }
