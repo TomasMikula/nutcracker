@@ -50,8 +50,8 @@ case class PropagationStore[K[_]] private(
   def fetchVector[D, N <: Nat](refs: Sized[Vector[VRef[D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))
 
-  private def update[D, U, Δ](ref: DRef[D, U, Δ], u: U): PropagationStore[K] = {
-    val (d0, dom) = domains(ref)
+  private def update[D, U, Δ](ref: DRef[D, U, Δ], u: U)(implicit dom: Dom[D, U, Δ]): PropagationStore[K] = {
+    val d0 = domains(ref)._1
     dom.update(d0, u) match {
       case None => this
       case Some((d1, diff1)) =>
@@ -196,7 +196,7 @@ object PropagationStore {
               case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
                 case (s1, ok) => (ok.toList, s1, ())
               }
-              case Update(ref, u) => (Nil, s.update(ref, u), ())
+              case Update(ref, u, dom) => (Nil, s.update(ref, u)(dom), ())
               case Fetch(ref) => (Nil, s, s.fetch(ref))
               case FetchVector(refs) => (Nil, s, s.fetchVector(refs))
             }
@@ -214,10 +214,10 @@ object PropagationStore {
     if(s.failedVars.nonEmpty) Failed
     else if(s.unresolvedVars.isEmpty) Done
     else {
-      def splitDomain[D, U](ref: DRef[D, U, _]): Option[List[K[Unit]]] = {
+      def splitDomain[D, U, Δ](ref: DRef[D, U, Δ]): Option[List[K[Unit]]] = {
         val (d, domain) = s.domains(ref)
         domain.assess(d) match {
-          case Dom.Unrefined(choices) => choices() map { _ map { ui => tr(updateF(ref)(ui)) } }
+          case Dom.Unrefined(choices) => choices() map { _ map { ui => tr(updateF(ref)(ui)(domain)) } }
           case _ => sys.error("splitDomain should be called on unresolved variables only.")
         }
       }

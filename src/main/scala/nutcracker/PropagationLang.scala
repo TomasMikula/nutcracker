@@ -16,7 +16,7 @@ object PropagationLang {
 
   // constructors (the instruction set of a free program)
   case class Cell[K[_], D, U, Δ](d: D, dom: Dom[D, U, Δ]) extends PropagationLang[K, DRef[D, U, Δ]]
-  case class Update[K[_], D, U, Δ](ref: DRef[D, U, Δ], u: U) extends PropagationLang[K, Unit]
+  case class Update[K[_], D, U, Δ](ref: DRef[D, U, Δ], u: U, dom: Dom[D, U, Δ]) extends PropagationLang[K, Unit]
   case class Fetch[K[_], D](ref: VRef[D]) extends PropagationLang[K, D]
   case class FetchVector[K[_], D, N <: Nat](refs: Sized[Vector[VRef[D]], N]) extends PropagationLang[K, Sized[Vector[D], N]]
   case class DomTrigger[K[_], D, U, Δ](ref: DRef[D, U, Δ], f: D => (Option[K[Unit]], Option[(D, Δ) => Trigger[K]])) extends PropagationLang[K, Unit]
@@ -24,7 +24,7 @@ object PropagationLang {
 
   // constructors returning less specific types, and curried to help with type inference
   def cell[K[_], D, U, Δ](d: D)(implicit dom: Dom[D, U, Δ]): PropagationLang[K, DRef[D, U, Δ]] = Cell(d, dom)
-  def update[K[_], D, U](ref: DRef[D, U, _])(u: U): PropagationLang[K, Unit] = Update(ref, u)
+  def update[K[_], D, U, Δ](ref: DRef[D, U, Δ])(u: U)(implicit dom: Dom[D, U, Δ]): PropagationLang[K, Unit] = Update(ref, u, dom)
   def fetch[K[_], D](ref: VRef[D]): PropagationLang[K, D] = Fetch(ref)
   def fetchVector[K[_], D, N <: Nat](refs: Sized[Vector[VRef[D]], N]): PropagationLang[K, Sized[Vector[D], N]] = FetchVector(refs)
   def domTrigger[K[_], D, U, Δ](ref: DRef[D, U, Δ])(f: D => (Option[K[Unit]], Option[(D, Δ) => Trigger[K]])): PropagationLang[K, Unit] = DomTrigger(ref, f)
@@ -33,8 +33,8 @@ object PropagationLang {
   // constructors lifted to free programs
   def cellF[D, U, Δ](d: D)(implicit dom: Dom[D, U, Δ]): FP[DRef[D, U, Δ]] =
     FreeK.suspend(cell[FP, D, U, Δ](d))
-  def updateF[D, U](ref: DRef[D, U, _])(u: U): FP[Unit] =
-    FreeK.suspend(update[FP, D, U](ref)(u))
+  def updateF[D, U, Δ](ref: DRef[D, U, Δ])(u: U)(implicit dom: Dom[D, U, Δ]): FP[Unit] =
+    FreeK.suspend(update[FP, D, U, Δ](ref)(u))
   def fetchF[D](ref: VRef[D]): FP[D] =
     FreeK.suspend(fetch[FP, D](ref))
   def fetchVectorF[D, N <: Nat](refs: Sized[Vector[VRef[D]], N]): FP[Sized[Vector[D], N]] =
@@ -89,10 +89,10 @@ object PropagationLang {
       case SelTrigger(sel, f)   => selTrigger(sel){ l => FunctorK[Trigger].transform(f(l))(tr) }
 
       // the boring cases
-      case Cell(d, dom)      => Cell(d, dom)
-      case Update(ref, u)    => Update(ref, u)
-      case Fetch(ref)        => Fetch(ref)
-      case FetchVector(refs) => FetchVector(refs)
+      case Cell(d, dom)        => Cell(d, dom)
+      case Update(ref, u, dom) => Update(ref, u, dom)
+      case Fetch(ref)          => Fetch(ref)
+      case FetchVector(refs)   => FetchVector(refs)
     }
   }
 

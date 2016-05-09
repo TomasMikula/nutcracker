@@ -17,11 +17,11 @@ object DRef {
   implicit def drefOps[D, U, Δ](ref: DRef[D, U, Δ]) = DRefOps(ref)
 
   final case class DRefOps[D, U, Δ](ref: DRef[D, U, Δ]) extends AnyVal {
-    def ==>[U1](target: DRef[D, U1, _])(implicit inj: Inject[Meet[D], U1]): FreeK[PropagationLang, Unit] =
+    def ==>(target: DRef[D, U, Δ])(implicit inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
       valTriggerF(ref){ d => fireReload(meet(target)(d)) }
-    def <=>(target: DRef[D, U, _])(implicit inj: Inject[Meet[D], U]): FreeK[PropagationLang, Unit] =
+    def <=>(target: DRef[D, U, Δ])(implicit inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
       (ref ==> target) >> (target ==> ref)
-    def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ee: EmbedExtract[A, D]): FreeK[F, Unit] =
+    def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ee: EmbedExtract[A, D], dom: Dom[D, U, Δ]): FreeK[F, Unit] =
       whenResolvedF(ref)(f)
 
     def asCont[F[_[_], _], A](implicit inj: InjectK[PropagationLang, F], ee: EmbedExtract[A, D]): Cont[FreeK[F, Unit], A] =

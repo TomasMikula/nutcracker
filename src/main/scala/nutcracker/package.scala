@@ -80,16 +80,16 @@ package object nutcracker {
    * Convenience methods to work with lattice-based domains *
    * ****************************************************** */
 
-  def meet[D, U](ref: DRef[D, U, _])(d: D)(implicit inj: Inject[Meet[D], U]): FreeK[PropagationLang, Unit] =
+  def meet[D, U, Δ](ref: DRef[D, U, Δ])(d: D)(implicit inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
     updateF(ref)(inj(Meet(d)))
 
-  def set[A, D, U](ref: DRef[D, U, _], a: A)(implicit ee: EmbedExtract[A, D], inj: Inject[Meet[D], U]): FreeK[PropagationLang, Unit] =
+  def set[A, D, U, Δ](ref: DRef[D, U, Δ], a: A)(implicit ee: EmbedExtract[A, D], inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
     meet(ref)(EmbedExtract[A, D].embed(a))
 
-  def remove[D, U, Δ](ref: DRef[D, U, Δ], d: D)(implicit inj: Inject[Diff[D], U]): FreeK[PropagationLang, Unit] =
-    updateF[D, U](ref)(inj(Diff(d)))
+  def remove[D, U, Δ](ref: DRef[D, U, Δ], d: D)(implicit inj: Inject[Diff[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
+    updateF[D, U, Δ](ref)(inj(Diff(d)))
 
-  def exclude[A, D, U, Δ](ref: DRef[D, U, Δ], a: A)(implicit ee: EmbedExtract[A, D], inj: Inject[Diff[D], U]): FreeK[PropagationLang, Unit] =
+  def exclude[A, D, U, Δ](ref: DRef[D, U, Δ], a: A)(implicit ee: EmbedExtract[A, D], inj: Inject[Diff[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
     remove(ref, ee.embed(a))
 
   def different[D, U, Δ](d1: DRef[D, U, Δ], d2: DRef[D, U, Δ])(implicit
@@ -119,7 +119,7 @@ package object nutcracker {
     for {
       res <- variable[Boolean]()
       _ <- whenResolvedF(res) { (r: Boolean) => if(r) different(d1, d2) else d1 <=> d2 }
-      _ <- whenRefinedF(d1) { r1 => whenRefinedF(d2) { r2 => set[Boolean, BoolDomain, Meet[BoolDomain] \/ Diff[BoolDomain]](res, Eq[D].neqv(r1, r2)) } }
+      _ <- whenRefinedF(d1) { r1 => whenRefinedF(d2) { r2 => set[Boolean, BoolDomain, Meet[BoolDomain] \/ Diff[BoolDomain], Unit](res, Eq[D].neqv(r1, r2)) } }
     } yield res
 
 
