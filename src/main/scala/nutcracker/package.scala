@@ -75,11 +75,15 @@ package object nutcracker {
     def oneOf(as: A*): FreeK[PropagationLang, Vector[DecSetRef[A]]] = oneOf(as.toSet)
   }
 
-  def whenResolved[F[_[_], _], A, D](ref: DRef[D, _, _])(f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ex: Extract.Aux[D, A]): FreeK[F, Unit] =
-    valTriggerF[F, D](ref)(d => ex.extract(d) match {
-      case Some(a) => Fire[FreeK[F, ?]](f(a))
-      case None => Sleep[FreeK[F, ?]]()
-    })
+  def whenResolved[D](ref: DRef[D, _, _])(implicit ex: Extract[D]): WhenResolved[D, ex.Out] =
+    WhenResolved[D, ex.Out](ref, ex)
+  final case class WhenResolved[D, A] private[nutcracker](ref: DRef[D, _, _], ex: Extract.Aux[D, A]) {
+    def exec[F[_[_], _]](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+      valTriggerF[F, D](ref)(d => ex.extract(d) match {
+        case Some(a) => Fire[FreeK[F, ?]](f(a))
+        case None => Sleep[FreeK[F, ?]]()
+      })
+  }
 
 
   /* ****************************************************** *
@@ -124,13 +128,13 @@ package object nutcracker {
   ): FreeK[PropagationLang, BoolRef] =
     for {
       res <- variable[Boolean]()
-      _ <- whenResolved(res) { (r: Boolean) => if(r) different(d1, d2) else d1 <=> d2 }
+      _ <- whenResolved(res).exec(r => if(r) different(d1, d2) else d1 <=> d2)
       _ <- whenRefinedF(d1) { r1 => whenRefinedF(d2) { r2 =>
         val r = dom.update(r1, injm(Meet(r2))) match {
           case None => false
           case Some((x, _)) => dom.assess(x) == Dom.Failed
         }
-        set[Boolean, BoolDomain, Meet[BoolDomain] \/ Diff[BoolDomain], Unit](res,  r)
+        set(res,  r)
       } }
     } yield res
 
@@ -157,7 +161,7 @@ package object nutcracker {
       if(i < 0) {
         complete(pr, tail.toVector)
       } else {
-        whenResolved(cells(i))((a: ex.Out) => go(pr, a :: tail, i-1))(implicitly, ex)
+        whenResolved(cells(i)).exec(a => go(pr, a :: tail, i-1))
       }
     }
 
@@ -187,7 +191,7 @@ package object nutcracker {
     * to continue. When the choice is made, the chosen program is executed.
     */
   def branchAndExec[F[_[_], _]](conts: Set[FreeK[F, Unit]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    branch(conts) >>>= { whenResolved(_)((k: FreeK[F, Unit]) => k) }
+    branch(conts) >>>= { whenResolved(_).exec(k => k) }
   def branchAndExec[F[_[_], _]](conts: FreeK[F, Unit]*)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     branchAndExec(conts.toSet)
 

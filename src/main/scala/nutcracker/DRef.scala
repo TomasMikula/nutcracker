@@ -22,10 +22,10 @@ object DRef {
     def <=>(target: DRef[D, U, Δ])(implicit inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
       (ref ==> target) >> (target ==> ref)
     def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ex: Extract.Aux[D, A], dom: Dom[D, U, Δ]): FreeK[F, Unit] =
-      whenResolved(ref)(f)
+      whenResolved(ref).exec(f)
 
     def asCont[F[_[_], _]](implicit inj: InjectK[PropagationLang, F], ex: Extract[D]): Cont[FreeK[F, Unit], ex.Out] =
-      Cont { whenResolved(ref)(_)(inj, ex) }
+      Cont { whenResolved(ref).exec(_) }
 
   }
 
