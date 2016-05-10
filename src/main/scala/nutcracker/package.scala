@@ -1,6 +1,5 @@
 import scala.language.higherKinds
 
-import algebra.Eq
 import algebra.lattice.BoundedMeetSemilattice
 import nutcracker.DecSet.DecSetRef
 import nutcracker.PropagationLang
@@ -118,7 +117,7 @@ package object nutcracker {
     })
   }
 
-  def isDifferent[D: Eq, U, Δ](d1: DRef[D, U, Δ], d2: DRef[D, U, Δ])(implicit
+  def isDifferent[D, U, Δ](d1: DRef[D, U, Δ], d2: DRef[D, U, Δ])(implicit
     dom: Dom[D, U, Δ],
     injd: Inject[Diff[D], U],
     injm: Inject[Meet[D], U]
@@ -126,7 +125,13 @@ package object nutcracker {
     for {
       res <- variable[Boolean]()
       _ <- whenResolved(res) { (r: Boolean) => if(r) different(d1, d2) else d1 <=> d2 }
-      _ <- whenRefinedF(d1) { r1 => whenRefinedF(d2) { r2 => set[Boolean, BoolDomain, Meet[BoolDomain] \/ Diff[BoolDomain], Unit](res, Eq[D].neqv(r1, r2)) } }
+      _ <- whenRefinedF(d1) { r1 => whenRefinedF(d2) { r2 =>
+        val r = dom.update(r1, injm(Meet(r2))) match {
+          case None => false
+          case Some((x, _)) => dom.assess(x) == Dom.Failed
+        }
+        set[Boolean, BoolDomain, Meet[BoolDomain] \/ Diff[BoolDomain], Unit](res,  r)
+      } }
     } yield res
 
 
