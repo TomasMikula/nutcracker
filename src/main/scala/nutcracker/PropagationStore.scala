@@ -3,11 +3,11 @@ package nutcracker
 import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, Index, K2Map, K3Map, KMap, KMapB, StateInterpreterT, Uncons, ValK, WriterState}
+import nutcracker.util.{FreeK, FreeKT, Index, K2Map, K3Map, KMap, KMapB, StateInterpreterT, Uncons, ValK, WriterState}
 import nutcracker.util.StepT.Step
 
 import scalaz.Id._
-import scalaz.StateT
+import scalaz.{Monad, StateT, |>=|}
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
 
@@ -210,14 +210,14 @@ object PropagationStore {
         })
     }
 
-  def naiveAssess[K[_]](implicit tr: FreeK[PropagationLang, ?] ~> K): PropagationStore[K] => Assessment[List[K[Unit]]] = s => {
+  def naiveAssess[K[_]](implicit ord: K |>=| FreeK[PropagationLang, ?]): PropagationStore[K] => Assessment[List[K[Unit]]] = s => {
     if(s.failedVars.nonEmpty) Failed
     else if(s.unresolvedVars.isEmpty) Done
     else {
       def splitDomain[D, U, Δ](ref: DRef[D, U, Δ]): Option[List[K[Unit]]] = {
         val (d, domain) = s.domains(ref)
         domain.assess(d) match {
-          case Dom.Unrefined(choices) => choices() map { _ map { ui => tr(updateF(ref)(ui)(domain)) } }
+          case Dom.Unrefined(choices) => choices() map { _ map { ui => ord(updateF(ref)(ui)(domain)) } }
           case _ => sys.error("splitDomain should be called on unresolved variables only.")
         }
       }
@@ -230,18 +230,20 @@ object PropagationStore {
 
   def naiveAssess[K[_], S[_[_]]](
     lens: Lens[S[K], PropagationStore[K]])(implicit
-    tr: FreeK[PropagationLang, ?] ~> K
+    ord: K |>=| FreeK[PropagationLang, ?]
   ): S[K] => Assessment[List[K[Unit]]] =
-    s => (naiveAssess[K](tr))(lens.get(s))
+    s => (naiveAssess[K](ord))(lens.get(s))
 
 
   private def fetch: Promised ~> (PropagationStore[FreeK[PropagationLang, ?]] => ?) = new ~>[Promised, PropagationStore[FreeK[PropagationLang, ?]] => ?] {
     def apply[A](pa: Promised[A]): (PropagationStore[FreeK[PropagationLang, ?]] => A) = s => s.fetchResult(pa).get
   }
-  def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Id, Promised] =
+  def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Id, Promised] = {
+    implicit val mfp: Monad[FreeKT[PropagationLang, Id, ?]] = FreeKT.freeKTMonad[PropagationLang, Id] // scalac, why can't thou find this yourself?
     new DFSSolver[PropagationLang, PropagationStore, Id, Promised](
       interpreter.freeInstance,
       empty[FreeK[PropagationLang, ?]],
       naiveAssess[FreeK[PropagationLang, ?]],
       fetch)
+  }
 }

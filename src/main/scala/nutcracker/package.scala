@@ -1,13 +1,14 @@
 import scala.language.higherKinds
-
 import algebra.lattice.BoundedMeetSemilattice
 import nutcracker.DecSet.DecSetRef
 import nutcracker.PropagationLang
 import nutcracker.PropagationLang._
-import nutcracker.lib.bool.{BoolDomain, BoolRef}
+import nutcracker.lib.bool.BoolRef
 import nutcracker.lib.bool.BoolDomain._
-import nutcracker.util.{FreeK, Inject, InjectK}
-import scalaz.{Apply, Cont, Traverse, \/}
+import nutcracker.util.{FreeK, FreeKT, Inject, InjectK}
+
+import scalaz.{Apply, Cont, Traverse}
+import scalaz.Id._
 
 package object nutcracker {
 
@@ -29,10 +30,10 @@ package object nutcracker {
     ps.foldLeft[FreeK[F, Unit]](FreeK.pure(())) { _ >> _ }
 
   def sequence[F[_[_], _], C[_]: Traverse, A](ps: C[FreeK[F, A]]): FreeK[F, C[A]] =
-    Traverse[C].sequence[FreeK[F, ?], A](ps)
+    Traverse[C].sequence[FreeKT[F, Id, ?], A](ps)(FreeKT.freeKTMonad[F, Id])
 
   def traverse[F[_[_], _], C[_]: Traverse, A, B](ps: C[A])(f: A => FreeK[F, B]): FreeK[F, C[B]] =
-    Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)
+    Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)(FreeKT.freeKTMonad[F, Id])
 
 
   /* **************************************************** *

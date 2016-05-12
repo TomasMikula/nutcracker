@@ -4,7 +4,7 @@ import scala.language.higherKinds
 
 import monocle.Lens
 import nutcracker.algebraic.NonDecreasingMonoid
-import nutcracker.util.{ConstK, CoproductK, FreeK, ProductK}
+import nutcracker.util.{ConstK, CoproductK, FreeK, FreeKT, ProductK}
 import nutcracker.util.ProductK._
 
 import scalaz.Id._
@@ -22,7 +22,8 @@ final class PropCost[C: NonDecreasingMonoid] {
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
   private[PropCost] type Q[A] = FreeK[Vocabulary, A]
-  private def naiveAssess: State[Q] => Assessment[List[Q[Unit]]] = PropagationStore.naiveAssess(propStore[Q])
+  private def naiveAssess: State[Q] => Assessment[List[Q[Unit]]] =
+    PropagationStore.naiveAssess(propStore[Q])(FreeKT.injectionOrder[PropagationLang, Vocabulary, Id])
   private def fetch: Promised ~> (State[Q] => ?) = new ~>[Promised, State[Q] => ?] {
     def apply[A](pa: Promised[A]): (State[Q] => A) = s => propStore[Q].get(s).fetchResult(pa).get
   }
