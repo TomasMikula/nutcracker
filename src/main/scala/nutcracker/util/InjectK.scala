@@ -29,12 +29,6 @@ object InjectK extends InjectK0 {
       def prj[K[_], A](ga: CoproductK[H, G, K, A]) = ???
     }
 
-  implicit def injectCoyo[F[_[_], _], G[_[_], _]](implicit I: InjectK[F, G]): InjectK[F, CoyonedaK[G, ?[_], ?]] =
-    new InjectK[F, CoyonedaK[G, ?[_], ?]] {
-      def inj[K[_], A](fa: F[K, A]): CoyonedaK[G, K, A] = CoyonedaK.Pure(I.inj(fa))
-      def prj[K[_], A](ha: CoyonedaK[G, K, A]): Option[F[K, A]] = ???
-    }
-
   implicit def lift[F[_[_], _], G[_[_], _], K[_], A](f: F[K, A])(implicit inj: InjectK[F, G]): G[K, A] =
     inj.inj(f)
 }

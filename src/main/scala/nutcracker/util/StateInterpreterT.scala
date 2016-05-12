@@ -132,24 +132,6 @@ object StateInterpreterT {
       }
     }
   }
-
-  implicit def coyonedaInterpreter[M[_], F[_[_], _], S[_[_]]](implicit
-    i: StateInterpreterT.Aux[M, F, S],
-    M: Functor[M]
-  ): StateInterpreterT.Aux[M, CoyonedaK[F, ?[_], ?], S] =
-    new StateInterpreterT[M, CoyonedaK[F, ?[_], ?]] {
-      type State[K[_]] = S[K]
-
-      def step: StepT[M, CoyonedaK[F, ?[_], ?], S] =
-        new StepT[M, CoyonedaK[F, ?[_], ?], S] {
-          override def apply[K[_], A](c: CoyonedaK[F, K, A]): WriterStateT[M, List[K[Unit]], S[K], A] = c match {
-            case CoyonedaK.Pure(fa) => i.step.apply(fa)
-            case CoyonedaK.Map(fx, f) => i.step.apply(fx) map f
-          }
-        }
-
-      def uncons: Uncons[S] = i.uncons
-    }
 }
 
 
