@@ -15,7 +15,7 @@ object CostLang {
   def getCost[C, K[_]](): CostLang[C, K, C] = GetCost()
 
   def costF[C](c: C): FreeK[CostLang[C, ?[_], ?], Unit] =
-    FreeK.suspend[CostLang[C, ?[_], ?], Unit](cost[C, FreeK[CostLang[C, ?[_], ?], ?]](c))
+    FreeK.liftF[CostLang[C, ?[_], ?], Unit](cost[C, FreeK[CostLang[C, ?[_], ?], ?]](c))
 
   implicit def functorKInstance[C]: FunctorKA[CostLang[C, ?[_], ?]] = new FunctorKA[CostLang[C, ?[_], ?]] {
 

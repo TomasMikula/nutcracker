@@ -27,13 +27,13 @@ object RelLang {
 
   def relateF[L <: HList](rel: Rel[L])(implicit m: Mapped[L, Order]): RelateBuilder[L, m.Out] = RelateBuilder(rel)(m)
   case class RelateBuilder[L <: HList, OS <: HList] private[rel] (rel: Rel[L])(implicit m: Mapped.Aux[L, Order, OS]) {
-    def values(vals: L)(implicit os: SummonHList[OS]): FreeK[RelLang, Unit] = FreeK.suspend(relate[FR, L, OS](rel, vals))
+    def values(vals: L)(implicit os: SummonHList[OS]): FreeK[RelLang, Unit] = FreeK.liftF(relate[FR, L, OS](rel, vals))
   }
 
   def onPatternMatchF[F[_[_], _], V <: HList](p: Pattern[V])(h: V => FreeK[F, Unit])(implicit inj: InjectK[RelLang, F]): FreeK[F, Unit] =
-    FreeK.lift(onPatternMatch[FreeK[F, ?], V](p, p.emptyAssignment)(h))
+    FreeK.injLiftF(onPatternMatch[FreeK[F, ?], V](p, p.emptyAssignment)(h))
   def onPatternMatchF[F[_[_], _], V <: HList](p: PartiallyAssignedPattern[V])(h: V => FreeK[F, Unit])(implicit inj: InjectK[RelLang, F]): FreeK[F, Unit] =
-    FreeK.lift(onPatternMatch[FreeK[F, ?], V](p.pattern, p.assignment)(h))
+    FreeK.injLiftF(onPatternMatch[FreeK[F, ?], V](p.pattern, p.assignment)(h))
 
 
   implicit def functorKInstance: FunctorKA[RelLang] = new FunctorKA[RelLang] {

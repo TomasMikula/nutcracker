@@ -39,14 +39,14 @@ object FreeK {
   def pure[F[_[_], _], A](a: A): FreeK[F, A] =
     FreeK(FreeT.point(a))
 
-  def suspend[F[_[_], _], A](a: F[FreeK[F, ?], A]): FreeK[F, A] =
+  def liftF[F[_[_], _], A](a: F[FreeK[F, ?], A]): FreeK[F, A] =
     FreeK(FreeT.liftF[F[FreeK[F, ?], ?], Id, A](a))
 
   def bind[F[_[_], _], A1, A2](fa: FreeK[F, A1])(f: A1 => FreeK[F, A2]): FreeK[F, A2] =
     FreeK(fa.run.flatMap(f(_).run))
 
-  def lift[F[_[_], _], G[_[_], _], A](a: F[FreeK[G, ?], A])(implicit inj: InjectK[F, G]): FreeK[G, A] =
-    suspend(inj(a))
+  def injLiftF[F[_[_], _], G[_[_], _], A](a: F[FreeK[G, ?], A])(implicit inj: InjectK[F, G]): FreeK[G, A] =
+    liftF(inj(a))
 
   implicit def freeKMonad[F[_[_], _]]: Monad[FreeK[F, ?]] = new Monad[FreeK[F, ?]] {
     def point[A](a: => A): FreeK[F, A] = FreeK.pure(a)

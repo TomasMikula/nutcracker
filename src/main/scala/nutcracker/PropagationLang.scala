@@ -32,17 +32,17 @@ object PropagationLang {
 
   // constructors lifted to free programs
   def cellF[D, U, Δ](d: D)(implicit dom: Dom[D, U, Δ]): FP[DRef[D, U, Δ]] =
-    FreeK.suspend(cell[FP, D, U, Δ](d))
+    FreeK.liftF(cell[FP, D, U, Δ](d))
   def updateF[D, U, Δ](ref: DRef[D, U, Δ])(u: U)(implicit dom: Dom[D, U, Δ]): FP[Unit] =
-    FreeK.suspend(update[FP, D, U, Δ](ref)(u))
+    FreeK.liftF(update[FP, D, U, Δ](ref)(u))
   def fetchF[D](ref: VRef[D]): FP[D] =
-    FreeK.suspend(fetch[FP, D](ref))
+    FreeK.liftF(fetch[FP, D](ref))
   def fetchVectorF[D, N <: Nat](refs: Sized[Vector[VRef[D]], N]): FP[Sized[Vector[D], N]] =
-    FreeK.suspend(fetchVector[FP, D, N](refs))
+    FreeK.liftF(fetchVector[FP, D, N](refs))
   def domTriggerF[F[_[_], _], D, U, Δ](ref: DRef[D, U, Δ])(f: D => (Option[FreeK[F, Unit]], Option[(D, Δ) => Trigger[FreeK[F, ?]]]))(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    FreeK.lift(domTrigger[FreeK[F, ?], D, U, Δ](ref)(f))
+    FreeK.injLiftF(domTrigger[FreeK[F, ?], D, U, Δ](ref)(f))
   def selTriggerF[F[_[_], _], L <: HList](sel: Sel[L])(f: L => Trigger[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    FreeK.lift(selTrigger[FreeK[F, ?], L](sel)(f))
+    FreeK.injLiftF(selTrigger[FreeK[F, ?], L](sel)(f))
 
 
   // convenience API
