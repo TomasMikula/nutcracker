@@ -1,6 +1,7 @@
 import scala.language.higherKinds
 import algebra.lattice.BoundedMeetSemilattice
 import nutcracker.DecSet.DecSetRef
+import nutcracker.Promise.Complete
 import nutcracker.PropagationLang
 import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolRef
@@ -24,7 +25,7 @@ package object nutcracker {
     */
   final case class Diff[+D](value: D) extends AnyVal
 
-  type Promised[A] = DRef[Promise[A], Promise.Complete[A], Unit]
+  type Promised[A] = DRef.Aux[Promise[A], Complete[A], Unit]
 
   def concat[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
     ps.foldLeft[FreeK[F, Unit]](FreeK.pure(())) { _ >> _ }
@@ -43,16 +44,16 @@ package object nutcracker {
 
   def variable[A]: VarBuilder[A] = new VarBuilder[A]
   final class VarBuilder[A] private[nutcracker] {
-    def apply[D, U, Δ]()(implicit
+    def apply[D]()(implicit
       ex: Extract.Aux[D, A],
-      dom: Dom[D, U, Δ],
+      dom: Dom[D],
       l: BoundedMeetSemilattice[D]
-    ): FreeK[PropagationLang, DRef[D, U, Δ]] = any()
-    def any[D, U, Δ]()(implicit
+    ): FreeK[PropagationLang, DRef.Aux[D, dom.Update, dom.Delta]] = any()
+    def any[D]()(implicit
       ex: Extract.Aux[D, A],
-      dom: Dom[D, U, Δ],
+      dom: Dom[D],
       l: BoundedMeetSemilattice[D]
-    ): FreeK[PropagationLang, DRef[D, U, Δ]] = cellF(l.one)
+    ): FreeK[PropagationLang, DRef.Aux[D, dom.Update, dom.Delta]] = cellF(l.one)
 
     def oneOf(as: Set[A]): FreeK[PropagationLang, DecSetRef[A]] = cellF(DecSet.wrap(as))
     def oneOf(as: A*): FreeK[PropagationLang, DecSetRef[A]] = oneOf(as.toSet)
@@ -61,24 +62,24 @@ package object nutcracker {
   }
 
   final class VarsBuilder[A] private[nutcracker](n: Int) {
-    def apply[D, U, Δ]()(implicit
+    def apply[D]()(implicit
       ee: Extract.Aux[D, A],
-      dom: Dom[D, U, Δ],
+      dom: Dom[D],
       l: BoundedMeetSemilattice[D]
-    ): FreeK[PropagationLang, Vector[DRef[D, U, Δ]]] = any()
-    def any[D, U, Δ]()(implicit
+    ): FreeK[PropagationLang, Vector[DRef.Aux[D, dom.Update, dom.Delta]]] = any()
+    def any[D]()(implicit
       ee: Extract.Aux[D, A],
-      dom: Dom[D, U, Δ],
+      dom: Dom[D],
       l: BoundedMeetSemilattice[D]
-    ): FreeK[PropagationLang, Vector[DRef[D, U, Δ]]] = cellsF(l.one, n)
+    ): FreeK[PropagationLang, Vector[DRef.Aux[D, dom.Update, dom.Delta]]] = cellsF(l.one, n)
 
     def oneOf(as: Set[A]): FreeK[PropagationLang, Vector[DecSetRef[A]]] = cellsF(DecSet.wrap(as), n)
     def oneOf(as: A*): FreeK[PropagationLang, Vector[DecSetRef[A]]] = oneOf(as.toSet)
   }
 
-  def whenResolved[D](ref: DRef[D, _, _])(implicit ex: Extract[D]): WhenResolved[D, ex.Out] =
+  def whenResolved[D](ref: DRef[D])(implicit ex: Extract[D]): WhenResolved[D, ex.Out] =
     WhenResolved[D, ex.Out](ref, ex)
-  final case class WhenResolved[D, A] private[nutcracker](ref: DRef[D, _, _], ex: Extract.Aux[D, A]) {
+  final case class WhenResolved[D, A] private[nutcracker](ref: DRef[D], ex: Extract.Aux[D, A]) {
     def exec[F[_[_], _]](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
       valTriggerF[F, D](ref)(d => ex.extract(d) match {
         case Some(a) => Fire[FreeK[F, ?]](f(a))
@@ -91,39 +92,39 @@ package object nutcracker {
    * Convenience methods to work with lattice-based domains *
    * ****************************************************** */
 
-  def meet[D, U, Δ](ref: DRef[D, U, Δ])(d: D)(implicit inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
+  def meet[D](ref: DRef[D])(d: D)(implicit inj: Inject[Meet[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
     updateF(ref)(inj(Meet(d)))
 
-  def set[A, D, U, Δ](ref: DRef[D, U, Δ], a: A)(implicit em: Embed[A, D], inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
+  def set[A, D](ref: DRef[D], a: A)(implicit em: Embed[A, D], inj: Inject[Meet[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
     meet(ref)(em.embed(a))
 
-  def remove[D, U, Δ](ref: DRef[D, U, Δ], d: D)(implicit inj: Inject[Diff[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
-    updateF[D, U, Δ](ref)(inj(Diff(d)))
+  def remove[D](ref: DRef[D], d: D)(implicit inj: Inject[Diff[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
+    updateF[D](ref)(inj(Diff(d)))
 
-  def exclude[A, D, U, Δ](ref: DRef[D, U, Δ], a: A)(implicit em: Embed[A, D], inj: Inject[Diff[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
+  def exclude[A, D](ref: DRef[D], a: A)(implicit em: Embed[A, D], inj: Inject[Diff[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
     remove(ref, em.embed(a))
 
-  def different[D, U, Δ](d1: DRef[D, U, Δ], d2: DRef[D, U, Δ])(implicit
-    dom: Dom[D, U, Δ],
+  def different[D, U, Δ](d1: DRef.Aux[D, U, Δ], d2: DRef.Aux[D, U, Δ])(implicit
+    dom: Dom.Aux[D, U, Δ],
     inj: Inject[Diff[D], U]
   ): FreeK[PropagationLang, Unit] = {
     whenRefinedF(d1){ d => remove(d2, d) } >>
     whenRefinedF(d2){ d => remove(d1, d) }
   }
 
-  def allDifferent[D, U, Δ](doms: DRef[D, U, Δ]*)(implicit
-    dom: Dom[D, U, Δ],
+  def allDifferent[D, U, Δ](doms: DRef.Aux[D, U, Δ]*)(implicit
+    dom: Dom.Aux[D, U, Δ],
     inj: Inject[Diff[D], U]
   ): FreeK[PropagationLang, Unit] = {
     val n = doms.size
-    concat((0 until n) map { i => whenRefinedF(doms(i)){ d =>
+    concat((0 until n) map { i => whenRefinedF[PropagationLang, D](doms(i)){ d =>
       concat((0 until i) map { j => remove(doms(j), d) }) >>
       concat((i+1 until n) map { j => remove(doms(j), d) }) }
     })
   }
 
-  def isDifferent[D, U, Δ](d1: DRef[D, U, Δ], d2: DRef[D, U, Δ])(implicit
-    dom: Dom[D, U, Δ],
+  def isDifferent[D, U, Δ](d1: DRef.Aux[D, U, Δ], d2: DRef.Aux[D, U, Δ])(implicit
+    dom: Dom.Aux[D, U, Δ],
     injd: Inject[Diff[D], U],
     injm: Inject[Meet[D], U]
   ): FreeK[PropagationLang, BoolRef] =
@@ -144,7 +145,7 @@ package object nutcracker {
    * Convenience methods to work with promises *
    * ***************************************** */
 
-  def promise[A]: FreeK[PropagationLang, Promised[A]] = cellF(Promise.empty[A])
+  def promise[A]: FreeKT[PropagationLang, Id, Promised[A]] = cellF(Promise.empty[A])
   def complete[A](p: Promised[A], a: A): FreeK[PropagationLang, Unit] = updateF(p)(Promise.Complete(a))
 
   def promiseC[F[_[_], _], A](cont: Cont[FreeK[F, Unit], A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Promised[A]] = for {
@@ -156,7 +157,7 @@ package object nutcracker {
   // so we provide this API for convenience.
   def promiseC[F[_[_], _]]: PromiseContBuilder[F] = PromiseContBuilder()
 
-  def promiseResults[D, U, Δ](cells: Vector[DRef[D, U, Δ]])(implicit ex: Extract[D]): FreeK[PropagationLang, Promised[Vector[ex.Out]]] = {
+  def promiseResults[D](cells: Vector[DRef[D]])(implicit ex: Extract[D]): FreeK[PropagationLang, Promised[Vector[ex.Out]]] = {
 
     def go(pr: Promised[Vector[ex.Out]], tail: List[ex.Out], i: Int): FreeK[PropagationLang, Unit] = {
       if(i < 0) {
@@ -172,7 +173,7 @@ package object nutcracker {
     } yield pr
   }
 
-  def promiseResults[D, U, Δ](cells: DRef[D, U, Δ]*)(implicit ex: Extract[D]): FreeK[PropagationLang, Promised[Vector[ex.Out]]] =
+  def promiseResults[D](cells: DRef[D]*)(implicit ex: Extract[D]): FreeK[PropagationLang, Promised[Vector[ex.Out]]] =
     promiseResults(cells.toVector)
 
 

@@ -25,7 +25,10 @@ object Promise {
     }
   }
 
-  implicit def promiseDomain[A]: Dom[Promise[A], Complete[A], Unit] = new Dom[Promise[A], Complete[A], Unit] {
+  implicit def promiseDomain[A]: Dom.Aux[Promise[A], Complete[A], Unit] = new Dom[Promise[A]] {
+    type Update = Complete[A]
+    type Delta = Unit
+
     override def assess(pa: Promise[A]): Dom.Status[Complete[A]] = pa match {
       case Empty => Dom.Unrefined(() => None)
       case Completed(a) => Dom.Refined
@@ -43,6 +46,6 @@ object Promise {
       case Contradiction => None
     }
 
-    def combineDiffs(d1: Unit, d2: Unit): Unit = ()
+    override def combineDeltas(d1: Unit, d2: Unit): Unit = ()
   }
 }

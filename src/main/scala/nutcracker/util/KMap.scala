@@ -72,7 +72,7 @@ object K2Map {
 final case class K3Map[K[_, _, _], V[_, _, _]](map: Map[K[_, _, _], V[_, _, _]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
-  def head: (K[A, B, C], V[A, B, C]) forSome { type A; type B; type C } = map.head.asInstanceOf[(K[A, B, C], V[A, B, C]) forSome { type A; type B; type C }]
+  def head: K3Pair[K, V] = K3Pair(map.head.asInstanceOf[(K[A, B, C], V[A, B, C]) forSome { type A; type B; type C }])
   def tail: K3Map[K, V] = K3Map[K, V](map.tail)
   def apply[A, B, C](k: K[A, B, C]): V[A, B, C] = map(k).asInstanceOf[V[A, B, C]]
   def get[A, B, C](k: K[A, B, C]): Option[V[A, B, C]] = map.get(k).asInstanceOf[Option[V[A, B, C]]]
@@ -88,4 +88,23 @@ final case class K3Map[K[_, _, _], V[_, _, _]](map: Map[K[_, _, _], V[_, _, _]])
 
 object K3Map {
   def apply[K[_, _, _], V[_, _, _]](): K3Map[K, V] = K3Map[K, V](Map[K[_, _, _], V[_, _, _]]())
+}
+
+sealed abstract class K3Pair[K[_, _, _], V[_, _, _]] {
+  type A; type B; type C
+  val _1: K[A, B, C]
+  val _2: V[A, B, C]
+}
+
+object K3Pair {
+
+  def apply[K[_, _, _], V[_, _, _], A0, B0, C0](p: (K[A0, B0, C0], V[A0, B0, C0])): K3Pair[K, V] =
+    K3Pair(p._1, p._2)
+
+  def apply[K[_, _, _], V[_, _, _], A0, B0, C0](k: K[A0, B0, C0], v: V[A0, B0, C0]): K3Pair[K, V] =
+    new K3Pair[K, V] {
+      type A = A0; type B = B0; type C = C0
+      val _1 = k
+      val _2 = v
+    }
 }

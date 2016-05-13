@@ -16,24 +16,24 @@ import nutcracker.util.FreeK
   * Unrefined -> Refined -> Failed, since a refined state can go to unrefined
   * when all the refined members become failed.
   */
-case class DSet[D, U, Δ] private(unrefined: Set[DRef[D, U, Δ]], refined: Set[DRef[D, U, Δ]])
+case class DSet[D] private(unrefined: Set[DRef[D]], refined: Set[DRef[D]])
 
 object DSet {
 
-  sealed trait Update[D, U, Δ] {
-    def ref: DRef[D, U, Δ];
-    def toDelta: Delta[D, U, Δ]
+  sealed trait Update[D] {
+    def ref: DRef[D];
+    def toDelta: Delta[D]
   }
-  case class Unrefined[D, U, Δ](ref: DRef[D, U, Δ]) extends Update[D, U, Δ] { def toDelta = Delta.unrefined(ref) }
-  case class Refined  [D, U, Δ](ref: DRef[D, U, Δ]) extends Update[D, U, Δ] { def toDelta = Delta.refined(ref) }
-  case class Failed   [D, U, Δ](ref: DRef[D, U, Δ]) extends Update[D, U, Δ] { def toDelta = Delta.failed(ref) }
+  case class Unrefined[D](ref: DRef[D]) extends Update[D] { def toDelta = Delta.unrefined(ref) }
+  case class Refined  [D](ref: DRef[D]) extends Update[D] { def toDelta = Delta.refined(ref) }
+  case class Failed   [D](ref: DRef[D]) extends Update[D] { def toDelta = Delta.failed(ref) }
 
-  case class Delta[D, U, Δ](
-    unrefined: Set[DRef[D, U, Δ]],
-    refined:   Set[DRef[D, U, Δ]],
-    failed:    Set[DRef[D, U, Δ]]
+  case class Delta[D](
+    unrefined: Set[DRef[D]],
+    refined:   Set[DRef[D]],
+    failed:    Set[DRef[D]]
   ) {
-    def +(that: Delta[D, U, Δ]): Delta[D, U, Δ] = Delta(
+    def +(that: Delta[D]): Delta[D] = Delta(
       this.unrefined union that.unrefined,
       this.refined   union that.refined,
       this.failed    union that.failed
@@ -41,24 +41,26 @@ object DSet {
   }
 
   object Delta {
-    def unrefined[D, U, Δ](ref: DRef[D, U, Δ]): Delta[D, U, Δ] = Delta(Set(ref), Set(), Set())
-    def   refined[D, U, Δ](ref: DRef[D, U, Δ]): Delta[D, U, Δ] = Delta(Set(), Set(ref), Set())
-    def    failed[D, U, Δ](ref: DRef[D, U, Δ]): Delta[D, U, Δ] = Delta(Set(), Set(), Set(ref))
+    def unrefined[D](ref: DRef[D]): Delta[D] = Delta(Set(ref), Set(), Set())
+    def   refined[D](ref: DRef[D]): Delta[D] = Delta(Set(), Set(ref), Set())
+    def    failed[D](ref: DRef[D]): Delta[D] = Delta(Set(), Set(), Set(ref))
   }
 
-  type DSetRef[D, U, Δ] = DRef[DSet[D, U, Δ], Update[D, U, Δ], Delta[D, U, Δ]]
+  type DSetRef[D] = DRef.Aux[DSet[D], Update[D], Delta[D]]
 
-  def insert[D, U, Δ](dsref: DSetRef[D, U, Δ], ref: DRef[D, U, Δ])(implicit dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
+  def insert[D](dsref: DSetRef[D], ref: DRef[D])(implicit dom: Dom[D]): FreeK[PropagationLang, Unit] =
     valTriggerF(ref)(d => dom.assess(d) match {
       case Dom.Failed => Fire(updateF(dsref)(Failed(ref)))
       case Dom.Unrefined(_) => FireReload(updateF(dsref)(Unrefined(ref)))
       case Dom.Refined => FireReload(updateF(dsref)(Refined(ref)))
     })
 
-  implicit def domInstance[D, U, Δ]: Dom[DSet[D, U, Δ], Update[D, U, Δ], Delta[D, U, Δ]] =
-    new Dom[DSet[D, U, Δ], Update[D, U, Δ], Delta[D, U, Δ]] {
+  implicit def domInstance[D]: Dom.Aux[DSet[D], Update[D], Delta[D]] =
+    new Dom[DSet[D]] {
+      type Update = DSet.Update[D]
+      type Delta = DSet.Delta[D]
 
-      def update(d: DSet[D, U, Δ], u: Update[D, U, Δ]): Option[(DSet[D, U, Δ], Delta[D, U, Δ])] = {
+      def update(d: DSet[D], u: Update): Option[(DSet[D], Delta)] = {
         val (unrefined, refined) = u match {
           case Unrefined(ref) => (d.unrefined + ref, d.refined - ref)
           case Refined(ref)   => (d.unrefined - ref, d.refined + ref)
@@ -71,12 +73,12 @@ object DSet {
           Some((DSet(unrefined, refined), u.toDelta))
       }
 
-      def combineDiffs(d1: Delta[D, U, Δ], d2: Delta[D, U, Δ]): Delta[D, U, Δ] = d1 + d2
+      def combineDeltas(d1: Delta, d2: Delta): Delta = d1 + d2
 
       /** DSet is considered refined if at least one of the contained
         * domains is refined.
         */
-      def assess(d: DSet[D, U, Δ]): Status[Update[D, U, Δ]] =
+      def assess(d: DSet[D]): Status[Update] =
         if(d.refined.nonEmpty) Dom.Refined
         else Dom.Unrefined(() => None)
     }

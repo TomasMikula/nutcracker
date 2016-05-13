@@ -23,10 +23,12 @@ object DecSet {
   def singleton[A](a: A): DecSet[A] = new DecSet(Set(a))
   def wrap[A](as: Set[A]): DecSet[A] = new DecSet(as)
 
-  type DecSetDom[A] = Dom [DecSet[A], Meet[DecSet[A]] \/ Diff[DecSet[A]], Diff[DecSet[A]]]
-  type DecSetRef[A] = DRef[DecSet[A], Meet[DecSet[A]] \/ Diff[DecSet[A]], Diff[DecSet[A]]]
+  type DecSetDom[A] = Dom .Aux[DecSet[A], Meet[DecSet[A]] \/ Diff[DecSet[A]], Diff[DecSet[A]]]
+  type DecSetRef[A] = DRef.Aux[DecSet[A], Meet[DecSet[A]] \/ Diff[DecSet[A]], Diff[DecSet[A]]]
 
-  implicit def domInstance[A]: DecSetDom[A] = new DecSetDom[A] {
+  implicit def domInstance[A]: DecSetDom[A] = new Dom[DecSet[A]] {
+    type Update = Meet[DecSet[A]] \/ Diff[DecSet[A]]
+    type Delta = Diff[DecSet[A]]
 
     override def assess(d: DecSet[A]): Dom.Status[Meet[DecSet[A]] \/ Diff[DecSet[A]]] = d.size match {
       case 0 => Dom.Failed
@@ -39,7 +41,7 @@ object DecSet {
       case \/-(d) => diff(s, d.value);
     }
 
-    override def combineDiffs(d1: Diff[DecSet[A]], d2: Diff[DecSet[A]]): Diff[DecSet[A]] =
+    override def combineDeltas(d1: Diff[DecSet[A]], d2: Diff[DecSet[A]]): Diff[DecSet[A]] =
       Diff(d1.value union d2.value)
 
     @inline

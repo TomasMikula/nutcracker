@@ -32,7 +32,10 @@ object BoolDomain {
   }
 
   implicit val boolDomain: BoolDom with Bool[BoolDomain] =
-    new BoolDom with Bool[BoolDomain] {
+    new Dom[BoolDomain] with Bool[BoolDomain] {
+      type Update = Meet[BoolDomain] \/ Diff[BoolDomain]
+      type Delta = Unit
+
       override def zero: BoolDomain = Bottom
       override def one: BoolDomain = Top
       override def and(a: BoolDomain, b: BoolDomain): BoolDomain =
@@ -53,6 +56,6 @@ object BoolDomain {
         }
         if(res == d) None else Some((res, ()))
       }
-      override def combineDiffs(d1: Unit, d2: Unit): Unit = ()
+      override def combineDeltas(d1: Unit, d2: Unit): Unit = ()
     }
 }

@@ -5,23 +5,33 @@ import scala.language.implicitConversions
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._
 import nutcracker.util.{FreeK, Inject, InjectK}
-
 import scalaz.Cont
 
-sealed trait VRef[+D]
-
-sealed case class DRef[+D, -U, +Δ](domainId: Long) extends VRef[D]
+sealed abstract class DRef[+D](private[nutcracker] val domainId: Long) {
+  type Update
+  type Delta
+}
 
 object DRef {
+  type Aux[+D, U, Δ] = DRef[D] { type Update = U; type Delta = Δ }
 
-  implicit def drefOps[D, U, Δ](ref: DRef[D, U, Δ]) = DRefOps(ref)
+  def apply[D](domainId: Long)(implicit dom: Dom[D]): DRef.Aux[D, dom.Update, dom.Delta] =
+    new DRef(domainId) {
+      type Update = dom.Update
+      type Delta = dom.Delta
+    }
 
-  final case class DRefOps[D, U, Δ](ref: DRef[D, U, Δ]) extends AnyVal {
-    def ==>(target: DRef[D, U, Δ])(implicit inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
+  implicit def drefOps[D](ref: DRef[D]) = DRefOps[D, ref.Update, ref.Delta](ref)
+
+  final case class DRefOps[D, U, Δ](ref: DRef.Aux[D, U, Δ]) extends AnyVal {
+
+    def ==>(target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Meet[D], U], dom: Dom.Aux[D, U, Δ]): FreeK[PropagationLang, Unit] =
       valTriggerF(ref){ d => fireReload(meet(target)(d)) }
-    def <=>(target: DRef[D, U, Δ])(implicit inj: Inject[Meet[D], U], dom: Dom[D, U, Δ]): FreeK[PropagationLang, Unit] =
+
+    def <=>(target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Meet[D], U], dom: Dom.Aux[D, U, Δ]): FreeK[PropagationLang, Unit] =
       (ref ==> target) >> (target ==> ref)
-    def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ex: Extract.Aux[D, A], dom: Dom[D, U, Δ]): FreeK[F, Unit] =
+
+    def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ex: Extract.Aux[D, A], dom: Dom[D]): FreeK[F, Unit] =
       whenResolved(ref).exec(f)
 
     def asCont[F[_[_], _]](implicit inj: InjectK[PropagationLang, F], ex: Extract[D]): Cont[FreeK[F, Unit], ex.Out] =
@@ -29,6 +39,6 @@ object DRef {
 
   }
 
-  implicit def toCont[F[_[_], _], D](ref: DRef[D, _, _])(implicit inj: InjectK[PropagationLang, F], ex: Extract[D]): Cont[FreeK[F, Unit], ex.Out] =
+  implicit def toCont[F[_[_], _], D](ref: DRef[D])(implicit inj: InjectK[PropagationLang, F], ex: Extract[D]): Cont[FreeK[F, Unit], ex.Out] =
     ref.asCont
 }
