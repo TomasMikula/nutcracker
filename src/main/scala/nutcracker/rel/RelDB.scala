@@ -3,10 +3,9 @@ package nutcracker.rel
 import scala.language.existentials
 import scala.language.higherKinds
 import nutcracker.rel.RelLang._
-import nutcracker.util.{Mapped, TransformedIndex, WriterState}
+import nutcracker.util.{Lst, Mapped, TransformedIndex, WriterState}
 import nutcracker.util.StepT.Step
 import algebra.Order
-
 import shapeless.HList
 import RelDB._
 
@@ -18,18 +17,18 @@ case class RelDB[K[_]] private (
 
   case class Inserter[L <: HList, OS <: HList] private[RelDB] (rel: Rel[L])(implicit m: Mapped.Aux[L, Order, OS]) {
 
-    def insert(row: L)(implicit orders: OS): (RelDB[K], List[K[Unit]]) =  {
+    def insert(row: L)(implicit orders: OS): (RelDB[K], Lst[K[Unit]]) =  {
 
       // insert the row to the corresponding table
       table(rel).insert(row) match {
 
         case None => // row was already present, no additional actions necessary
-          (RelDB.this, Nil)
+          (RelDB.this, Lst.empty)
 
         case Some(tbl1) => // successfully inserted
 
           // search for pattern matches before including the new relation
-          val ks: List[K[Unit]] = collectTriggers(rel, row)
+          val ks: Lst[K[Unit]] = collectTriggers(rel, row)
 
           (replaceTable(rel)(tbl1), ks)
       }
@@ -38,18 +37,18 @@ case class RelDB[K[_]] private (
 
   def into[L <: HList](rel: Rel[L])(implicit m: Mapped[L, Order]): Inserter[L, m.Out] = Inserter(rel)(m)
 
-  def addOnPatternMatch[V <: HList](p: Pattern[V], ass: Assignment[V])(h: V => K[Unit]): (RelDB[K], List[K[Unit]]) = {
+  def addOnPatternMatch[V <: HList](p: Pattern[V], ass: Assignment[V])(h: V => K[Unit]): (RelDB[K], Lst[K[Unit]]) = {
     require(p.isCovered, "The domain of the pattern is not fully covered by its relations. These positions are not covered: " + ((0 until p.vertexCount).toSet -- p.vertexSet))
 
     val matches: List[V] = search(p, ass)
 
-    val ks = matches map h
+    val ks = matches.foldLeft(Lst.empty[K[Unit]])((l, v) => h(v) :: l)
 
     (addTrigger(PartiallyAssignedPattern(p, ass), h), ks)
   }
 
-  private def collectTriggers[L <: HList](rel: Rel[L], row: L): List[K[Unit]] =
-    watchedPatterns(rel) flatMap { collectTriggers(_, row) }
+  private def collectTriggers[L <: HList](rel: Rel[L], row: L): Lst[K[Unit]] =
+    watchedPatterns(rel).foldLeft(Lst.empty[K[Unit]])((l, p) => collectTriggers(p, row) rev_::: l)
 
   private def collectTriggers[V <: HList, L <: HList](paop: PartiallyAssignedOrientedPattern[V, L], row: L): List[K[Unit]] = for {
     hit <- search(paop, row)
@@ -145,7 +144,7 @@ object RelDB {
   )
 
   def interpreter: Step[RelLang, RelDB] = new Step[RelLang, RelDB] {
-    override def apply[K[_], A](f: RelLang[K, A]): WriterState[List[K[Unit]], RelDB[K], A] = f match {
+    override def apply[K[_], A](f: RelLang[K, A]): WriterState[Lst[K[Unit]], RelDB[K], A] = f match {
       case r @ Relate(rel, values) => WriterState(db => db.into(rel)(r.ordersWitness).insert(values)(r.orders) match { case (db1, ks) => (ks, db1, ()) })
       case OnPatternMatch(p, a, h) => WriterState(db => db.addOnPatternMatch(p, a)(h) match { case (db1, ks) => (ks, db1, ()) })
     }

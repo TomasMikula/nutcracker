@@ -48,7 +48,7 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
       type State[K[_]] = self.State[K]
 
       def step: StepT[N, F, State] = new StepT[N, F, State] {
-        override def apply[K[_], A](f: F[K, A]): WriterStateT[N, List[K[Unit]], State[K], A] =
+        override def apply[K[_], A](f: F[K, A]): WriterStateT[N, Lst[K[Unit]], State[K], A] =
           WriterStateT(s => mn(self.step[K, A](f)(s)))
       }
       def uncons: Uncons[State] = self.uncons
@@ -98,12 +98,14 @@ object StateInterpreterT {
         case (ku, s1, a) => M0.map(runToCompletionU(ku)(s1)) { (_, a) }
       }
 
-    def runToCompletionU(ps: List[FreeK[F, Unit]])(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = {
-      def go(a: (List[FreeK[F, Unit]], S[FreeK[F, ?]])): M[(List[FreeK[F, Unit]], S[FreeK[F, ?]]) \/ S[FreeK[F, ?]]] =
-        a match {
-          case (Nil, s) => s.right.point[M]
-          case (k :: ks, s) => M0.map(k.foldMapN(step1).apply(s)) { case (ks1, s1, ()) => (ks1 ::: ks, s1).left }
+    def runToCompletionU(ps: Lst[FreeK[F, Unit]])(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = {
+      def go(a: (Lst[FreeK[F, Unit]], S[FreeK[F, ?]])): M[(Lst[FreeK[F, Unit]], S[FreeK[F, ?]]) \/ S[FreeK[F, ?]]] = {
+        val (l, s) = a
+        l.uncons match {
+          case None => s.right.point[M]
+          case Some((k, ks)) => M0.map(k.foldMapN(step1).apply(s)) { case (ks1, s1, ()) => (ks1 ++ ks, s1).left }
         }
+      }
       M1.tailrecM(go)((ps, s))
     }
 
@@ -137,11 +139,11 @@ object StateInterpreterT {
 
 abstract class StepT[M[_], F[_[_], _], S[_[_]]] { self =>
 
-  def apply[K[_], A](f: F[K, A]): WriterStateT[M, List[K[Unit]], S[K], A]
+  def apply[K[_], A](f: F[K, A]): WriterStateT[M, Lst[K[Unit]], S[K], A]
 
-  def papply[K[_]]: F[K, ?] ~> WriterStateT[M, List[K[Unit]], S[K], ?] =
-    new (F[K, ?] ~> WriterStateT[M, List[K[Unit]], S[K], ?]) {
-      def apply[A](fa: F[K, A]): WriterStateT[M, List[K[Unit]], S[K], A] = self(fa)
+  def papply[K[_]]: F[K, ?] ~> WriterStateT[M, Lst[K[Unit]], S[K], ?] =
+    new (F[K, ?] ~> WriterStateT[M, Lst[K[Unit]], S[K], ?]) {
+      def apply[A](fa: F[K, A]): WriterStateT[M, Lst[K[Unit]], S[K], A] = self(fa)
     }
 
   def :*:[G[_[_], _], T[_[_]]](
@@ -154,7 +156,7 @@ abstract class StepT[M[_], F[_[_], _], S[_[_]]] { self =>
     val gLens = ProductK.leftLensZK[T, S]
     val fLens = ProductK.rightLensZK[T, S]
     new StepT[M, H, U] {
-      override def apply[K[_], A](h: H[K, A]): WriterStateT[M, List[K[Unit]], U[K], A] =
+      override def apply[K[_], A](h: H[K, A]): WriterStateT[M, Lst[K[Unit]], U[K], A] =
         h.run match {
           case -\/(g) => that(g).zoomOut(gLens[K])
           case \/-(f) => self(f).zoomOut(fLens[K])
@@ -178,7 +180,7 @@ abstract class StepT[M[_], F[_[_], _], S[_[_]]] { self =>
 
   def :+:[G[_[_], _]](that: StepT[M, G, S]): StepT[M, CoproductK[G, F, ?[_], ?], S] =
     new StepT[M, CoproductK[G, F, ?[_], ?], S] {
-      def apply[K[_], A](ca: CoproductK[G, F, K, A]): WriterStateT[M, List[K[Unit]], S[K], A] =
+      def apply[K[_], A](ca: CoproductK[G, F, K, A]): WriterStateT[M, Lst[K[Unit]], S[K], A] =
         WriterStateT(s => ca.run.fold(that(_), self(_))(s))
     }
 }
@@ -187,26 +189,26 @@ object StepT {
 
   def lift[M[_]: Monad, F[_[_], _], S[_[_]]](fm: F ~>> M): StepT[M, F, S] =
     new StepT[M, F, S] {
-      override def apply[K[_], A](f: F[K, A]): WriterStateT[M, List[K[Unit]], S[K], A] =
-        WriterStateT.monadTrans[List[K[Unit]], S[K]].liftM(fm(f))
+      override def apply[K[_], A](f: F[K, A]): WriterStateT[M, Lst[K[Unit]], S[K], A] =
+        WriterStateT.monadTrans[Lst[K[Unit]], S[K]].liftM(fm(f))
     }
 
   type Step[F[_[_], _], S[_[_]]] = StepT[Id, F, S]
 }
 
-final case class Uncons[S[_[_]]](run: ValK[λ[K[_] => StateT[Option, S[K], List[K[Unit]]]]]) extends AnyVal { self =>
+final case class Uncons[S[_[_]]](run: ValK[λ[K[_] => StateT[Option, S[K], Lst[K[Unit]]]]]) extends AnyVal { self =>
   def apply[K[_]] = run[K]
 
   def zoomOut[T[_[_]]](f: ValK[λ[K[_] => Lens[T[K], S[K]]]]): Uncons[T] = {
-    type StS[K[_]] = StateT[Option, S[K], List[K[Unit]]]
-    type StT[K[_]] = StateT[Option, T[K], List[K[Unit]]]
+    type StS[K[_]] = StateT[Option, S[K], Lst[K[Unit]]]
+    type StT[K[_]] = StateT[Option, T[K], Lst[K[Unit]]]
     Uncons[T](run.map[StT](new (StS ≈> StT) {
       def apply[K[_]](sts: StS[K]): StT[K] = sts.zoom(f[K])
     }))
   }
 
-  def orElse(that: Uncons[S]): Uncons[S] = Uncons[S](new ValK[λ[K[_] => StateT[Option, S[K], List[K[Unit]]]]] {
-    override def compute[K[_]]: StateT[Option, S[K], List[K[Unit]]] =
+  def orElse(that: Uncons[S]): Uncons[S] = Uncons[S](new ValK[λ[K[_] => StateT[Option, S[K], Lst[K[Unit]]]]] {
+    override def compute[K[_]]: StateT[Option, S[K], Lst[K[Unit]]] =
       StateT(s => self[K](s).orElse(that[K](s)))
   })
 }

@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMapB, StateInterpreterT, Uncons, ValK, WriterState}
+import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMapB, Lst, StateInterpreterT, Uncons, ValK, WriterState}
 import nutcracker.util.StepT.Step
 
 import scalaz.Id._
@@ -62,13 +62,13 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  def addDomainTrigger[D, U, Δ](ref: DRef.Aux[D, U, Δ], t: D => (Option[K[Unit]], Option[(D, Δ) => Trigger[K]])): (PropagationStore[K], List[K[Unit]]) = {
+  def addDomainTrigger[D, U, Δ](ref: DRef.Aux[D, U, Δ], t: D => (Option[K[Unit]], Option[(D, Δ) => Trigger[K]])): (PropagationStore[K], Lst[K[Unit]]) = {
     val (now, onChange) = t(fetch(ref))
     onChange match {
       case Some(action) =>
         val (s1, ks) = addDomainTrigger0(ref, action)
-        (s1, now.toList ::: ks)
-      case None => (this, now.toList)
+        (s1, now ?+: ks)
+      case None => (this, Lst.maybe(now))
     }
   }
 
@@ -81,11 +81,11 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  private def addDomainTrigger0[D, U, Δ](ref: DRef.Aux[D, U, Δ], t: (D, Δ) => Trigger[K]): (PropagationStore[K], List[K[Unit]]) = {
+  private def addDomainTrigger0[D, U, Δ](ref: DRef.Aux[D, U, Δ], t: (D, Δ) => Trigger[K]): (PropagationStore[K], Lst[K[Unit]]) = {
     val triggers = domainTriggers.getOrElse(ref, Nil)
     val (remainingTriggers, firedTriggers) = dirtyDomains.get(ref) match {
       case Some(δ) => collectDomTriggers(fetch(ref), δ, triggers)
-      case None => (triggers, Nil)
+      case None => (triggers, Lst.empty)
     }
     (
       copy(
@@ -103,13 +103,13 @@ case class PropagationStore[K[_]] private(
     )
   }
 
-  private def triggersForDomain[D, U, Δ](ref: DRef.Aux[D, U, Δ], δ: Δ): (PropagationStore[K], List[K[Unit]]) =
+  private def triggersForDomain[D, U, Δ](ref: DRef.Aux[D, U, Δ], δ: Δ): (PropagationStore[K], Lst[K[Unit]]) =
     collectDomTriggers(fetch(ref), δ, domainTriggers.getOrElse(ref, Nil)) match {
       case (Nil, fired) => (copy(domainTriggers = domainTriggers - ref), fired)
       case (forLater, fired) => (copy(domainTriggers = domainTriggers.updated(ref, forLater)), fired)
     }
 
-  private def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], List[K[Unit]]) = {
+  private def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], Lst[K[Unit]]) = {
     val d = sel.fetch(cellFetcher)
     collectSelTriggers(d, selTriggers.getOrElse(sel, Nil)) match {
       case (Nil, fired) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), fired)
@@ -119,9 +119,9 @@ case class PropagationStore[K[_]] private(
 
   private def getSelsForCell(ref: DRef[_]): Set[Sel[_ <: HList]] = cellsToSels.get(ref)
 
-  private def collectDomTriggers[D, Δ](d: D, δ: Δ, triggers: List[(D, Δ) => Trigger[K]]): (List[(D, Δ) => Trigger[K]], List[K[Unit]]) =
+  private def collectDomTriggers[D, Δ](d: D, δ: Δ, triggers: List[(D, Δ) => Trigger[K]]): (List[(D, Δ) => Trigger[K]], Lst[K[Unit]]) =
     triggers match {
-      case Nil => (Nil, Nil)
+      case Nil => (Nil, Lst.empty)
       case t :: ts =>
         val (ts1, conts) = collectDomTriggers(d, δ, ts)
         t(d, δ) match {
@@ -132,9 +132,9 @@ case class PropagationStore[K[_]] private(
         }
     }
 
-  private def collectSelTriggers[L <: HList](l: L, triggers: List[L => Trigger[K]]): (List[L => Trigger[K]], List[K[Unit]]) =
+  private def collectSelTriggers[L <: HList](l: L, triggers: List[L => Trigger[K]]): (List[L => Trigger[K]], Lst[K[Unit]]) =
     triggers match {
-      case Nil => (Nil, Nil)
+      case Nil => (Nil, Lst.empty)
       case t :: ts =>
         val (ts1, conts) = collectSelTriggers(l, ts)
         t(l) match {
@@ -145,7 +145,7 @@ case class PropagationStore[K[_]] private(
         }
     }
 
-  private def uncons: Option[(PropagationStore[K], List[K[Unit]])] =
+  private def uncons: Option[(PropagationStore[K], Lst[K[Unit]])] =
     if(dirtyDomains.nonEmpty) {
       val h = dirtyDomains.head
       val dirtySels = dirtySelections union getSelsForCell(h._1)
@@ -181,27 +181,27 @@ object PropagationStore {
 
       def step: Step[PropagationLang, State] =
         new Step[PropagationLang, State] {
-          override def apply[K[_], A](p: PropagationLang[K, A]): WriterState[List[K[Unit]], State[K], A] = WriterState(s =>
+          override def apply[K[_], A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], State[K], A] = WriterState(s =>
             p match {
               case Cell(d, dom) => s.addVariable(d, dom) match {
-                case (s1, ref) => (Nil, s1, ref)
+                case (s1, ref) => (Lst.empty, s1, ref)
               }
               case DomTrigger(ref, f) => s.addDomainTrigger(ref, f) match {
                 case (s1, ks) => (ks, s1, ())
               }
               case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
-                case (s1, ok) => (ok.toList, s1, ())
+                case (s1, ok) => (Lst.maybe(ok), s1, ())
               }
-              case Update(ref, u, dom) => (Nil, s.update(ref, u)(dom), ())
-              case Fetch(ref) => (Nil, s, s.fetch(ref))
-              case FetchVector(refs) => (Nil, s, s.fetchVector(refs))
+              case Update(ref, u, dom) => (Lst.empty, s.update(ref, u)(dom), ())
+              case Fetch(ref) => (Lst.empty, s, s.fetch(ref))
+              case FetchVector(refs) => (Lst.empty, s, s.fetchVector(refs))
             }
           )
         }
 
       def uncons: Uncons[PropagationStore] = Uncons[PropagationStore](
-        new ValK[λ[K[_] => StateT[Option, PropagationStore[K], List[K[Unit]]]]] {
-          override def compute[K[_]]: StateT[Option, PropagationStore[K], List[K[Unit]]] =
+        new ValK[λ[K[_] => StateT[Option, PropagationStore[K], Lst[K[Unit]]]]] {
+          override def compute[K[_]]: StateT[Option, PropagationStore[K], Lst[K[Unit]]] =
             StateT(_.uncons)
         })
     }
