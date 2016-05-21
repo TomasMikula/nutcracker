@@ -21,6 +21,7 @@ class PtrTest extends FlatSpec {
     Ptr(_0): Pointer[ISB, Int]
     Ptr(_1): Pointer[ISB, String]
     Ptr(_2): Pointer[ISB, Boolean]
+    ()
   }
 
   "Ill-typed examples" should "not compile" in {

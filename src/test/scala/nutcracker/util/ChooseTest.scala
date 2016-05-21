@@ -12,6 +12,7 @@ class ChooseTest extends FlatSpec with Matchers {
 
   "Choose creation examples" should "compile" in {
     (_2 :: _0 :: _0 :: _1 :: Choose[ISB]): Choose[ISB,  Boolean :: Int :: Int :: String :: HNil]
+    ()
   }
 
   "Choose instance" should " be applicable to an appropriate HList" in {
