@@ -49,6 +49,9 @@ object Lst {
   def empty[A]: Lst[A] = Nil
 
   @inline
+  def singleton[A](a: A): Lst[A] = a :: Nil
+
+  @inline
   def maybe[A](a: Option[A]): Lst[A] = a match {
     case Some(x) => x :: Nil
     case None => Nil

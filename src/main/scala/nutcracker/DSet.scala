@@ -2,7 +2,7 @@ package nutcracker
 
 import nutcracker.Dom.Status
 import nutcracker.PropagationLang._
-import nutcracker.util.FreeK
+import nutcracker.util.{FreeK, Lst}
 
 /** A set of domain references.
   *
@@ -21,32 +21,21 @@ case class DSet[D] private(unrefined: Set[DRef[D]], refined: Set[DRef[D]])
 object DSet {
 
   sealed trait Update[D] {
-    def ref: DRef[D];
-    def toDelta: Delta[D]
+    def ref: DRef[D]
   }
-  case class Unrefined[D](ref: DRef[D]) extends Update[D] { def toDelta = Delta.unrefined(ref) }
-  case class Refined  [D](ref: DRef[D]) extends Update[D] { def toDelta = Delta.refined(ref) }
-  case class Failed   [D](ref: DRef[D]) extends Update[D] { def toDelta = Delta.failed(ref) }
+  case class Unrefined[D](ref: DRef[D]) extends Update[D]
+  case class Refined  [D](ref: DRef[D]) extends Update[D]
+  case class Failed   [D](ref: DRef[D]) extends Update[D]
 
-  case class Delta[D](
-    unrefined: Set[DRef[D]],
-    refined:   Set[DRef[D]],
-    failed:    Set[DRef[D]]
-  ) {
-    def +(that: Delta[D]): Delta[D] = Delta(
-      this.unrefined union that.unrefined,
-      this.refined   union that.refined,
-      this.failed    union that.failed
-    )
+  case class Inserted[D](refs: Lst[DRef[D]]) extends AnyVal {
+    def +(that: Inserted[D]): Inserted[D] = Inserted(this.refs ++ that.refs)
   }
 
-  object Delta {
-    def unrefined[D](ref: DRef[D]): Delta[D] = Delta(Set(ref), Set(), Set())
-    def   refined[D](ref: DRef[D]): Delta[D] = Delta(Set(), Set(ref), Set())
-    def    failed[D](ref: DRef[D]): Delta[D] = Delta(Set(), Set(), Set(ref))
+  object Inserted {
+    def apply[D](ref: DRef[D]): Inserted[D] = Inserted(Lst.singleton(ref))
   }
 
-  type DSetRef[D] = DRef.Aux[DSet[D], Update[D], Delta[D]]
+  type DSetRef[D] = DRef.Aux[DSet[D], Update[D], Inserted[D]]
 
   def insert[D](dsref: DSetRef[D], ref: DRef[D])(implicit dom: Dom[D]): FreeK[PropagationLang, Unit] =
     valTriggerF(ref)(d => dom.assess(d) match {
@@ -55,10 +44,10 @@ object DSet {
       case Dom.Refined => FireReload(updateF(dsref)(Refined(ref)))
     })
 
-  implicit def domInstance[D]: Dom.Aux[DSet[D], Update[D], Delta[D]] =
+  implicit def domInstance[D]: Dom.Aux[DSet[D], Update[D], Inserted[D]] =
     new Dom[DSet[D]] {
       type Update = DSet.Update[D]
-      type Delta = DSet.Delta[D]
+      type Delta = DSet.Inserted[D]
 
       def update(d: DSet[D], u: Update): Option[(DSet[D], Delta)] = {
         val (unrefined, refined) = u match {
@@ -67,10 +56,10 @@ object DSet {
           case Failed(ref)    => (d.unrefined - ref, d.refined - ref)
         }
 
-        if(unrefined.size == d.unrefined.size && refined.size == d.refined.size)
-          None
+        if(unrefined.size + refined.size > d.unrefined.size + d.refined.size)
+          Some((DSet(unrefined, refined), Inserted(u.ref)))
         else
-          Some((DSet(unrefined, refined), u.toDelta))
+          None
       }
 
       def combineDeltas(d1: Delta, d2: Delta): Delta = d1 + d2
