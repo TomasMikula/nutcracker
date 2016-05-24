@@ -13,7 +13,6 @@ final class DecSet[A] private(private val value: Set[A]) extends AnyVal {
   def head: A = value.head
   def tail: DecSet[A] = new DecSet(value.tail)
   def intersect(that: DecSet[A]): DecSet[A] = new DecSet(this.value intersect that.value)
-  def union(that: DecSet[A]): DecSet[A] = new DecSet(this.value union that.value)
   def diff(that: DecSet[A]): DecSet[A] = new DecSet(this.value diff that.value)
   def toList: List[A] = value.toList
 }
@@ -23,12 +22,12 @@ object DecSet {
   def singleton[A](a: A): DecSet[A] = new DecSet(Set(a))
   def wrap[A](as: Set[A]): DecSet[A] = new DecSet(as)
 
-  type DecSetDom[A] = Dom .Aux[DecSet[A], Meet[DecSet[A]] \/ Diff[DecSet[A]], Diff[DecSet[A]]]
-  type DecSetRef[A] = DRef.Aux[DecSet[A], Meet[DecSet[A]] \/ Diff[DecSet[A]], Diff[DecSet[A]]]
+  type DecSetDom[A] = Dom .Aux[DecSet[A], Meet[DecSet[A]] \/ Diff[DecSet[A]], Diff[Set[A]]]
+  type DecSetRef[A] = DRef.Aux[DecSet[A], Meet[DecSet[A]] \/ Diff[DecSet[A]], Diff[Set[A]]]
 
   implicit def domInstance[A]: DecSetDom[A] = new Dom[DecSet[A]] {
     type Update = Meet[DecSet[A]] \/ Diff[DecSet[A]]
-    type Delta = Diff[DecSet[A]]
+    type Delta = Diff[Set[A]]
 
     override def assess(d: DecSet[A]): Dom.Status[Meet[DecSet[A]] \/ Diff[DecSet[A]]] = d.size match {
       case 0 => Dom.Failed
@@ -36,25 +35,25 @@ object DecSet {
       case _ => Dom.Unrefined(() => Some(d.toList map (x => Meet(singleton(x)).left))) // split into singleton sets
     }
 
-    override def update(s: DecSet[A], u: Meet[DecSet[A]] \/ Diff[DecSet[A]]): Option[(DecSet[A], Diff[DecSet[A]])] = u match {
+    override def update(s: DecSet[A], u: Meet[DecSet[A]] \/ Diff[DecSet[A]]): Option[(DecSet[A], Diff[Set[A]])] = u match {
       case -\/(m) => intersect(s, m.value);
       case \/-(d) => diff(s, d.value);
     }
 
-    override def combineDeltas(d1: Diff[DecSet[A]], d2: Diff[DecSet[A]]): Diff[DecSet[A]] =
+    override def combineDeltas(d1: Diff[Set[A]], d2: Diff[Set[A]]): Diff[Set[A]] =
       Diff(d1.value union d2.value)
 
     @inline
-    private def intersect(a: DecSet[A], b: DecSet[A]): Option[(DecSet[A], Diff[DecSet[A]])] = {
+    private def intersect(a: DecSet[A], b: DecSet[A]): Option[(DecSet[A], Diff[Set[A]])] = {
       val res = a intersect b
-      if(res.size < a.size) Some((res, Diff(a diff b)))
+      if(res.size < a.size) Some((res, Diff(a.value diff b.value)))
       else None
     }
 
     @inline
-    private def diff(a: DecSet[A], b: DecSet[A]): Option[(DecSet[A], Diff[DecSet[A]])] = {
+    private def diff(a: DecSet[A], b: DecSet[A]): Option[(DecSet[A], Diff[Set[A]])] = {
       val res = a diff b
-      if(res.size < a.size) Some((res, Diff(a intersect b)))
+      if(res.size < a.size) Some((res, Diff(a.value intersect b.value)))
       else None
     }
   }

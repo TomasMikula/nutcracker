@@ -14,9 +14,14 @@ import scalaz.Id._
 package object nutcracker {
 
   /** Used as a monotonic update on domain D:
-    * represents the operation of meet with the given value.
+    * represents the operation of lattice meet with the given value.
     */
   final case class Meet[+D](value: D) extends AnyVal
+
+  /** Used as a monotonic update on domain D:
+    * represents the operation of lattice join with the given value.
+    */
+  final case class Join[D](value: D) extends AnyVal
 
   /** When used as a monotonic update, represents the operation of relative complement.
     * When used as a delta, represents the part that was removed.
