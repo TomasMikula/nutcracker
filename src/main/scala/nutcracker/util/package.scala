@@ -24,12 +24,12 @@ package object util {
       WriterStateT[Id, W, S, A](run)
   }
 
-  implicit def idToM[M[_]](implicit M: Monad[M]): M |>=| Id = new (M |>=| Id) {
-    override val MF = implicitly[Monad[Id]]
-    override val MG = M
-
-    override def promote[A](a: Id[A]): M[A] = M.point(a)
+  type StateInterpreter[F[_[_], _]]  = StateInterpreterT[Id, F]
+  object StateInterpreter {
+    type Aux[F[_[_], _], S[_[_]]] = StateInterpreterT.Aux[Id, F, S]
   }
+
+  type Step[F[_[_], _], S[_[_]]] = StepT[Id, F, S]
 
   type FreeK[F[_[_], _], A] = FreeKT[F, Id, A]
   object FreeK {
@@ -46,5 +46,12 @@ package object util {
     ): FreeK[G, A] =
       liftF(inj(a))
 
+  }
+
+  implicit def idToM[M[_]](implicit M: Monad[M]): M |>=| Id = new (M |>=| Id) {
+    override val MF = implicitly[Monad[Id]]
+    override val MG = M
+
+    override def promote[A](a: Id[A]): M[A] = M.point(a)
   }
 }

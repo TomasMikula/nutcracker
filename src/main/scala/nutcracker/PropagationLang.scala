@@ -1,8 +1,7 @@
 package nutcracker
 
 import scala.language.higherKinds
-
-import nutcracker.util.{FreeK, FunctorK, FunctorKA, InjectK, StateInterpreterT}
+import nutcracker.util.{FreeK, FunctorK, FunctorKA, InjectK, StateInterpreter}
 import shapeless.{::, HList, HNil, Nat, Sized}
 
 import scalaz.{Traverse, ~>}
@@ -96,5 +95,5 @@ object PropagationLang {
     }
   }
 
-  implicit def interpreter: StateInterpreterT.StateInterpreter.Aux[PropagationLang, PropagationStore] = PropagationStore.interpreter
+  implicit def interpreter: StateInterpreter.Aux[PropagationLang, PropagationStore] = PropagationStore.interpreter
 }

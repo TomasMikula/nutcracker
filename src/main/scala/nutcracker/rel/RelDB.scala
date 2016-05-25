@@ -3,8 +3,7 @@ package nutcracker.rel
 import scala.language.existentials
 import scala.language.higherKinds
 import nutcracker.rel.RelLang._
-import nutcracker.util.{Lst, Mapped, TransformedIndex, WriterState}
-import nutcracker.util.StepT.Step
+import nutcracker.util.{Lst, Mapped, Step, TransformedIndex, WriterState}
 import algebra.Order
 import shapeless.HList
 import RelDB._

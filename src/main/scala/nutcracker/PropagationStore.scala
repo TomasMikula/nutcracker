@@ -3,8 +3,7 @@ package nutcracker
 import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMapB, Lst, StateInterpreterT, Uncons, ValK, WriterState}
-import nutcracker.util.StepT.Step
+import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMapB, Lst, StateInterpreter, StateInterpreterT, Step, Uncons, ValK, WriterState}
 
 import scalaz.Id._
 import scalaz.{Monad, StateT, |>=|}
@@ -175,8 +174,8 @@ object PropagationStore {
     dirtySelections = Set()
   )
 
-  val interpreter: StateInterpreterT.StateInterpreter.Aux[PropagationLang, PropagationStore] =
-    new StateInterpreterT.StateInterpreter[PropagationLang] {
+  val interpreter: StateInterpreter.Aux[PropagationLang, PropagationStore] =
+    new StateInterpreter[PropagationLang] {
       type State[K[_]] = PropagationStore[K]
 
       def step: Step[PropagationLang, State] =

@@ -2,7 +2,7 @@ package nutcracker.rel
 
 import algebra.Order
 import nutcracker.rel.RelDB.PartiallyAssignedPattern
-import nutcracker.util.{FreeK, FunctorKA, InjectK, Mapped, StepT, SummonHList}
+import nutcracker.util.{FreeK, FunctorKA, InjectK, Mapped, Step, SummonHList}
 
 import scala.language.higherKinds
 import shapeless.HList
@@ -43,6 +43,6 @@ object RelLang {
     }
   }
 
-  implicit def interpreter: StepT.Step[RelLang, RelDB] = RelDB.interpreter
+  implicit def interpreter: Step[RelLang, RelDB] = RelDB.interpreter
 
 }
