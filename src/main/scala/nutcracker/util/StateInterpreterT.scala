@@ -31,7 +31,7 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
   }
 
   def :+:[G[_[_], _]](
-    ig: G ~>> M
+    ig: G ≈>> M
   )(implicit
     M: Monad[M]
   ): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], State] = {
@@ -187,7 +187,7 @@ abstract class StepT[M[_], F[_[_], _], S[_[_]]] { self =>
 
 object StepT {
 
-  def lift[M[_]: Monad, F[_[_], _], S[_[_]]](fm: F ~>> M): StepT[M, F, S] =
+  def lift[M[_]: Monad, F[_[_], _], S[_[_]]](fm: F ≈>> M): StepT[M, F, S] =
     new StepT[M, F, S] {
       override def apply[K[_], A](f: F[K, A]): WriterStateT[M, Lst[K[Unit]], S[K], A] =
         WriterStateT.monadTrans[Lst[K[Unit]], S[K]].liftM(fm(f))
@@ -202,7 +202,7 @@ final case class Uncons[S[_[_]]](run: ValK[λ[K[_] => StateT[Option, S[K], Lst[K
   def zoomOut[T[_[_]]](f: ValK[λ[K[_] => Lens[T[K], S[K]]]]): Uncons[T] = {
     type StS[K[_]] = StateT[Option, S[K], Lst[K[Unit]]]
     type StT[K[_]] = StateT[Option, T[K], Lst[K[Unit]]]
-    Uncons[T](run.map[StT](new (StS ≈> StT) {
+    Uncons[T](run.transform[StT](new (StS ≈> StT) {
       def apply[K[_]](sts: StS[K]): StT[K] = sts.zoom(f[K])
     }))
   }

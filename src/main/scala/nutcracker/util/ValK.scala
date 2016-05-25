@@ -2,6 +2,9 @@ package nutcracker.util
 
 import scala.language.higherKinds
 
+/** Universally quantified value:
+  * `∀ K[_]. F[K]`
+  */
 trait ValK[F[_[_]]] { self =>
   private lazy val value: F[Nothing] = compute[Nothing]
 
@@ -9,7 +12,10 @@ trait ValK[F[_[_]]] { self =>
 
   final def apply[K[_]]: F[K] = value.asInstanceOf[F[K]]
 
-  final def map[G[_[_]]](tr: F ≈> G): ValK[G] = new ValK[G] {
-    def compute[K[_]]: G[K] = tr(self.compute[K])
+  /** Transform this value by a universally quantified function
+    * `f: ∀ K[_]. F[K] => G[K]`
+    */
+  final def transform[G[_[_]]](f: F ≈> G): ValK[G] = new ValK[G] {
+    def compute[K[_]]: G[K] = f(self.compute[K])
   }
 }
