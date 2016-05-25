@@ -50,13 +50,16 @@ object IncSet {
   def initF[F[_[_], _], A](implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] =
     init[A].inject[F]
 
-  def insert[A](add: Set[A], into: IncSetRef[A]): FreeK[PropagationLang, Unit] =
+  def insert[A](a: A, into: IncSetRef[A]): FreeK[PropagationLang, Unit] =
+    insertAll(Set(a), into)
+
+  def insertAll[A](add: Set[A], into: IncSetRef[A]): FreeK[PropagationLang, Unit] =
     PropagationLang.updateF(into)(Join(wrap(add)))
 
   def include[A](sub: IncSetRef[A], sup: IncSetRef[A]): FreeK[PropagationLang, Unit] =
     domTriggerF(sub)((sa: IncSet[A]) => {
-      val now = Some(insert(sa.value, sup))
-      val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(insert(delta.value, sup)))
+      val now = Some(insertAll(sa.value, sup))
+      val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(insertAll(delta.value, sup)))
       (now, onChange)
     })
 
