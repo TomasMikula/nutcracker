@@ -6,7 +6,7 @@ import nutcracker.PropagationLang
 import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolRef
 import nutcracker.lib.bool.BoolDomain._
-import nutcracker.util.{FreeK, FreeKT, Inject, InjectK}
+import nutcracker.util.{ContF, FreeK, FreeKT, Inject, InjectK}
 
 import scalaz.{Apply, Cont, Traverse}
 import scalaz.Id._
@@ -210,9 +210,9 @@ package object nutcracker {
     * cartesian product `as × as`. If this is not what you want, use
     * [[branch(Set[A])]] directly.
     */
-  def branchC[A, F[_[_], _]](as: Set[A])(implicit inj: InjectK[PropagationLang, F]): Cont[FreeK[F, Unit], A] =
-    Cont(f => branch(as) >>>= { _.asCont.apply(f) })
-  def branchC[A, F[_[_], _]](as: A*)(implicit inj: InjectK[PropagationLang, F]): Cont[FreeK[F, Unit], A] =
+  def branchC[A, F[_[_], _]](as: Set[A])(implicit inj: InjectK[PropagationLang, F]): ContF[F, A] =
+    ContF(f => branch(as) >>>= { _.asCont.apply(f) })
+  def branchC[A, F[_[_], _]](as: A*)(implicit inj: InjectK[PropagationLang, F]): ContF[F, A] =
     branchC(as.toSet)
 }
 

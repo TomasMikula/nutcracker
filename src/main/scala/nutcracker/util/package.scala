@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 import scalaz.Id.Id
-import scalaz.{Monad, |>=|, ~>}
+import scalaz.{Cont, Monad, |>=|}
 
 package object util {
   type ConstK[A, K[_]] = A
@@ -10,6 +10,13 @@ package object util {
   type ≈>[F[_[_]], G[_[_]]] = FunctionK[F, G]
   type ≈~>[F[_[_], _], G[_[_], _]] = FunctionKA[F, G]
   type ≈>>[F[_[_], _], G[_]] = F ≈~> λ[(K[_], A) => G[A]]
+
+  /** Continuation monad with result type `FreeK[F, Unit]`. */
+  type ContF[F[_[_], _], A] = Cont[FreeK[F, Unit], A]
+  object ContF {
+    def apply[F[_[_], _], A](f: (A => FreeK[F, Unit]) => FreeK[F, Unit]): ContF[F, A] =
+      Cont(f)
+  }
 
   type Index[K, V] = TransformedIndex[K, V, V]
 

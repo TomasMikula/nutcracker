@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.PropagationLang._
-import nutcracker.util.{FreeK, InjectK}
+import nutcracker.util.{ContF, FreeK, InjectK}
 
 import scalaz.{Codensity, Foldable, Monad}
 
@@ -62,6 +62,11 @@ object IncSet {
       val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(insertAll(delta.value, sup)))
       (now, onChange)
     })
+
+  def collect[F[_[_], _], A](cps: ContF[F, A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] = for {
+    res <- IncSet.initF[F, A]
+    _ <- cps(a => IncSet.insert(a, res).inject[F])
+  } yield res
 
   /** Relative monadic bind. [[nutcracker.IncSet.IncSetRef]] is a monad relative to `FreeK[F, ?]`,
     * i.e. we can implement `bind` if additional effects of type `FreeK[F, ?]` are allowed.
