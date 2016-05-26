@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMapB, Lst, StateInterpreter, StateInterpreterT, Step, Uncons, ValK, WriterState}
+import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMapB, Lst, StateInterpreter, Step, Uncons, ValK, WriterState}
 
 import scalaz.Id._
 import scalaz.{Monad, StateT, |>=|}
