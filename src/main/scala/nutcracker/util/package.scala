@@ -16,6 +16,10 @@ package object util {
   object ContF {
     def apply[F[_[_], _], A](f: (A => FreeK[F, Unit]) => FreeK[F, Unit]): ContF[F, A] =
       Cont(f)
+    def noop[F[_[_], _], A]: ContF[F, A] =
+      ContF(k => FreeK.pure(()))
+    def sequence[F[_[_], _], A](a: ContF[F, A], b: ContF[F, A]): ContF[F, A] =
+      ContF(f => nutcracker.concat(a(f), b(f)))
   }
 
   type Index[K, V] = TransformedIndex[K, V, V]

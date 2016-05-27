@@ -35,6 +35,9 @@ package object nutcracker {
   def concat[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
     ps.foldLeft[FreeK[F, Unit]](FreeK.pure(())) { _ >> _ }
 
+  def concat[F[_[_], _]](ps: FreeK[F, Unit]*): FreeK[F, Unit] =
+    concat(ps)
+
   def sequence[F[_[_], _], C[_]: Traverse, A](ps: C[FreeK[F, A]]): FreeK[F, C[A]] =
     Traverse[C].sequence[FreeKT[F, Id, ?], A](ps)(FreeKT.freeKTMonad[F, Id])
 
