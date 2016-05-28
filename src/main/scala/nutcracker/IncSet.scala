@@ -50,6 +50,16 @@ object IncSet {
   def initF[F[_[_], _], A](implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] =
     init[A].inject[F]
 
+  /** Returns the given set in a CPS style, executing any subsequently
+    * given callback for every current and future element of that set.
+    */
+  def forEach[F[_[_], _], A](ref: IncSetRef[A])(implicit inj: InjectK[PropagationLang, F]): ContF[F, A] =
+    ContF(f => domTriggerF(ref)(as => {
+      val now = concat(as.toList.map(f))
+      val onChange = (as: IncSet[A], delta: Diff[Set[A]]) => Trigger.fireReload(concat(delta.value.toList.map(f)))
+      (Some(now), Some(onChange))
+    }))
+
   def insert[A](a: A, into: IncSetRef[A]): FreeK[PropagationLang, Unit] =
     insertAll(Set(a), into)
 
