@@ -32,11 +32,11 @@ package object nutcracker {
 
   type Promised[A] = DRef.Aux[Promise[A], Complete[A], Unit]
 
-  def concat[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
+  def sequence_[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
     ps.foldLeft[FreeK[F, Unit]](FreeK.pure(())) { _ >> _ }
 
-  def concat[F[_[_], _]](ps: FreeK[F, Unit]*): FreeK[F, Unit] =
-    concat(ps)
+  def sequence_[F[_[_], _]](ps: FreeK[F, Unit]*): FreeK[F, Unit] =
+    sequence_(ps)
 
   def sequence[F[_[_], _], C[_]: Traverse, A](ps: C[FreeK[F, A]]): FreeK[F, C[A]] =
     Traverse[C].sequence[FreeKT[F, Id, ?], A](ps)(FreeKT.freeKTMonad[F, Id])
@@ -125,9 +125,9 @@ package object nutcracker {
     inj: Inject[Diff[D], U]
   ): FreeK[PropagationLang, Unit] = {
     val n = doms.size
-    concat((0 until n) map { i => whenRefinedF[PropagationLang, D](doms(i)){ d =>
-      concat((0 until i) map { j => remove(doms(j), d) }) >>
-      concat((i+1 until n) map { j => remove(doms(j), d) }) }
+    sequence_((0 until n) map { i => whenRefinedF[PropagationLang, D](doms(i)){ d =>
+      sequence_((0 until i) map { j => remove(doms(j), d) }) >>
+      sequence_((i+1 until n) map { j => remove(doms(j), d) }) }
     })
   }
 

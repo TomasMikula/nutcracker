@@ -24,13 +24,13 @@ class Sudoku extends FunSuite {
       cells <- variable[Int].count(81).oneOf((1 to 9).toSet)
 
       // numbers in each row are all different
-      _ <- concat(rows(cells) map { allDifferent(_:_*) })
+      _ <- sequence_(rows(cells) map { allDifferent(_:_*) })
 
       // numbers in each column are all different
-      _ <- concat(cols(cells) map { allDifferent(_:_*) })
+      _ <- sequence_(cols(cells) map { allDifferent(_:_*) })
 
       // numbers in each 3x3 square are all different
-      _ <- concat(sqrs(cells) map { allDifferent(_:_*) })
+      _ <- sequence_(sqrs(cells) map { allDifferent(_:_*) })
     } yield cells
   }
 
@@ -45,7 +45,7 @@ class Sudoku extends FunSuite {
     def segNumConstraint(seg: Seq[Cell], x: Int): FreeK[PropagationLang, Unit] = {
       for {
         xPos <- variable[Cell].oneOf(seg.toSet)
-        _ <- concat(seg map { cell => valTriggerF(cell) { ys =>
+        _ <- sequence_(seg map { cell => valTriggerF(cell) { ys =>
           if(!ys.contains(x)) fire(exclude(xPos, cell))
           else if(ys.size == 1) fire(nutcracker.set(xPos, cell))
           else sleep[PropagationLang]
@@ -55,14 +55,14 @@ class Sudoku extends FunSuite {
     }
 
     def segConstraints(seg: Seq[Cell]): FreeK[PropagationLang, Unit] = {
-      concat((1 to 9) map { segNumConstraint(seg, _) })
+      sequence_((1 to 9) map { segNumConstraint(seg, _) })
     }
 
     for {
       cells <- sudoku0
-      _ <- concat(rows(cells) map { segConstraints(_) })
-      _ <- concat(cols(cells) map { segConstraints(_) })
-      _ <- concat(sqrs(cells) map { segConstraints(_) })
+      _ <- sequence_(rows(cells) map { segConstraints(_) })
+      _ <- sequence_(cols(cells) map { segConstraints(_) })
+      _ <- sequence_(sqrs(cells) map { segConstraints(_) })
     } yield cells
   }
 
@@ -118,7 +118,7 @@ class Sudoku extends FunSuite {
       for {
         cells <- sudoku
 
-        _ <- concat(Seq(
+        _ <- sequence_(Seq(
           set(0, 2, 3), set(0, 6, 6), set(0, 7, 1),
           set(1, 1, 6), set(1, 4, 2), set(1, 5, 4), set(1, 8, 3),
           set(2, 0, 5), set(2, 7, 8),

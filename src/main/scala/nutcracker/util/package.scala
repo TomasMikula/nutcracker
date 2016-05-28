@@ -19,7 +19,7 @@ package object util {
     def noop[F[_[_], _], A]: ContF[F, A] =
       ContF(k => FreeK.pure(()))
     def sequence[F[_[_], _], A](a: ContF[F, A], b: ContF[F, A]): ContF[F, A] =
-      ContF(f => nutcracker.concat(a(f), b(f)))
+      ContF(f => nutcracker.sequence_(a(f), b(f)))
   }
 
   type Index[K, V] = TransformedIndex[K, V, V]

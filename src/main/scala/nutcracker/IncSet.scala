@@ -55,8 +55,8 @@ object IncSet {
     */
   def forEach[F[_[_], _], A](ref: IncSetRef[A])(implicit inj: InjectK[PropagationLang, F]): ContF[F, A] =
     ContF(f => domTriggerF(ref)(as => {
-      val now = concat(as.toList.map(f))
-      val onChange = (as: IncSet[A], delta: Diff[Set[A]]) => Trigger.fireReload(concat(delta.value.toList.map(f)))
+      val now = sequence_(as.toList.map(f))
+      val onChange = (as: IncSet[A], delta: Diff[Set[A]]) => Trigger.fireReload(sequence_(delta.value.toList.map(f)))
       (Some(now), Some(onChange))
     }))
 
@@ -85,8 +85,8 @@ object IncSet {
   def relBind[F[_[_], _], A, B](sref: IncSetRef[A])(f: A => FreeK[F, IncSetRef[B]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[B]] = for {
     res <- initF[F, B]
     _ <- domTriggerF[F, IncSet[A]](sref)((sa: IncSet[A]) => {
-      val now = concat(sa.toList.map(f(_) >>= (refb => include(refb, res))))
-      val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(concat(delta.value.toList.map(f(_) >>= (refb => include(refb, res))))))
+      val now = sequence_(sa.toList.map(f(_) >>= (refb => include(refb, res))))
+      val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(sequence_(delta.value.toList.map(f(_) >>= (refb => include(refb, res))))))
       (Some(now), onChange)
     })
   } yield res
