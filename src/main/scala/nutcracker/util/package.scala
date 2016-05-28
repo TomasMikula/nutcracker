@@ -20,6 +20,10 @@ package object util {
       ContF(k => FreeK.pure(()))
     def sequence[F[_[_], _], A](a: ContF[F, A], b: ContF[F, A]): ContF[F, A] =
       ContF(f => FreeK.sequence_(a(f), b(f)))
+    def filter[F[_[_], _], A](c: ContF[F, A])(p: A => Boolean): ContF[F, A] =
+      ContF(f => c(a => if(p(a)) f(a) else FreeK.pure(())))
+    def filterMap[F[_[_], _], A, B](c: ContF[F, A])(f: A => Option[B]): ContF[F, B] =
+      ContF(k => c(a => f(a).fold[FreeK[F, Unit]](FreeK.pure(()))(k(_))))
   }
 
   type Index[K, V] = TransformedIndex[K, V, V]
