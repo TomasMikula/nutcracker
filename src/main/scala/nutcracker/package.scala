@@ -8,7 +8,7 @@ import nutcracker.lib.bool.BoolRef
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.util.{ContF, FreeK, FreeKT, Inject, InjectK}
 
-import scalaz.{Apply, Cont, Traverse}
+import scalaz.{Apply, Cont}
 import scalaz.Id._
 
 package object nutcracker {
@@ -31,18 +31,6 @@ package object nutcracker {
   final case class Diff[+D](value: D) extends AnyVal
 
   type Promised[A] = DRef.Aux[Promise[A], Complete[A], Unit]
-
-  def sequence_[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
-    ps.foldLeft[FreeK[F, Unit]](FreeK.pure(())) { _ >> _ }
-
-  def sequence_[F[_[_], _]](ps: FreeK[F, Unit]*): FreeK[F, Unit] =
-    sequence_(ps)
-
-  def sequence[F[_[_], _], C[_]: Traverse, A](ps: C[FreeK[F, A]]): FreeK[F, C[A]] =
-    Traverse[C].sequence[FreeKT[F, Id, ?], A](ps)(FreeKT.freeKTMonad[F, Id])
-
-  def traverse[F[_[_], _], C[_]: Traverse, A, B](ps: C[A])(f: A => FreeK[F, B]): FreeK[F, C[B]] =
-    Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)(FreeKT.freeKTMonad[F, Id])
 
 
   /* **************************************************** *
@@ -125,9 +113,9 @@ package object nutcracker {
     inj: Inject[Diff[D], U]
   ): FreeK[PropagationLang, Unit] = {
     val n = doms.size
-    sequence_((0 until n) map { i => whenRefinedF[PropagationLang, D](doms(i)){ d =>
-      sequence_((0 until i) map { j => remove(doms(j), d) }) >>
-      sequence_((i+1 until n) map { j => remove(doms(j), d) }) }
+    FreeK.sequence_((0 until n) map { i => whenRefinedF[PropagationLang, D](doms(i)){ d =>
+      FreeK.sequence_((0 until i) map { j => remove(doms(j), d) }) >>
+        FreeK.sequence_((i+1 until n) map { j => remove(doms(j), d) }) }
     })
   }
 

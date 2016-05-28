@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 import scalaz.Id.Id
-import scalaz.{Cont, Monad, |>=|}
+import scalaz.{Cont, Monad, Traverse, |>=|}
 
 package object util {
   type ConstK[A, K[_]] = A
@@ -19,7 +19,7 @@ package object util {
     def noop[F[_[_], _], A]: ContF[F, A] =
       ContF(k => FreeK.pure(()))
     def sequence[F[_[_], _], A](a: ContF[F, A], b: ContF[F, A]): ContF[F, A] =
-      ContF(f => nutcracker.sequence_(a(f), b(f)))
+      ContF(f => FreeK.sequence_(a(f), b(f)))
   }
 
   type Index[K, V] = TransformedIndex[K, V, V]
@@ -56,6 +56,18 @@ package object util {
       inj: InjectK[F, G]
     ): FreeK[G, A] =
       liftF(inj(a))
+
+    def sequence_[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
+      ps.foldLeft[FreeK[F, Unit]](FreeK.pure(())) { _ >> _ }
+
+    def sequence_[F[_[_], _]](ps: FreeK[F, Unit]*): FreeK[F, Unit] =
+      sequence_(ps)
+
+    def sequence[F[_[_], _], C[_]: Traverse, A](ps: C[FreeK[F, A]]): FreeK[F, C[A]] =
+      Traverse[C].sequence[FreeKT[F, Id, ?], A](ps)(FreeKT.freeKTMonad[F, Id])
+
+    def traverse[F[_[_], _], C[_]: Traverse, A, B](ps: C[A])(f: A => FreeK[F, B]): FreeK[F, C[B]] =
+      Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)(FreeKT.freeKTMonad[F, Id])
 
   }
 

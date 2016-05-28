@@ -5,6 +5,7 @@ import nutcracker.PropagationLang._
 import nutcracker.Trigger._
 import nutcracker._
 import nutcracker.util.FreeK
+import nutcracker.util.FreeK._
 import org.scalatest.FunSuite
 
 import scala.language.higherKinds

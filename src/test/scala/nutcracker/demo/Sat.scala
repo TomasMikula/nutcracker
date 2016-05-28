@@ -4,6 +4,7 @@ import nutcracker.PropagationLang._
 import nutcracker._
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.lib.bool._
+import nutcracker.util.FreeK
 import org.scalatest.FunSpec
 
 import scala.language.higherKinds
@@ -16,7 +17,7 @@ class Sat extends FunSpec {
 
     val problem = (for {
       a <- variable[Boolean].count(4)()
-      ā <- traverse(a){ neg(_) }
+      ā <- FreeK.traverse(a){ neg(_) }
 
       _ <- atLeastOneTrue(a(0), a(1), a(2))
       _ <- atLeastOneTrue(ā(1), a(2), ā(3))
