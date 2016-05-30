@@ -18,8 +18,10 @@ package object util {
       Cont(f)
     def noop[F[_[_], _], A]: ContF[F, A] =
       ContF(k => FreeK.pure(()))
-    def sequence[F[_[_], _], A](a: ContF[F, A], b: ContF[F, A]): ContF[F, A] =
-      ContF(f => FreeK.sequence_(a(f), b(f)))
+    def sequence[F[_[_], _], A](cs: ContF[F, A]*): ContF[F, A] =
+      sequence(cs)
+    def sequence[F[_[_], _], A](cs: Iterable[ContF[F, A]]): ContF[F, A] =
+      ContF(f => FreeK.sequence_(cs.map(_(f))))
     def filter[F[_[_], _], A](c: ContF[F, A])(p: A => Boolean): ContF[F, A] =
       ContF(f => c(a => if(p(a)) f(a) else FreeK.pure(())))
     def filterMap[F[_[_], _], A, B](c: ContF[F, A])(f: A => Option[B]): ContF[F, B] =
