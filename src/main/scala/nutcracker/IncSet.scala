@@ -78,6 +78,12 @@ object IncSet {
     _ <- cps(a => IncSet.insert(a, res).inject[F])
   } yield res
 
+  def collectAll[F[_[_], _], A](cps: ContF[F, A]*)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] =
+    collectAll(cps)
+
+  def collectAll[F[_[_], _], A](cps: Iterable[ContF[F, A]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] =
+    collect(ContF.sequence(cps))
+
   /** Relative monadic bind. [[nutcracker.IncSet.IncSetRef]] is a monad relative to `FreeK[F, ?]`,
     * i.e. we can implement `bind` if additional effects of type `FreeK[F, ?]` are allowed.
     * This is equivalent to having a monad instance for `λ[A => FreeK[F, IncSetRef[A]]]`.
