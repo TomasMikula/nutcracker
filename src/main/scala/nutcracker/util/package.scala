@@ -80,6 +80,9 @@ package object util {
     def sequence_[F[_[_], _]](ps: FreeK[F, Unit]*): FreeK[F, Unit] =
       sequence_(ps)
 
+    def traverse_[F[_[_], _], A](ps: Iterable[A])(f: A => FreeK[F, Unit]): FreeK[F, Unit] =
+      ps.foldLeft[FreeK[F, Unit]](FreeK.pure(())) { _ >> f(_) }
+
     def sequence[F[_[_], _], C[_]: Traverse, A](ps: C[FreeK[F, A]]): FreeK[F, C[A]] =
       Traverse[C].sequence[FreeKT[F, Id, ?], A](ps)(FreeKT.freeKTMonad[F, Id])
 
