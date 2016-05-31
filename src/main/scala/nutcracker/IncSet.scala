@@ -10,7 +10,7 @@ import scalaz.Monad
   * A wrapper for `Set` where a _monotonic_ update is one that adds
   * elements, e.g. by union with another set.
   */
-final class IncSet[A] private(private val value: Set[A]) extends AnyVal {
+final class IncSet[A] private(val value: Set[A]) extends AnyVal {
   def size: Int = value.size
   def contains(a: A): Boolean = value.contains(a)
   def head: A = value.head
