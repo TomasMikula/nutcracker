@@ -11,6 +11,8 @@ trait InjectK[F[_[_], _], H[_[_], _]] extends (F ≈~> H) {
 
 object InjectK extends InjectK0 {
 
+  def apply[F[_[_], _], H[_[_], _]](implicit inj: InjectK[F, H]): InjectK[F, H] = inj
+
   implicit def reflexiveInject[F[_[_], _]]: InjectK[F, F] =
     new InjectK[F, F] {
       def inj[K[_], A](fa: F[K, A]): F[K, A] = fa
