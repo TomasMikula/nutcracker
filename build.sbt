@@ -11,7 +11,7 @@ resolvers += "bintray/non" at "http://dl.bintray.com/non/maven"
 resolvers += Resolver.sonatypeRepo("releases")
 
 autoCompilerPlugins := true
-addCompilerPlugin("org.spire-math" % "kind-projector" % "0.6.0" cross CrossVersion.binary)
+addCompilerPlugin("org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary)
 addCompilerPlugin("com.milessabin" % "si2712fix-plugin" % "1.1.0" cross CrossVersion.full)
 addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.12")
 
