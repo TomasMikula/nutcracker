@@ -8,7 +8,7 @@ import nutcracker.util.{Lst, StateInterpreter, Step, Uncons, ValK, WriterState}
 import scalaz.{Heap, Order, StateT}
 import scalaz.std.option._
 
-final case class DeferStore[D, K[_]](
+final case class DeferStore[D, K[_]] private (
   private val currentTime: D,
   private val heap: Heap[(D, K[Unit])]
 )(implicit
@@ -27,6 +27,9 @@ final case class DeferStore[D, K[_]](
 }
 
 object DeferStore {
+  def empty[D, K[_]](implicit D: NonDecreasingMonoid[D] with OrderPreservingMonoid[D]) =
+    DeferStore(D.zero, Heap.Empty[(D, K[Unit])])
+
   def interpreter[D]: StateInterpreter.Aux[DeferLang[D, ?[_], ?], DeferStore[D, ?[_]]] =
     new StateInterpreter[DeferLang[D, ?[_], ?]] {
       type State[K[_]] = DeferStore[D, K]
