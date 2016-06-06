@@ -1,7 +1,7 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.util.{FreeK, InjectK}
+import nutcracker.util.{ContF, FreeK, InjectK}
 
 sealed trait DeferLang[D, K[_], A]
 
@@ -13,4 +13,8 @@ object DeferLang {
 
   def deferF[D, F[_[_], _]](delay: D, k: FreeK[F, Unit])(implicit inj: InjectK[DeferLang[D, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF[DeferLang[D, ?[_], ?], F, Unit](defer[D, FreeK[F, ?]](delay, k))
+
+  /** Defer registration of callbacks to the given CPS computation. */
+  def deferC[D, F[_[_], _], A](delay: D, c: ContF[F, A])(implicit inj: InjectK[DeferLang[D, ?[_], ?], F]): ContF[F, A] =
+    ContF(f => deferF(delay, c(f)))
 }
