@@ -1,6 +1,6 @@
 name := "nutcracker"
 
-version := "0.1.1-SNAPSHOT"
+version := "0.1.1"
 
 organization := "com.github.tomasmikula"
 
@@ -41,7 +41,7 @@ lazy val root = (project in file(".")).
 libraryDependencies ++= Seq(
   "org.spire-math" %% "algebra" % "0.4.2",
   "org.spire-math" %% "algebra-std" % "0.4.2",
-  "org.scalaz" %% "scalaz-core" % "7.3.0-SNAPSHOT",
+  "org.scalaz" %% "scalaz-core" % "7.3.0-M3",
   "com.chuusai" %% "shapeless" % "2.3.0",
   "com.github.julien-truffaut"  %%  "monocle-core" % "1.2.0",
   "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
