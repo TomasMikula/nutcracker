@@ -3,13 +3,13 @@ package nutcracker.rel
 import scala.language.existentials
 import scala.language.higherKinds
 import nutcracker.rel.RelLang._
-import nutcracker.util.{Lst, Mapped, Step, TransformedIndex, WriterState}
+import nutcracker.util.{KMapB, Lst, Mapped, Step, TransformedIndex, WriterState}
 import algebra.Order
 import shapeless.HList
 import RelDB._
 
 case class RelDB[K[_]] private (
-  private val tables: Map[Rel[_], RelTable[_]],
+  private val tables: KMapB[Rel, RelTable, HList],
   private val patternTriggers: Map[PartiallyAssignedPattern[_], List[_ => K[Unit]]],
   private val relToPatterns: TransformedIndex[Rel[_ <: HList], PartiallyAssignedPattern[_ <: HList], PartiallyAssignedOrientedPattern[_ <: HList, _ <: HList]]
 ) {
@@ -117,7 +117,7 @@ case class RelDB[K[_]] private (
     patternTriggers.getOrElse(p, Nil).asInstanceOf[List[V => K[Unit]]]
 
   private def replaceTable[L <: HList](rel: Rel[L])(tbl: RelTable[L]): RelDB[K] =
-    copy(tables = tables + ((rel, tbl)))
+    copy(tables = tables.updated(rel, tbl))
 
   private def addTrigger[V <: HList](p: PartiallyAssignedPattern[V], h: V => K[Unit]): RelDB[K] =
     copy(
@@ -137,7 +137,7 @@ object RelDB {
   }
 
   def empty[K[_]]: RelDB[K] = RelDB(
-    Map.empty,
+    KMapB[Rel, RelTable, HList](),
     Map.empty,
     TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel))
   )

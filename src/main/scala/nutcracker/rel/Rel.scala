@@ -3,7 +3,7 @@ package nutcracker.rel
 import nutcracker.util.ChooseByPtrs
 import shapeless._
 
-trait Rel[L <: HList] {
+trait Rel[L <: HList] { self: Singleton =>
 
   def apply[V <: HList, Ptrs <: HList](
     ptrs: Ptrs)(implicit
