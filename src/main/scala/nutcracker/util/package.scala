@@ -59,6 +59,18 @@ package object util {
 
   type Step[F[_[_], _], S[_[_]]] = StepT[Id, F, S]
 
+  /** Free monad for type constructors of kind `F[_[_], _]`,
+    * where `F`'s first type parameter is recursively set to FreeK[F, ?].
+    * If we pretend that recursive type aliases are legal, then `FreeK` is
+    * equivalent to
+    *
+    * {{{
+    * type FreeK[F[_[_], _], A] = Free[F[FreeK[F, ?], ?], A]
+    * }}}
+    *
+    * This is useful for instruction sets (a.k.a. algebras, DSLs, ...) that
+    * need to refer to the type of the free program that they are embedded in.
+    */
   type FreeK[F[_[_], _], A] = FreeKT[F, Id, A]
   object FreeK {
 
