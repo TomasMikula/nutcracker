@@ -1,7 +1,7 @@
 package nutcracker.util
 
 import scala.language.{higherKinds, implicitConversions}
-import scalaz.{Applicative, BindRec, FreeT, Functor, Monad, MonadPartialOrder, ~>}
+import scalaz.{Applicative, BindRec, Functor, Monad, MonadPartialOrder, ~>}
 
 final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M, A]) extends AnyVal {
 
