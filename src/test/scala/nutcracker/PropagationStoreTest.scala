@@ -17,7 +17,7 @@ class PropagationStoreTest extends FunSuite {
       _   <- remove(ref, DecSet(4, 5))
     } yield log
 
-    val (store, logRef) = PropagationStore.interpreter.freeInstance.apply(prg)(PropagationStore.empty[FreeK[PropagationLang, ?]])
+    val (store, logRef) = PropagationStore.interpreter.freeInstance.apply(prg)(PropagationStore.emptyF[PropagationLang])
     val log = store.fetch(logRef)
     assertResult(List(Diff(Set(1, 2, 4, 5))))(log)
   }
@@ -32,7 +32,7 @@ class PropagationStoreTest extends FunSuite {
 
     val interpreter = PropagationStore.interpreter.freeInstance
 
-    val (store1, (ref, logRef)) = interpreter.apply(prg1)(PropagationStore.empty[FreeK[PropagationLang, ?]])
+    val (store1, (ref, logRef)) = interpreter.apply(prg1)(PropagationStore.emptyF[PropagationLang])
     val log1 = store1.fetch(logRef)
     assertResult(List(Diff(Set(1, 2))))(log1)
 
@@ -51,7 +51,7 @@ class PropagationStoreTest extends FunSuite {
       _   <- remove(ref, DecSet(2, 3, 4, 5)) // only removal of {2, 3} should be logged
     } yield log
 
-    val (store, logRef) = PropagationStore.interpreter.freeInstance.apply(prg)(PropagationStore.empty[FreeK[PropagationLang, ?]])
+    val (store, logRef) = PropagationStore.interpreter.freeInstance.apply(prg)(PropagationStore.emptyF[PropagationLang])
     val log = store.fetch(logRef)
     assertResult(List(Diff(Set(2, 3))))(log)
   }

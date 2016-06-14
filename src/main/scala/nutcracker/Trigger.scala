@@ -1,24 +1,24 @@
 package nutcracker
 
-import nutcracker.util.{FreeK, FunctorK}
+import nutcracker.util.{FreeK}
 
 import scala.language.higherKinds
-import scalaz.~>
+import scalaz.{Functor, ~>}
 
-sealed trait Trigger[K[_]]
-case class Discard[K[_]]() extends Trigger[K]
-case class Sleep[K[_]]() extends Trigger[K]
-case class Fire[K[_]](cont: K[Unit]) extends Trigger[K]
-case class FireReload[K[_]](cont: K[Unit]) extends Trigger[K]
+sealed trait Trigger[K]
+case class Discard[K]() extends Trigger[K]
+case class Sleep[K]() extends Trigger[K]
+case class Fire[K](cont: K) extends Trigger[K]
+case class FireReload[K](cont: K) extends Trigger[K]
 
 object Trigger {
-  def discard[F[_[_], _]]: Trigger[FreeK[F, ?]] = Discard[FreeK[F, ?]]()
-  def sleep[F[_[_], _]]: Trigger[FreeK[F, ?]] = Sleep[FreeK[F, ?]]()
-  def fire[F[_[_], _]](cont: FreeK[F, Unit]): Trigger[FreeK[F, ?]] = Fire[FreeK[F, ?]](cont)
-  def fireReload[F[_[_], _]](cont: FreeK[F, Unit]): Trigger[FreeK[F, ?]] = FireReload[FreeK[F, ?]](cont)
+  def discard[F[_[_], _]]: Trigger[FreeK[F, Unit]] = Discard[FreeK[F, Unit]]()
+  def sleep[F[_[_], _]]: Trigger[FreeK[F, Unit]] = Sleep[FreeK[F, Unit]]()
+  def fire[F[_[_], _]](cont: FreeK[F, Unit]): Trigger[FreeK[F, Unit]] = Fire[FreeK[F, Unit]](cont)
+  def fireReload[F[_[_], _]](cont: FreeK[F, Unit]): Trigger[FreeK[F, Unit]] = FireReload[FreeK[F, Unit]](cont)
 
-  implicit def functorKInstance: FunctorK[Trigger] = new FunctorK[Trigger] {
-    def transform[K[_], L[_]](tk: Trigger[K])(f: K ~> L): Trigger[L] = tk match {
+  implicit def functorInstance: Functor[Trigger] = new Functor[Trigger] {
+    def map[K, L](tk: Trigger[K])(f: K => L): Trigger[L] = tk match {
       case Discard() => Discard()
       case Sleep() => Sleep()
       case Fire(k) => Fire(f(k))

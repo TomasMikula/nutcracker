@@ -5,58 +5,58 @@ import monocle.Lens
 import scala.language.higherKinds
 import scalaz.Monoid
 
-final case class ProductK[F[_[_]], G[_[_]], K[_]](_1: F[K], _2: G[K]) {
-  def update_1(f: F[K]) = ProductK[F, G, K](f, _2)
-  def update_2(g: G[K]) = ProductK[F, G, K](_1, g)
-  def :*:[E[_[_]]](e: E[K]): ProductK[E, ProductK[F, G, ?[_]], K] = ProductK[E, ProductK[F, G, ?[_]], K](e, this)
+final case class ProductK[F[_], G[_], A](_1: F[A], _2: G[A]) {
+  def update_1(f: F[A]) = ProductK[F, G, A](f, _2)
+  def update_2(g: G[A]) = ProductK[F, G, A](_1, g)
+  def :*:[E[_]](e: E[A]): ProductK[E, ProductK[F, G, ?], A] = ProductK[E, ProductK[F, G, ?], A](e, this)
 }
 
 object ProductK {
-  implicit class ProductKOps[G[_[_]], K[_]](g: G[K]) {
-    def :*:[F[_[_]]](f: F[K]): ProductK[F, G, K] = ProductK(f, g)
+  implicit class ProductKOps[G[_], A](g: G[A]) {
+    def :*:[F[_]](f: F[A]): ProductK[F, G, A] = ProductK(f, g)
   }
 
-  implicit def leftLens[F[_[_]], G[_[_]], K[_]]: Lens[ProductK[F, G, K], F[K]] =
-    Lens[ProductK[F, G, K], F[K]](_._1)(fk => pk => pk.update_1(fk))
+  implicit def leftLens[F[_], G[_], A]: Lens[ProductK[F, G, A], F[A]] =
+    Lens[ProductK[F, G, A], F[A]](_._1)(fa => pa => pa.update_1(fa))
 
-  implicit def leftLensZ[F[_[_]], G[_[_]], K[_]]: scalaz.Lens[ProductK[F, G, K], F[K]] =
-    scalaz.Lens[ProductK[F, G, K], F[K]](pk => scalaz.Store(fk => pk.update_1(fk), pk._1))
+  implicit def leftLensZ[F[_], G[_], A]: scalaz.Lens[ProductK[F, G, A], F[A]] =
+    scalaz.Lens[ProductK[F, G, A], F[A]](pa => scalaz.Store(fa => pa.update_1(fa), pa._1))
 
-  implicit def leftLensZK[F[_[_]], G[_[_]]]: ValK[λ[K[_] => scalaz.Lens[ProductK[F, G, K], F[K]]]] =
-    new ValK[λ[K[_] => scalaz.Lens[ProductK[F, G, K], F[K]]]] {
-      def compute[K[_]]: scalaz.Lens[ProductK[F, G, K], F[K]] =
-        scalaz.Lens[ProductK[F, G, K], F[K]] (pk => scalaz.Store (fk => pk.update_1 (fk), pk._1) )
+  implicit def leftLensZK[F[_], G[_]]: ValA[λ[A => scalaz.Lens[ProductK[F, G, A], F[A]]]] =
+    new ValA[λ[A => scalaz.Lens[ProductK[F, G, A], F[A]]]] {
+      def compute[A]: scalaz.Lens[ProductK[F, G, A], F[A]] =
+        scalaz.Lens[ProductK[F, G, A], F[A]] (pa => scalaz.Store (fa => pa.update_1 (fa), pa._1) )
     }
 
-  implicit def rightLens[F[_[_]], G[_[_]], K[_]]: Lens[ProductK[F, G, K], G[K]] =
-    Lens[ProductK[F, G, K], G[K]](_._2)(gk => pk => pk.update_2(gk))
+  implicit def rightLens[F[_], G[_], A]: Lens[ProductK[F, G, A], G[A]] =
+    Lens[ProductK[F, G, A], G[A]](_._2)(ga => pa => pa.update_2(ga))
 
-  implicit def rightLensZ[F[_[_]], G[_[_]], K[_]]: scalaz.Lens[ProductK[F, G, K], G[K]] =
-    scalaz.Lens[ProductK[F, G, K], G[K]](pk => scalaz.Store(gk => pk.update_2(gk), pk._2))
+  implicit def rightLensZ[F[_], G[_], A]: scalaz.Lens[ProductK[F, G, A], G[A]] =
+    scalaz.Lens[ProductK[F, G, A], G[A]](pa => scalaz.Store(ga => pa.update_2(ga), pa._2))
 
-  implicit def rightLensZK[F[_[_]], G[_[_]]]: ValK[λ[K[_] => scalaz.Lens[ProductK[F, G, K], G[K]]]] =
-    new ValK[λ[K[_] => scalaz.Lens[ProductK[F, G, K], G[K]]]] {
-      def compute[K[_]]: scalaz.Lens[ProductK[F, G, K], G[K]] =
-        scalaz.Lens[ProductK[F, G, K], G[K]](pk => scalaz.Store(gk => pk.update_2(gk), pk._2))
+  implicit def rightLensZK[F[_], G[_]]: ValA[λ[A => scalaz.Lens[ProductK[F, G, A], G[A]]]] =
+    new ValA[λ[A => scalaz.Lens[ProductK[F, G, A], G[A]]]] {
+      def compute[A]: scalaz.Lens[ProductK[F, G, A], G[A]] =
+        scalaz.Lens[ProductK[F, G, A], G[A]](pa => scalaz.Store(ga => pa.update_2(ga), pa._2))
     }
 
-  implicit def leftComposedLens[F[_[_]], G[_[_]], K[_], A](implicit lfa: Lens[F[K], A]): Lens[ProductK[F, G, K], A] =
+  implicit def leftComposedLens[F[_], G[_], K, A](implicit lfa: Lens[F[K], A]): Lens[ProductK[F, G, K], A] =
     leftLens[F, G, K].composeLens(lfa)
 
-  implicit def rightComposedLens[F[_[_]], G[_[_]], K[_], A](implicit lga: Lens[G[K], A]): Lens[ProductK[F, G, K], A] =
+  implicit def rightComposedLens[F[_], G[_], K, A](implicit lga: Lens[G[K], A]): Lens[ProductK[F, G, K], A] =
     rightLens[F, G, K].composeLens(lga)
 
-  implicit def monoidK[F[_[_]], G[_[_]]](implicit F: MonoidK[F], G: MonoidK[G]): MonoidK[ProductK[F, G, ?[_]]] = new MonoidK[ProductK[F, G, ?[_]]] {
-    def zero[K[_]]: ProductK[F, G, K] = ProductK(F.zero, G.zero)
+  implicit def monoidK[F[_], G[_]](implicit F: MonoidK[F], G: MonoidK[G]): MonoidK[ProductK[F, G, ?]] = new MonoidK[ProductK[F, G, ?]] {
+    def zero[A]: ProductK[F, G, A] = ProductK(F.zero, G.zero)
 
-    def append[K[_]](p1: ProductK[F, G, K], p2: ProductK[F, G, K]): ProductK[F, G, K] =
+    def append[A](p1: ProductK[F, G, A], p2: ProductK[F, G, A]): ProductK[F, G, A] =
       ProductK(F.append(p1._1, p2._1), G.append(p1._2, p2._2))
   }
 
-  implicit def monoid[F[_[_]], G[_[_]], K[_]](implicit F: Monoid[F[K]], G: Monoid[G[K]]): Monoid[ProductK[F, G, K]] = new Monoid[ProductK[F, G, K]] {
-    def zero: ProductK[F, G, K] = ProductK(F.zero, G.zero)
+  implicit def monoid[F[_], G[_], A](implicit F: Monoid[F[A]], G: Monoid[G[A]]): Monoid[ProductK[F, G, A]] = new Monoid[ProductK[F, G, A]] {
+    def zero: ProductK[F, G, A] = ProductK(F.zero, G.zero)
 
-    def append(p1: ProductK[F, G, K], p2: => ProductK[F, G, K]): ProductK[F, G, K] =
+    def append(p1: ProductK[F, G, A], p2: => ProductK[F, G, A]): ProductK[F, G, A] =
       ProductK(F.append(p1._1, p2._1), G.append(p1._2, p2._2))
   }
 }

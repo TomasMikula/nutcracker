@@ -3,14 +3,14 @@ package nutcracker
 import scala.language.{existentials, higherKinds}
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMapB, Lst, StateInterpreter, Step, Uncons, ValK, WriterState}
+import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMapB, Lst, StateInterpreter, Step, Uncons, ValA, WriterState}
 
 import scalaz.Id._
 import scalaz.{Monad, StateT, |>=|}
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
 
-case class PropagationStore[K[_]] private(
+case class PropagationStore[K] private(
   nextId: Long,
   domains: K3Map[DRef.Aux, λ[(D, U, Δ) => (D, Dom.Aux[D, U, Δ])]],
   domainTriggers: K3Map[DRef.Aux, λ[(D, U, Δ) => List[(D, Δ) => Trigger[K]]]],
@@ -61,7 +61,7 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  def addDomainTrigger[D, U, Δ](ref: DRef.Aux[D, U, Δ], t: D => (Option[K[Unit]], Option[(D, Δ) => Trigger[K]])): (PropagationStore[K], Lst[K[Unit]]) = {
+  def addDomainTrigger[D, U, Δ](ref: DRef.Aux[D, U, Δ], t: D => (Option[K], Option[(D, Δ) => Trigger[K]])): (PropagationStore[K], Lst[K]) = {
     val (now, onChange) = t(fetch(ref))
     onChange match {
       case Some(action) =>
@@ -71,7 +71,7 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  def addSelTrigger[L <: HList](sel: Sel[L], t: L => Trigger[K]): (PropagationStore[K], Option[K[Unit]]) = {
+  def addSelTrigger[L <: HList](sel: Sel[L], t: L => Trigger[K]): (PropagationStore[K], Option[K]) = {
     t(sel.fetch(cellFetcher)) match {
       case Discard() => (this, None)
       case Sleep() => (addSelTrigger0(sel, t), None)
@@ -80,7 +80,7 @@ case class PropagationStore[K[_]] private(
     }
   }
 
-  private def addDomainTrigger0[D, U, Δ](ref: DRef.Aux[D, U, Δ], t: (D, Δ) => Trigger[K]): (PropagationStore[K], Lst[K[Unit]]) = {
+  private def addDomainTrigger0[D, U, Δ](ref: DRef.Aux[D, U, Δ], t: (D, Δ) => Trigger[K]): (PropagationStore[K], Lst[K]) = {
     val triggers = domainTriggers.getOrElse(ref, Nil)
     val (remainingTriggers, firedTriggers) = dirtyDomains.get(ref) match {
       case Some(δ) => collectDomTriggers(fetch(ref), δ, triggers)
@@ -102,13 +102,13 @@ case class PropagationStore[K[_]] private(
     )
   }
 
-  private def triggersForDomain[D, U, Δ](ref: DRef.Aux[D, U, Δ], δ: Δ): (PropagationStore[K], Lst[K[Unit]]) =
+  private def triggersForDomain[D, U, Δ](ref: DRef.Aux[D, U, Δ], δ: Δ): (PropagationStore[K], Lst[K]) =
     collectDomTriggers(fetch(ref), δ, domainTriggers.getOrElse(ref, Nil)) match {
       case (Nil, fired) => (copy(domainTriggers = domainTriggers - ref), fired)
       case (forLater, fired) => (copy(domainTriggers = domainTriggers.updated(ref, forLater)), fired)
     }
 
-  private def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], Lst[K[Unit]]) = {
+  private def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], Lst[K]) = {
     val d = sel.fetch(cellFetcher)
     collectSelTriggers(d, selTriggers.getOrElse(sel, Nil)) match {
       case (Nil, fired) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), fired)
@@ -118,7 +118,7 @@ case class PropagationStore[K[_]] private(
 
   private def getSelsForCell(ref: DRef[_]): Set[Sel[_ <: HList]] = cellsToSels.get(ref)
 
-  private def collectDomTriggers[D, Δ](d: D, δ: Δ, triggers: List[(D, Δ) => Trigger[K]]): (List[(D, Δ) => Trigger[K]], Lst[K[Unit]]) =
+  private def collectDomTriggers[D, Δ](d: D, δ: Δ, triggers: List[(D, Δ) => Trigger[K]]): (List[(D, Δ) => Trigger[K]], Lst[K]) =
     triggers match {
       case Nil => (Nil, Lst.empty)
       case t :: ts =>
@@ -131,7 +131,7 @@ case class PropagationStore[K[_]] private(
         }
     }
 
-  private def collectSelTriggers[L <: HList](l: L, triggers: List[L => Trigger[K]]): (List[L => Trigger[K]], Lst[K[Unit]]) =
+  private def collectSelTriggers[L <: HList](l: L, triggers: List[L => Trigger[K]]): (List[L => Trigger[K]], Lst[K]) =
     triggers match {
       case Nil => (Nil, Lst.empty)
       case t :: ts =>
@@ -144,7 +144,7 @@ case class PropagationStore[K[_]] private(
         }
     }
 
-  private def uncons: Option[(PropagationStore[K], Lst[K[Unit]])] =
+  private def uncons: Option[(PropagationStore[K], Lst[K])] =
     if(dirtyDomains.nonEmpty) {
       val h = dirtyDomains.head
       val dirtySels = dirtySelections union getSelsForCell(h._1)
@@ -162,7 +162,7 @@ object PropagationStore {
   import PropagationLang._
   import scalaz.~>
 
-  def empty[K[_]] = PropagationStore[K](
+  def empty[K] = PropagationStore[K](
     nextId = 0L,
     domains = K3Map[DRef.Aux, λ[(D, U, Δ) => (D, Dom.Aux[D, U, Δ])]](),
     domainTriggers = K3Map[DRef.Aux, λ[(D, U, Δ) => List[(D, Δ) => Trigger[K]]]](),
@@ -174,13 +174,16 @@ object PropagationStore {
     dirtySelections = Set()
   )
 
+  def emptyF[F[_[_], _]]: PropagationStore[FreeK[F, Unit]] =
+    empty
+
   val interpreter: StateInterpreter.Aux[PropagationLang, PropagationStore] =
     new StateInterpreter[PropagationLang] {
-      type State[K[_]] = PropagationStore[K]
+      type State[K] = PropagationStore[K]
 
       def step: Step[PropagationLang, State] =
         new Step[PropagationLang, State] {
-          override def apply[K[_], A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], State[K], A] = WriterState(s =>
+          override def apply[K[_], A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], State[K[Unit]], A] = WriterState(s =>
             p match {
               case Cell(d, dom) => s.addVariable(d, dom) match {
                 case (s1, ref) => (Lst.empty, s1, ref)
@@ -199,13 +202,13 @@ object PropagationStore {
         }
 
       def uncons: Uncons[PropagationStore] = Uncons[PropagationStore](
-        new ValK[λ[K[_] => StateT[Option, PropagationStore[K], Lst[K[Unit]]]]] {
-          override def compute[K[_]]: StateT[Option, PropagationStore[K], Lst[K[Unit]]] =
+        new ValA[λ[K => StateT[Option, PropagationStore[K], Lst[K]]]] {
+          override def compute[K]: StateT[Option, PropagationStore[K], Lst[K]] =
             StateT(_.uncons)
         })
     }
 
-  def naiveAssess[K[_]](implicit ord: K |>=| FreeK[PropagationLang, ?]): PropagationStore[K] => Assessment[List[K[Unit]]] = s => {
+  def naiveAssess[K[_]](implicit ord: K |>=| FreeK[PropagationLang, ?]): PropagationStore[K[Unit]] => Assessment[List[K[Unit]]] = s => {
     if(s.failedVars.nonEmpty) Failed
     else if(s.unresolvedVars.isEmpty) Done
     else {
@@ -223,21 +226,21 @@ object PropagationStore {
     }
   }
 
-  def naiveAssess[K[_], S[_[_]]](
-    lens: Lens[S[K], PropagationStore[K]])(implicit
+  def naiveAssess[K[_], S[_]](
+    lens: Lens[S[K[Unit]], PropagationStore[K[Unit]]])(implicit
     ord: K |>=| FreeK[PropagationLang, ?]
-  ): S[K] => Assessment[List[K[Unit]]] =
+  ): S[K[Unit]] => Assessment[List[K[Unit]]] =
     s => (naiveAssess[K](ord))(lens.get(s))
 
 
-  private def fetch: Promised ~> (PropagationStore[FreeK[PropagationLang, ?]] => ?) = new ~>[Promised, PropagationStore[FreeK[PropagationLang, ?]] => ?] {
-    def apply[A](pa: Promised[A]): (PropagationStore[FreeK[PropagationLang, ?]] => A) = s => s.fetchResult(pa).get
+  private def fetch: Promised ~> (PropagationStore[FreeK[PropagationLang, Unit]] => ?) = new ~>[Promised, PropagationStore[FreeK[PropagationLang, Unit]] => ?] {
+    def apply[A](pa: Promised[A]): (PropagationStore[FreeK[PropagationLang, Unit]] => A) = s => s.fetchResult(pa).get
   }
   def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Id, Promised] = {
     implicit val mfp: Monad[FreeKT[PropagationLang, Id, ?]] = FreeKT.freeKTMonad[PropagationLang, Id] // scalac, why can't thou find this yourself?
     new DFSSolver[PropagationLang, PropagationStore, Id, Promised](
       interpreter.freeInstance,
-      empty[FreeK[PropagationLang, ?]],
+      emptyF[PropagationLang],
       naiveAssess[FreeK[PropagationLang, ?]],
       fetch)
   }

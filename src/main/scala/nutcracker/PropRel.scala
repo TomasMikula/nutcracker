@@ -12,18 +12,18 @@ import scalaz.~>
 object PropRel {
 
   type Vocabulary[K[_], A] = CoproductK[PropagationLang, RelLang, K, A]
-  type State[K[_]] = ProductK[PropagationStore, RelDB, K]
+  type State[K] = ProductK[PropagationStore, RelDB, K]
 
   val interpreter = (PropagationStore.interpreter :*: RelDB.interpreter).freeInstance
 
   private[PropRel] type Q[A] = FreeK[Vocabulary, A]
-  def propStore: Lens[State[Q], PropagationStore[Q]] = implicitly[Lens[State[Q], PropagationStore[Q]]]
-  private def naiveAssess: State[Q] => Assessment[List[Q[Unit]]] =
+  def propStore: Lens[State[Q[Unit]], PropagationStore[Q[Unit]]] = implicitly[Lens[State[Q[Unit]], PropagationStore[Q[Unit]]]]
+  private def naiveAssess: State[Q[Unit]] => Assessment[List[Q[Unit]]] =
     PropagationStore.naiveAssess(propStore)(FreeKT.injectionOrder[PropagationLang, Vocabulary, Id])
-  private def fetch: Promised ~> (State[Q] => ?) = new ~>[Promised, State[Q] => ?] {
-    def apply[A](pa: Promised[A]): (State[Q] => A) = s => propStore.get(s).fetchResult(pa).get
+  private def fetch: Promised ~> (State[Q[Unit]] => ?) = new ~>[Promised, State[Q[Unit]] => ?] {
+    def apply[A](pa: Promised[A]): (State[Q[Unit]] => A) = s => propStore.get(s).fetchResult(pa).get
   }
-  def emptyState: State[Q] = PropagationStore.empty[Q] :*: RelDB.empty[Q]
+  def emptyState: State[Q[Unit]] = PropagationStore.empty[Q[Unit]] :*: RelDB.empty[Q[Unit]]
 
   def dfsSolver: DFSSolver[Vocabulary, State, Id, Promised] = new DFSSolver[Vocabulary, State, Id, Promised](interpreter, emptyState, naiveAssess, fetch)
 }

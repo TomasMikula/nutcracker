@@ -78,8 +78,8 @@ package object nutcracker {
   final case class WhenResolved[D, A] private[nutcracker](ref: DRef[D], ex: Extract.Aux[D, A]) {
     def exec[F[_[_], _]](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
       valTriggerF[F, D](ref)(d => ex.extract(d) match {
-        case Some(a) => Fire[FreeK[F, ?]](f(a))
-        case None => Sleep[FreeK[F, ?]]()
+        case Some(a) => Fire[FreeK[F, Unit]](f(a))
+        case None => Sleep[FreeK[F, Unit]]()
       })
   }
 

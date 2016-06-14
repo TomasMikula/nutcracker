@@ -8,15 +8,15 @@ import nutcracker.util.idToM
 import scalaz.{-\/, BindRec, Monad, StateT, StreamT, \/, \/-, ~>}
 import scalaz.syntax.monad._
 
-class DFSSolver[F[_[_], _], St[_[_]], M[_], P[_]](
-  interpreter: FreeK[F, ?] ~> StateT[M, St[FreeK[F, ?]], ?],
-  initialState: St[FreeK[F, ?]],
-  assess: St[FreeK[F, ?]] => Assessment[List[FreeK[F, Unit]]],
-  fetch: P ~> (St[FreeK[F, ?]] => ?)
+class DFSSolver[F[_[_], _], St[_], M[_], P[_]](
+  interpreter: FreeK[F, ?] ~> StateT[M, St[FreeK[F, Unit]], ?],
+  initialState: St[FreeK[F, Unit]],
+  assess: St[FreeK[F, Unit]] => Assessment[List[FreeK[F, Unit]]],
+  fetch: P ~> (St[FreeK[F, Unit]] => ?)
 ) {
 
   type K[A] = FreeK[F, A]
-  type S = St[K]
+  type S = St[K[Unit]]
 
   def solutions[A](p: K[P[A]])(implicit M: Monad[M]): StreamT[M, A] = {
     StreamT.wrapEffect(init(p) map { case (s, pr) =>

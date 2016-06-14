@@ -9,22 +9,22 @@ import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 
 trait StateInterpreterT[M[_], F[_[_], _]] { self =>
-  type State[K[_]]
+  type State[K]
 
   def step: StepT[M, F, State]
   def uncons: Uncons[State]
 
-  final def :*:[G[_[_], _]](i2: StateInterpreterT[M, G])(implicit M: Functor[M]): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], ProductK[i2.State, State, ?[_]]] =
+  final def :*:[G[_[_], _]](i2: StateInterpreterT[M, G])(implicit M: Functor[M]): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], ProductK[i2.State, State, ?]] =
     StateInterpreterT.coproductInterpreter(i2, this)
 
-  final def :*:[G[_[_], _], S[_[_]]](
+  final def :*:[G[_[_], _], S[_]](
     i2: StepT[M, G, S]
   )(implicit
     M: Functor[M]
-  ): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], ProductK[S, State, ?[_]]] = {
+  ): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], ProductK[S, State, ?]] = {
     type H[K[_], A] = CoproductK[G, F, K, A]
     new StateInterpreterT[M, H] {
-      type State[K[_]] = ProductK[S, self.State, K]
+      type State[K] = ProductK[S, self.State, K]
       def step: StepT[M, H, State] = i2 :*: self.step
       def uncons: Uncons[State] = self.uncons.zoomOut[State](ProductK.rightLensZK[S, self.State])
     }
@@ -37,7 +37,7 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
   ): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], State] = {
     val stepG: StepT[M, G, State] = StepT.lift[M, G, State](ig)
     new StateInterpreterT[M, CoproductK[G, F, ?[_], ?]] {
-      type State[K[_]] = self.State[K]
+      type State[K] = self.State[K]
       def step = stepG :+: self.step
       def uncons = self.uncons
     }
@@ -45,10 +45,10 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
 
   def hoist[N[_]](mn: M ~> N)(implicit M: Monad[M], N: Monad[N]): StateInterpreterT.Aux[N, F, State] =
     new StateInterpreterT[N, F] {
-      type State[K[_]] = self.State[K]
+      type State[K] = self.State[K]
 
       def step: StepT[N, F, State] = new StepT[N, F, State] {
-        override def apply[K[_], A](f: F[K, A]): WriterStateT[N, Lst[K[Unit]], State[K], A] =
+        override def apply[K[_], A](f: F[K, A]): WriterStateT[N, Lst[K[Unit]], State[K[Unit]], A] =
           WriterStateT(s => mn(self.step[K, A](f)(s)))
       }
       def uncons: Uncons[State] = self.uncons
@@ -57,30 +57,30 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
   def hoistId[N[_]](implicit N: Monad[N], ev: this.type <:< StateInterpreterT.Aux[Id, F, State]): StateInterpreterT.Aux[N, F, State] =
     ev(this).hoist(idToM[N])
 
-  def freeInstance(implicit M0: Monad[M], M1: BindRec[M]): FreeK[F, ?] ~> StateT[M, State[FreeK[F, ?]], ?] =
+  def freeInstance(implicit M0: Monad[M], M1: BindRec[M]): FreeK[F, ?] ~> StateT[M, State[FreeK[F, Unit]], ?] =
     StateInterpreterT.freeInstance(step, uncons)
 }
 
 object StateInterpreterT {
 
-  type Aux[M[_], F[_[_], _], S[_[_]]] = StateInterpreterT[M, F] { type State[K[_]] = S[K] }
+  type Aux[M[_], F[_[_], _], S[_]] = StateInterpreterT[M, F] { type State[K] = S[K] }
 
-  def freeInstance[M[_], F[_[_], _], S[_[_]]](
+  def freeInstance[M[_], F[_[_], _], S[_]](
     step: StepT[M, F, S],
     uncons: Uncons[S]
   )(implicit
     M0: Monad[M],
     M1: BindRec[M]
-  ): FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?] = {
+  ): FreeK[F, ?] ~> StateT[M, S[FreeK[F, Unit]], ?] = {
     val step1 = step.papply[FreeK[F, ?]]
-    val uncons1 = uncons[FreeK[F, ?]]
+    val uncons1 = uncons[FreeK[F, Unit]]
 
-    def runUntilClean[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] = {
+    def runUntilClean[A](p: FreeK[F, A])(s: S[FreeK[F, Unit]]): M[(S[FreeK[F, Unit]], A)] = {
       M0.bind(runToCompletion(p)(s)){ case (s1, a) => M0.map(runUntilClean1(s1)) {(_, a)} }
     }
 
-    def runUntilClean1(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = {
-      def go(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]] \/ S[FreeK[F, ?]]] =
+    def runUntilClean1(s: S[FreeK[F, Unit]]): M[S[FreeK[F, Unit]]] = {
+      def go(s: S[FreeK[F, Unit]]): M[S[FreeK[F, Unit]] \/ S[FreeK[F, Unit]]] =
         uncons1(s) match {
           case None => s.right.point[M]
           case Some((s1, ku)) => M0.map(runToCompletionU(ku)(s1)){ _.left }
@@ -88,13 +88,13 @@ object StateInterpreterT {
       M1.tailrecM(go)(s)
     }
 
-    def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] =
+    def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, Unit]]): M[(S[FreeK[F, Unit]], A)] =
       M0.bind(p.foldMapN(step1).apply(s)) {
         case (ku, s1, a) => M0.map(runToCompletionU(ku)(s1)) { (_, a) }
       }
 
-    def runToCompletionU(ps: Lst[FreeK[F, Unit]])(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = {
-      def go(a: (Lst[FreeK[F, Unit]], S[FreeK[F, ?]])): M[(Lst[FreeK[F, Unit]], S[FreeK[F, ?]]) \/ S[FreeK[F, ?]]] = {
+    def runToCompletionU(ps: Lst[FreeK[F, Unit]])(s: S[FreeK[F, Unit]]): M[S[FreeK[F, Unit]]] = {
+      def go(a: (Lst[FreeK[F, Unit]], S[FreeK[F, Unit]])): M[(Lst[FreeK[F, Unit]], S[FreeK[F, Unit]]) \/ S[FreeK[F, Unit]]] = {
         val (l, s) = a
         l.uncons match {
           case None => s.right.point[M]
@@ -104,8 +104,8 @@ object StateInterpreterT {
       M1.tailrecM(go)((ps, s))
     }
 
-    new (FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?]) {
-      def apply[A](fa: FreeK[F, A]): StateT[M, S[FreeK[F, ?]], A] = StateT(runUntilClean(fa))
+    new (FreeK[F, ?] ~> StateT[M, S[FreeK[F, Unit]], ?]) {
+      def apply[A](fa: FreeK[F, A]): StateT[M, S[FreeK[F, Unit]], A] = StateT(runUntilClean(fa))
     }
   }
 
@@ -114,12 +114,12 @@ object StateInterpreterT {
     i2: StateInterpreterT[M, H]
   )(implicit
     M: Functor[M]
-  ): StateInterpreterT.Aux[M, CoproductK[G, H, ?[_], ?], ProductK[i1.State, i2.State, ?[_]]] = {
+  ): StateInterpreterT.Aux[M, CoproductK[G, H, ?[_], ?], ProductK[i1.State, i2.State, ?]] = {
 
     type F[K[_], A] = CoproductK[G, H, K, A]
 
     new StateInterpreterT[M, F] {
-      type State[K[_]] = ProductK[i1.State, i2.State, K]
+      type State[K] = ProductK[i1.State, i2.State, K]
       def step: StepT[M, F, State] = i1.step :*: i2.step
 
       def uncons: Uncons[State] = {

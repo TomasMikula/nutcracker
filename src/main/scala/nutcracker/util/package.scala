@@ -5,8 +5,6 @@ import scalaz.Id.Id
 import scalaz.{Cont, Monad, Traverse, |>=|}
 
 package object util {
-  type ConstK[A, K[_]] = A
-
   type ≈>[F[_[_]], G[_[_]]] = FunctionK[F, G]
   type ≈~>[F[_[_], _], G[_[_], _]] = FunctionKA[F, G]
   type ≈>>[F[_[_], _], G[_]] = F ≈~> λ[(K[_], A) => G[A]]
@@ -54,10 +52,10 @@ package object util {
 
   type StateInterpreter[F[_[_], _]]  = StateInterpreterT[Id, F]
   object StateInterpreter {
-    type Aux[F[_[_], _], S[_[_]]] = StateInterpreterT.Aux[Id, F, S]
+    type Aux[F[_[_], _], S[_]] = StateInterpreterT.Aux[Id, F, S]
   }
 
-  type Step[F[_[_], _], S[_[_]]] = StepT[Id, F, S]
+  type Step[F[_[_], _], S[_]] = StepT[Id, F, S]
 
   /** Free monad for type constructors of kind `F[_[_], _]`,
     * where `F`'s first type parameter is recursively set to FreeK[F, ?].
