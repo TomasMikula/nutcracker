@@ -21,8 +21,11 @@ sealed abstract class Lst[+A] {
 
   final def ::[B >: A](h: B): Lst[B] = Cons(h, this)
 
-  final def rev_:::[B >: A](l: List[B]): Lst[B] =
-    revPrepend(l, this)
+  final def rev_:::[B >: A](bs: Iterable[B]): Lst[B] =
+    revPrepend(bs, this)
+
+  final def mapRev_:::[B, A1 >: A](bsf: (Iterable[B], B => A1)): Lst[A1] =
+    mapRevPrepend(bsf._1, this, bsf._2)
 
   @inline
   final def ?+:[B >: A](b: Option[B]): Lst[B] = b match {
@@ -58,9 +61,21 @@ object Lst {
   }
 
   @inline
-  private final def revPrepend[A](l: List[A], lst: Lst[A]): Lst[A] = l match {
-    case a :: as => revPrepend(as, Cons(a, lst))
-    case scala.Nil => lst
+  private final def revPrepend[A](as: Iterable[A], lst: Lst[A]): Lst[A] = {
+    @tailrec def loop(it: Iterator[A], lst: Lst[A]): Lst[A] =
+      if(it.hasNext) loop(it, Cons(it.next, lst))
+      else lst
+
+    loop(as.iterator, lst)
+  }
+
+  @inline
+  private final def mapRevPrepend[A, B](as: Iterable[A], lst: Lst[B], f: A => B): Lst[B] = {
+    @tailrec def loop(it: Iterator[A], lst: Lst[B]): Lst[B] =
+      if(it.hasNext) loop(it, Cons(f(it.next), lst))
+      else lst
+
+    loop(as.iterator, lst)
   }
 
   implicit def monoid[A]: Monoid[Lst[A]] = new Monoid[Lst[A]] {
