@@ -47,10 +47,7 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
     new StateInterpreterT[N, F] {
       type State[K] = self.State[K]
 
-      def step: StepT[N, F, State] = new StepT[N, F, State] {
-        override def apply[K[_], A](f: F[K, A]): WriterStateT[N, Lst[K[Unit]], State[K[Unit]], A] =
-          WriterStateT(s => mn(self.step[K, A](f)(s)))
-      }
+      def step: StepT[N, F, State] = self.step.hoist(mn)
       def uncons: Uncons[State] = self.uncons
     }
 

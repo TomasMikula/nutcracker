@@ -12,6 +12,13 @@ abstract class StepT[M[_], F[_[_], _], S[_]] { self =>
       def apply[A](fa: F[K, A]): WriterStateT[M, Lst[K[Unit]], S[K[Unit]], A] = self(fa)
     }
 
+  def hoist[N[_]](mn: M ~> N): StepT[N, F, S] = new StepT[N, F, S] {
+    def apply[K[_], A](f: F[K, A]): WriterStateT[N, Lst[K[Unit]], S[K[Unit]], A] = {
+      val ws = self(f)
+      WriterStateT(s => mn(ws(s)))
+    }
+  }
+
   def :*:[G[_[_], _], T[_]](
     that: StepT[M, G, T]
   )(implicit
