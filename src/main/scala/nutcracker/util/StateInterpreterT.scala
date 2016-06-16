@@ -123,6 +123,21 @@ object StateInterpreterT {
 
   final case class Ops[M[_], F[_[_], _], S[_] <: KList[_]](self: StateInterpreterT.Aux[M, F, S]) extends AnyVal {
 
+    def :&:[G[_[_], _], T[_]](
+      that: StepT[M, G, T]
+    )(implicit
+      M: Functor[M]
+    ): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], Cons[T, S, ?]] = {
+      type H[K[_], A] = CoproductK[G, F, K, A]
+
+      new StateInterpreterT[M, H] {
+        type State[K] = Cons[T, S, K]
+        def step: StepT[M, H, State] = that :&: self.step
+        def uncons: Uncons[State] =
+          self.uncons.zoomOut[State](implicitly[ValA[λ[K => Lens[State[K], self.State[K]]]]])
+      }
+    }
+
     def :&:[G[_[_], _]](that: StateInterpreterT[M, G])(implicit M: Functor[M]): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], Cons[that.State, S, ?]] = {
       type H[K[_], A] = CoproductK[G, F, K, A]
 
