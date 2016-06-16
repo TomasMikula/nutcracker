@@ -177,13 +177,12 @@ object PropagationStore {
   def emptyF[F[_[_], _]]: PropagationStore[FreeK[F, Unit]] =
     empty
 
-  val interpreter: StateInterpreter.Aux[PropagationLang, PropagationStore] =
-    new StateInterpreter[PropagationLang] {
-      type State[K] = PropagationStore[K]
+  val interpreter: StateInterpreter[PropagationLang, PropagationStore] =
+    new StateInterpreter[PropagationLang, PropagationStore] {
 
-      def step: Step[PropagationLang, State] =
-        new Step[PropagationLang, State] {
-          override def apply[K[_], A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], State[K[Unit]], A] = WriterState(s =>
+      def step: Step[PropagationLang, PropagationStore] =
+        new Step[PropagationLang, PropagationStore] {
+          override def apply[K[_], A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], PropagationStore[K[Unit]], A] = WriterState(s =>
             p match {
               case Cell(d, dom) => s.addVariable(d, dom) match {
                 case (s1, ref) => (Lst.empty, s1, ref)

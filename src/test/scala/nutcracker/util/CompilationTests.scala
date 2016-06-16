@@ -23,9 +23,9 @@ object CompilationTests {
     val barStep: Step[BarL, BarS] = ???
     val bazStep: Step[BazL, BazS] = ???
 
-    val fooIntr: StateInterpreter.Aux[FooL, FooS] = ???
-    val barIntr: StateInterpreter.Aux[BarL, BarS] = ???
-    val bazIntr: StateInterpreter.Aux[BazL, BazS] = ???
+    val fooIntr: StateInterpreter[FooL, FooS] = ???
+    val barIntr: StateInterpreter[BarL, BarS] = ???
+    val bazIntr: StateInterpreter[BazL, BazS] = ???
 
     fooStep :&: barStep :&&: bazStep
     fooStep :&: barStep :&&: bazIntr
@@ -43,7 +43,7 @@ object CompilationTests {
     type QuxS[K] = QuuxS[Int, K]
 
     val quxStep: Step[QuxL, QuxS] = ???
-    val quxIntr: StateInterpreter.Aux[QuxL, QuxS] = ???
+    val quxIntr: StateInterpreter[QuxL, QuxS] = ???
 
     fooStep :&: barStep :&&: quxStep
     fooStep :&: barStep :&&: quxIntr

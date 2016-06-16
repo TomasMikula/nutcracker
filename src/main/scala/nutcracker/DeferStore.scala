@@ -30,19 +30,18 @@ object DeferStore {
   def empty[D, K](implicit D: NonDecreasingMonoid[D] with OrderPreservingMonoid[D]): DeferStore[D, K] =
     DeferStore(D.zero, Heap.Empty[(D, K)])
 
-  def interpreter[D]: StateInterpreter.Aux[DeferLang[D, ?[_], ?], DeferStore[D, ?]] =
-    new StateInterpreter[DeferLang[D, ?[_], ?]] {
-      type State[K] = DeferStore[D, K]
+  def interpreter[D]: StateInterpreter[DeferLang[D, ?[_], ?], DeferStore[D, ?]] =
+    new StateInterpreter[DeferLang[D, ?[_], ?], DeferStore[D, ?]] {
 
-      def step: Step[DeferLang[D, ?[_], ?], State] = new Step[DeferLang[D, ?[_], ?], State] {
-        def apply[K[_], A](f: DeferLang[D, K, A]): WriterState[Lst[K[Unit]], State[K[Unit]], A] =
+      def step: Step[DeferLang[D, ?[_], ?], DeferStore[D, ?]] = new Step[DeferLang[D, ?[_], ?], DeferStore[D, ?]] {
+        def apply[K[_], A](f: DeferLang[D, K, A]): WriterState[Lst[K[Unit]], DeferStore[D, K[Unit]], A] =
           WriterState(s => f match {
             case Defer(d, k) => (Lst.empty, s.add(d, k), ())
           })
       }
 
-      def uncons: Uncons[State] = Uncons(new ValA[λ[K => StateT[Option, State[K], Lst[K]]]] {
-        protected def compute[K]: StateT[Option, State[K], Lst[K]] =
+      def uncons: Uncons[DeferStore[D, ?]] = Uncons(new ValA[λ[K => StateT[Option, DeferStore[D, K], Lst[K]]]] {
+        protected def compute[K]: StateT[Option, DeferStore[D, K], Lst[K]] =
           StateT(_.uncons)
       })
     }

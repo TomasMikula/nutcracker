@@ -50,10 +50,7 @@ package object util {
       WriterStateT[Id, W, S, A](run)
   }
 
-  type StateInterpreter[F[_[_], _]]  = StateInterpreterT[Id, F]
-  object StateInterpreter {
-    type Aux[F[_[_], _], S[_]] = StateInterpreterT.Aux[Id, F, S]
-  }
+  type StateInterpreter[F[_[_], _], S[_]]  = StateInterpreterT[Id, F, S]
 
   type Step[F[_[_], _], S[_]] = StepT[Id, F, S]
 

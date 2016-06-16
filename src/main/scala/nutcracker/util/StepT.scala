@@ -36,17 +36,18 @@ abstract class StepT[M[_], F[_[_], _], S[_]] { self =>
     }
   }
 
-  final def :&&:[G[_[_], _]](
-    ig: StateInterpreterT[M, G]
+  final def :&&:[G[_[_], _], T[_]](
+    ig: StateInterpreterT[M, G, T]
   )(implicit
     M: Functor[M]
-  ): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], Cons[ig.State, Just[S, ?], ?]] = {
+  ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], Cons[T, Just[S, ?], ?]] = {
     type H[K[_], A] = CoproductK[G, F, K, A]
-    new StateInterpreterT[M, H] {
-      type State[K] = Cons[ig.State, Just[S, ?], K]
-      def step: StepT[M, H, State] = ig.step :&&: self
-      def uncons: Uncons[State] =
-        ig.uncons.zoomOut[State](KList.headLensZK[ig.State, Just[S, ?]])
+    type U[K] = Cons[T, Just[S, ?], K]
+
+    new StateInterpreterT[M, H, U] {
+      def step: StepT[M, H, U] = ig.step :&&: self
+      def uncons: Uncons[U] =
+        ig.uncons.zoomOut[U](KList.headLensZK[T, Just[S, ?]])
     }
   }
 
@@ -85,18 +86,18 @@ object StepT {
       }
     }
 
-    def :&:[G[_[_], _]](
-      ig: StateInterpreterT[M, G]
+    def :&:[G[_[_], _], T[_]](
+      ig: StateInterpreterT[M, G, T]
     )(implicit
       M: Functor[M]
-    ): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], Cons[ig.State, S, ?]] = {
+    ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], Cons[T, S, ?]] = {
       type H[K[_], A] = CoproductK[G, F, K, A]
+      type U[K] = Cons[T, S, K]
 
-      new StateInterpreterT[M, H] {
-        type State[K] = Cons[ig.State, S, K]
-        def step: StepT[M, H, State] = ig.step :&: self
-        def uncons: Uncons[State] =
-          ig.uncons.zoomOut[State](implicitly[ValA[λ[K => Lens[State[K], ig.State[K]]]]])
+      new StateInterpreterT[M, H, U] {
+        def step: StepT[M, H, U] = ig.step :&: self
+        def uncons: Uncons[U] =
+          ig.uncons.zoomOut[U](implicitly[ValA[λ[K => Lens[U[K], T[K]]]]])
       }
     }
 
