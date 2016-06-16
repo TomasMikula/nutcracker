@@ -12,7 +12,7 @@ resolvers += Resolver.sonatypeRepo("releases")
 
 autoCompilerPlugins := true
 addCompilerPlugin("org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary)
-addCompilerPlugin("com.milessabin" % "si2712fix-plugin" % "1.1.0" cross CrossVersion.full)
+addCompilerPlugin("com.milessabin" % "si2712fix-plugin" % "1.2.0" cross CrossVersion.full)
 addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.12")
 
 scalastyleFailOnError := true

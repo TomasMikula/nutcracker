@@ -4,21 +4,21 @@ import scala.language.higherKinds
 
 import monocle.Lens
 import nutcracker.algebraic.NonDecreasingMonoid
-import nutcracker.util.{CoproductK, FreeK, FreeKT, ProductK}
-import nutcracker.util.ProductK._
+import nutcracker.util.{FreeK, FreeKT}
+import nutcracker.util.CoproductK._
+import nutcracker.util.KList._
 
 import scalaz.Id._
-import scalaz.~>
-import shapeless.Const
+import scalaz.{Const, ~>}
 
 final class PropCost[C: NonDecreasingMonoid] {
   type CostL[K[_], A] = CostLang[C, K, A]
-  type CostS[K] = Const[C]#λ[K]
+  type CostS[K] = Const[C, K]
 
-  type Vocabulary[K[_], A] = CoproductK[PropagationLang, CostL, K, A]
-  type State[K] = ProductK[PropagationStore, CostS, K]
+  type Vocabulary[K[_], A] = (PropagationLang  :++: CostL)#Out[K, A]
+  type State[K]            = (PropagationStore :**: CostS)#Out[K]
 
-  val interpreter = (PropagationStore.interpreter :*: CostLang.interpreter[C]).freeInstance
+  val interpreter = (PropagationStore.interpreter :&&: CostLang.interpreter[C]).freeInstance
   def propStore[K]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
   def cost[K]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
@@ -28,8 +28,8 @@ final class PropCost[C: NonDecreasingMonoid] {
   private def fetch: Promised ~> (State[Q[Unit]] => ?) = new ~>[Promised, State[Q[Unit]] => ?] {
     def apply[A](pa: Promised[A]): (State[Q[Unit]] => A) = s => propStore[Q[Unit]].get(s).fetchResult(pa).get
   }
-  private def getCost: State[Q[Unit]] => C = s => cost[Q[Unit]].get(s)
-  private def emptyState: State[Q[Unit]] = PropagationStore.empty[Q[Unit]] :*: (NonDecreasingMonoid[C].zero: CostS[Q[Unit]])
+  private def getCost: State[Q[Unit]] => C = s => cost[Q[Unit]].get(s).getConst
+  private def emptyState: State[Q[Unit]] = PropagationStore.empty[Q[Unit]] :**: Const[C, Q[Unit]](NonDecreasingMonoid[C].zero)
 
   def dfsSolver: DFSSolver[Vocabulary, State, Id, Promised] = new DFSSolver[Vocabulary, State, Id, Promised](interpreter, emptyState, naiveAssess, fetch)
   def bfsSolver: BFSSolver[Vocabulary, State, Id, Promised, C] = new BFSSolver[Vocabulary, State, Id, Promised, C](interpreter, emptyState, naiveAssess, fetch, getCost)

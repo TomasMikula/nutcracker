@@ -7,6 +7,7 @@ import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
+import nutcracker.util.KList._
 
 trait StateInterpreterT[M[_], F[_[_], _]] { self =>
   type State[K]
@@ -14,23 +15,36 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
   def step: StepT[M, F, State]
   def uncons: Uncons[State]
 
-  final def :*:[G[_[_], _]](i2: StateInterpreterT[M, G])(implicit M: Functor[M]): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], ProductK[i2.State, State, ?]] =
-    StateInterpreterT.coproductInterpreter(i2, this)
-
-  final def :*:[G[_[_], _], S[_]](
-    i2: StepT[M, G, S]
-  )(implicit
-    M: Functor[M]
-  ): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], ProductK[S, State, ?]] = {
+  final def :&&:[G[_[_], _]](that: StateInterpreterT[M, G])(implicit M: Functor[M]): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], Cons[that.State, Just[State, ?], ?]] = {
     type H[K[_], A] = CoproductK[G, F, K, A]
+
     new StateInterpreterT[M, H] {
-      type State[K] = ProductK[S, self.State, K]
-      def step: StepT[M, H, State] = i2 :*: self.step
-      def uncons: Uncons[State] = self.uncons.zoomOut[State](ProductK.rightLensZK[S, self.State])
+      type State[K] = Cons[that.State, Just[self.State, ?], K]
+
+      def step: StepT[M, H, State] = that.step :&&: self.step
+
+      def uncons: Uncons[State] = {
+        val uncons1 = that.uncons.zoomOut[State](implicitly[ValA[λ[K => Lens[Cons[that.State, Just[self.State, ?], K], that.State[K]]]]])
+        val uncons2 = self.uncons.zoomOut[State](implicitly[ValA[λ[K => Lens[Cons[that.State, Just[self.State, ?], K], self.State[K]]]]])
+        uncons1 orElse uncons2
+      }
     }
   }
 
-  def :+:[G[_[_], _]](
+  final def :&&:[G[_[_], _], S[_]](
+    i2: StepT[M, G, S]
+  )(implicit
+    M: Functor[M]
+  ): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], Cons[S, Just[State, ?], ?]] = {
+    type H[K[_], A] = CoproductK[G, F, K, A]
+    new StateInterpreterT[M, H] {
+      type State[K] = Cons[S, Just[self.State, ?], K]
+      def step: StepT[M, H, State] = i2 :&&: self.step
+      def uncons: Uncons[State] = self.uncons.zoomOut[State](implicitly[ValA[λ[K => Lens[Cons[S, Just[self.State, ?], K], self.State[K]]]]])
+    }
+  }
+
+  final def ::[G[_[_], _]](
     ig: G ≈>> M
   )(implicit
     M: Monad[M]
@@ -38,7 +52,7 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
     val stepG: StepT[M, G, State] = StepT.lift[M, G, State](ig)
     new StateInterpreterT[M, CoproductK[G, F, ?[_], ?]] {
       type State[K] = self.State[K]
-      def step = stepG :+: self.step
+      def step = stepG :: self.step
       def uncons = self.uncons
     }
   }
@@ -59,6 +73,7 @@ trait StateInterpreterT[M[_], F[_[_], _]] { self =>
 }
 
 object StateInterpreterT {
+  import scala.language.implicitConversions  
 
   type Aux[M[_], F[_[_], _], S[_]] = StateInterpreterT[M, F] { type State[K] = S[K] }
 
@@ -106,24 +121,25 @@ object StateInterpreterT {
     }
   }
 
-  def coproductInterpreter[M[_], G[_[_], _], H[_[_], _]](
-    i1: StateInterpreterT[M, G],
-    i2: StateInterpreterT[M, H]
-  )(implicit
-    M: Functor[M]
-  ): StateInterpreterT.Aux[M, CoproductK[G, H, ?[_], ?], ProductK[i1.State, i2.State, ?]] = {
+  final case class Ops[M[_], F[_[_], _], S[_] <: KList[_]](self: StateInterpreterT.Aux[M, F, S]) extends AnyVal {
 
-    type F[K[_], A] = CoproductK[G, H, K, A]
+    def :&:[G[_[_], _]](that: StateInterpreterT[M, G])(implicit M: Functor[M]): StateInterpreterT.Aux[M, CoproductK[G, F, ?[_], ?], Cons[that.State, S, ?]] = {
+      type H[K[_], A] = CoproductK[G, F, K, A]
 
-    new StateInterpreterT[M, F] {
-      type State[K] = ProductK[i1.State, i2.State, K]
-      def step: StepT[M, F, State] = i1.step :*: i2.step
+      new StateInterpreterT[M, H] {
+        type State[K] = Cons[that.State, S, K]
 
-      def uncons: Uncons[State] = {
-        val uncons1 = i1.uncons.zoomOut[State](ProductK.leftLensZK[i1.State, i2.State])
-        val uncons2 = i2.uncons.zoomOut[State](ProductK.rightLensZK[i1.State, i2.State])
-        uncons1 orElse uncons2
+        def step: StepT[M, H, State] = that.step :&: self.step
+
+        def uncons: Uncons[State] = {
+          val uncons1 = that.uncons.zoomOut[State](implicitly[ValA[λ[K => Lens[State[K], that.State[K]]]]])
+          val uncons2 = self.uncons.zoomOut[State](implicitly[ValA[λ[K => Lens[State[K], self.State[K]]]]])
+          uncons1 orElse uncons2
+        }
       }
     }
   }
+
+  implicit def toOps[M[_], F[_[_], _], S[_] <: KList[_]](i: StateInterpreterT.Aux[M, F, S]): Ops[M, F, S] =
+    Ops(i)
 }
