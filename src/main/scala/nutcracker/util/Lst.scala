@@ -1,6 +1,7 @@
 package nutcracker.util
 
 import scala.annotation.tailrec
+import scala.collection.mutable.Buffer
 import scalaz.Monoid
 
 /** Linked list with O(1) cons, snoc and concatenation
@@ -39,6 +40,48 @@ sealed abstract class Lst[+A] {
       case Nil => this1
       case that1: NELst[B] => Cat[B](this1, that1)
     }
+  }
+
+  final def toRevList: List[A] = {
+    @tailrec def go(as: Lst[A], acc: List[A]): List[A] = as.toRightAssoc match {
+      case Nil => acc
+      case Cons(h, t) => go(t, h :: acc)
+      case Cat(Cons(h, t1), t2) => go(t1 ++ t2, h :: acc)
+      case _ => sys.error("Unreachable code")
+    }
+    go(this, List.empty)
+  }
+
+  final def toList: List[A] = {
+    val b = List.newBuilder[A]
+
+    @tailrec def go(as: Lst[A]): List[A] = as.toRightAssoc match {
+      case Nil => b.result()
+      case Cons(h, t) => b += h; go(t)
+      case Cat(Cons(h, t1), t2) => b += h; go(t1 ++ t2)
+      case _ => sys.error("Unreachable code")
+    }
+
+    go(this)
+  }
+
+  final def map[B](f: A => B): Lst[B] = {
+    val buf = Buffer.empty[B]
+
+    @tailrec def go(as: Lst[A]): Lst[B] = as.toRightAssoc match {
+      case Nil => buf.foldRight(Lst.empty[B])((b, l) => b :: l)
+      case Cons(h, t) => buf += f(h); go(t)
+      case Cat(Cons(h, t1), t2) => buf += f(h); go(t1 ++ t2)
+      case _ => sys.error("Unreachable code")
+    }
+
+    go(this)
+  }
+
+  @tailrec
+  private final def toRightAssoc: Lst[A] = this match {
+    case Cat(Cat(x, y), z) => (Cat(x, Cat(y, z)): Lst[A]).toRightAssoc
+    case l => l
   }
 }
 
