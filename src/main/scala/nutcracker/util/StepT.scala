@@ -56,6 +56,10 @@ abstract class StepT[M[_], F[_[_], _], S[_]] { self =>
       def apply[K[_], A](ca: CoproductK[G, F, K, A]): WriterStateT[M, Lst[K[Unit]], S[K[Unit]], A] =
         WriterStateT(s => ca.run.fold(that(_), self(_))(s))
     }
+
+  def :>>:[G[_[_], _]](ig: G ≈>> M)(implicit M: Monad[M]): StepT[M, CoproductK[G, F, ?[_], ?], S] =
+    StepT.lift[M, G, S](ig) :: self
+
 }
 
 object StepT {

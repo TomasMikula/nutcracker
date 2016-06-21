@@ -41,17 +41,23 @@ trait StateInterpreterT[M[_], F[_[_], _], S[_]] { self =>
     }
   }
 
-  final def ::[G[_[_], _]](
+  final def ::[G[_[_], _]](that: StateInterpreterT[M, G, S]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] = {
+    type H[K[_], A] = CoproductK[G, F, K, A]
+    new StateInterpreterT[M, H, S] {
+      def step: StepT[M, H, S] = that.step :: self.step
+      def uncons: Uncons[S] = self.uncons
+    }
+  }
+
+  final def :>>:[G[_[_], _]](
     ig: G ≈>> M
   )(implicit
     M: Monad[M]
-  ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] = {
-    val stepG: StepT[M, G, S] = StepT.lift[M, G, S](ig)
+  ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] =
     new StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] {
-      def step = stepG :: self.step
+      def step = ig :>>: self.step
       def uncons = self.uncons
     }
-  }
 
   def hoist[N[_]](mn: M ~> N)(implicit M: Monad[M], N: Monad[N]): StateInterpreterT[N, F, S] =
     new StateInterpreterT[N, F, S] {
