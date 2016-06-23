@@ -35,37 +35,37 @@ object KList {
   implicit def recTailLens[F[_], G[_] <: KList[_], A, B](implicit gab: Lens[G[A], B]): Lens[Cons[F, G, A], B] =
     Lens[Cons[F, G, A], B](la => gab.get(la.tail))(b => la => Cons(la.head, gab.set(b)(la.tail)))
 
-  implicit def justLensZ[F[_], A]: Lenz[Just[F, A], F[A]] =
+  implicit def justLenz[F[_], A]: Lenz[Just[F, A], F[A]] =
     Lenz[Just[F, A], F[A]](la => Store(fa => Just(fa), la.value))
 
-  implicit def headLensZ[F[_], G[_] <: KList[_], A]: Lenz[Cons[F, G, A], F[A]] =
+  implicit def headLenz[F[_], G[_] <: KList[_], A]: Lenz[Cons[F, G, A], F[A]] =
     Lenz[Cons[F, G, A], F[A]](la => Store(fa => Cons(fa, la.tail), la.head))
 
-  implicit def tailLensZ[F[_], G[_] <: KList[_], A]: Lenz[Cons[F, G, A], G[A]] =
+  implicit def tailLenz[F[_], G[_] <: KList[_], A]: Lenz[Cons[F, G, A], G[A]] =
     Lenz[Cons[F, G, A], G[A]](la => Store(ga => Cons(la.head, ga), la.tail))
 
-  implicit def recTailLensZ[F[_], G[_] <: KList[_], A, B](implicit gab: Lenz[G[A], B]): Lenz[Cons[F, G, A], B] =
+  implicit def recTailLenz[F[_], G[_] <: KList[_], A, B](implicit gab: Lenz[G[A], B]): Lenz[Cons[F, G, A], B] =
     Lenz[Cons[F, G, A], B](la => Store(b => Cons(la.head, gab.set(la.tail, b)), gab.get(la.tail)))
 
-  implicit def justLensZK[F[_]]: ValA[λ[A => Lenz[Just[F, A], F[A]]]] =
+  implicit def justLenzK[F[_]]: ValA[λ[A => Lenz[Just[F, A], F[A]]]] =
     new ValA[λ[A => Lenz[Just[F, A], F[A]]]] {
       def compute[A]: Lenz[Just[F, A], F[A]] =
         Lenz[Just[F, A], F[A]](la => Store(fa => Just(fa), la.value))
     }
 
-  implicit def headLensZK[F[_], G[_] <: KList[_]]: ValA[λ[A => Lenz[Cons[F, G, A], F[A]]]] =
+  implicit def headLenzK[F[_], G[_] <: KList[_]]: ValA[λ[A => Lenz[Cons[F, G, A], F[A]]]] =
     new ValA[λ[A => Lenz[Cons[F, G, A], F[A]]]] {
       def compute[A]: Lenz[Cons[F, G, A], F[A]] =
         Lenz[Cons[F, G, A], F[A]](la => Store(fa => Cons(fa, la.tail), la.head))
     }
 
-  implicit def tailLensZK[F[_], G[_] <: KList[_]]: ValA[λ[A => Lenz[Cons[F, G, A], G[A]]]] =
+  implicit def tailLenzK[F[_], G[_] <: KList[_]]: ValA[λ[A => Lenz[Cons[F, G, A], G[A]]]] =
     new ValA[λ[A => Lenz[Cons[F, G, A], G[A]]]] {
       def compute[A]: Lenz[Cons[F, G, A], G[A]] =
         Lenz[Cons[F, G, A], G[A]](la => Store(ga => Cons(la.head, ga), la.tail))
     }
 
-  implicit def recTailLensZK[F[_], G[_] <: KList[_], H[_]](implicit gh: ValA[λ[A => Lenz[G[A], H[A]]]]): ValA[λ[A => Lenz[Cons[F, G, A], H[A]]]] =
+  implicit def recTailLenzK[F[_], G[_] <: KList[_], H[_]](implicit gh: ValA[λ[A => Lenz[G[A], H[A]]]]): ValA[λ[A => Lenz[Cons[F, G, A], H[A]]]] =
     new ValA[λ[A => Lenz[Cons[F, G, A], H[A]]]] {
       def compute[A]: Lenz[Cons[F, G, A], H[A]] =
         Lenz[Cons[F, G, A], H[A]](la => Store(ha => Cons(la.head, gh[A].set(la.tail, ha)), gh[A].get(la.tail)))

@@ -47,7 +47,7 @@ abstract class StepT[M[_], F[_[_], _], S[_]] { self =>
     new StateInterpreterT[M, H, U] {
       def step: StepT[M, H, U] = ig.step :&&: self
       def uncons: Uncons[U] =
-        ig.uncons.zoomOut[U](KList.headLensZK[T, Just[S, ?]])
+        ig.uncons.zoomOut[U](KList.headLenzK[T, Just[S, ?]])
     }
   }
 
