@@ -1,7 +1,8 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.util.{ContF, FreeK, InjectK}
+import nutcracker.util.{ContF, FreeK, FunctorKA, InjectK}
+import scalaz.~>
 
 sealed trait DeferLang[D, K[_], A]
 
@@ -17,4 +18,10 @@ object DeferLang {
   /** Defer registration of callbacks to the given CPS computation. */
   def deferC[D, F[_[_], _], A](delay: D, c: ContF[F, A])(implicit inj: InjectK[DeferLang[D, ?[_], ?], F]): ContF[F, A] =
     ContF(f => deferF(delay, c(f)))
+
+  implicit def functorKAInstance[D]: FunctorKA[DeferLang[D, ?[_], ?]] = new FunctorKA[DeferLang[D, ?[_], ?]] {
+    def transform[K[_], L[_], A](d: DeferLang[D, K, A])(f: K ~> L): DeferLang[D, L, A] = d match {
+      case Defer(d, k) => Defer(d, f(k))
+    }
+  }
 }
