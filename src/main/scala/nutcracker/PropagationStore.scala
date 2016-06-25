@@ -29,7 +29,7 @@ case class PropagationStore[K] private(
 
   def addVariable[D, U, Δ](d: D, dom: Dom[D]): (PropagationStore[K], DRef.Aux[D, dom.Update, dom.Delta]) = {
     val ref = DRef[D](nextId)(dom)
-    val domains1 = domains.updated(ref, (d, dom: Dom.Aux[D, dom.Update, dom.Delta]))
+    val domains1 = domains.put(ref)((d, dom: Dom.Aux[D, dom.Update, dom.Delta]))
     val (unresolvedVars1, failedVars1) = dom.assess(d) match {
       case Dom.Failed => (unresolvedVars, failedVars + nextId)
       case Dom.Refined => (unresolvedVars, failedVars)
@@ -55,8 +55,8 @@ case class PropagationStore[K] private(
           case Dom.Refined => (unresolvedVars - ref, failedVars)
           case Dom.Unrefined(_) => (unresolvedVars, failedVars)
         }
-        val domains1 = domains.updated(ref, (d1, dom))
-        val dirtyDomains1 = dirtyDomains.updated(ref, diff1, dom.combineDeltas)
+        val domains1 = domains.put(ref)((d1, dom))
+        val dirtyDomains1 = dirtyDomains.updated(ref)(diff1)(dom.combineDeltas)
         copy(domains = domains1, unresolvedVars = unresolvedVars1, failedVars = failedVars1, dirtyDomains = dirtyDomains1)
     }
   }
@@ -81,14 +81,14 @@ case class PropagationStore[K] private(
   }
 
   private def addDomainTrigger0[D, U, Δ](ref: DRef.Aux[D, U, Δ], t: (D, Δ) => Trigger[K]): (PropagationStore[K], Lst[K]) = {
-    val triggers = domainTriggers.getOrElse(ref, Nil)
+    val triggers = domainTriggers.getOrElse(ref)(Nil)
     val (remainingTriggers, firedTriggers) = dirtyDomains.get(ref) match {
       case Some(δ) => collectDomTriggers(fetch(ref), δ, triggers)
       case None => (triggers, Lst.empty)
     }
     (
       copy(
-        domainTriggers = domainTriggers.updated(ref, t :: remainingTriggers),
+        domainTriggers = domainTriggers.put(ref)(t :: remainingTriggers),
         dirtyDomains = dirtyDomains - ref
       ),
       firedTriggers
@@ -97,22 +97,22 @@ case class PropagationStore[K] private(
 
   private def addSelTrigger0[L <: HList](sel: Sel[L], t: L => Trigger[K]): PropagationStore[K] = {
     copy(
-      selTriggers = selTriggers.updated(sel, t :: selTriggers.getOrElse(sel, Nil)),
+      selTriggers = selTriggers.put(sel)(t :: selTriggers.getOrElse(sel)(Nil)),
       cellsToSels = cellsToSels.add(sel)
     )
   }
 
   private def triggersForDomain[D, U, Δ](ref: DRef.Aux[D, U, Δ], δ: Δ): (PropagationStore[K], Lst[K]) =
-    collectDomTriggers(fetch(ref), δ, domainTriggers.getOrElse(ref, Nil)) match {
+    collectDomTriggers(fetch(ref), δ, domainTriggers.getOrElse(ref)(Nil)) match {
       case (Nil, fired) => (copy(domainTriggers = domainTriggers - ref), fired)
-      case (forLater, fired) => (copy(domainTriggers = domainTriggers.updated(ref, forLater)), fired)
+      case (forLater, fired) => (copy(domainTriggers = domainTriggers.put(ref)(forLater)), fired)
     }
 
   private def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], Lst[K]) = {
     val d = sel.fetch(cellFetcher)
-    collectSelTriggers(d, selTriggers.getOrElse(sel, Nil)) match {
+    collectSelTriggers(d, selTriggers.getOrElse(sel)(Nil)) match {
       case (Nil, fired) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), fired)
-      case (forLater, fired) => (copy(selTriggers = selTriggers.updated(sel, forLater)), fired)
+      case (forLater, fired) => (copy(selTriggers = selTriggers.put(sel)(forLater)), fired)
     }
   }
 

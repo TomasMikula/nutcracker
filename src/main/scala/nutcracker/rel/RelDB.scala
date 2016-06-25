@@ -117,7 +117,7 @@ case class RelDB[K] private (
     patternTriggers.getOrElse(p, Nil).asInstanceOf[List[V => K]]
 
   private def replaceTable[L <: HList](rel: Rel[L])(tbl: RelTable[L]): RelDB[K] =
-    copy(tables = tables.updated(rel, tbl))
+    copy(tables = tables.put(rel)(tbl))
 
   private def addTrigger[V <: HList](p: PartiallyAssignedPattern[V], h: V => K): RelDB[K] =
     copy(

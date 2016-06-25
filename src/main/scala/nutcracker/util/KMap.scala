@@ -10,12 +10,12 @@ final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
   def tail: KMap[K, V] = KMap[K, V](map.tail)
   def apply[A](k: K[A]): V[A] = map(k).asInstanceOf[V[A]]
   def get[A](k: K[A]): Option[V[A]] = map.get(k).asInstanceOf[Option[V[A]]]
-  def getOrElse[A](k: K[A], default: => V[A]): V[A] = get(k).getOrElse(default)
-  def updated[A](k: K[A], v: V[A]): KMap[K, V] = KMap[K, V](map.updated(k, v))
-  def updated[A](k: K[A], v: V[A], combineIfPresent: (V[A], V[A]) => V[A]): KMap[K, V] =
+  def getOrElse[A](k: K[A])(default: => V[A]): V[A] = get(k).getOrElse(default)
+  def put[A](k: K[A])(v: V[A]): KMap[K, V] = KMap[K, V](map.updated(k, v))
+  def updated[A](k: K[A])(v: V[A])(combineIfPresent: (V[A], V[A]) => V[A]): KMap[K, V] =
     get(k) match {
-      case None => updated(k, v)
-      case Some(v0) => updated(k, combineIfPresent(v0, v))
+      case None => put(k)(v)
+      case Some(v0) => put(k)(combineIfPresent(v0, v))
     }
   def -(k: K[_]): KMap[K, V] = KMap[K, V](map - k)
 }
@@ -32,12 +32,12 @@ final case class KMapB[K[_ <: UB], V[_ <: UB], UB](map: Map[K[_], V[_]]) extends
   def tail: KMapB[K, V, UB] = KMapB[K, V, UB](map.tail)
   def apply[A <: UB](k: K[A]): V[A] = map(k).asInstanceOf[V[A]]
   def get[A <: UB](k: K[A]): Option[V[A]] = map.get(k).asInstanceOf[Option[V[A]]]
-  def getOrElse[A <: UB](k: K[A], default: => V[A]): V[A] = get(k).getOrElse(default)
-  def updated[A <: UB](k: K[A], v: V[A]): KMapB[K, V, UB] = KMapB[K, V, UB](map.updated(k, v))
-  def updated[A <: UB](k: K[A], v: V[A], combineIfPresent: (V[A], V[A]) => V[A]): KMapB[K, V, UB] =
+  def getOrElse[A <: UB](k: K[A])(default: => V[A]): V[A] = get(k).getOrElse(default)
+  def put[A <: UB](k: K[A])(v: V[A]): KMapB[K, V, UB] = KMapB[K, V, UB](map.updated(k, v))
+  def updated[A <: UB](k: K[A])(v: V[A])(combineIfPresent: (V[A], V[A]) => V[A]): KMapB[K, V, UB] =
     get(k) match {
-      case None => updated(k, v)
-      case Some(v0) => updated(k, combineIfPresent(v0, v))
+      case None => put(k)(v)
+      case Some(v0) => put(k)(combineIfPresent(v0, v))
     }
   def -(k: K[_]): KMapB[K, V, UB] = KMapB[K, V, UB](map - k)
 }
@@ -54,12 +54,12 @@ final case class K2Map[K[_, _], V[_, _]](map: Map[K[_, _], V[_, _]]) extends Any
   def tail: K2Map[K, V] = K2Map[K, V](map.tail)
   def apply[A, B](k: K[A, B]): V[A, B] = map(k).asInstanceOf[V[A, B]]
   def get[A, B](k: K[A, B]): Option[V[A, B]] = map.get(k).asInstanceOf[Option[V[A, B]]]
-  def getOrElse[A, B](k: K[A, B], default: => V[A, B]): V[A, B] = get(k).getOrElse(default)
-  def updated[A, B](k: K[A, B], v: V[A, B]): K2Map[K, V] = K2Map[K, V](map.updated(k, v))
-  def updated[A, B](k: K[A, B], v: V[A, B], combineIfPresent: (V[A, B], V[A, B]) => V[A, B]): K2Map[K, V] =
+  def getOrElse[A, B](k: K[A, B])(default: => V[A, B]): V[A, B] = get(k).getOrElse(default)
+  def put[A, B](k: K[A, B])(v: V[A, B]): K2Map[K, V] = K2Map[K, V](map.updated(k, v))
+  def updated[A, B](k: K[A, B])(v: V[A, B])(combineIfPresent: (V[A, B], V[A, B]) => V[A, B]): K2Map[K, V] =
     get(k) match {
-      case None => updated(k, v)
-      case Some(v0) => updated(k, combineIfPresent(v0, v))
+      case None => put(k)(v)
+      case Some(v0) => put(k)(combineIfPresent(v0, v))
     }
   def -(k: K[_, _]): K2Map[K, V] = K2Map[K, V](map - k)
 }
@@ -76,12 +76,12 @@ final case class K3Map[K[_, _, _], V[_, _, _]](map: Map[K[_, _, _], V[_, _, _]])
   def tail: K3Map[K, V] = K3Map[K, V](map.tail)
   def apply[A, B, C](k: K[A, B, C]): V[A, B, C] = map(k).asInstanceOf[V[A, B, C]]
   def get[A, B, C](k: K[A, B, C]): Option[V[A, B, C]] = map.get(k).asInstanceOf[Option[V[A, B, C]]]
-  def getOrElse[A, B, C](k: K[A, B, C], default: => V[A, B, C]): V[A, B, C] = get(k).getOrElse(default)
-  def updated[A, B, C](k: K[A, B, C], v: V[A, B, C]): K3Map[K, V] = K3Map[K, V](map.updated(k, v))
-  def updated[A, B, C](k: K[A, B, C], v: V[A, B, C], combineIfPresent: (V[A, B, C], V[A, B, C]) => V[A, B, C]): K3Map[K, V] =
+  def getOrElse[A, B, C](k: K[A, B, C])(default: => V[A, B, C]): V[A, B, C] = get(k).getOrElse(default)
+  def put[A, B, C](k: K[A, B, C])(v: V[A, B, C]): K3Map[K, V] = K3Map[K, V](map.updated(k, v))
+  def updated[A, B, C](k: K[A, B, C])(v: V[A, B, C])(combineIfPresent: (V[A, B, C], V[A, B, C]) => V[A, B, C]): K3Map[K, V] =
     get(k) match {
-      case None => updated(k, v)
-      case Some(v0) => updated(k, combineIfPresent(v0, v))
+      case None => put(k)(v)
+      case Some(v0) => put(k)(combineIfPresent(v0, v))
     }
   def -(k: K[_, _, _]): K3Map[K, V] = K3Map[K, V](map - k)
 }
