@@ -16,6 +16,8 @@ package object util {
       Cont(f)
     def noop[F[_[_], _], A]: ContF[F, A] =
       ContF(k => FreeK.pure(()))
+    def point[F[_[_], _], A](a: A): ContF[F, A] =
+      ContF(k => k(a))
     def sequence[F[_[_], _], A](cs: ContF[F, A]*): ContF[F, A] =
       sequence(cs)
     def sequence[F[_[_], _], A](cs: Iterable[ContF[F, A]]): ContF[F, A] =
