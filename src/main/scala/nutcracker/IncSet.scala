@@ -24,12 +24,15 @@ object IncSet {
   def singleton[A](a: A): IncSet[A] = new IncSet(Set(a))
   def wrap[A](as: Set[A]): IncSet[A] = new IncSet(as)
 
+  type Update[A] = Join[IncSet[A]]
+  type Delta[A] = Diff[Set[A]]
+
   type IncSetDom[A] = Dom .Aux[IncSet[A], Join[IncSet[A]], Diff[Set[A]]]
   type IncSetRef[A] = DRef.Aux[IncSet[A], Join[IncSet[A]], Diff[Set[A]]]
 
   implicit def domInstance[A]: IncSetDom[A] = new Dom[IncSet[A]] {
-    type Update = Join[IncSet[A]]
-    type Delta = Diff[Set[A]]
+    type Update = IncSet.Update[A]
+    type Delta = IncSet.Delta[A]
 
     override def assess(d: IncSet[A]): Dom.Status[Join[IncSet[A]]] = d.size match {
       case 0 => Dom.Unrefined(() => None)
