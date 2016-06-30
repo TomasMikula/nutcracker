@@ -73,9 +73,12 @@ object IncSet {
       (now, onChange)
     })
 
+  def includeC[F[_[_], _], A](cps: ContF[F, A], ref: IncSetRef[A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+    cps(a => IncSet.insert(a, ref).inject[F])
+
   def collect[F[_[_], _], A](cps: ContF[F, A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] = for {
     res <- IncSet.initF[F, A]
-    _ <- cps(a => IncSet.insert(a, res).inject[F])
+    _   <- includeC(cps, res)
   } yield res
 
   def collectAll[F[_[_], _], A](cps: ContF[F, A]*)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] =
