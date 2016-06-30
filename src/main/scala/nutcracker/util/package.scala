@@ -18,6 +18,8 @@ package object util {
       ContF(k => FreeK.pure(()))
     def point[F[_[_], _], A](a: A): ContF[F, A] =
       ContF(k => k(a))
+    def wrapEffect[F[_[_], _], A](a: FreeK[F, ContF[F, A]]): ContF[F, A] =
+      ContF[F, A](f => a >>= { k => k(f) })
     def sequence[F[_[_], _], A](cs: ContF[F, A]*): ContF[F, A] =
       sequence(cs)
     def sequence[F[_[_], _], A](cs: Iterable[ContF[F, A]]): ContF[F, A] =
