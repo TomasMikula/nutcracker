@@ -39,6 +39,10 @@ package object util {
       for { a1 <- c1; a2 <- c2; a3 <- c3; a4 <- c4; a5 <- c5 } yield (a1, a2, a3, a4, a5)
     def tuple6[F[_[_], _], A1, A2, A3, A4, A5, A6](c1: ContF[F, A1], c2: ContF[F, A2], c3: ContF[F, A3], c4: ContF[F, A4], c5: ContF[F, A5], c6: ContF[F, A6]): ContF[F, (A1, A2, A3, A4, A5, A6)] =
         for { a1 <- c1; a2 <- c2; a3 <- c3; a4 <- c4; a5 <- c5; a6 <- c6 } yield (a1, a2, a3, a4, a5, a6)
+
+    implicit class WrappedContF[F[_[_], _], A](self: FreeK[F, ContF[F, A]]) {
+      def wrapEffect: ContF[F, A] = ContF.wrapEffect(self)
+    }
   }
 
   type Index[K, V] = TransformedIndex[K, V, V]
