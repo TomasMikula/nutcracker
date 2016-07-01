@@ -32,10 +32,6 @@ final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M
   ): FreeKT[G, M, B] =
     this >>>= { _ => gb }
 
-  def inj[G[_[_], _]](implicit tr: (FreeKT[F, M, ?] ~> FreeKT[G, M, ?])): FreeKT[G, M, A] =
-    tr(this)
-
-  // sometimes it is easier for scalac to find these implicit arguments than for inj above
   def inject[G[_[_], _]](implicit
     inj: InjectK[F, G],
     FK: FunctorKA[F],
