@@ -43,10 +43,10 @@ object DSet {
   def init[F[_[_], _], D](implicit inj: InjectK[PropagationLang, F]): FreeK[F, DSetRef[D]] =
     cellF(empty[D]).inject[F]
 
-  def includeC[F[_[_], _], D](cps: ContF[F, DRef[D]], ref: DSetRef[D])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, Unit] =
+  def includeC[F[_[_], _], D](cps: ContF[F, _ <: DRef[D]], ref: DSetRef[D])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, Unit] =
     cps(dref => insert(dref, ref))
 
-  def collect[F[_[_], _], D](cps: ContF[F, DRef[D]])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, DSetRef[D]] =
+  def collect[F[_[_], _], D](cps: ContF[F, _ <: DRef[D]])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, DSetRef[D]] =
     for {
       res <- init[F, D]
         _ <- includeC(cps, res)
