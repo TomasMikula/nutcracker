@@ -1,8 +1,9 @@
 package nutcracker
 
+import scala.language.higherKinds
 import nutcracker.Dom.Status
 import nutcracker.PropagationLang._
-import nutcracker.util.{FreeK, Lst}
+import nutcracker.util.{ContF, FreeK, InjectK, Lst}
 
 /** A set of domain references.
   *
@@ -37,11 +38,25 @@ object DSet {
 
   type DSetRef[D] = DRef.Aux[DSet[D], Update[D], Inserted[D]]
 
-  def insert[D](dsref: DSetRef[D], ref: DRef[D])(implicit dom: Dom[D]): FreeK[PropagationLang, Unit] =
+  def empty[D]: DSet[D] = DSet(Set.empty, Set.empty)
+
+  def initF[F[_[_], _], D](implicit inj: InjectK[PropagationLang, F]): FreeK[F, DSetRef[D]] =
+    cellF(empty[D]).inject[F]
+
+  def includeC[F[_[_], _], D](cps: ContF[F, DRef[D]], ref: DSetRef[D])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, Unit] =
+    cps(dref => insert(dref, ref).inject[F])
+
+  def collect[F[_[_], _], D](cps: ContF[F, DRef[D]])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, DSetRef[D]] =
+    for {
+      res <- initF[F, D]
+        _ <- includeC(cps, res)
+    } yield res
+
+  def insert[D](ref: DRef[D], into: DSetRef[D])(implicit dom: Dom[D]): FreeK[PropagationLang, Unit] =
     valTriggerF(ref)(d => dom.assess(d) match {
-      case Dom.Failed => Fire(updateF(dsref)(Failed(ref)))
-      case Dom.Unrefined(_) => FireReload(updateF(dsref)(Unrefined(ref)))
-      case Dom.Refined => FireReload(updateF(dsref)(Refined(ref)))
+      case Dom.Failed => Fire(updateF(into)(Failed(ref)))
+      case Dom.Unrefined(_) => FireReload(updateF(into)(Unrefined(ref)))
+      case Dom.Refined => FireReload(updateF(into)(Refined(ref)))
     })
 
   implicit def domInstance[D]: Dom.Aux[DSet[D], Update[D], Inserted[D]] =
