@@ -40,19 +40,19 @@ object DSet {
 
   def empty[D]: DSet[D] = DSet(Set.empty, Set.empty)
 
-  def initF[F[_[_], _], D](implicit inj: InjectK[PropagationLang, F]): FreeK[F, DSetRef[D]] =
+  def init[F[_[_], _], D](implicit inj: InjectK[PropagationLang, F]): FreeK[F, DSetRef[D]] =
     cellF(empty[D]).inject[F]
 
   def includeC[F[_[_], _], D](cps: ContF[F, DRef[D]], ref: DSetRef[D])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, Unit] =
-    cps(dref => insert(dref, ref).inject[F])
+    cps(dref => insert(dref, ref))
 
   def collect[F[_[_], _], D](cps: ContF[F, DRef[D]])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, DSetRef[D]] =
     for {
-      res <- initF[F, D]
+      res <- init[F, D]
         _ <- includeC(cps, res)
     } yield res
 
-  def insert[D](ref: DRef[D], into: DSetRef[D])(implicit dom: Dom[D]): FreeK[PropagationLang, Unit] =
+  def insert[F[_[_], _], D](ref: DRef[D], into: DSetRef[D])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, Unit] =
     valTriggerF(ref)(d => dom.assess(d) match {
       case Dom.Failed => Fire(updateF(into)(Failed(ref)))
       case Dom.Unrefined(_) => FireReload(updateF(into)(Unrefined(ref)))

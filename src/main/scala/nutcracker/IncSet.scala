@@ -49,9 +49,8 @@ object IncSet {
       Diff(d1.value union d2.value)
   }
 
-  def init[A]: FreeK[PropagationLang, IncSetRef[A]] = cellF(IncSet.empty[A])
-  def initF[F[_[_], _], A](implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] =
-    init[A].inject[F]
+  def init[F[_[_], _], A](implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] =
+    cellF(IncSet.empty[A]).inject[F]
 
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
@@ -63,13 +62,13 @@ object IncSet {
       (Some(now), Some(onChange))
     }))
 
-  def insert[A](a: A, into: IncSetRef[A]): FreeK[PropagationLang, Unit] =
+  def insert[F[_[_], _], A](a: A, into: IncSetRef[A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     insertAll(Set(a), into)
 
-  def insertAll[A](add: Set[A], into: IncSetRef[A]): FreeK[PropagationLang, Unit] =
+  def insertAll[F[_[_], _], A](add: Set[A], into: IncSetRef[A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     PropagationLang.updateF(into)(Join(wrap(add)))
 
-  def include[A](sub: IncSetRef[A], sup: IncSetRef[A]): FreeK[PropagationLang, Unit] =
+  def include[F[_[_], _], A](sub: IncSetRef[A], sup: IncSetRef[A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     domTriggerF(sub)((sa: IncSet[A]) => {
       val now = Some(insertAll(sa.value, sup))
       val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(insertAll(delta.value, sup)))
@@ -77,10 +76,10 @@ object IncSet {
     })
 
   def includeC[F[_[_], _], A](cps: ContF[F, A], ref: IncSetRef[A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    cps(a => IncSet.insert(a, ref).inject[F])
+    cps(a => IncSet.insert(a, ref))
 
   def collect[F[_[_], _], A](cps: ContF[F, A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] = for {
-    res <- IncSet.initF[F, A]
+    res <- IncSet.init[F, A]
     _   <- includeC(cps, res)
   } yield res
 
@@ -95,7 +94,7 @@ object IncSet {
     * This is equivalent to having a monad instance for `λ[A => FreeK[F, IncSetRef[A]]]`.
     */
   def relBind[F[_[_], _], A, B](sref: IncSetRef[A])(f: A => FreeK[F, IncSetRef[B]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[B]] = for {
-    res <- initF[F, B]
+    res <- init[F, B]
     _ <- domTriggerF[F, IncSet[A]](sref)((sa: IncSet[A]) => {
       val now = FreeK.sequence_(sa.toList.map(f(_) >>= (refb => include(refb, res))))
       val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(FreeK.sequence_(delta.value.toList.map(f(_) >>= (refb => include(refb, res))))))
