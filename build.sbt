@@ -13,7 +13,7 @@ resolvers += Resolver.sonatypeRepo("releases")
 autoCompilerPlugins := true
 addCompilerPlugin("org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary)
 addCompilerPlugin("com.milessabin" % "si2712fix-plugin" % "1.2.0" cross CrossVersion.full)
-addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.12")
+addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.14")
 
 scalastyleFailOnError := true
 
@@ -41,11 +41,11 @@ lazy val root = (project in file(".")).
 libraryDependencies ++= Seq(
   "org.spire-math" %% "algebra" % "0.4.2",
   "org.spire-math" %% "algebra-std" % "0.4.2",
-  "org.scalaz" %% "scalaz-core" % "7.3.0-M3",
-  "com.chuusai" %% "shapeless" % "2.3.0",
-  "com.github.julien-truffaut"  %%  "monocle-core" % "1.2.0",
-  "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
-  "org.scalacheck" %% "scalacheck" % "1.12.4"
+  "org.scalaz" %% "scalaz-core" % "7.3.0-M4",
+  "com.chuusai" %% "shapeless" % "2.3.1",
+  "com.github.julien-truffaut"  %%  "monocle-core" % "1.2.2",
+  "org.scalatest" % "scalatest_2.11" % "2.2.6" % "test",
+  "org.scalacheck" %% "scalacheck" % "1.13.2"
 )
 
 fork := true
