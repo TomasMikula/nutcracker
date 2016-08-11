@@ -152,7 +152,7 @@ class Sudoku extends FunSuite {
         2,5,9,6,3,1,8,4,7,
         3,7,1,8,4,5,9,2,6,
         8,4,6,2,9,7,1,3,5
-      ))(sols(0))
+      ))(sols.head)
     }
 
     assert(solutions(1)._2 <= solutions(0)._2, "advanced sudoku program should not increase the number of backtrackings")

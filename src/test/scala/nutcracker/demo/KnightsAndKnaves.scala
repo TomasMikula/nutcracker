@@ -69,7 +69,7 @@ class KnightsAndKnaves extends FreeSpec {
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
 
-      val sol = solutions(0)
+      val sol = solutions.head
       ("Solution: " + sol) - {
         "A is a knight" in { assertResult(true)(sol(0)) }
         "B is a knave" in { assertResult(false)(sol(1)) }
@@ -94,7 +94,7 @@ class KnightsAndKnaves extends FreeSpec {
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
 
-      val sol = solutions(0)
+      val sol = solutions.head
       ("Solution: " + sol) - {
         "A is a knave" in { assertResult(false)(sol(0)) }
         "B is a knight" in { assertResult(true)(sol(1)) }
@@ -124,7 +124,7 @@ class KnightsAndKnaves extends FreeSpec {
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
 
-      val sol = solutions(0)
+      val sol = solutions.head
       ("Solution: " + sol) - {
         "A is a knave" in { assertResult(false)(sol(0)) }
         "B is a knight" in { assertResult(true)(sol(1)) }

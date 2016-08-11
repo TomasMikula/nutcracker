@@ -2,18 +2,18 @@ package nutcracker.util
 
 import scala.language.existentials
 
-import org.scalatest.FlatSpec
+import org.scalatest.FunSuite
 import shapeless.Nat._
 import shapeless.test.illTyped
 import shapeless.{HList, HNil, ::}
 
-class PtrTest extends FlatSpec {
+class PtrTest extends FunSuite {
 
   type Pointer[L <: HList, A] = nutcracker.util.Ptr.Aux[L, _, A]
 
   type ISB = Int :: String :: Boolean :: HNil
 
-  "Ptr creation examples" should "compile" in {
+  test("Ptr creation examples should compile") {
     Ptr[ISB, _0]: Pointer[ISB, Int]
     Ptr[ISB, _1]: Pointer[ISB, String]
     Ptr[ISB, _2]: Pointer[ISB, Boolean]
@@ -24,13 +24,14 @@ class PtrTest extends FlatSpec {
     ()
   }
 
-  "Ill-typed examples" should "not compile" in {
-    illTyped("""Ptr[ISB, _0]: Pointer[ISB, Boolean]""")
-    illTyped("""Ptr[ISB, _1]: Pointer[ISB, Int]""")
-    illTyped("""Ptr[ISB, _2]: Pointer[ISB, String]""")
+  private def eval(testFun: => Unit): Unit = testFun
 
-    illTyped("""Ptr(_0): Pointer[ISB, String]""")
-    illTyped("""Ptr(_1): Pointer[ISB, Boolean]""")
-    illTyped("""Ptr(_2): Pointer[ISB, Int]""")
-  }
+  eval { illTyped("""Ptr[ISB, _0]: Pointer[ISB, Boolean]""") }
+  eval { illTyped("""Ptr[ISB, _1]: Pointer[ISB, Int]""") }
+  eval { illTyped("""Ptr[ISB, _2]: Pointer[ISB, String]""") }
+
+  eval { illTyped("""Ptr(_0): Pointer[ISB, String]""") }
+  eval { illTyped("""Ptr(_1): Pointer[ISB, Boolean]""") }
+  eval { illTyped("""Ptr(_2): Pointer[ISB, Int]""") }
+
 }

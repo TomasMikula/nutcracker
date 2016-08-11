@@ -11,7 +11,7 @@ import nutcracker.util.{ContF, FreeK, FreeKT, Inject, InjectK}
 import scalaz.{Apply, Cont}
 import scalaz.Id._
 
-package object nutcracker {
+package nutcracker {
 
   /** Used as a monotonic update on domain D:
     * represents the operation of lattice meet with the given value.
@@ -30,15 +30,7 @@ package object nutcracker {
     */
   final case class Diff[+D](value: D) extends AnyVal
 
-  type Promised[A] = DRef.Aux[Promise[A], Complete[A], Unit]
 
-
-  /* **************************************************** *
-   * Convenience API to work with domains that in the end *
-   * resolve to a value of a different ("smaller") type.  *
-   * **************************************************** */
-
-  def variable[A]: VarBuilder[A] = new VarBuilder[A]
   final class VarBuilder[A] private[nutcracker] {
     def apply[D]()(implicit
       ex: Extract.Aux[D, A],
@@ -73,8 +65,6 @@ package object nutcracker {
     def oneOf(as: A*): FreeK[PropagationLang, Vector[DecSetRef[A]]] = oneOf(as.toSet)
   }
 
-  def whenResolved[D](ref: DRef[D])(implicit ex: Extract[D]): WhenResolved[D, ex.Out] =
-    WhenResolved[D, ex.Out](ref, ex)
   final case class WhenResolved[D, A] private[nutcracker](ref: DRef[D], ex: Extract.Aux[D, A]) {
     def exec[F[_[_], _]](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
       valTriggerF[F, D](ref)(d => ex.extract(d) match {
@@ -82,6 +72,23 @@ package object nutcracker {
         case None => Sleep[FreeK[F, Unit]]()
       })
   }
+
+}
+
+package object nutcracker {
+
+  type Promised[A] = DRef.Aux[Promise[A], Complete[A], Unit]
+
+
+  /* **************************************************** *
+   * Convenience API to work with domains that in the end *
+   * resolve to a value of a different ("smaller") type.  *
+   * **************************************************** */
+
+  def variable[A]: VarBuilder[A] = new VarBuilder[A]
+
+  def whenResolved[D](ref: DRef[D])(implicit ex: Extract[D]): WhenResolved[D, ex.Out] =
+    WhenResolved[D, ex.Out](ref, ex)
 
 
   /* ****************************************************** *

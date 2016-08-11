@@ -15,7 +15,7 @@ object Ptr {
   type Aux[L <: HList, N <: Nat, Out0] = Ptr[L, N] { type Out = Out0 }
 
   def apply[L <: HList, N <: Nat](implicit at: Ptr[L, N]): Aux[L, N, at.Out] = at
-  def apply[L <: HList, N <: Nat](n: N)(implicit at: Ptr[L, N]): Aux[L, N, at.Out] = at
+  def apply[L <: HList, N <: Nat](n: N)(implicit at: Ptr[L, N]): Aux[L, N, at.Out] = at // linter:ignore UnusedParameter
 
   implicit def hlistAtZero[H, T <: HList]: Aux[H :: T, _0, H] =
     new Ptr[H :: T, _0] {
@@ -32,5 +32,5 @@ object Ptr {
       def index = att.index + 1
     }
 
-  implicit def ptrFromNat[L <: HList, N <: Nat, A](n : N)(implicit ptr: Ptr.Aux[L, N, A]): Ptr.Aux[L, N, A] = ptr
+  implicit def ptrFromNat[L <: HList, N <: Nat, A](n : N)(implicit ptr: Ptr.Aux[L, N, A]): Ptr.Aux[L, N, A] = ptr // linter:ignore UnusedParameter
 }
