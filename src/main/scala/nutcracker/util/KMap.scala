@@ -47,6 +47,33 @@ object KMapB {
 }
 
 
+/** KMap where values are parameterized by 2 additional type parameters,
+  * uniquely determined by a typeclass instance. Type safety relies on
+  * `TC[A, B, C]` being functional in `A`, i.e. for each `A` there are
+  * globally unique `B`, `C` such that there is an instance of `TC[A, B, C]`.
+  */
+final case class KMap1_2[K[_], V[_, _, _], TC[_, _, _]](map: Map[K[_], V[_, _, _]]) extends AnyVal {
+  def isEmpty: Boolean = map.isEmpty
+  def nonEmpty: Boolean = map.nonEmpty
+  def head: (K[A], V[A, B, C]) forSome { type A; type B; type C } = map.head.asInstanceOf[(K[A], V[A, B, C]) forSome { type A; type B; type C }]
+  def tail: KMap1_2[K, V, TC] = KMap1_2[K, V, TC](map.tail)
+  def apply[A, B, C](k: K[A])(implicit ev: TC[A, B, C]): V[A, B, C] = map(k).asInstanceOf[V[A, B, C]]
+  def get[A, B, C](k: K[A])(implicit ev: TC[A, B, C]): Option[V[A, B, C]] = map.get(k).asInstanceOf[Option[V[A, B, C]]]
+  def getOrElse[A, B, C](k: K[A])(default: => V[A, _, _])(implicit ev: TC[A, B, C]): V[A, B, C] = get(k).getOrElse(default.asInstanceOf[V[A, B, C]])
+  def put[A, B, C](k: K[A])(v: V[A, B, C])(implicit ev: TC[A, B, C]): KMap1_2[K, V, TC] = KMap1_2[K, V, TC](map.updated(k, v))
+  def updated[A, B, C](k: K[A])(v: V[A, B, C])(combineIfPresent: (V[A, B, C], V[A, B, C]) => V[A, B, C])(implicit ev: TC[A, B, C]): KMap1_2[K, V, TC] =
+    get(k) match {
+      case None => put(k)(v)
+      case Some(v0) => put(k)(combineIfPresent(v0, v))
+    }
+  def -(k: K[_]): KMap1_2[K, V, TC] = KMap1_2[K, V, TC](map - k)
+}
+
+object KMap1_2 {
+  def apply[K[_], V[_, _, _], TC[_, _, _]](): KMap1_2[K, V, TC] = KMap1_2[K, V, TC](Map[K[_], V[_, _, _]]())
+}
+
+
 final case class K2Map[K[_, _], V[_, _]](map: Map[K[_, _], V[_, _]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
