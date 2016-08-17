@@ -10,6 +10,12 @@ import scalaz.Cont
 sealed abstract class DRef[D](private[nutcracker] val domainId: Long) {
   type Update
   type Delta
+
+  /** Infer `Update` and `Delta` types. Relies on global uniqueness
+    * `Dom[D]` instance.
+    */
+  def infer(implicit dom: Dom[D]): DRef.Aux[D, dom.Update, dom.Delta] =
+    this.asInstanceOf[DRef.Aux[D, dom.Update, dom.Delta]]
 }
 
 object DRef {
