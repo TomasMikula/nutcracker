@@ -7,16 +7,16 @@ import nutcracker.Trigger._
 import nutcracker.util.{FreeK, Inject, InjectK}
 import scalaz.Cont
 
-sealed abstract class DRef[+D](private[nutcracker] val domainId: Long) {
+sealed abstract class DRef[D](private[nutcracker] val domainId: Long) {
   type Update
   type Delta
 }
 
 object DRef {
-  type Aux[+D, U, Δ] = DRef[D] { type Update = U; type Delta = Δ }
+  type Aux[D, U, Δ] = DRef[D] { type Update = U; type Delta = Δ }
 
   def apply[D](domainId: Long)(implicit dom: Dom[D]): DRef.Aux[D, dom.Update, dom.Delta] =
-    new DRef(domainId) {
+    new DRef[D](domainId) {
       type Update = dom.Update
       type Delta = dom.Delta
     }
