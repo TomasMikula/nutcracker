@@ -1,25 +1,36 @@
 package nutcracker.util
 
-import nutcracker.{DecSet, Dom, DRef}
 import org.scalatest.FunSuite
 import shapeless.test.illTyped
 
+object KMapTest {
+  final case class Foo[A]()
+  final case class Bar[A, B, C]()
+
+  trait Typeclass[A, B, C]
+
+  implicit val tc1: Typeclass[Int, Unit, Unit] = new Typeclass[Int, Unit, Unit]{}
+}
+
 class KMapTest extends FunSuite {
+  import KMapTest._
+
   test("KMap1_2 compilation test") {
-    val m = KMap1_2[DRef, DRef.Aux, Dom.Aux]()
+    val m = KMap1_2[Foo, Bar, Typeclass]()
 
-    val ref: DecSet.DecSetRef[Int] = DRef[DecSet[Int]](0)
+    val k1: Foo[Int] = Foo()
+    val v1: Bar[Int, Unit, Unit] = Bar()
 
-    assert(m.get(ref) == None)
-    assert(m.getOrElse(ref)(ref) == ref)
+    m.get(k1): Option[Bar[Int, Unit, Unit]]
 
-    val m1 = m.put(ref)(ref)
-    val m2 = m1.updated(ref)(ref)((r1, r2) => r2)
+    val m1 = m.put(k1)(v1)
+    val m2 = m1.updated(k1)(v1)((v1, v2) => v2)
 
-    assert(m2(ref) == ref)
+    m2(k1): Bar[Int, Unit, Unit]
 
-    val ref2: DecSet.DecSetRef[String] = DRef[DecSet[String]](0)
 
-    illTyped("""m.put(ref)(ref2)""")
+    val k2: Foo[String] = Foo()
+
+    illTyped("""m.put(k2)(v1)""")
   }
 }
