@@ -76,24 +76,24 @@ class PathSearch extends FunSuite {
 
   def successors(v: Vertex): List[(Int, Vertex)] = edges filter { _._1 == v } map { _._2 }
 
-  def findPath(u: Vertex, v: Vertex): FreeK[Lang, Promised[Path]] = for {
+  def findPath(u: Vertex, v: Vertex): FreeK[Lang, Promise.Ref[Path]] = for {
     pr <- promise[Path].inject[Lang]
     _ <- findPath(Nil, u, v, pr)
   } yield pr
 
-  def findPath(visited: List[Vertex], u: Vertex, v: Vertex, pr: Promised[Path]): FreeK[Lang, Unit] = {
+  def findPath(visited: List[Vertex], u: Vertex, v: Vertex, pr: Promise.Ref[Path]): FreeK[Lang, Unit] = {
     branchAndExec(
       zeroLengthPaths(visited, u, v, pr),
       nonZeroLengthPaths(visited, u, v, pr)
     )
   }
 
-  def zeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Promised[Path]): FreeK[Lang, Unit] = {
+  def zeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Promise.Ref[Path]): FreeK[Lang, Unit] = {
     if(u == v) complete(pr, revPath(u::visited)).inject[Lang]
     else branchAndExec()
   }
 
-  def nonZeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Promised[Path]): FreeK[Lang, Unit] = {
+  def nonZeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Promise.Ref[Path]): FreeK[Lang, Unit] = {
     val branches = successors(u) filter {
       case (c, w) => w != u && !visited.contains(w)
     } map {

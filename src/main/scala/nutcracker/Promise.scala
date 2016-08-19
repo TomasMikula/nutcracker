@@ -10,6 +10,8 @@ object Promise {
 
   final case class Complete[A](value: A) extends AnyVal
 
+  type Ref[A] = DRef.Aux[Promise[A], Complete[A], Unit]
+
   def empty[A]: Promise[A] = Empty
 
   implicit def embedInstance[A]: Embed[A, Promise[A]] = new Embed[A, Promise[A]] {

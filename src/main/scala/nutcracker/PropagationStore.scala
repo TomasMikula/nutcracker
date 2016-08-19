@@ -232,12 +232,12 @@ object PropagationStore {
     s => (naiveAssess[K](ord))(lens.get(s))
 
 
-  private def fetch: Promised ~> (PropagationStore[FreeK[PropagationLang, Unit]] => ?) = new ~>[Promised, PropagationStore[FreeK[PropagationLang, Unit]] => ?] {
-    def apply[A](pa: Promised[A]): (PropagationStore[FreeK[PropagationLang, Unit]] => A) = s => s.fetchResult(pa).get
+  private def fetch: Promise.Ref ~> (PropagationStore[FreeK[PropagationLang, Unit]] => ?) = new ~>[Promise.Ref, PropagationStore[FreeK[PropagationLang, Unit]] => ?] {
+    def apply[A](pa: Promise.Ref[A]): (PropagationStore[FreeK[PropagationLang, Unit]] => A) = s => s.fetchResult(pa).get
   }
-  def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Id, Promised] = {
+  def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Id, Promise.Ref] = {
     implicit val mfp: Monad[FreeKT[PropagationLang, Id, ?]] = FreeKT.freeKTMonad[PropagationLang, Id] // scalac, why can't thou find this yourself?
-    new DFSSolver[PropagationLang, PropagationStore, Id, Promised](
+    new DFSSolver[PropagationLang, PropagationStore, Id, Promise.Ref](
       interpreter.freeInstance,
       emptyF[PropagationLang],
       naiveAssess[FreeK[PropagationLang, ?]],
