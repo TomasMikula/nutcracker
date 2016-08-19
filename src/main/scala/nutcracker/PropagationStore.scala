@@ -194,8 +194,6 @@ object PropagationStore {
                 case (s1, ok) => (Lst.maybe(ok), s1, ())
               }
               case Update(ref, u, dom) => (Lst.empty, s.update(ref, u)(dom), ())
-              case Fetch(ref) => (Lst.empty, s, s.fetch(ref))
-              case FetchVector(refs) => (Lst.empty, s, s.fetchVector(refs))
             }
           )
         }

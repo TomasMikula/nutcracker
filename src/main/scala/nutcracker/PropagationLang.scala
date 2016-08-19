@@ -16,8 +16,6 @@ object PropagationLang {
   // constructors (the instruction set of a free program)
   case class Cell[K[_], D, U, Δ](d: D, dom: Dom.Aux[D, U, Δ]) extends PropagationLang[K, DRef.Aux[D, U, Δ]]
   case class Update[K[_], D, U, Δ](ref: DRef.Aux[D, U, Δ], u: U, dom: Dom.Aux[D, U, Δ]) extends PropagationLang[K, Unit]
-  case class Fetch[K[_], D](ref: DRef[D]) extends PropagationLang[K, D]
-  case class FetchVector[K[_], D, N <: Nat](refs: Sized[Vector[DRef[D]], N]) extends PropagationLang[K, Sized[Vector[D], N]]
   case class DomTrigger[K[_], D, U, Δ](ref: DRef.Aux[D, U, Δ], f: D => (Option[K[Unit]], Option[(D, Δ) => Trigger[K[Unit]]])) extends PropagationLang[K, Unit]
   case class SelTrigger[K[_], L <: HList](sel: Sel[L], f: L => Trigger[K[Unit]]) extends PropagationLang[K, Unit]
 
@@ -26,10 +24,6 @@ object PropagationLang {
     Cell(d, dom)
   def update[K[_], D](ref: DRef[D])(u: ref.Update)(implicit dom: Dom.Aux[D, ref.Update, ref.Delta]): PropagationLang[K, Unit] =
     Update[K, D, ref.Update, ref.Delta](ref, u, dom)
-  def fetch[K[_], D](ref: DRef[D]): PropagationLang[K, D] =
-    Fetch(ref)
-  def fetchVector[K[_], D, N <: Nat](refs: Sized[Vector[DRef[D]], N]): PropagationLang[K, Sized[Vector[D], N]] =
-    FetchVector(refs)
   def domTrigger[K[_], D](ref: DRef[D])(f: D => (Option[K[Unit]], Option[(D, ref.Delta) => Trigger[K[Unit]]])): PropagationLang[K, Unit] =
     DomTrigger[K, D, ref.Update, ref.Delta](ref, f)
   def selTrigger[K[_], L <: HList](sel: Sel[L])(f: L => Trigger[K[Unit]]): PropagationLang[K, Unit] =
@@ -40,10 +34,6 @@ object PropagationLang {
     FreeK.liftF(cell[FP, D](d))
   def updateF[D](ref: DRef[D])(u: ref.Update)(implicit dom: Dom.Aux[D, ref.Update, ref.Delta]): FP[Unit] =
     FreeK.liftF(update[FP, D](ref)(u))
-  def fetchF[D](ref: DRef[D]): FP[D] =
-    FreeK.liftF(fetch[FP, D](ref))
-  def fetchVectorF[D, N <: Nat](refs: Sized[Vector[DRef[D]], N]): FP[Sized[Vector[D], N]] =
-    FreeK.liftF(fetchVector[FP, D, N](refs))
   def domTriggerF[F[_[_], _], D](ref: DRef[D])(f: D => (Option[FreeK[F, Unit]], Option[(D, ref.Delta) => Trigger[FreeK[F, Unit]]]))(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     FreeK.injLiftF(domTrigger[FreeK[F, ?], D](ref)(f))
   def selTriggerF[F[_[_], _], L <: HList](sel: Sel[L])(f: L => Trigger[FreeK[F, Unit]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
@@ -90,8 +80,6 @@ object PropagationLang {
       // the boring cases
       case Cell(d, dom)        => Cell(d, dom)
       case Update(ref, u, dom) => Update(ref, u, dom)
-      case Fetch(ref)          => Fetch(ref)
-      case FetchVector(refs)   => FetchVector(refs)
     }
   }
 
