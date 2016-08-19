@@ -1,6 +1,6 @@
 package nutcracker.demo
 
-import nutcracker.DecSet.DecSetRef
+import nutcracker.DecSet
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._
 import nutcracker._
@@ -13,7 +13,7 @@ import scala.language.higherKinds
 class Sudoku extends FunSuite {
   val solver = PropagationStore.dfsSolver
 
-  type Cell = DecSetRef[Int]
+  type Cell = DecSet.Ref[Int]
   type Cells = Vector[Cell]
 
   /** A program that sets up an empty Sudoku, that is 81 integer variables

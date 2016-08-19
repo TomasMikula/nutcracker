@@ -18,29 +18,32 @@ final class DecSet[A] private(private val value: Set[A]) extends AnyVal {
 }
 
 object DecSet {
+  type Update[A] = Meet[DecSet[A]] \/ Diff[DecSet[A]]
+  type Delta[A] = Diff[Set[A]]
+
   def apply[A](as: A*): DecSet[A] = new DecSet(Set(as: _*))
   def singleton[A](a: A): DecSet[A] = new DecSet(Set(a))
   def wrap[A](as: Set[A]): DecSet[A] = new DecSet(as)
 
-  type DecSetDom[A] = Dom .Aux[DecSet[A], Meet[DecSet[A]] \/ Diff[DecSet[A]], Diff[Set[A]]]
-  type DecSetRef[A] = DRef.Aux[DecSet[A], Meet[DecSet[A]] \/ Diff[DecSet[A]], Diff[Set[A]]]
+  type Dom[A] = Dom .Aux[DecSet[A], Update[A], Delta[A]]
+  type Ref[A] = DRef.Aux[DecSet[A], Update[A], Delta[A]]
 
-  implicit def domInstance[A]: DecSetDom[A] = new Dom[DecSet[A]] {
-    type Update = Meet[DecSet[A]] \/ Diff[DecSet[A]]
-    type Delta = Diff[Set[A]]
+  implicit def domInstance[A]: DecSet.Dom[A] = new nutcracker.Dom[DecSet[A]] {
+    type Update = DecSet.Update[A]
+    type Delta = DecSet.Delta[A]
 
-    override def assess(d: DecSet[A]): Dom.Status[Meet[DecSet[A]] \/ Diff[DecSet[A]]] = d.size match {
+    override def assess(d: DecSet[A]): Dom.Status[Update] = d.size match {
       case 0 => Dom.Failed
       case 1 => Dom.Refined
       case _ => Dom.Unrefined(() => Some(d.toList map (x => Meet(singleton(x)).left))) // split into singleton sets
     }
 
-    override def update(s: DecSet[A], u: Meet[DecSet[A]] \/ Diff[DecSet[A]]): Option[(DecSet[A], Diff[Set[A]])] = u match {
+    override def update(s: DecSet[A], u: Update): Option[(DecSet[A], Delta)] = u match {
       case -\/(m) => intersect(s, m.value);
       case \/-(d) => diff(s, d.value);
     }
 
-    override def combineDeltas(d1: Diff[Set[A]], d2: Diff[Set[A]]): Diff[Set[A]] =
+    override def combineDeltas(d1: Delta, d2: Delta): Delta =
       Diff(d1.value union d2.value)
 
     @inline

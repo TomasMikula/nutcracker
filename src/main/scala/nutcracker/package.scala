@@ -1,8 +1,5 @@
 import scala.language.higherKinds
 import algebra.lattice.BoundedMeetSemilattice
-import nutcracker.DecSet.DecSetRef
-import nutcracker.Promise.Complete
-import nutcracker.PropagationLang
 import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolRef
 import nutcracker.lib.bool.BoolDomain._
@@ -43,8 +40,8 @@ package nutcracker {
       l: BoundedMeetSemilattice[D]
     ): FreeK[PropagationLang, DRef.Aux[D, dom.Update, dom.Delta]] = cellF(l.one)
 
-    def oneOf(as: Set[A]): FreeK[PropagationLang, DecSetRef[A]] = cellF(DecSet.wrap(as))
-    def oneOf(as: A*): FreeK[PropagationLang, DecSetRef[A]] = oneOf(as.toSet)
+    def oneOf(as: Set[A]): FreeK[PropagationLang, DecSet.Ref[A]] = cellF(DecSet.wrap(as))
+    def oneOf(as: A*): FreeK[PropagationLang, DecSet.Ref[A]] = oneOf(as.toSet)
 
     def count(n: Int): VarsBuilder[A] = new VarsBuilder(n)
   }
@@ -61,8 +58,8 @@ package nutcracker {
       l: BoundedMeetSemilattice[D]
     ): FreeK[PropagationLang, Vector[DRef.Aux[D, dom.Update, dom.Delta]]] = cellsF(l.one, n)
 
-    def oneOf(as: Set[A]): FreeK[PropagationLang, Vector[DecSetRef[A]]] = cellsF(DecSet.wrap(as), n)
-    def oneOf(as: A*): FreeK[PropagationLang, Vector[DecSetRef[A]]] = oneOf(as.toSet)
+    def oneOf(as: Set[A]): FreeK[PropagationLang, Vector[DecSet.Ref[A]]] = cellsF(DecSet.wrap(as), n)
+    def oneOf(as: A*): FreeK[PropagationLang, Vector[DecSet.Ref[A]]] = oneOf(as.toSet)
   }
 
   final case class WhenResolved[D, A] private[nutcracker](ref: DRef[D], ex: Extract.Aux[D, A]) {
@@ -186,8 +183,8 @@ package object nutcracker {
     * of finite sets of elements of type A, initialized to the given set of
     * elements.
     */
-  def branch[A](as: Set[A]): FreeK[PropagationLang, DecSetRef[A]] = variable[A].oneOf(as)
-  def branch[A](as: A*): FreeK[PropagationLang, DecSetRef[A]] = branch(as.toSet)
+  def branch[A](as: Set[A]): FreeK[PropagationLang, DecSet.Ref[A]] = variable[A].oneOf(as)
+  def branch[A](as: A*): FreeK[PropagationLang, DecSet.Ref[A]] = branch(as.toSet)
 
   /** Convenience method to add an exclusive choice of arbitrary free programs
     * to continue. When the choice is made, the chosen program is executed.
