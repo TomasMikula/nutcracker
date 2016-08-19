@@ -1,5 +1,4 @@
 import scala.language.higherKinds
-import algebra.lattice.BoundedMeetSemilattice
 import nutcracker.PropagationLang._
 import nutcracker.lib.bool.BoolRef
 import nutcracker.lib.bool.BoolDomain._
@@ -31,14 +30,12 @@ package nutcracker {
   final class VarBuilder[A] private[nutcracker] {
     def apply[D]()(implicit
       ex: Extract.Aux[D, A],
-      dom: Dom[D],
-      l: BoundedMeetSemilattice[D]
+      dom: DomWithBottom[D]
     ): FreeK[PropagationLang, DRef.Aux[D, dom.Update, dom.Delta]] = any()
     def any[D]()(implicit
       ex: Extract.Aux[D, A],
-      dom: Dom[D],
-      l: BoundedMeetSemilattice[D]
-    ): FreeK[PropagationLang, DRef.Aux[D, dom.Update, dom.Delta]] = cellF(l.one)
+      dom: DomWithBottom[D]
+    ): FreeK[PropagationLang, DRef.Aux[D, dom.Update, dom.Delta]] = cellF(dom.bottom)
 
     def oneOf(as: Set[A]): FreeK[PropagationLang, DecSet.Ref[A]] = cellF(DecSet.wrap(as))
     def oneOf(as: A*): FreeK[PropagationLang, DecSet.Ref[A]] = oneOf(as.toSet)
@@ -49,14 +46,12 @@ package nutcracker {
   final class VarsBuilder[A] private[nutcracker](n: Int) {
     def apply[D]()(implicit
       ee: Extract.Aux[D, A],
-      dom: Dom[D],
-      l: BoundedMeetSemilattice[D]
+      dom: DomWithBottom[D]
     ): FreeK[PropagationLang, Vector[DRef.Aux[D, dom.Update, dom.Delta]]] = any()
     def any[D]()(implicit
       ee: Extract.Aux[D, A],
-      dom: Dom[D],
-      l: BoundedMeetSemilattice[D]
-    ): FreeK[PropagationLang, Vector[DRef.Aux[D, dom.Update, dom.Delta]]] = cellsF(l.one, n)
+      dom: DomWithBottom[D]
+    ): FreeK[PropagationLang, Vector[DRef.Aux[D, dom.Update, dom.Delta]]] = cellsF(dom.bottom, n)
 
     def oneOf(as: Set[A]): FreeK[PropagationLang, Vector[DecSet.Ref[A]]] = cellsF(DecSet.wrap(as), n)
     def oneOf(as: A*): FreeK[PropagationLang, Vector[DecSet.Ref[A]]] = oneOf(as.toSet)
