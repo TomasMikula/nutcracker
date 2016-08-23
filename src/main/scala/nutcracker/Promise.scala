@@ -1,5 +1,14 @@
 package nutcracker
 
+/** For any type `A`, `Promise[A]` is a bounded lattice on the set `A ⊔ {0, 1}`
+  * (where "⊔" means "disjoint union") with `0` being the least element, `1`
+  * being the greatest element, and all elements of `A` forming an antichain
+  * (i.e. mutually incomparable). `0` represents an empty (incomplete) promise,
+  * the elements of `A` represent a completed promise, and `1` represents a
+  * conflict (a promise completed multiple times with different values).
+  *
+  * @see [[Antichain]]
+  */
 sealed trait Promise[+A]
 
 object Promise {
@@ -38,7 +47,7 @@ object Promise {
     }
 
     /** Completed promise cannot be completed again. Therefore, any attempt
-      * to refine a completed promise will result in bottom, even if refining
+      * to refine a completed promise will result in conflict, even if refining
       * with the exact same value. Note that this breaks the idempotence of
       * updates, but it allows us to not require `Eq` instance on `A`.
       */
