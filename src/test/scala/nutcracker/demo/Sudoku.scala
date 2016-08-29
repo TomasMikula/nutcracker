@@ -51,7 +51,7 @@ class Sudoku extends FunSuite {
           else if(ys.size == 1) fire(nutcracker.set(xPos, cell))
           else sleep[PropagationLang]
         } })
-        _ <- whenResolved(xPos).exec(cell => nutcracker.set(cell, x))
+        _ <- whenFinal(xPos).exec(cell => nutcracker.set(cell, x))
       } yield ()
     }
 

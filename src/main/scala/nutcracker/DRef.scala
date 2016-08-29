@@ -38,10 +38,10 @@ object DRef {
       (ref ==> target) >> (target ==> ref)
 
     def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ex: Extract.Aux[D, A], dom: Dom[D]): FreeK[F, Unit] =
-      whenResolved(ref).exec(f)
+      whenFinal(ref).exec(f)
 
     def asCont[F[_[_], _]](implicit inj: InjectK[PropagationLang, F], ex: Extract[D]): Cont[FreeK[F, Unit], ex.Out] =
-      Cont { whenResolved(ref).exec(_) }
+      Cont { whenFinal(ref).exec(_) }
 
   }
 

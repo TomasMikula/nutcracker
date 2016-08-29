@@ -57,7 +57,7 @@ package nutcracker {
     def oneOf(as: A*): FreeK[PropagationLang, Vector[DecSet.Ref[A]]] = oneOf(as.toSet)
   }
 
-  final case class WhenResolved[D, A] private[nutcracker](ref: DRef[D], ex: Extract.Aux[D, A]) {
+  final case class WhenFinal[D, A] private[nutcracker](ref: DRef[D], ex: Extract.Aux[D, A]) {
     def exec[F[_[_], _]](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
       valTriggerF[F, D](ref)(d => ex.extract(d) match {
         case Some(a) => Fire[FreeK[F, Unit]](f(a))
@@ -71,13 +71,15 @@ package object nutcracker {
 
   /* **************************************************** *
    * Convenience API to work with domains that in the end *
-   * resolve to a value of a different ("smaller") type.  *
+   * resolve to a value of a different ("smaller") type,  *
+   * which cannot be refined further without reaching a   *
+   * contradiction (thus is final).                       *
    * **************************************************** */
 
   def variable[A]: VarBuilder[A] = new VarBuilder[A]
 
-  def whenResolved[D](ref: DRef[D])(implicit ex: Extract[D]): WhenResolved[D, ex.Out] =
-    WhenResolved[D, ex.Out](ref, ex)
+  def whenFinal[D](ref: DRef[D])(implicit ex: Extract[D]): WhenFinal[D, ex.Out] =
+    WhenFinal[D, ex.Out](ref, ex)
 
 
   /* ****************************************************** *
@@ -122,7 +124,7 @@ package object nutcracker {
   ): FreeK[PropagationLang, BoolRef] =
     for {
       res <- variable[Boolean]()
-      _ <- whenResolved(res).exec(r => if(r) different(d1, d2) else d1 <=> d2)
+      _ <- whenFinal(res).exec(r => if(r) different(d1, d2) else d1 <=> d2)
       _ <- whenRefinedF(d1) { r1 => whenRefinedF(d2) { r2 =>
         val r = dom.update(r1, injm(Meet(r2))) match {
           case None => false
@@ -155,7 +157,7 @@ package object nutcracker {
       if(i < 0) {
         complete(pr, tail.toVector)
       } else {
-        whenResolved(cells(i)).exec(a => go(pr, a :: tail, i-1))
+        whenFinal(cells(i)).exec(a => go(pr, a :: tail, i-1))
       }
     }
 
@@ -185,7 +187,7 @@ package object nutcracker {
     * to continue. When the choice is made, the chosen program is executed.
     */
   def branchAndExec[F[_[_], _]](conts: Set[FreeK[F, Unit]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    branch(conts) >>>= { whenResolved(_).exec(k => k) }
+    branch(conts) >>>= { whenFinal(_).exec(k => k) }
   def branchAndExec[F[_[_], _]](conts: FreeK[F, Unit]*)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     branchAndExec(conts.toSet)
 
