@@ -55,7 +55,7 @@ object Antichain {
     def assess(d: Antichain[A]): Status[Update] = Refined
   }
 
-  implicit def extractInstance[A]: Extract.Aux[Antichain[A], A] = new Extract[Antichain[A]] {
+  implicit def finalInstance[A]: Final.Aux[Antichain[A], A] = new Final[Antichain[A]] {
     type Out = A
 
     def extract(a: Antichain[A]): Option[A] = Some(a.value)

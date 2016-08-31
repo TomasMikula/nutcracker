@@ -40,7 +40,7 @@ case class PropagationStore[K] private(
 
   def fetch[D](ref: DRef[D]): D = domains(ref: DRef.Aux[D, ref.Update, ref.Delta])._1
 
-  def fetchResult[D](ref: DRef[D])(implicit ex: Extract[D]): Option[ex.Out] = ex.extract(fetch(ref))
+  def fetchResult[D](ref: DRef[D])(implicit fin: Final[D]): Option[fin.Out] = fin.extract(fetch(ref))
 
   def fetchVector[D, N <: Nat](refs: Sized[Vector[DRef[D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))

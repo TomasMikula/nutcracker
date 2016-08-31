@@ -1,6 +1,6 @@
 package nutcracker.lib.bool
 
-import nutcracker.{Diff, Dom, DomWithBottom, Embed, Extract, Meet}
+import nutcracker.{Diff, Dom, DomWithBottom, Embed, Final, Meet}
 
 import scalaz.{-\/, \/, \/-}
 import scalaz.syntax.either._
@@ -20,7 +20,7 @@ object BoolDomain {
       else  MustBeFalse
   }
 
-  implicit val extractInstance: Extract.Aux[BoolDomain, Boolean] = new Extract[BoolDomain] {
+  implicit val finalInstance: Final.Aux[BoolDomain, Boolean] = new Final[BoolDomain] {
     type Out = Boolean
 
     def extract(d: BoolDomain): Option[Boolean] = d match {

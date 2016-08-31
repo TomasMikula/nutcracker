@@ -37,14 +37,14 @@ object DRef {
     def <=>(target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Meet[D], U], dom: Dom.Aux[D, U, Δ]): FreeK[PropagationLang, Unit] =
       (ref ==> target) >> (target ==> ref)
 
-    def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ex: Extract.Aux[D, A], dom: Dom[D]): FreeK[F, Unit] =
+    def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ex: Final.Aux[D, A], dom: Dom[D]): FreeK[F, Unit] =
       whenFinal(ref).exec(f)
 
-    def asCont[F[_[_], _]](implicit inj: InjectK[PropagationLang, F], ex: Extract[D]): Cont[FreeK[F, Unit], ex.Out] =
+    def asCont[F[_[_], _]](implicit inj: InjectK[PropagationLang, F], fin: Final[D]): Cont[FreeK[F, Unit], fin.Out] =
       Cont { whenFinal(ref).exec(_) }
 
   }
 
-  implicit def toCont[F[_[_], _], D](ref: DRef[D])(implicit inj: InjectK[PropagationLang, F], ex: Extract[D]): Cont[FreeK[F, Unit], ex.Out] =
+  implicit def toCont[F[_[_], _], D](ref: DRef[D])(implicit inj: InjectK[PropagationLang, F], fin: Final[D]): Cont[FreeK[F, Unit], fin.Out] =
     ref.asCont
 }

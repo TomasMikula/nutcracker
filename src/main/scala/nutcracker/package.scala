@@ -29,11 +29,11 @@ package nutcracker {
 
   final class VarBuilder[A] private[nutcracker] {
     def apply[D]()(implicit
-      ex: Extract.Aux[D, A],
+      ex: Final.Aux[D, A],
       dom: DomWithBottom[D]
     ): FreeK[PropagationLang, DRef.Aux[D, dom.Update, dom.Delta]] = any()
     def any[D]()(implicit
-      ex: Extract.Aux[D, A],
+      ex: Final.Aux[D, A],
       dom: DomWithBottom[D]
     ): FreeK[PropagationLang, DRef.Aux[D, dom.Update, dom.Delta]] = cellF(dom.bottom)
 
@@ -45,11 +45,11 @@ package nutcracker {
 
   final class VarsBuilder[A] private[nutcracker](n: Int) {
     def apply[D]()(implicit
-      ee: Extract.Aux[D, A],
+      ee: Final.Aux[D, A],
       dom: DomWithBottom[D]
     ): FreeK[PropagationLang, Vector[DRef.Aux[D, dom.Update, dom.Delta]]] = any()
     def any[D]()(implicit
-      ee: Extract.Aux[D, A],
+      ee: Final.Aux[D, A],
       dom: DomWithBottom[D]
     ): FreeK[PropagationLang, Vector[DRef.Aux[D, dom.Update, dom.Delta]]] = cellsF(dom.bottom, n)
 
@@ -57,9 +57,9 @@ package nutcracker {
     def oneOf(as: A*): FreeK[PropagationLang, Vector[DecSet.Ref[A]]] = oneOf(as.toSet)
   }
 
-  final case class WhenFinal[D, A] private[nutcracker](ref: DRef[D], ex: Extract.Aux[D, A]) {
+  final case class WhenFinal[D, A] private[nutcracker](ref: DRef[D], fin: Final.Aux[D, A]) {
     def exec[F[_[_], _]](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-      valTriggerF[F, D](ref)(d => ex.extract(d) match {
+      valTriggerF[F, D](ref)(d => fin.extract(d) match {
         case Some(a) => Fire[FreeK[F, Unit]](f(a))
         case None => Sleep[FreeK[F, Unit]]()
       })
@@ -78,8 +78,8 @@ package object nutcracker {
 
   def variable[A]: VarBuilder[A] = new VarBuilder[A]
 
-  def whenFinal[D](ref: DRef[D])(implicit ex: Extract[D]): WhenFinal[D, ex.Out] =
-    WhenFinal[D, ex.Out](ref, ex)
+  def whenFinal[D](ref: DRef[D])(implicit fin: Final[D]): WhenFinal[D, fin.Out] =
+    WhenFinal[D, fin.Out](ref, fin)
 
 
   /* ****************************************************** *
@@ -151,9 +151,9 @@ package object nutcracker {
   // so we provide this API for convenience.
   def promiseC[F[_[_], _]]: PromiseContBuilder[F] = PromiseContBuilder()
 
-  def promiseResults[D](cells: Vector[DRef[D]])(implicit ex: Extract[D]): FreeK[PropagationLang, Promise.Ref[Vector[ex.Out]]] = {
+  def promiseResults[D](cells: Vector[DRef[D]])(implicit fin: Final[D]): FreeK[PropagationLang, Promise.Ref[Vector[fin.Out]]] = {
 
-    def go(pr: Promise.Ref[Vector[ex.Out]], tail: List[ex.Out], i: Int): FreeK[PropagationLang, Unit] = {
+    def go(pr: Promise.Ref[Vector[fin.Out]], tail: List[fin.Out], i: Int): FreeK[PropagationLang, Unit] = {
       if(i < 0) {
         complete(pr, tail.toVector)
       } else {
@@ -162,12 +162,12 @@ package object nutcracker {
     }
 
     for {
-      pr <- promise[Vector[ex.Out]]
+      pr <- promise[Vector[fin.Out]]
       _ <- go(pr, Nil, cells.size - 1)
     } yield pr
   }
 
-  def promiseResults[D](cells: DRef[D]*)(implicit ex: Extract[D]): FreeK[PropagationLang, Promise.Ref[Vector[ex.Out]]] =
+  def promiseResults[D](cells: DRef[D]*)(implicit fin: Final[D]): FreeK[PropagationLang, Promise.Ref[Vector[fin.Out]]] =
     promiseResults(cells.toVector)
 
 

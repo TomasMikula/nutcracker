@@ -5,7 +5,7 @@ package nutcracker
   * words, typeclass for domains that have elements _covered_ by top. Final
   * elements must be considered _refined_ by [[Dom.assess()]].
   */
-trait Extract[D] {
+trait Final[D] {
   /** For many domains, _final_ elements (i.e. elements _covered_ by top)
     * can be given a more precise type than `D`. For example, final elements
     * of `Promise[A]` correspond to elements of `A`; final elements of integer
@@ -20,10 +20,15 @@ trait Extract[D] {
     * [[Dom.assess()]] must return [[Dom.Refined]].
     */
   def extract(d: D): Option[Out]
+
+  /** Must be consistent with [[Dom.assess()]]: If this method returns `true`,
+    * [[Dom.assess()]] must return [[Dom.Refined]].
+    */
+  def isFinal(d: D): Boolean = extract(d).isDefined
 }
 
-object Extract {
-  type Aux[D, A] = Extract[D] { type Out = A }
+object Final {
+  type Aux[D, A] = Final[D] { type Out = A }
 
-  def apply[D](implicit ex: Extract[D]): Extract.Aux[D, ex.Out] = ex
+  def apply[D](implicit fin: Final[D]): Final.Aux[D, fin.Out] = fin
 }
