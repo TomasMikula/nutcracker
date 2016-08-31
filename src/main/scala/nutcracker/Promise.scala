@@ -23,10 +23,6 @@ object Promise {
 
   def empty[A]: Promise[A] = Empty
 
-  implicit def embedInstance[A]: Embed[A, Promise[A]] = new Embed[A, Promise[A]] {
-    def embed(a: A): Promise[A] = Completed(a)
-  }
-
   implicit def finalInstance[A]: Final.Aux[Promise[A], A] = new Final[Promise[A]] {
     type Out = A
 
@@ -34,6 +30,8 @@ object Promise {
       case Completed(a) => Some(a)
       case _ => None
     }
+
+    def embed(a: A): Promise[A] = Completed(a)
   }
 
   implicit def promiseDomain[A]: Dom.Aux[Promise[A], Complete[A], Unit] = new Dom[Promise[A]] {

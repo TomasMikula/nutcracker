@@ -21,6 +21,10 @@ trait Final[D] {
     */
   def extract(d: D): Option[Out]
 
+  /** The reverse of [[extract()]].
+    */
+  def embed(a: Out): D
+
   /** Must be consistent with [[Dom.assess()]]: If this method returns `true`,
     * [[Dom.assess()]] must return [[Dom.Refined]].
     */

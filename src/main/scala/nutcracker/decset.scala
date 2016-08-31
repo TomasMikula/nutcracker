@@ -61,14 +61,12 @@ object DecSet {
     }
   }
 
-  implicit def embedInstance[A]: Embed[A, DecSet[A]] = new Embed[A, DecSet[A]] {
-    def embed(a: A): DecSet[A] = singleton(a)
-  }
-
   implicit def finalInstance[A]: Final.Aux[DecSet[A], A] = new Final[DecSet[A]] {
     type Out = A
 
     def extract(d: DecSet[A]): Option[A] = if(d.size == 1) Some(d.head) else None
+
+    def embed(a: A): DecSet[A] = singleton(a)
   }
 
 }

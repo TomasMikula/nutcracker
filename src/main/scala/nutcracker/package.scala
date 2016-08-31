@@ -95,14 +95,14 @@ package object nutcracker {
   def meet[D](ref: DRef[D])(d: D)(implicit inj: Inject[Meet[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
     updateF(ref)(inj(Meet(d)))
 
-  def set[A, D](ref: DRef[D], a: A)(implicit em: Embed[A, D], inj: Inject[Meet[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
-    meet(ref)(em.embed(a))
+  def set[A, D](ref: DRef[D], a: A)(implicit fin: Final.Aux[D, A], inj: Inject[Meet[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
+    meet(ref)(fin.embed(a))
 
   def remove[D](ref: DRef[D], d: D)(implicit inj: Inject[Diff[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
     updateF[D](ref)(inj(Diff(d)))
 
-  def exclude[A, D](ref: DRef[D], a: A)(implicit em: Embed[A, D], inj: Inject[Diff[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
-    remove(ref, em.embed(a))
+  def exclude[A, D](ref: DRef[D], a: A)(implicit fin: Final.Aux[D, A], inj: Inject[Diff[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
+    remove(ref, fin.embed(a))
 
   def different[D, U, Δ](d1: DRef.Aux[D, U, Δ], d2: DRef.Aux[D, U, Δ])(implicit
     dom: Dom.Aux[D, U, Δ],

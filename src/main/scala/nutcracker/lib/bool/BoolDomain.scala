@@ -1,6 +1,6 @@
 package nutcracker.lib.bool
 
-import nutcracker.{Diff, Dom, DomWithBottom, Embed, Final, Meet}
+import nutcracker.{Diff, Dom, DomWithBottom, Final, Meet}
 
 import scalaz.{-\/, \/, \/-}
 import scalaz.syntax.either._
@@ -14,12 +14,6 @@ object BoolDomain {
   val MustBeFalse = BoolDomain(2)
   val Anything = BoolDomain(3)
 
-  implicit val embedInstance: Embed[Boolean, BoolDomain] = new Embed[Boolean, BoolDomain] {
-    def embed(b: Boolean): BoolDomain =
-      if(b) MustBeTrue
-      else  MustBeFalse
-  }
-
   implicit val finalInstance: Final.Aux[BoolDomain, Boolean] = new Final[BoolDomain] {
     type Out = Boolean
 
@@ -28,6 +22,10 @@ object BoolDomain {
       case MustBeFalse => Some(false)
       case _ => None
     }
+
+    def embed(b: Boolean): BoolDomain =
+      if(b) MustBeTrue
+      else  MustBeFalse
   }
 
   implicit val boolDomain: BoolDom =

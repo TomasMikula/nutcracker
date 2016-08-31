@@ -59,6 +59,8 @@ object Antichain {
     type Out = A
 
     def extract(a: Antichain[A]): Option[A] = Some(a.value)
+
+    def embed(a: A): Antichain[A] = Antichain(a)
   }
 
   implicit def showInstance[A](implicit A: Show[A]): Show[Antichain[A]] = new Show[Antichain[A]] {
