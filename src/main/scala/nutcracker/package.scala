@@ -63,6 +63,12 @@ package nutcracker {
         case Some(a) => Fire[FreeK[F, Unit]](f(a))
         case None => Sleep[FreeK[F, Unit]]()
       })
+
+    def exec0[F[_[_], _]](f: D => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+      valTriggerF[F, D](ref)(d =>
+        if(fin.isFinal(d)) Fire[FreeK[F, Unit]](f(d))
+        else Sleep[FreeK[F, Unit]]()
+      )
   }
 
 }
@@ -100,38 +106,41 @@ package object nutcracker {
 
   def different[D, U, Δ](d1: DRef.Aux[D, U, Δ], d2: DRef.Aux[D, U, Δ])(implicit
     dom: Dom.Aux[D, U, Δ],
+    fin: Final[D],
     inj: Inject[Diff[D], U]
   ): FreeK[PropagationLang, Unit] = {
-    whenRefinedF(d1){ d => remove(d2, d) } >>
-    whenRefinedF(d2){ d => remove(d1, d) }
+    whenFinal(d1).exec0(d => remove(d2, d)) >>
+    whenFinal(d2).exec0(d => remove(d1, d))
   }
 
   def allDifferent[D, U, Δ](doms: DRef.Aux[D, U, Δ]*)(implicit
     dom: Dom.Aux[D, U, Δ],
+    fin: Final[D],
     inj: Inject[Diff[D], U]
   ): FreeK[PropagationLang, Unit] = {
     val n = doms.size
-    FreeK.sequence_((0 until n) map { i => whenRefinedF[PropagationLang, D](doms(i)){ d =>
+    FreeK.sequence_((0 until n) map { i => whenFinal(doms(i)).exec0(d =>
       FreeK.sequence_((0 until i) map { j => remove(doms(j), d) }) >>
-        FreeK.sequence_((i+1 until n) map { j => remove(doms(j), d) }) }
-    })
+      FreeK.sequence_((i+1 until n) map { j => remove(doms(j), d) })
+    )})
   }
 
   def isDifferent[D, U, Δ](d1: DRef.Aux[D, U, Δ], d2: DRef.Aux[D, U, Δ])(implicit
     dom: Dom.Aux[D, U, Δ],
+    fin: Final[D],
     injd: Inject[Diff[D], U],
     injm: Inject[Meet[D], U]
   ): FreeK[PropagationLang, BoolRef] =
     for {
       res <- variable[Boolean]()
       _ <- whenFinal(res).exec(r => if(r) different(d1, d2) else d1 <=> d2)
-      _ <- whenRefinedF(d1) { r1 => whenRefinedF(d2) { r2 =>
+      _ <- whenFinal(d1).exec0(r1 => whenFinal(d2).exec0(r2 => {
         val r = dom.update(r1, injm(Meet(r2))) match {
           case None => false
           case Some((x, _)) => dom.assess(x) == Dom.Failed
         }
-        set(res,  r)
-      } }
+        set(res, r)
+      }))
     } yield res
 
 

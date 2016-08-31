@@ -53,12 +53,6 @@ object PropagationLang {
       case Discard() => (None, None)
     })
 
-  def whenRefinedF[F[_[_], _], D](ref: DRef[D])(f: D => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, Unit] =
-    valTriggerF[F, D](ref)(d => dom.assess(d) match {
-      case Dom.Refined => Fire[FreeK[F, Unit]](f(d))
-      case _ => Sleep[FreeK[F, Unit]]()
-    })
-
   def selTrigger2F[F[_[_], _], D1, D2](ref1: DRef[D1], ref2: DRef[D2])(f: (D1, D2) => Trigger[FreeK[F, Unit]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     selTriggerF[F, D1 :: D2 :: HNil](Sel(ref1, ref2))(l => f(l.head, l.tail.head))
 
