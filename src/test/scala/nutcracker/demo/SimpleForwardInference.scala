@@ -9,6 +9,7 @@ import nutcracker.rel.RelLang._
 import nutcracker.util.FreeK
 import org.scalatest.{Matchers, FunSpec}
 import scalaz.NonEmptyList
+import scalaz.std.anyVal._
 import shapeless.{::, HNil}
 
 import scala.language.higherKinds

@@ -8,6 +8,7 @@ import nutcracker.util.FreeK
 import org.scalatest.FunSpec
 
 import scala.language.higherKinds
+import scalaz.std.anyVal._
 import scalaz.std.vector._
 
 class Sat extends FunSpec {

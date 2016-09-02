@@ -7,6 +7,7 @@ import nutcracker._
 import nutcracker.util.FreeK
 import nutcracker.util.FreeK._
 import org.scalatest.FunSuite
+import scalaz.std.anyVal._
 
 import scala.language.higherKinds
 

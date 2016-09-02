@@ -10,7 +10,7 @@ import org.scalatest.FunSuite
 import scala.annotation.tailrec
 import scala.language.higherKinds
 import scalaz.Id._
-import scalaz.{Ordering, StreamT}
+import scalaz.{Equal, Ordering, StreamT}
 
 class PathSearch extends FunSuite {
   implicit val positiveIntMonoid: NonDecreasingMonoid[Int] = new NonDecreasingMonoid[Int] {
@@ -57,6 +57,11 @@ class PathSearch extends FunSuite {
   }
   case class Cons(v: Vertex, tail: Path) extends Path {
     override def toString = s"$v->$tail"
+  }
+  object Path {
+    implicit val equalInstance: Equal[Path] = new Equal[Path] {
+      def equal(p: Path, q: Path): Boolean = p == q
+    }
   }
 
   def identity(v: Vertex): Path = Identity(v)

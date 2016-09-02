@@ -1,5 +1,7 @@
 package nutcracker
 
+import scalaz.Equal
+
 /** For any type `A`, `Promise[A]` is a bounded lattice on the set `A ⊔ {0, 1}`
   * (where "⊔" means "disjoint union") with `0` being the least element, `1`
   * being the greatest element, and all elements of `A` forming an antichain
@@ -34,7 +36,7 @@ object Promise {
     def embed(a: A): Promise[A] = Completed(a)
   }
 
-  implicit def promiseDomain[A]: Dom.Aux[Promise[A], Complete[A], Unit] = new Dom[Promise[A]] {
+  implicit def promiseDomain[A](implicit EqA: Equal[A]): Dom.Aux[Promise[A], Complete[A], Unit] = new Dom[Promise[A]] {
     type Update = Complete[A]
     type Delta = Unit
 
@@ -44,14 +46,11 @@ object Promise {
       case Contradiction => Dom.Failed
     }
 
-    /** Completed promise cannot be completed again. Therefore, any attempt
-      * to refine a completed promise will result in conflict, even if refining
-      * with the exact same value. Note that this breaks the idempotence of
-      * updates, but it allows us to not require `Eq` instance on `A`.
-      */
     override def update(p: Promise[A], v: Complete[A]): Option[(Promise[A], Unit)] = p match {
       case Empty => Some((Completed(v.value), ()))
-      case Completed(_) => Some((Contradiction, ()))
+      case Completed(a) =>
+        if(EqA.equal(a, v.value)) None
+        else Some((Contradiction, ()))
       case Contradiction => None
     }
 

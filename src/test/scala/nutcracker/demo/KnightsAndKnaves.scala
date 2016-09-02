@@ -5,6 +5,7 @@ import nutcracker._
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.lib.bool._
 import org.scalatest.FreeSpec
+import scalaz.std.anyVal._
 
 import scala.language.higherKinds
 
