@@ -36,7 +36,7 @@ object Promise {
     def embed(a: A): Promise[A] = Completed(a)
   }
 
-  implicit def promiseDomain[A](implicit EqA: Equal[A]): Dom.Aux[Promise[A], Complete[A], Unit] = new Dom[Promise[A]] {
+  implicit def promiseDomain[A](implicit EqA: Equal[A]): JoinDom.Aux[Promise[A], Complete[A], Unit] = new JoinDom[Promise[A]] {
     type Update = Complete[A]
     type Delta = Unit
 
@@ -52,6 +52,13 @@ object Promise {
         if(EqA.equal(a, v.value)) None
         else Some((Contradiction, ()))
       case Contradiction => None
+    }
+
+    override def ljoin(d1: Promise[A], d2: Promise[A]): Option[(Promise[A], Unit)] = (d1, d2) match {
+      case (_, Empty) => None
+      case (d1, Completed(a)) => update(d1, Complete(a))
+      case (Contradiction, Contradiction) => None
+      case (_, Contradiction) => Some((Contradiction, ()))
     }
 
     override def combineDeltas(d1: Unit, d2: Unit): Unit = ()
