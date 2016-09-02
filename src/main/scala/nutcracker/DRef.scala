@@ -31,10 +31,10 @@ object DRef {
 
   final case class DRefOps[D, U, Δ](ref: DRef.Aux[D, U, Δ]) extends AnyVal {
 
-    def ==>(target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Meet[D], U], dom: Dom.Aux[D, U, Δ]): FreeK[PropagationLang, Unit] =
-      valTriggerF(ref){ d => fireReload(meet(target)(d)) }
+    def ==>(target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Join[D], U], dom: Dom.Aux[D, U, Δ]): FreeK[PropagationLang, Unit] =
+      valTriggerF(ref){ d => fireReload(join(target)(d)) }
 
-    def <=>(target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Meet[D], U], dom: Dom.Aux[D, U, Δ]): FreeK[PropagationLang, Unit] =
+    def <=>(target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Join[D], U], dom: Dom.Aux[D, U, Δ]): FreeK[PropagationLang, Unit] =
       (ref ==> target) >> (target ==> ref)
 
     def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ex: Final.Aux[D, A], dom: Dom[D]): FreeK[F, Unit] =

@@ -92,11 +92,11 @@ package object nutcracker {
    * Convenience methods to work with lattice-based domains *
    * ****************************************************** */
 
-  def meet[D](ref: DRef[D])(d: D)(implicit inj: Inject[Meet[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
-    updateF(ref)(inj(Meet(d)))
+  def join[D](ref: DRef[D])(d: D)(implicit inj: Inject[Join[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
+    updateF(ref)(inj(Join(d)))
 
-  def set[A, D](ref: DRef[D], a: A)(implicit fin: Final.Aux[D, A], inj: Inject[Meet[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
-    meet(ref)(fin.embed(a))
+  def set[A, D](ref: DRef[D], a: A)(implicit fin: Final.Aux[D, A], inj: Inject[Join[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
+    join(ref)(fin.embed(a))
 
   def remove[D](ref: DRef[D], d: D)(implicit inj: Inject[Diff[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[PropagationLang, Unit] =
     updateF[D](ref)(inj(Diff(d)))
@@ -129,13 +129,13 @@ package object nutcracker {
     dom: Dom.Aux[D, U, Δ],
     fin: Final[D],
     injd: Inject[Diff[D], U],
-    injm: Inject[Meet[D], U]
+    injm: Inject[Join[D], U]
   ): FreeK[PropagationLang, BoolRef] =
     for {
       res <- variable[Boolean]()
       _ <- whenFinal(res).exec(r => if(r) different(d1, d2) else d1 <=> d2)
       _ <- whenFinal(d1).exec0(r1 => whenFinal(d2).exec0(r2 => {
-        val r = dom.update(r1, injm(Meet(r2))) match {
+        val r = dom.update(r1, injm(Join(r2))) match {
           case None => false
           case Some((x, _)) => dom.assess(x) == Dom.Failed
         }

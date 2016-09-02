@@ -11,8 +11,8 @@ import scalaz.\/
 
 package object bool {
 
-  type BoolDom = DomWithBottom.Aux[BoolDomain, Meet[BoolDomain] \/ Diff[BoolDomain], Unit]
-  type BoolRef = DRef.Aux[BoolDomain, Meet[BoolDomain] \/ Diff[BoolDomain], Unit]
+  type BoolDom = DomWithBottom.Aux[BoolDomain, Join[BoolDomain] \/ Diff[BoolDomain], Unit]
+  type BoolRef = DRef.Aux[BoolDomain, Join[BoolDomain] \/ Diff[BoolDomain], Unit]
 
   def and(x: BoolRef, y: BoolRef): FreeK[PropagationLang, BoolRef] = {
     variable[Boolean]() >>= { res =>

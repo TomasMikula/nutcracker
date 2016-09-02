@@ -5,7 +5,10 @@ import scalaz.syntax.either._
 
 /** Decreasing set.
   * A wrapper for `Set` where a _monotonic_ update is one that removes
-  * elements, e.g. by intersection or set difference.
+  * elements, e.g. by intersection or set difference. This is dual to
+  * the usual view of the poset of sets: here, smaller sets (by subset
+  * relation) are considered greater (i.e. are higher in the lattice),
+  * set intersection is the join and set union is the meet.
   */
 final class DecSet[A] private(private val value: Set[A]) extends AnyVal {
   def size: Int = value.size
@@ -18,7 +21,7 @@ final class DecSet[A] private(private val value: Set[A]) extends AnyVal {
 }
 
 object DecSet {
-  type Update[A] = Meet[DecSet[A]] \/ Diff[DecSet[A]]
+  type Update[A] = Join[DecSet[A]] \/ Diff[DecSet[A]]
   type Delta[A] = Diff[Set[A]]
 
   def apply[A](as: A*): DecSet[A] = new DecSet(Set(as: _*))
@@ -35,7 +38,7 @@ object DecSet {
     override def assess(d: DecSet[A]): Dom.Status[Update] = d.size match {
       case 0 => Dom.Failed
       case 1 => Dom.Refined
-      case _ => Dom.Unrefined(() => Some(d.toList map (x => Meet(singleton(x)).left))) // split into singleton sets
+      case _ => Dom.Unrefined(() => Some(d.toList map (x => Join(singleton(x)).left))) // split into singleton sets
     }
 
     override def update(s: DecSet[A], u: Update): Option[(DecSet[A], Delta)] = u match {
