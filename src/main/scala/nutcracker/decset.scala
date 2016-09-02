@@ -28,10 +28,10 @@ object DecSet {
   def singleton[A](a: A): DecSet[A] = new DecSet(Set(a))
   def wrap[A](as: Set[A]): DecSet[A] = new DecSet(as)
 
-  type Dom[A] = Dom .Aux[DecSet[A], Update[A], Delta[A]]
+  type Dom[A] = JoinDom.Aux[DecSet[A], Update[A], Delta[A]]
   type Ref[A] = DRef.Aux[DecSet[A], Update[A], Delta[A]]
 
-  implicit def domInstance[A]: DecSet.Dom[A] = new nutcracker.Dom[DecSet[A]] {
+  implicit def domInstance[A]: DecSet.Dom[A] = new nutcracker.JoinDom[DecSet[A]] {
     type Update = DecSet.Update[A]
     type Delta = DecSet.Delta[A]
 
@@ -45,6 +45,9 @@ object DecSet {
       case -\/(m) => intersect(s, m.value);
       case \/-(d) => diff(s, d.value);
     }
+
+    def ljoin(d1: DecSet[A], d2: DecSet[A]): Option[(DecSet[A], Delta)] =
+      update(d1, -\/(Join(d2)))
 
     override def combineDeltas(d1: Delta, d2: Delta): Delta =
       Diff(d1.value union d2.value)
