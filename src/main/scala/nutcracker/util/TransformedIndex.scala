@@ -2,7 +2,7 @@ package nutcracker.util
 
 import algebra.Eq
 import algebra.lattice.GenBool
-import algebra.std.set._
+import algebra.instances.set._
 
 case class TransformedIndex[K, VIn, VOut] private (
   private val keys: VIn => Seq[K],

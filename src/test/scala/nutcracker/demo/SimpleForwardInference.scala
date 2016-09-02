@@ -1,7 +1,7 @@
 package nutcracker.demo
 
 import algebra.Order
-import algebra.std.string._
+import algebra.instances.string._
 import nutcracker._
 import nutcracker.rel.Pattern
 import nutcracker.rel.Rel.Rel2

@@ -39,8 +39,7 @@ lazy val root = (project in file(".")).
   dependsOn(RootProject(uri("https://github.com/TomasMikula/Principled.git")))
 
 libraryDependencies ++= Seq(
-  "org.spire-math" %% "algebra" % "0.4.2",
-  "org.spire-math" %% "algebra-std" % "0.4.2",
+  "org.typelevel" %% "algebra" % "0.5.0",
   "org.scalaz" %% "scalaz-core" % "7.3.0-M4",
   "com.chuusai" %% "shapeless" % "2.3.1",
   "com.github.julien-truffaut"  %%  "monocle-core" % "1.2.2",
