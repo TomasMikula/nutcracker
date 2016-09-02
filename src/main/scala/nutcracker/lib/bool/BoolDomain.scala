@@ -1,6 +1,6 @@
 package nutcracker.lib.bool
 
-import nutcracker.{Diff, Dom, DomWithBottom, Final, Meet}
+import nutcracker.{Diff, Dom, DomWithBottom, Final, JoinDom, Meet}
 
 import scalaz.{-\/, \/, \/-}
 import scalaz.syntax.either._
@@ -29,23 +29,24 @@ object BoolDomain {
   }
 
   implicit val boolDomain: BoolDom =
-    new DomWithBottom[BoolDomain] {
+    new JoinDom[BoolDomain] with DomWithBottom[BoolDomain] {
       type Update = Meet[BoolDomain] \/ Diff[BoolDomain]
       type Delta = Unit
 
-      override def assess(d: BoolDomain): Dom.Status[Meet[BoolDomain] \/ Diff[BoolDomain]] = d match {
+      override def assess(d: BoolDomain): Dom.Status[Update] = d match {
         case Anything => Dom.Unrefined(() => Some(List(Meet(MustBeTrue).left, Meet(MustBeFalse).left)))
         case Contradiction => Dom.Failed
         case _ => Dom.Refined
       }
-      override def update(d: BoolDomain, u: Meet[BoolDomain] \/ Diff[BoolDomain]): Option[(BoolDomain, Unit)] = {
+      override def update(d: BoolDomain, u: Update): Option[(BoolDomain, Delta)] = {
         val res = u match {
           case -\/(Meet(x)) => BoolDomain(d.intValue &  x.intValue)
           case \/-(Diff(x)) => BoolDomain(d.intValue & ~x.intValue)
         }
         if(res == d) None else Some((res, ()))
       }
-      override def combineDeltas(d1: Unit, d2: Unit): Unit = ()
+      override def ljoin(d1: BoolDomain, d2: BoolDomain): Option[(BoolDomain, Delta)] = update(d1, -\/(Meet(d2)))
+      override def combineDeltas(d1: Delta, d2: Delta): Delta = ()
       override def bottom: BoolDomain = Anything
     }
 }
