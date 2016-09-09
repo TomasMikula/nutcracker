@@ -49,7 +49,7 @@ sealed abstract class FreeT[S[_], M[_], A] {
       }
     }
 
-    M0.tailrecM(go)(this)
+    M0.tailrecM(this)(go)
   }
 }
 
@@ -65,13 +65,11 @@ object FreeT {
       case FlatMap1(sz, f) => Suspend(sz).flatMap(f)
     }
 
-    def foldMap(f: S ~> M)(implicit M: BindRec[M], M1: Applicative[M]): M[A] = {
-      def go(fa: FreeT1[S, M, A]): M[FreeT1[S, M, A] \/ A] = fa match {
+    def foldMap(f: S ~> M)(implicit M: BindRec[M], M1: Applicative[M]): M[A] =
+      M.tailrecM(this)(_ match {
         case Suspend1(sa) => M.map(f(sa))(\/.right)
         case FlatMap1(sz, g) => M.bind(f(sz))(z => g(z).resume0)
-      }
-      M.tailrecM(go)(this)
-    }
+      })
   }
   private final case class Suspend1[S[_], M[_], A](sa: S[A]) extends FreeT1[S, M, A]
   private final case class FlatMap1[S[_], M[_], Z, A](sz: S[Z], f: Z => FreeT[S, M, A]) extends FreeT1[S, M, A]

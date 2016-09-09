@@ -33,7 +33,7 @@ object WriterStateT {
 
   implicit def bindRec[F[_], W, S](implicit F0: BindRec[F], F1: Monad[F], W: Monoid[W]): BindRec[WriterStateT[F, W, S, ?]] =
     new BindRec[WriterStateT[F, W, S, ?]] {
-      def tailrecM[A, B](f: A => WriterStateT[F, W, S, A \/ B])(a: A): WriterStateT[F, W, S, B] = {
+      def tailrecM[A, B](a: A)(f: A => WriterStateT[F, W, S, A \/ B]): WriterStateT[F, W, S, B] = {
         def go(x: (W, S, A)): F[(W, S, A) \/ (W, S, B)] = {
           val (w, s, a) = x
           F0.map(f(a)(s)) {
@@ -41,7 +41,7 @@ object WriterStateT {
             case (w1, s1, -\/(a1)) => -\/((W.append(w, w1), s1, a1))
           }
         }
-        WriterStateT(s => F0.tailrecM(go)((W.zero, s, a)))
+        WriterStateT(s => F0.tailrecM((W.zero, s, a))(go))
       }
 
       def bind[A, B](fa: WriterStateT[F, W, S, A])(f: A => WriterStateT[F, W, S, B]): WriterStateT[F, W, S, B] =

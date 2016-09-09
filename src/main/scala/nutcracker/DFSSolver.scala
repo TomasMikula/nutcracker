@@ -62,7 +62,7 @@ class DFSSolver[F[_[_], _], St[_], M[_], P[_]](
               else \/-(Option.empty)
           })
       }
-      M1.tailrecM(go)((s, 0))
+      M1.tailrecM((s, 0))(go)
     }
 
     StreamT.unfoldM[M, (Option[S], Int), StreamT[M, Option[S]]](leafs)(takeOne(_))(M0)

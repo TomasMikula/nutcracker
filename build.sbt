@@ -11,9 +11,9 @@ resolvers += "bintray/non" at "http://dl.bintray.com/non/maven"
 resolvers += Resolver.sonatypeRepo("releases")
 
 autoCompilerPlugins := true
-addCompilerPlugin("org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary)
+addCompilerPlugin("org.spire-math" % "kind-projector" % "0.8.2" cross CrossVersion.binary)
 addCompilerPlugin("com.milessabin" % "si2712fix-plugin" % "1.2.0" cross CrossVersion.full)
-addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.14")
+addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.15")
 
 scalastyleFailOnError := true
 
@@ -40,10 +40,10 @@ lazy val root = (project in file(".")).
 
 libraryDependencies ++= Seq(
   "org.typelevel" %% "algebra" % "0.5.0",
-  "org.scalaz" %% "scalaz-core" % "7.3.0-M4",
-  "com.chuusai" %% "shapeless" % "2.3.1",
+  "org.scalaz" %% "scalaz-core" % "7.3.0-M5",
+  "com.chuusai" %% "shapeless" % "2.3.2",
   "com.github.julien-truffaut"  %%  "monocle-core" % "1.2.2",
-  "org.scalatest" % "scalatest_2.11" % "2.2.6" % "test",
+  "org.scalatest" %% "scalatest" % "3.0.0" % "test",
   "org.scalacheck" %% "scalacheck" % "1.13.2"
 )
 

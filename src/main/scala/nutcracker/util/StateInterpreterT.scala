@@ -89,14 +89,11 @@ object StateInterpreterT {
       M0.bind(runToCompletion(p)(s)){ case (s1, a) => M0.map(runUntilClean1(s1)) {(_, a)} }
     }
 
-    def runUntilClean1(s: S[FreeK[F, Unit]]): M[S[FreeK[F, Unit]]] = {
-      def go(s: S[FreeK[F, Unit]]): M[S[FreeK[F, Unit]] \/ S[FreeK[F, Unit]]] =
-        uncons1(s) match {
-          case None => s.right.point[M]
-          case Some((s1, ku)) => M0.map(runToCompletionU(ku)(s1)){ _.left }
-        }
-      M1.tailrecM(go)(s)
-    }
+    def runUntilClean1(s: S[FreeK[F, Unit]]): M[S[FreeK[F, Unit]]] =
+      M1.tailrecM(s)(s => uncons1(s) match {
+        case None => s.right.point[M]
+        case Some((s1, ku)) => M0.map(runToCompletionU(ku)(s1)){ _.left }
+      })
 
     def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, Unit]]): M[(S[FreeK[F, Unit]], A)] =
       M0.bind(p.foldMapN(step1).apply(s)) {
@@ -111,7 +108,7 @@ object StateInterpreterT {
           case Some((k, ks)) => M0.map(k.foldMapN(step1).apply(s)) { case (ks1, s1, ()) => (ks1 ++ ks, s1).left }
         }
       }
-      M1.tailrecM(go)((ps, s))
+      M1.tailrecM((ps, s))(go)
     }
 
     new (FreeK[F, ?] ~> StateT[M, S[FreeK[F, Unit]], ?]) {
