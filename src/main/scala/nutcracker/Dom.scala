@@ -18,6 +18,13 @@ trait Dom[D] {
   def combineDeltas(d1: Delta, d2: Delta): Delta
 
   def assess(d: D): Dom.Status[Update]
+
+  /** A variation on [[update]] that always returns the updated value,
+    * whether changed or unchaged. */
+  def update_(d: D, u: Update): D = update(d, u) match {
+    case Some((d1, _)) => d1
+    case None => d
+  }
 }
 
 object Dom {
