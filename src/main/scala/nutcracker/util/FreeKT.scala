@@ -17,6 +17,11 @@ final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M
   def >>[B](fb: => FreeKT[F, M, B])(implicit AIsUnit: A =:= Unit): FreeKT[F, M, B] =
     this >>= { _ => fb }
 
+  def effect(f: A => FreeKT[F, M, Unit])(implicit M: Applicative[M]): FreeKT[F, M, A] = for {
+    a <- this
+    _ <- f(a)
+  } yield a
+
   def >>>=[G[_[_], _], B](f: A => FreeKT[G, M, B])(implicit
     inj: InjectK[F, G],
     FK: FunctorKA[F],
