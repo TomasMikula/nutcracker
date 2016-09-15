@@ -5,14 +5,15 @@ import scala.language.implicitConversions
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._
 import nutcracker.util.{FreeK, Inject, InjectK}
-import scalaz.Cont
+
+import scalaz.{Cont, Show}
 
 sealed abstract class DRef[D](private[nutcracker] val domainId: Long) {
   type Update
   type Delta
 
   /** Infer `Update` and `Delta` types. Relies on global uniqueness
-    * `Dom[D]` instance.
+    * of `Dom[D]` instances.
     */
   def infer(implicit dom: Dom[D]): DRef.Aux[D, dom.Update, dom.Delta] =
     this.asInstanceOf[DRef.Aux[D, dom.Update, dom.Delta]]
@@ -47,4 +48,8 @@ object DRef {
 
   implicit def toCont[F[_[_], _], D](ref: DRef[D])(implicit inj: InjectK[PropagationLang, F], fin: Final[D]): Cont[FreeK[F, Unit], fin.Out] =
     ref.asCont
+
+  implicit def showInstance[D, U, Δ]: Show[DRef.Aux[D, U, Δ]] = new Show[DRef.Aux[D, U, Δ]] {
+    override def shows(ref: DRef.Aux[D, U, Δ]): String = s"ref${ref.domainId}"
+  }
 }
