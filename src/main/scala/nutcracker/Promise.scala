@@ -15,15 +15,16 @@ sealed trait Promise[+A]
 
 object Promise {
 
-  private final case object Empty extends Promise[Nothing] // incomplete promise
-  private final case class Completed[A](value: A) extends Promise[A]
-  private final case object Contradiction extends Promise[Nothing] // promise completed multiple times
+  final case object Empty extends Promise[Nothing] // incomplete promise
+  final case class Completed[A](value: A) extends Promise[A]
+  final case object Conflict extends Promise[Nothing] // promise completed multiple times with different values
 
   final case class Complete[A](value: A) extends AnyVal
 
   type Ref[A] = DRef.Aux[Promise[A], Complete[A], Unit]
 
   def empty[A]: Promise[A] = Empty
+  def completed[A](a: A): Promise[A] = Completed(a)
 
   implicit def finalInstance[A]: Final.Aux[Promise[A], A] = new Final[Promise[A]] {
     type Out = A
@@ -43,22 +44,22 @@ object Promise {
     override def assess(pa: Promise[A]): Dom.Status[Complete[A]] = pa match {
       case Empty => Dom.Unrefined(() => None)
       case Completed(a) => Dom.Refined
-      case Contradiction => Dom.Failed
+      case Conflict => Dom.Failed
     }
 
     override def update(p: Promise[A], v: Complete[A]): Option[(Promise[A], Unit)] = p match {
       case Empty => Some((Completed(v.value), ()))
       case Completed(a) =>
         if(EqA.equal(a, v.value)) None
-        else Some((Contradiction, ()))
-      case Contradiction => None
+        else Some((Conflict, ()))
+      case Conflict => None
     }
 
     override def ljoin(d1: Promise[A], d2: Promise[A]): Option[(Promise[A], Unit)] = (d1, d2) match {
       case (_, Empty) => None
       case (d1, Completed(a)) => update(d1, Complete(a))
-      case (Contradiction, Contradiction) => None
-      case (_, Contradiction) => Some((Contradiction, ()))
+      case (Conflict, Conflict) => None
+      case (_, Conflict) => Some((Conflict, ()))
     }
 
     override def combineDeltas(d1: Unit, d2: Unit): Unit = ()
