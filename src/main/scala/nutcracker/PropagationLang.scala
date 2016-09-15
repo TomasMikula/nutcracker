@@ -56,6 +56,57 @@ object PropagationLang {
   def selTrigger2F[F[_[_], _], D1, D2](ref1: DRef[D1], ref2: DRef[D2])(f: (D1, D2) => Trigger[FreeK[F, Unit]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
     selTriggerF[F, D1 :: D2 :: HNil](Sel(ref1, ref2))(l => f(l.head, l.tail.head))
 
+  def peek[F[_[_], _], D](ref: DRef[D])(f: D => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+    valTriggerF(ref)(d => Fire(f(d)))
+
+  def alternate[F[_[_], _], D1, D2, L, R](ref1: DRef[D1], ref2: DRef[D2])(
+    f: (D1, D2) => Alternator,
+    onStartLeft: () => FreeK[F, L],
+    onStartRight: () => FreeK[F, R],
+    onSwitchToLeft: R => FreeK[F, L],
+    onSwitchToRight: L => FreeK[F, R],
+    onStop: Option[Either[L, R]] => FreeK[F, Unit]
+  )(implicit
+    inj: InjectK[PropagationLang, F]
+  ): FreeK[F, Unit] = {
+    def observeLeft(d2: D2, l: L): FreeK[F, Unit] = valTriggerF(ref1)(d1 => f(d1, d2) match {
+      case Alternator.Left  => Sleep()
+      case Alternator.Right => Fire(onSwitchToRight(l) >>= { observeRight(d1, _) })
+      case Alternator.Stop  => Fire(onStop(Some(Left(l))))
+    })
+    def observeRight(d1: D1, r: R): FreeK[F, Unit] = valTriggerF(ref2)(d2 => f(d1, d2) match {
+      case Alternator.Left  => Fire(onSwitchToLeft(r) >>= { observeLeft(d2, _) })
+      case Alternator.Right => Sleep()
+      case Alternator.Stop  => Fire(onStop(Some(Right(r))))
+    })
+    peek(ref1)(d1 => {
+      peek(ref2)(d2 => {
+        f(d1, d2) match {
+          case Alternator.Left  => onStartLeft() >>= { observeLeft(d2, _) }
+          case Alternator.Right => onStartRight() >>= { observeRight(d1, _) }
+          case Alternator.Stop  => onStop(None)
+        }
+      })
+    })
+  }
+
+  def alternate0[F[_[_], _], D1, D2](ref1: DRef[D1], ref2: DRef[D2])(
+    f: (D1, D2) => Alternator,
+    onSwitchToLeft: FreeK[F, Unit],
+    onSwitchToRight: FreeK[F, Unit],
+    onStop: FreeK[F, Unit]
+  )(implicit
+    inj: InjectK[PropagationLang, F]
+  ): FreeK[F, Unit] =
+    alternate[F, D1, D2, Unit, Unit](ref1, ref2)(
+      f,
+      () => onSwitchToLeft,
+      () => onSwitchToRight,
+      (_ => onSwitchToLeft),
+      (_ => onSwitchToRight),
+      (_ => onStop)
+    )
+
 
   implicit def functorKInstance: FunctorKA[PropagationLang] = new FunctorKA[PropagationLang] {
 
