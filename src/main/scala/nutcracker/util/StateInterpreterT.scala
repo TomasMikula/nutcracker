@@ -1,9 +1,8 @@
 package nutcracker.util
 
 import scala.language.higherKinds
-import scalaz.{BindRec, Functor, Lens, Monad, StateT, \/, -\/, \/-, ~>}
+import scalaz.{BindRec, Functor, Lens, Monad, StateT, \/, ~>}
 import scalaz.Id._
-import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._

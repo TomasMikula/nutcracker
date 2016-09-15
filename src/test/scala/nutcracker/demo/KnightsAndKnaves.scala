@@ -7,8 +7,6 @@ import nutcracker.lib.bool._
 import org.scalatest.FreeSpec
 import scalaz.std.anyVal._
 
-import scala.language.higherKinds
-
 // From https://en.wikipedia.org/wiki/Knights_and_Knaves:
 //
 // The puzzles are set on a fictional island where all inhabitants

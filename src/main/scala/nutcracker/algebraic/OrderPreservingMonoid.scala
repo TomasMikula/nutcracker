@@ -1,6 +1,6 @@
 package nutcracker.algebraic
 
-import scalaz.{Monoid, Ordering}
+import scalaz.Monoid
 import principled.LawSet
 import org.scalacheck.Arbitrary
 

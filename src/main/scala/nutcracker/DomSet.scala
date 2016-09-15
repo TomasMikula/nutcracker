@@ -3,7 +3,6 @@ package nutcracker
 import scala.language.higherKinds
 
 import nutcracker.Dom.{Refined, Status}
-import nutcracker.DomSet.{Delta, Update}
 import nutcracker.PropagationLang.{cellF, updateF, valTriggerF}
 import nutcracker.util.{ContF, FreeK, InjectK, Lst}
 

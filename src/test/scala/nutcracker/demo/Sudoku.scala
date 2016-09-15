@@ -9,8 +9,6 @@ import nutcracker.util.FreeK._
 import org.scalatest.FunSuite
 import scalaz.std.anyVal._
 
-import scala.language.higherKinds
-
 class Sudoku extends FunSuite {
   val solver = PropagationStore.dfsSolver
 

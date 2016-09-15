@@ -1,7 +1,5 @@
 package nutcracker.util
 
-import scala.language.implicitConversions
-
 import scalaz.{-\/, \/, \/-}
 
 trait Inject[A, B] {

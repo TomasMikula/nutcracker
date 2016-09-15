@@ -1,7 +1,5 @@
 package nutcracker
 
-import scala.language.higherKinds
-
 sealed trait Alternator
 
 object Alternator {

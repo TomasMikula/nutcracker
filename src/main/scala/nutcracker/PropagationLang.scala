@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.util.{FreeK, FunctorKA, InjectK, StateInterpreter}
-import shapeless.{::, HList, HNil, Nat, Sized}
+import shapeless.{::, HList, HNil}
 
 import scalaz.{Functor, Traverse, ~>}
 import scalaz.std.vector._

@@ -3,7 +3,7 @@ package nutcracker
 import nutcracker.util.{FreeK}
 
 import scala.language.higherKinds
-import scalaz.{Functor, ~>}
+import scalaz.Functor
 
 sealed trait Trigger[K]
 case class Discard[K]() extends Trigger[K]

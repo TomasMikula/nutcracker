@@ -1,6 +1,6 @@
 package nutcracker
 
-import scala.language.{existentials, higherKinds}
+import scala.language.higherKinds
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
 import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMapB, Lst, StateInterpreter, Step, Uncons, ValA, WriterState}

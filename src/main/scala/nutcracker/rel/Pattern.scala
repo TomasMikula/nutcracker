@@ -2,7 +2,7 @@ package nutcracker.rel
 
 import nutcracker.rel.Pattern.Orientation
 import nutcracker.rel.RelDB.PartiallyAssignedPattern
-import nutcracker.util.{ValuedPointers, Ptr, Mapped, Pointers}
+import nutcracker.util.{ValuedPointers, Pointers}
 import shapeless.ops.hlist.Length
 import shapeless.ops.nat.ToInt
 import shapeless.{:: => _, _}
