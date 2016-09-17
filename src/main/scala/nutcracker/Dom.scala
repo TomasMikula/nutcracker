@@ -30,6 +30,8 @@ trait Dom[D] {
 object Dom {
   type Aux[D, U, Δ] = Dom[D] { type Update = U; type Delta = Δ }
 
+  def apply[D](implicit dom: Dom[D]): Dom.Aux[D, dom.Update, dom.Delta] = dom
+
   sealed trait Status[+U]
   case class Unrefined[U](xor: () => Option[List[U]]) extends Status[U]
   case object Refined extends Status[Nothing]
