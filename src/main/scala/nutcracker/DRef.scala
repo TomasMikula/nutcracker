@@ -6,7 +6,7 @@ import nutcracker.PropagationLang._
 import nutcracker.Trigger._
 import nutcracker.util.{FreeK, Inject, InjectK}
 
-import scalaz.{Cont, Show}
+import scalaz.{Cont, Equal, Show}
 
 sealed abstract class DRef[D](private[nutcracker] val domainId: Long) {
   type Update
@@ -48,6 +48,10 @@ object DRef {
 
   implicit def toCont[F[_[_], _], D](ref: DRef[D])(implicit inj: InjectK[PropagationLang, F], fin: Final[D]): Cont[FreeK[F, Unit], fin.Out] =
     ref.asCont
+
+  implicit def equalInstance[D, U, Δ]: Equal[DRef.Aux[D, U, Δ]] = new Equal[DRef.Aux[D, U, Δ]] {
+    def equal(r1: Aux[D, U, Δ], r2: Aux[D, U, Δ]): Boolean = r1.domainId == r2.domainId
+  }
 
   implicit def showInstance[D, U, Δ]: Show[DRef.Aux[D, U, Δ]] = new Show[DRef.Aux[D, U, Δ]] {
     override def shows(ref: DRef.Aux[D, U, Δ]): String = s"ref${ref.domainId}"
