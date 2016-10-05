@@ -1,6 +1,7 @@
 package nutcracker
 
 import scalaz.{Semigroup, \&/}
+import scalaz.Isomorphism.<=>
 
 trait Dom[D] {
   type Update
@@ -42,6 +43,21 @@ object Dom {
   case class Unrefined[U](xor: () => Option[List[U]]) extends Status[U]
   case object Refined extends Status[Nothing]
   case object Failed extends Status[Nothing]
+
+  def via[A, B](iso: A <=> B)(implicit domB: Dom[B]): Dom.Aux[A, domB.Update, domB.Delta] =
+    new Dom[A] {
+      type Update = domB.Update
+      type Delta = domB.Delta
+
+      def update(a: A, u: Update): Option[(A, Delta)] =
+        domB.update(iso.to(a), u) map { case (b, u) => (iso.from(b), u) }
+
+      def combineDeltas(d1: Delta, d2: Delta): Delta =
+        domB.combineDeltas(d1, d2)
+
+      def assess(a: A): Status[Update] =
+        domB.assess(iso.to(a))
+    }
 
   def tuple2[D1, D2](implicit dom1: Dom[D1], dom2: Dom[D2]): Dom.Aux[(D1, D2), dom1.Update \&/ dom2.Update, dom1.Delta \&/ dom2.Delta] =
     new Dom[(D1, D2)] {
