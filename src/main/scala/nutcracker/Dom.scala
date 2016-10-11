@@ -29,6 +29,11 @@ trait Dom[D] {
     case None => d
   }
 
+  final def isFailed(d: D): Boolean = assess(d) match {
+    case Dom.Failed => true
+    case _ => false
+  }
+
   def deltaSemigroup: Semigroup[Delta] = new Semigroup[Delta] {
     def append(d1: Delta, d2: => Delta): Delta = combineDeltas(d1, d2)
   }
