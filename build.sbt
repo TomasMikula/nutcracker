@@ -1,6 +1,6 @@
 name := "nutcracker"
 
-version := "0.1.5-SNAPSHOT"
+version := "0.2-SNAPSHOT"
 
 organization := "com.github.tomasmikula"
 
