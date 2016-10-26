@@ -159,8 +159,10 @@ case class PropagationStore[K] private(
 }
 
 object PropagationStore {
-  import PropagationLang._
   import scalaz.~>
+
+  private val P = Propagation[FreeK[PropagationLang, ?]]
+  import P._
 
   def empty[K] = PropagationStore[K](
     nextId = 0L,
@@ -182,6 +184,7 @@ object PropagationStore {
 
       def step: Step[PropagationLang, PropagationStore] =
         new Step[PropagationLang, PropagationStore] {
+          import PropagationLang._
           override def apply[K[_], A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], PropagationStore[K[Unit]], A] = WriterState(s =>
             p match {
               case Cell(d, dom) => s.addVariable(d, dom) match {
@@ -212,7 +215,7 @@ object PropagationStore {
       def splitDomain[D](ref: DRef[D]): Option[List[K[Unit]]] = {
         val (d, domain) = s.domains(ref: DRef.Aux[D, ref.Update, ref.Delta])
         domain.assess(d) match {
-          case Dom.Unrefined(choices) => choices() map { _ map { ui => ord(updateF(ref)(ui)(domain)) } }
+          case Dom.Unrefined(choices) => choices() map { _ map { ui => ord(update(ref)(ui)(domain)) } }
           case _ => sys.error("splitDomain should be called on unresolved variables only.")
         }
       }

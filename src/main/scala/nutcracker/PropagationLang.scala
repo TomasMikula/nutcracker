@@ -28,16 +28,6 @@ object PropagationLang {
   def selTrigger[K[_], L <: HList](sel: Sel[L])(f: L => Trigger[K[Unit]]): PropagationLang[K, Unit] =
     SelTrigger(sel, f)
 
-  // constructors lifted to free programs
-  def cellF[D](d: D)(implicit dom: Dom[D]): FP[DRef.Aux[D, dom.Update, dom.Delta]] =
-    FreeK.liftF(cell[FP, D](d))
-  def updateF[D](ref: DRef[D])(u: ref.Update)(implicit dom: Dom.Aux[D, ref.Update, ref.Delta]): FP[Unit] =
-    FreeK.liftF(update[FP, D](ref)(u))
-  def domTriggerF[F[_[_], _], D](ref: DRef[D])(f: D => (Option[FreeK[F, Unit]], Option[(D, ref.Delta) => Trigger[FreeK[F, Unit]]]))(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    FreeK.injLiftF(domTrigger[FreeK[F, ?], D](ref)(f))
-  def selTriggerF[F[_[_], _], L <: HList](sel: Sel[L])(f: L => Trigger[FreeK[F, Unit]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    FreeK.injLiftF(selTrigger[FreeK[F, ?], L](sel)(f))
-
 
   implicit def functorKInstance: FunctorKA[PropagationLang] = new FunctorKA[PropagationLang] {
 
@@ -67,17 +57,16 @@ object PropagationLang {
 
 
 private[nutcracker] class FreePropagation[F[_[_], _]](implicit inj: InjectK[PropagationLang, F]) extends Propagation[FreeK[F, ?]] {
-  import PropagationLang._
 
   def cell[D](d: D)(implicit dom: Dom[D]): FreeK[F, DRef.Aux[D, dom.Update, dom.Delta]] =
-    cellF(d).inject[F]
+    FreeK.injLiftF(PropagationLang.cell[FreeK[F, ?], D](d))
 
   def update[D](ref: DRef[D])(u: ref.Update)(implicit dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[F, Unit] =
-    updateF(ref)(u).inject[F]
+    FreeK.injLiftF(PropagationLang.update[FreeK[F, ?], D](ref)(u))
 
   def domTrigger[D](ref: DRef[D])(f: (D) => (Option[FreeK[F, Unit]], Option[(D, ref.Delta) => Trigger[FreeK[F, Unit]]])): FreeK[F, Unit] =
-    domTriggerF(ref)(f)
+    FreeK.injLiftF(PropagationLang.domTrigger[FreeK[F, ?], D](ref)(f))
 
   def selTrigger[L <: HList](sel: Sel[L])(f: (L) => Trigger[FreeK[F, Unit]]): FreeK[F, Unit] =
-    selTriggerF(sel)(f)
+    FreeK.injLiftF(PropagationLang.selTrigger[FreeK[F, ?], L](sel)(f))
 }
