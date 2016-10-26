@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 import scalaz.Id.Id
-import scalaz.{Applicative, Bind, Cont, ContT, Monad, Traverse, |>=|}
+import scalaz.{Applicative, Bind, ContT, Monad, Traverse, |>=|}
 import scalaz.std.list._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
@@ -59,51 +59,6 @@ package object util {
 
     implicit class WrappedContU[F[_], A](self: F[ContU[F, A]]) {
       def wrapEffect(implicit F: Bind[F]): ContU[F, A] = ContU.wrapEffect(self)
-    }
-  }
-
-  /** Continuation monad with result type `FreeK[F, Unit]`. */
-  type ContF[F[_[_], _], A] = Cont[FreeK[F, Unit], A]
-  object ContF {
-    def apply[F[_[_], _], A](f: (A => FreeK[F, Unit]) => FreeK[F, Unit]): ContF[F, A] =
-      Cont(f)
-    def noop[F[_[_], _], A]: ContF[F, A] =
-      ContF(k => FreeK.pure(()))
-    def point[F[_[_], _], A](a: A): ContF[F, A] =
-      ContF(k => k(a))
-    def liftM[F[_[_], _], A](fa: FreeK[F, A]): ContF[F, A] =
-      ContF(k => fa.flatMap(k))
-    def wrapEffect[F[_[_], _], A](a: FreeK[F, ContF[F, A]]): ContF[F, A] =
-      ContF[F, A](f => a >>= { k => k(f) })
-    def absorbEffect[F[_[_], _], A](a: ContF[F, FreeK[F, A]]): ContF[F, A] =
-      a.flatMap(liftM(_))
-    def sequence[F[_[_], _], A](cs: ContF[F, A]*): ContF[F, A] =
-      sequence(cs)
-    def sequence[F[_[_], _], A](cs: Iterable[ContF[F, A]]): ContF[F, A] =
-      ContF(f => FreeK.sequence_(cs.map(_(f))))
-    def filter[F[_[_], _], A](c: ContF[F, A])(p: A => Boolean): ContF[F, A] =
-      ContF(f => c(a => if(p(a)) f(a) else FreeK.pure(())))
-    def filterMap[F[_[_], _], A, B](c: ContF[F, A])(f: A => Option[B]): ContF[F, B] =
-      ContF(k => c(a => f(a).fold[FreeK[F, Unit]](FreeK.pure(()))(k(_))))
-
-    def tuple2[F[_[_], _], A1, A2](c1: ContF[F, A1], c2: ContF[F, A2]): ContF[F, (A1, A2)] =
-      for { a1 <- c1; a2 <- c2 } yield (a1, a2)
-    def tuple3[F[_[_], _], A1, A2, A3](c1: ContF[F, A1], c2: ContF[F, A2], c3: ContF[F, A3]): ContF[F, (A1, A2, A3)] =
-      for { a1 <- c1; a2 <- c2; a3 <- c3 } yield (a1, a2, a3)
-    def tuple4[F[_[_], _], A1, A2, A3, A4](c1: ContF[F, A1], c2: ContF[F, A2], c3: ContF[F, A3], c4: ContF[F, A4]): ContF[F, (A1, A2, A3, A4)] =
-      for { a1 <- c1; a2 <- c2; a3 <- c3; a4 <- c4 } yield (a1, a2, a3, a4)
-    def tuple5[F[_[_], _], A1, A2, A3, A4, A5](c1: ContF[F, A1], c2: ContF[F, A2], c3: ContF[F, A3], c4: ContF[F, A4], c5: ContF[F, A5]): ContF[F, (A1, A2, A3, A4, A5)] =
-      for { a1 <- c1; a2 <- c2; a3 <- c3; a4 <- c4; a5 <- c5 } yield (a1, a2, a3, a4, a5)
-    def tuple6[F[_[_], _], A1, A2, A3, A4, A5, A6](c1: ContF[F, A1], c2: ContF[F, A2], c3: ContF[F, A3], c4: ContF[F, A4], c5: ContF[F, A5], c6: ContF[F, A6]): ContF[F, (A1, A2, A3, A4, A5, A6)] =
-        for { a1 <- c1; a2 <- c2; a3 <- c3; a4 <- c4; a5 <- c5; a6 <- c6 } yield (a1, a2, a3, a4, a5, a6)
-
-    implicit class ContFOps[F[_[_], _], A](self: ContF[F, A]) {
-      def absorbEffect[B](implicit ev: A =:= FreeK[F, B]): ContF[F, B] =
-        self.flatMap(a => ContF.liftM(ev(a)))
-    }
-
-    implicit class WrappedContF[F[_[_], _], A](self: FreeK[F, ContF[F, A]]) {
-      def wrapEffect: ContF[F, A] = ContF.wrapEffect(self)
     }
   }
 
