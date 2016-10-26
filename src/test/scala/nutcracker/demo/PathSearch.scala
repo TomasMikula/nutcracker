@@ -4,15 +4,16 @@ import nutcracker._
 import nutcracker.CostLang._
 import nutcracker.PropagationLang._
 import nutcracker.algebraic.NonDecreasingMonoid
-import nutcracker.util.{FreeK, InjectK}
+import nutcracker.util.{FreeK, FreeKT, InjectK}
 import org.scalatest.FunSuite
 
 import scala.annotation.tailrec
 import scala.language.higherKinds
 import scalaz.Id._
-import scalaz.{Equal, Ordering, StreamT}
+import scalaz.{Equal, Monad, Ordering, StreamT}
 
 class PathSearch extends FunSuite {
+
   implicit val positiveIntMonoid: NonDecreasingMonoid[Int] = new NonDecreasingMonoid[Int] {
     def zero: Int = 0
     def append(a: Int, b: => Int): Int = a + b
@@ -27,6 +28,15 @@ class PathSearch extends FunSuite {
   // not sure why scalac is not able to find these itself
   implicit val injP = implicitly[InjectK[PropagationLang, Lang]]
   implicit val injC = implicitly[InjectK[solver.lang.CostL, Lang]]
+
+  val P = PromiseOps[FreeK[Lang, ?]]
+  val B = Branching[FreeK[Lang, ?]]
+
+  implicit val freeKMonad: Monad[FreeKT[Lang, Id, ?]] = FreeKT.freeKTMonad[Lang, Id]
+
+  import P._
+  import B._
+
 
   type Vertex = Symbol
 

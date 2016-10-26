@@ -3,7 +3,10 @@ package nutcracker
 import scala.language.higherKinds
 import nutcracker.Dom.Status
 import nutcracker.PropagationLang._
-import nutcracker.util.{ContF, FreeK, InjectK, Lst}
+import nutcracker.util.{ContU, Lst}
+
+import scalaz.Bind
+import scalaz.syntax.monad._
 
 /** A set of domain references.
   *
@@ -40,23 +43,23 @@ object DSet {
 
   def empty[D]: DSet[D] = DSet(Set.empty, Set.empty)
 
-  def init[F[_[_], _], D](implicit inj: InjectK[PropagationLang, F]): FreeK[F, DSetRef[D]] =
-    cellF(empty[D]).inject[F]
+  def init[F[_], D](implicit P: Propagation[F]): F[DSetRef[D]] =
+    P.cell(empty[D])
 
-  def includeC[F[_[_], _], D](cps: ContF[F, _ <: DRef[D]], ref: DSetRef[D])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, Unit] =
+  def includeC[F[_], D](cps: ContU[F, _ <: DRef[D]], ref: DSetRef[D])(implicit dom: Dom[D], P: Propagation[F]): F[Unit] =
     cps(dref => insert(dref, ref))
 
-  def collect[F[_[_], _], D](cps: ContF[F, _ <: DRef[D]])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, DSetRef[D]] =
+  def collect[F[_], D](cps: ContU[F, _ <: DRef[D]])(implicit dom: Dom[D], P: Propagation[F], B: Bind[F]): F[DSetRef[D]] =
     for {
       res <- init[F, D]
         _ <- includeC(cps, res)
     } yield res
 
-  def insert[F[_[_], _], D](ref: DRef[D], into: DSetRef[D])(implicit inj: InjectK[PropagationLang, F], dom: Dom[D]): FreeK[F, Unit] =
-    valTriggerF(ref)(d => dom.assess(d) match {
-      case Dom.Failed => Fire(updateF(into)(Failed(ref)))
-      case Dom.Unrefined(_) => FireReload(updateF(into)(Unrefined(ref)))
-      case Dom.Refined => FireReload(updateF(into)(Refined(ref)))
+  def insert[F[_], D](ref: DRef[D], into: DSetRef[D])(implicit dom: Dom[D], P: Propagation[F]): F[Unit] =
+    P.valTrigger(ref)(d => dom.assess(d) match {
+      case Dom.Failed => Fire(P.update(into)(Failed(ref)))
+      case Dom.Unrefined(_) => FireReload(P.update(into)(Unrefined(ref)))
+      case Dom.Refined => FireReload(P.update(into)(Refined(ref)))
     })
 
   implicit def domInstance[D]: Dom.Aux[DSet[D], Update[D], Inserted[D]] =

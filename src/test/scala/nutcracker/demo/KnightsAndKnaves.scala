@@ -1,10 +1,13 @@
 package nutcracker.demo
 
-import nutcracker.PropagationLang._
-import nutcracker._
+import nutcracker.{FinalVars, PromiseOps, PropagationLang, PropagationStore}
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.lib.bool._
+import nutcracker.util._
 import org.scalatest.FreeSpec
+
+import scalaz.Monad
+import scalaz.Id._
 import scalaz.std.anyVal._
 
 // From https://en.wikipedia.org/wiki/Knights_and_Knaves:
@@ -16,6 +19,16 @@ import scalaz.std.anyVal._
 // the inhabitants' type from their statements.
 
 class KnightsAndKnaves extends FreeSpec {
+  val V = FinalVars[FreeK[PropagationLang, ?]]
+  val B = BoolOps[FreeK[PropagationLang, ?]]
+  val P = PromiseOps[FreeK[PropagationLang, ?]]
+
+  import V._
+  import B._
+  import P._
+
+  implicit val freeKMonad: Monad[FreeKT[PropagationLang, Id, ?]] = FreeKT.freeKTMonad[PropagationLang, Id]
+
   val solver = PropagationStore.dfsSolver
 
   "Problem 1" - {
@@ -23,18 +36,19 @@ class KnightsAndKnaves extends FreeSpec {
     // The visitor asks A what type he is, but does not hear A's answer.
     // B then says "A said that he is a knave" and
     // C says "Don't believe B; he is lying!"
-    val problem = (for {
+    val problem = for {
       a <- variable[Boolean]()
       b <- variable[Boolean]()
       c <- variable[Boolean]()
 
       // b says (a says knave(a))
-      _ <- presume(b =?= (a =?= neg(a)))
+      _ <- B.presume(b =?= (a =?= neg(a)))
 
       // c says knave(b)
       _ <- presume(c =?= neg(b))
 
-    } yield (a, b, c)) >>>= { case (a, b, c) => promiseResults(a, b, c) }
+      pr <- promiseResults(a, b, c)
+    } yield pr
 
     val solutions = solver.solutions(problem).toStream.toList
 

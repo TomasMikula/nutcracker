@@ -1,10 +1,11 @@
 package nutcracker
 
 import scala.language.higherKinds
-
 import nutcracker.Dom.{Refined, Status}
-import nutcracker.PropagationLang.{cellF, updateF, valTriggerF}
-import nutcracker.util.{ContF, FreeK, InjectK, Lst}
+import nutcracker.util.{ContU, Lst}
+
+import scalaz.Bind
+import scalaz.syntax.bind._
 
 /** A set of domain references, with auto-cleaning failed domains.
   *
@@ -29,22 +30,22 @@ object DomSet {
 
   def empty[A]: DomSet[A] = DomSet(Set.empty)
 
-  def init[F[_[_], _], A](implicit inj: InjectK[PropagationLang, F]): FreeK[F, Ref[A]] =
-    cellF(empty[A]).inject[F]
+  def init[F[_], A](implicit P: Propagation[F]): F[Ref[A]] =
+    P.cell(empty[A])
 
-  def includeC[F[_[_], _], A](cps: ContF[F, _ <: DRef[A]], ref: Ref[A])(implicit inj: InjectK[PropagationLang, F], dom: Dom[A]): FreeK[F, Unit] =
+  def includeC[F[_], A](cps: ContU[F, _ <: DRef[A]], ref: Ref[A])(implicit P: Propagation[F], dom: Dom[A]): F[Unit] =
     cps(dref => insert(dref, ref))
 
-  def collect[F[_[_], _], A](cps: ContF[F, _ <: DRef[A]])(implicit inj: InjectK[PropagationLang, F], dom: Dom[A]): FreeK[F, Ref[A]] =
+  def collect[F[_]: Propagation: Bind, A](cps: ContU[F, _ <: DRef[A]])(implicit dom: Dom[A]): F[Ref[A]] =
     for {
       res <- init[F, A]
       _ <- includeC(cps, res)
     } yield res
 
-  def insert[F[_[_], _], A](ref: DRef[A], into: Ref[A])(implicit inj: InjectK[PropagationLang, F], dom: Dom[A]): FreeK[F, Unit] =
-    valTriggerF(ref)(d => dom.assess(d) match {
-      case Dom.Failed => Fire(updateF(into)(Failed(ref)))
-      case _ => FireReload(updateF(into)(Insert(ref)))
+  def insert[F[_], A](ref: DRef[A], into: Ref[A])(implicit P: Propagation[F], dom: Dom[A]): F[Unit] =
+    P.valTrigger(ref)(d => dom.assess(d) match {
+      case Dom.Failed => Fire(P.update(into)(Failed(ref)))
+      case _ => FireReload(P.update(into)(Insert(ref)))
     })
 
   implicit def domInstance[A]: Dom.Aux[DomSet[A], Update[A], Delta[A]] = new Dom[DomSet[A]] {

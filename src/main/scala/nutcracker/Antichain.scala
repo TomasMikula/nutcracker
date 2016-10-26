@@ -1,10 +1,11 @@
 package nutcracker
 
 import nutcracker.Dom.{Refined, Status}
-import nutcracker.util.{ContF, InjectK, Uninhabited}
+import nutcracker.util.{ContU, Uninhabited}
 
 import scala.language.higherKinds
-import scalaz.Show
+import scalaz.{Bind, ContT, Monad, Show}
+import scalaz.Id.Id
 
 /** Marker wrapper meaning that any two distinct values of type `Antichain[A]`
   * should be treated as incomparable. As a consequence, a value of type
@@ -23,28 +24,28 @@ object Antichain {
 
   type Ref[A] = DRef.Aux[Antichain[A], Update[A], Delta[A]]
 
-  def map[F[_[_], _], A, B](refC: ContF[F, Ref[A]])(f: A => B)(implicit i: InjectK[PropagationLang, F]): ContF[F, Ref[B]] = for {
+  def map[M[_], A, B](refC: ContU[M, Ref[A]])(f: A => B)(implicit M: Propagation[M], MB: Bind[M]): ContU[M, Ref[B]] = for {
     ref <- refC
-    a   <- ref.asCont[F]
+    a   <- ref.asCont[M]
     res <- cellC(f(a))
   } yield res
 
-  def mapC[F[_[_], _], A, B](ref: Ref[A])(f: A => ContF[F, Ref[B]])(implicit i: InjectK[PropagationLang, F]): ContF[F, Ref[B]] = for {
-    a   <- ref.asCont[F]
+  def mapC[M[_]: Propagation, A, B](ref: Ref[A])(f: A => ContU[M, Ref[B]]): ContU[M, Ref[B]] = for {
+    a   <- ref.asCont[M]
     res <- f(a)
   } yield res
 
-  def filterMap[F[_[_], _], A, B](refC: ContF[F, Ref[A]])(f: A => Option[B])(implicit i: InjectK[PropagationLang, F]): ContF[F, Ref[B]] = for {
+  def filterMap[M[_], A, B](refC: ContT[M, Unit, Ref[A]])(f: A => Option[B])(implicit P: Propagation[M], M: Monad[M]): ContT[M, Unit, Ref[B]] = for {
     ref <- refC
-    a   <- ref.asCont[F]
+    a   <- ref.asCont[M]
     res <- f(a) match {
-      case Some(b) => ContF.liftM(PropagationLang.cellF(Antichain(b)).inject[F])
-      case None    => ContF.noop[F, Ref[B]]
+      case Some(b) => ContU.liftM(P.cell(Antichain(b)))
+      case None    => ContU.noop[M, Ref[B]]
     }
   } yield res
 
-  def cellC[F[_[_], _], A](a: A)(implicit i: InjectK[PropagationLang, F]): ContF[F, Ref[A]] =
-    ContF.liftM(PropagationLang.cellF(Antichain(a)).inject[F])
+  def cellC[M[_], A](a: A)(implicit M: Propagation[M], MB: Bind[M]): ContT[M, Unit, Ref[A]] =
+    ContT.liftM[Id, M, Unit, Ref[A]](M.cell(Antichain(a)))
 
   implicit def domInstance[A]: Dom.Aux[Antichain[A], Update[A], Delta[A]] = new Dom[Antichain[A]] {
     type Update = Antichain.Update[A]

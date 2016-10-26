@@ -19,6 +19,9 @@ class SimpleForwardInference extends FunSpec with Matchers {
   // our instruction sets will be propagation and relations
   type Lang[K[_], A] = PropRel.Vocabulary[K, A]
 
+  val P = PromiseOps[FreeK[Lang, ?]]
+  import P._
+
 
   // Define some relations.
   // In this demo, we're going to do reasoning with symbols only, so our relations are between symbols

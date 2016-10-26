@@ -3,10 +3,10 @@ package nutcracker
 import scala.language.higherKinds
 import scala.language.implicitConversions
 import nutcracker.PropagationLang._
-import nutcracker.Trigger._
-import nutcracker.util.{FreeK, Inject, InjectK}
+import nutcracker.util.{ContU, Inject}
 
-import scalaz.{Cont, Equal, Show}
+import scalaz.{Bind, Equal, Show}
+import scalaz.syntax.bind._
 
 sealed abstract class DRef[D](private[nutcracker] val domainId: Long) {
   type Update
@@ -32,21 +32,24 @@ object DRef {
 
   final case class DRefOps[D, U, Δ](ref: DRef.Aux[D, U, Δ]) extends AnyVal {
 
-    def ==>(target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Join[D], U], dom: Dom.Aux[D, U, Δ]): FreeK[PropagationLang, Unit] =
-      valTriggerF(ref){ d => fireReload(join(target)(d)) }
+    def ==>[M[_]: Propagation](target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Join[D], U], dom: Dom.Aux[D, U, Δ]): M[Unit] =
+      Propagation[M].valTrigger(ref){ d => FireReload(FinalVars[M].join(target)(d)) }
 
-    def <=>(target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Join[D], U], dom: Dom.Aux[D, U, Δ]): FreeK[PropagationLang, Unit] =
+    def <=>[M[_]: Propagation: Bind](target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Join[D], U], dom: Dom.Aux[D, U, Δ]): M[Unit] =
       (ref ==> target) >> (target ==> ref)
 
-    def >>=[F[_[_], _], A](f: A => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F], ex: Final.Aux[D, A], dom: Dom[D]): FreeK[F, Unit] =
-      whenFinal(ref).exec(f)
+    def >>=[M[_]: Propagation, A](f: A => M[Unit])(implicit fin: Final.Aux[D, A], dom: Dom[D]): M[Unit] =
+      FinalVars[M].whenFinal(ref).exec(f)
 
-    def asCont[F[_[_], _]](implicit inj: InjectK[PropagationLang, F], fin: Final[D]): Cont[FreeK[F, Unit], fin.Out] =
-      Cont { whenFinal(ref).exec(_) }
+    def asCont[M[_]: Propagation](implicit fin: Final[D]): ContU[M, fin.Out] =
+      ContU { FinalVars[M].whenFinal(ref).exec(_) }
+
+    def peekC[M[_]](implicit M: Propagation[M]): ContU[M, D] =
+      ContU(f => M.peek(ref)(f))
 
   }
 
-  implicit def toCont[F[_[_], _], D](ref: DRef[D])(implicit inj: InjectK[PropagationLang, F], fin: Final[D]): Cont[FreeK[F, Unit], fin.Out] =
+  implicit def toCont[M[_], D](ref: DRef[D])(implicit M: Propagation[M], fin: Final[D]): ContU[M, fin.Out] =
     ref.asCont
 
   implicit def equalInstance[D, U, Δ]: Equal[DRef.Aux[D, U, Δ]] = new Equal[DRef.Aux[D, U, Δ]] {

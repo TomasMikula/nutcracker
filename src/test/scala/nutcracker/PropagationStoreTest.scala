@@ -4,8 +4,11 @@ import org.scalatest.FunSuite
 import nutcracker.log._
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._
+import nutcracker.util.FreeK
 
 class PropagationStoreTest extends FunSuite {
+  val V = FinalVars[FreeK[PropagationLang, ?]]
+  import V._
 
   test("diff accumulation") {
     val prg = for {

@@ -1,7 +1,5 @@
 package nutcracker
 
-import nutcracker.util.{FreeK}
-
 import scala.language.higherKinds
 import scalaz.Functor
 
@@ -12,10 +10,10 @@ case class Fire[K](cont: K) extends Trigger[K]
 case class FireReload[K](cont: K) extends Trigger[K]
 
 object Trigger {
-  def discard[F[_[_], _]]: Trigger[FreeK[F, Unit]] = Discard[FreeK[F, Unit]]()
-  def sleep[F[_[_], _]]: Trigger[FreeK[F, Unit]] = Sleep[FreeK[F, Unit]]()
-  def fire[F[_[_], _]](cont: FreeK[F, Unit]): Trigger[FreeK[F, Unit]] = Fire[FreeK[F, Unit]](cont)
-  def fireReload[F[_[_], _]](cont: FreeK[F, Unit]): Trigger[FreeK[F, Unit]] = FireReload[FreeK[F, Unit]](cont)
+  def discard[F[_]]: Trigger[F[Unit]] = Discard()
+  def sleep[F[_]]: Trigger[F[Unit]] = Sleep()
+  def fire[F[_]](cont: F[Unit]): Trigger[F[Unit]] = Fire(cont)
+  def fireReload[F[_]](cont: F[Unit]): Trigger[F[Unit]] = FireReload(cont)
 
   implicit def functorInstance: Functor[Trigger] = new Functor[Trigger] {
     def map[K, L](tk: Trigger[K])(f: K => L): Trigger[L] = tk match {

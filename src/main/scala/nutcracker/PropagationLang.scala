@@ -2,10 +2,9 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.util.{FreeK, FunctorKA, InjectK, StateInterpreter}
-import shapeless.{::, HList, HNil}
+import shapeless.HList
 
-import scalaz.{Functor, Traverse, ~>}
-import scalaz.std.vector._
+import scalaz.{Functor, ~>}
 
 sealed trait PropagationLang[K[_], A]
 
@@ -40,74 +39,6 @@ object PropagationLang {
     FreeK.injLiftF(selTrigger[FreeK[F, ?], L](sel)(f))
 
 
-  // convenience API
-
-  def cellsF[D](d: D, n: Int)(implicit dom: Dom[D]): FP[Vector[DRef.Aux[D, dom.Update, dom.Delta]]] =
-    Traverse[Vector].sequenceU(Vector.fill(n)(cellF(d)))
-
-  def valTriggerF[F[_[_], _], D](ref: DRef[D])(f: D => Trigger[FreeK[F, Unit]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    domTriggerF(ref)(d => f(d) match {
-      case FireReload(k) => (Some(k), Some((d, δ) => f(d)))
-      case Fire(k) => (Some(k), None)
-      case Sleep() => (None, Some((d, δ) => f(d)))
-      case Discard() => (None, None)
-    })
-
-  def selTrigger2F[F[_[_], _], D1, D2](ref1: DRef[D1], ref2: DRef[D2])(f: (D1, D2) => Trigger[FreeK[F, Unit]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    selTriggerF[F, D1 :: D2 :: HNil](Sel(ref1, ref2))(l => f(l.head, l.tail.head))
-
-  def peek[F[_[_], _], D](ref: DRef[D])(f: D => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    valTriggerF(ref)(d => Fire(f(d)))
-
-  def alternate[F[_[_], _], D1, D2, L, R](ref1: DRef[D1], ref2: DRef[D2])(
-    f: (D1, D2) => Alternator,
-    onStartLeft: () => FreeK[F, L],
-    onStartRight: () => FreeK[F, R],
-    onSwitchToLeft: R => FreeK[F, L],
-    onSwitchToRight: L => FreeK[F, R],
-    onStop: Option[Either[L, R]] => FreeK[F, Unit]
-  )(implicit
-    inj: InjectK[PropagationLang, F]
-  ): FreeK[F, Unit] = {
-    def observeLeft(d2: D2, l: L): FreeK[F, Unit] = valTriggerF(ref1)(d1 => f(d1, d2) match {
-      case Alternator.Left  => Sleep()
-      case Alternator.Right => Fire(onSwitchToRight(l) >>= { observeRight(d1, _) })
-      case Alternator.Stop  => Fire(onStop(Some(Left(l))))
-    })
-    def observeRight(d1: D1, r: R): FreeK[F, Unit] = valTriggerF(ref2)(d2 => f(d1, d2) match {
-      case Alternator.Left  => Fire(onSwitchToLeft(r) >>= { observeLeft(d2, _) })
-      case Alternator.Right => Sleep()
-      case Alternator.Stop  => Fire(onStop(Some(Right(r))))
-    })
-    peek(ref1)(d1 => {
-      peek(ref2)(d2 => {
-        f(d1, d2) match {
-          case Alternator.Left  => onStartLeft() >>= { observeLeft(d2, _) }
-          case Alternator.Right => onStartRight() >>= { observeRight(d1, _) }
-          case Alternator.Stop  => onStop(None)
-        }
-      })
-    })
-  }
-
-  def alternate0[F[_[_], _], D1, D2](ref1: DRef[D1], ref2: DRef[D2])(
-    f: (D1, D2) => Alternator,
-    onSwitchToLeft: FreeK[F, Unit],
-    onSwitchToRight: FreeK[F, Unit],
-    onStop: FreeK[F, Unit]
-  )(implicit
-    inj: InjectK[PropagationLang, F]
-  ): FreeK[F, Unit] =
-    alternate[F, D1, D2, Unit, Unit](ref1, ref2)(
-      f,
-      () => onSwitchToLeft,
-      () => onSwitchToRight,
-      (_ => onSwitchToLeft),
-      (_ => onSwitchToRight),
-      (_ => onStop)
-    )
-
-
   implicit def functorKInstance: FunctorKA[PropagationLang] = new FunctorKA[PropagationLang] {
 
     private def ftr[A, B, K[_], L[_]](f: (A, B) => Trigger[K[Unit]], tr: K ~> L)(implicit ft: Functor[Trigger]): (A, B) => Trigger[L[Unit]] =
@@ -128,5 +59,25 @@ object PropagationLang {
     }
   }
 
+  implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[PropagationLang, F]): Propagation[FreeK[F, ?]] =
+    new FreePropagation[F]
+
   implicit def interpreter: StateInterpreter[PropagationLang, PropagationStore] = PropagationStore.interpreter
+}
+
+
+private[nutcracker] class FreePropagation[F[_[_], _]](implicit inj: InjectK[PropagationLang, F]) extends Propagation[FreeK[F, ?]] {
+  import PropagationLang._
+
+  def cell[D](d: D)(implicit dom: Dom[D]): FreeK[F, DRef.Aux[D, dom.Update, dom.Delta]] =
+    cellF(d).inject[F]
+
+  def update[D](ref: DRef[D])(u: ref.Update)(implicit dom: Dom.Aux[D, ref.Update, ref.Delta]): FreeK[F, Unit] =
+    updateF(ref)(u).inject[F]
+
+  def domTrigger[D](ref: DRef[D])(f: (D) => (Option[FreeK[F, Unit]], Option[(D, ref.Delta) => Trigger[FreeK[F, Unit]]])): FreeK[F, Unit] =
+    domTriggerF(ref)(f)
+
+  def selTrigger[L <: HList](sel: Sel[L])(f: (L) => Trigger[FreeK[F, Unit]]): FreeK[F, Unit] =
+    selTriggerF(sel)(f)
 }

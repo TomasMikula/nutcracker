@@ -4,12 +4,26 @@ import nutcracker.DecSet
 import nutcracker.PropagationLang._
 import nutcracker.Trigger._
 import nutcracker._
-import nutcracker.util.FreeK
+import nutcracker.util.{FreeK, FreeKT}
 import nutcracker.util.FreeK._
 import org.scalatest.FunSuite
+
+import scalaz.Id._
+import scalaz.Monad
 import scalaz.std.anyVal._
 
 class Sudoku extends FunSuite {
+  val P1 = Propagation[FreeK[PropagationLang, ?]]
+  val P2 = PromiseOps[FreeK[PropagationLang, ?]]
+  val V = FinalVars[FreeK[PropagationLang, ?]]
+
+  import P1._
+  import P2._
+  import V._
+
+  implicit val freeKMonad: Monad[FreeKT[PropagationLang, Id, ?]] = FreeKT.freeKTMonad[PropagationLang, Id]
+
+
   val solver = PropagationStore.dfsSolver
 
   type Cell = DecSet.Ref[Int]
@@ -45,12 +59,12 @@ class Sudoku extends FunSuite {
     def segNumConstraint(seg: Seq[Cell], x: Int): FreeK[PropagationLang, Unit] = {
       for {
         xPos <- variable[Cell].oneOf(seg.toSet)
-        _ <- sequence_(seg map { cell => valTriggerF(cell) { ys =>
+        _ <- sequence_(seg map { cell => valTrigger(cell) { ys =>
           if(!ys.contains(x)) fire(exclude(xPos, cell))
-          else if(ys.size == 1) fire(nutcracker.set(xPos, cell))
-          else sleep[PropagationLang]
+          else if(ys.size == 1) fire(V.set(xPos, cell))
+          else sleep
         } })
-        _ <- whenFinal(xPos).exec(cell => nutcracker.set(cell, x))
+        _ <- whenFinal(xPos).exec(cell => V.set(cell, x))
       } yield ()
     }
 
@@ -70,7 +84,7 @@ class Sudoku extends FunSuite {
     * to enter the given number to the specified cell.
     */
   def set(i: Int, j: Int, value: Int): Cells => FreeK[PropagationLang, Unit] =
-    cells => nutcracker.set(cells(i*9 + j), value)
+    cells => V.set(cells(i*9 + j), value)
 
 
   // technicalities
