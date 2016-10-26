@@ -3,11 +3,11 @@ package nutcracker.demo
 import algebra.Order
 import algebra.instances.string._
 import nutcracker._
-import nutcracker.rel.Pattern
+import nutcracker.rel.{Pattern, Relations}
 import nutcracker.rel.Rel.Rel2
-import nutcracker.rel.RelLang._
 import nutcracker.util.FreeK
-import org.scalatest.{Matchers, FunSpec}
+import org.scalatest.{FunSpec, Matchers}
+
 import scalaz.NonEmptyList
 import scalaz.std.anyVal._
 import shapeless.{::, HNil}
@@ -20,7 +20,9 @@ class SimpleForwardInference extends FunSpec with Matchers {
   type Lang[K[_], A] = PropRel.Vocabulary[K, A]
 
   val P = PromiseOps[FreeK[Lang, ?]]
+  val R = Relations[FreeK[Lang, ?]]
   import P._
+  import R._
 
 
   // Define some relations.
@@ -38,24 +40,24 @@ class SimpleForwardInference extends FunSpec with Matchers {
   // a program to add some inference rules for LT and LTE
   val LtLteRules: FreeK[Lang, Unit] = (for {
     // LT(a, b) => LTE(a, b)
-    _ <- onPatternMatchF(
+    _ <- onPatternMatch(
            Pattern[Pair].build({ case (a :: b :: HNil) => NonEmptyList(LT(a, b)) }))(
-           { case (a :: b :: HNil) => relateF(LTE).values(a :: b :: HNil) })
+           { case (a :: b :: HNil) => relate(LTE).values(a :: b :: HNil) })
 
     // LT(a, b), LTE(b, c) => LT(a, c)
-    _ <- onPatternMatchF(
+    _ <- onPatternMatch(
            Pattern[Triple].build({ case (a :: b :: c :: HNil) => NonEmptyList(LT(a, b), LTE(b, c)) }))(
-           { case (a :: b :: c :: HNil) => relateF(LT).values(a :: c :: HNil) })
+           { case (a :: b :: c :: HNil) => relate(LT).values(a :: c :: HNil) })
 
     // LTE(a, b), LT(b, c) => LT(a, c)
-    _ <- onPatternMatchF(
+    _ <- onPatternMatch(
            Pattern[Triple].build({ case (a :: b :: c :: HNil) => NonEmptyList(LTE(a, b), LT(b, c)) }))(
-           { case (a :: b :: c :: HNil) => relateF(LT).values(a :: c :: HNil) })
+           { case (a :: b :: c :: HNil) => relate(LT).values(a :: c :: HNil) })
 
     // LTE(a, b), LTE(b, c) => LTE(a, c)
-    _ <- onPatternMatchF(
+    _ <- onPatternMatch(
            Pattern[Triple].build({ case (a :: b :: c :: HNil) => NonEmptyList(LTE(a, b), LTE(b, c)) }))(
-           { case (a :: b :: c :: HNil) => relateF(LTE).values(a :: c :: HNil) })
+           { case (a :: b :: c :: HNil) => relate(LTE).values(a :: c :: HNil) })
 
   } yield ()).inject[Lang]
 
@@ -64,16 +66,16 @@ class SimpleForwardInference extends FunSpec with Matchers {
 
     val problem =
       // set up the initial relations
-      relateF(LTE).values('a :: 'b :: HNil) >>
-      relateF(LTE).values('b :: 'c :: HNil) >>
-      relateF(LT ).values('c :: 'd :: HNil) >>
-      relateF(LTE).values('d :: 'e :: HNil) >>>
+      relate(LTE).values('a :: 'b :: HNil) >>
+      relate(LTE).values('b :: 'c :: HNil) >>
+      relate(LT ).values('c :: 'd :: HNil) >>
+      relate(LTE).values('d :: 'e :: HNil) >>>
       // add inference rules to the mix
       LtLteRules >>
       // observe when a < e is inferred
       (for {
         pr <- promise[Unit].inject[Lang]
-        _ <- onPatternMatchF(
+        _ <- onPatternMatch(
           Pattern[Pair].where({ case (x :: y :: HNil) => (x -> 'a) :: (y -> 'e) :: HNil }).build({ case (x :: y :: HNil) => NonEmptyList(LT(x, y)) }))(
           { _ => complete(pr, ()).inject[Lang] })
       } yield pr)

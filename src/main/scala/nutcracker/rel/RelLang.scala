@@ -1,7 +1,6 @@
 package nutcracker.rel
 
 import algebra.Order
-import nutcracker.rel.RelDB.PartiallyAssignedPattern
 import nutcracker.util.{FreeK, FunctorKA, InjectK, Mapped, Step, SummonHList}
 
 import scala.language.higherKinds
@@ -23,19 +22,6 @@ object RelLang {
   def onPatternMatch[K[_], V <: HList](p: Pattern[V], a: Assignment[V])(h: V => K[Unit]): RelLang[K, Unit] = OnPatternMatch(p, a, h)
 
 
-  private type FR[A] = FreeK[RelLang, A]
-
-  def relateF[L <: HList](rel: Rel[L])(implicit m: Mapped[L, Order]): RelateBuilder[L, m.Out] = RelateBuilder(rel)(m)
-  case class RelateBuilder[L <: HList, OS <: HList] private[rel] (rel: Rel[L])(implicit m: Mapped.Aux[L, Order, OS]) {
-    def values(vals: L)(implicit os: SummonHList[OS]): FreeK[RelLang, Unit] = FreeK.liftF(relate[FR, L, OS](rel, vals))
-  }
-
-  def onPatternMatchF[F[_[_], _], V <: HList](p: Pattern[V])(h: V => FreeK[F, Unit])(implicit inj: InjectK[RelLang, F]): FreeK[F, Unit] =
-    FreeK.injLiftF(onPatternMatch[FreeK[F, ?], V](p, p.emptyAssignment)(h))
-  def onPatternMatchF[F[_[_], _], V <: HList](p: PartiallyAssignedPattern[V])(h: V => FreeK[F, Unit])(implicit inj: InjectK[RelLang, F]): FreeK[F, Unit] =
-    FreeK.injLiftF(onPatternMatch[FreeK[F, ?], V](p.pattern, p.assignment)(h))
-
-
   implicit def functorKInstance: FunctorKA[RelLang] = new FunctorKA[RelLang] {
     def transform[K[_], L[_], A](rk: RelLang[K, A])(f: K ~> L): RelLang[L, A] = rk match {
       case r @ Relate(rel, values) => Relate(rel, values)(r.ordersWitness, r.orders)
@@ -45,4 +31,15 @@ object RelLang {
 
   implicit def interpreter: Step[RelLang, RelDB] = RelDB.interpreter
 
+  implicit def relationsInstance[F[_[_], _]](implicit inj: InjectK[RelLang, F]): Relations[FreeK[F, ?]] =
+    new Relations[FreeK[F, ?]] {
+      def relate[L <: HList](rel: Rel[L])(implicit m: Mapped[L, Order]): RelateBuilder[L, m.Out] =
+        new RelateBuilder[L, m.Out] {
+          def values(vals: L)(implicit os: SummonHList[m.Out]): FreeK[F, Unit] =
+            FreeK.injLiftF(RelLang.relate[FreeK[F, ?], L, m.Out](rel, vals)(m, os))
+        }
+
+      def onPatternMatch[V <: HList](p: Pattern[V], a: Assignment[V])(h: V => FreeK[F, Unit]): FreeK[F, Unit] =
+        FreeK.injLiftF(RelLang.onPatternMatch[FreeK[F, ?], V](p, a)(h))
+    }
 }
