@@ -3,7 +3,6 @@ package nutcracker
 import scala.language.higherKinds
 
 import nutcracker.Dom.{Failed, Refined, Status}
-import nutcracker.util.{FreeK, InjectK}
 
 sealed trait Revocable[+A]
 
@@ -21,11 +20,11 @@ object Revocable {
 
   def apply[A](a: A): Revocable[A] = Valid(a)
 
-  def init[F[_[_], _], A](a: A)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Ref[A]] =
-    PropagationLang.cellF(Revocable(a)).inject[F]
+  def init[F[_], A](a: A)(implicit P: Propagation[F]): F[Ref[A]] =
+    P.cell(Revocable(a))
 
-  def revoke[F[_[_], _], A](ref: Ref[A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    PropagationLang.updateF(ref)(()).inject[F]
+  def revoke[F[_], A](ref: Ref[A])(implicit P: Propagation[F]): F[Unit] =
+    P.update(ref)(())
 
   implicit def domInstance[A]: Dom.Aux[Revocable[A], Update, Delta] = new Dom[Revocable[A]] {
     type Update = Revocable.Update
