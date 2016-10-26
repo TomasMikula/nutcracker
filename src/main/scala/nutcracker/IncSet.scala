@@ -2,9 +2,11 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.PropagationLang._
-import nutcracker.util.{ContF, FreeK, InjectK}
+import nutcracker.util.ContU
 
-import scalaz.Monad
+import scalaz.{Applicative, Bind, Monad}
+import scalaz.std.list._
+import scalaz.syntax.bind._
 
 /** Increasing set.
   * A wrapper for `Set` where a _monotonic_ update is one that adds
@@ -49,64 +51,69 @@ object IncSet {
       Diff(d1.value union d2.value)
   }
 
-  def init[F[_[_], _], A](implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] =
-    cellF(IncSet.empty[A]).inject[F]
+  def init[F[_], A](implicit P: Propagation[F]): F[IncSetRef[A]] =
+    P.cell(IncSet.empty[A])
 
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
     */
-  def forEach[F[_[_], _], A](ref: IncSetRef[A])(implicit inj: InjectK[PropagationLang, F]): ContF[F, A] =
-    ContF(f => domTriggerF(ref)(as => {
-      val now = FreeK.sequence_(as.toList.map(f))
-      val onChange = (as: IncSet[A], delta: Diff[Set[A]]) => Trigger.fireReload(FreeK.sequence_(delta.value.toList.map(f)))
+  def forEach[F[_], A](ref: IncSetRef[A])(implicit P: Propagation[F], A: Applicative[F]): ContU[F, A] = {
+    import scalaz.syntax.traverse._
+    ContU(f => P.domTrigger(ref)(as => {
+      val now = as.toList.traverse_(f)
+      val onChange = (as: IncSet[A], delta: Diff[Set[A]]) => Trigger.fireReload(delta.value.toList.traverse_(f))
       (Some(now), Some(onChange))
     }))
+  }
 
-  def insert[F[_[_], _], A](a: A, into: IncSetRef[A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+  def insert[F[_]: Propagation, A](a: A, into: IncSetRef[A]): F[Unit] =
     insertAll(Set(a), into)
 
-  def insertAll[F[_[_], _], A](add: Set[A], into: IncSetRef[A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    PropagationLang.updateF(into)(Join(wrap(add)))
+  def insertAll[F[_], A](add: Set[A], into: IncSetRef[A])(implicit P: Propagation[F]): F[Unit] =
+    P.update(into)(Join(wrap(add)))
 
-  def include[F[_[_], _], A](sub: IncSetRef[A], sup: IncSetRef[A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
-    domTriggerF(sub)((sa: IncSet[A]) => {
+  def include[F[_], A](sub: IncSetRef[A], sup: IncSetRef[A])(implicit P: Propagation[F]): F[Unit] =
+    P.domTrigger(sub)((sa: IncSet[A]) => {
       val now = Some(insertAll(sa.value, sup))
       val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(insertAll(delta.value, sup)))
       (now, onChange)
     })
 
-  def includeC[F[_[_], _], A](cps: ContF[F, A], ref: IncSetRef[A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+  def includeC[F[_]: Propagation, A](cps: ContU[F, A], ref: IncSetRef[A]): F[Unit] =
     cps(a => IncSet.insert(a, ref))
 
-  def collect[F[_[_], _], A](cps: ContF[F, A])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] = for {
+  def collect[F[_]: Propagation: Bind, A](cps: ContU[F, A]): F[IncSetRef[A]] = for {
     res <- IncSet.init[F, A]
     _   <- includeC(cps, res)
   } yield res
 
-  def collectAll[F[_[_], _], A](cps: ContF[F, A]*)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] =
+  def collectAll[F[_]: Propagation: Monad, A](cps: ContU[F, A]*): F[IncSetRef[A]] =
     collectAll(cps)
 
-  def collectAll[F[_[_], _], A](cps: Iterable[ContF[F, A]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[A]] =
-    collect(ContF.sequence(cps))
+  def collectAll[F[_]: Propagation: Monad, A](cps: Iterable[ContU[F, A]]): F[IncSetRef[A]] =
+    collect(ContU.sequence(cps))
 
   /** Relative monadic bind. [[nutcracker.IncSet.IncSetRef]] is a monad relative to `FreeK[F, ?]`,
     * i.e. we can implement `bind` if additional effects of type `FreeK[F, ?]` are allowed.
     * This is equivalent to having a monad instance for `λ[A => FreeK[F, IncSetRef[A]]]`.
     */
-  def relBind[F[_[_], _], A, B](sref: IncSetRef[A])(f: A => FreeK[F, IncSetRef[B]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, IncSetRef[B]] = for {
-    res <- init[F, B]
-    _ <- domTriggerF[F, IncSet[A]](sref)((sa: IncSet[A]) => {
-      val now = FreeK.sequence_(sa.toList.map(f(_) >>= (refb => include(refb, res))))
-      val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(FreeK.sequence_(delta.value.toList.map(f(_) >>= (refb => include(refb, res))))))
-      (Some(now), onChange)
-    })
-  } yield res
+  def relBind[F[_], A, B](sref: IncSetRef[A])(f: A => F[IncSetRef[B]])(implicit P: Propagation[F], M: Monad[F]): F[IncSetRef[B]] = {
+    import scalaz.syntax.traverse._
+    for {
+      res <- init[F, B]
+      _ <- P.domTrigger[IncSet[A]](sref)((sa: IncSet[A]) => {
+        val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
+        val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res)))))
+        (Some(now), onChange)
+      })
+    } yield res
+  }
 
-  implicit def monad[F[_[_], _]](implicit inj: InjectK[PropagationLang, F]): Monad[λ[A => FreeK[F, IncSetRef[A]]]] =
-    new Monad[λ[A => FreeK[F, IncSetRef[A]]]] {
-      def point[A](a: => A): FreeK[F, IncSetRef[A]] = cellF(singleton(a)).inject[F]
+  implicit def monad[F[_]](implicit P: Propagation[F], M: Monad[F]): Monad[λ[A => F[IncSetRef[A]]]] =
+    new Monad[λ[A => F[IncSetRef[A]]]] {
+      def point[A](a: => A): F[IncSetRef[A]] = P.cell(singleton(a))
 
-      def bind[A, B](fa: FreeK[F, IncSetRef[A]])(f: A => FreeK[F, IncSetRef[B]]): FreeK[F, IncSetRef[B]] =
+      def bind[A, B](fa: F[IncSetRef[A]])(f: A => F[IncSetRef[B]]): F[IncSetRef[B]] =
         fa.flatMap(sa => relBind(sa)(f))
     }
 }
