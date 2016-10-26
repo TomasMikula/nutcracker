@@ -1,7 +1,7 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.DeferLang.Defer
+import nutcracker.DeferLang.Delay
 import nutcracker.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
 import nutcracker.util.{Lst, StateInterpreter, Step, Uncons, ValA, WriterState}
 
@@ -36,7 +36,7 @@ object DeferStore {
       def step: Step[DeferLang[D, ?[_], ?], DeferStore[D, ?]] = new Step[DeferLang[D, ?[_], ?], DeferStore[D, ?]] {
         def apply[K[_], A](f: DeferLang[D, K, A]): WriterState[Lst[K[Unit]], DeferStore[D, K[Unit]], A] =
           WriterState(s => f match {
-            case Defer(d, k) => (Lst.empty, s.add(d, k), ())
+            case Delay(d, k) => (Lst.empty, s.add(d, k), ())
           })
       }
 
