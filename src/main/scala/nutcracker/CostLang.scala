@@ -1,7 +1,8 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.util.{FreeK, FunctorKA, Lst, Step, WriterState}
+import nutcracker.util.{FreeK, FunctorKA, InjectK, Lst, Step, WriterState}
+
 import scalaz.{Const, Monoid, ~>}
 
 sealed trait CostLang[C, K[_], A]
@@ -12,9 +13,6 @@ object CostLang {
 
   def cost[C, K[_]](c: C): CostLang[C, K, Unit] = Cost(c)
   def getCost[C, K[_]](): CostLang[C, K, C] = GetCost()
-
-  def costF[C](c: C): FreeK[CostLang[C, ?[_], ?], Unit] =
-    FreeK.liftF[CostLang[C, ?[_], ?], Unit](cost[C, FreeK[CostLang[C, ?[_], ?], ?]](c))
 
   implicit def functorKInstance[C]: FunctorKA[CostLang[C, ?[_], ?]] = new FunctorKA[CostLang[C, ?[_], ?]] {
 
@@ -30,5 +28,16 @@ object CostLang {
         case Cost(c1) => WriterState(c0 => (Lst.empty, Const[C, K[Unit]](Monoid[C].append(c0.getConst, c1)), ()))
         case GetCost() => WriterState(c0 => (Lst.empty, c0, c0.getConst.asInstanceOf[A])) // XXX is there a way to convince scalac that C =:= A?
       }
+    }
+
+  implicit def costOpsInstance[F[_[_], _], C0](implicit i: InjectK[CostLang[C0, ?[_], ?], F]): CostOps.Aux[FreeK[F, ?], C0] =
+    new CostOps[FreeK[F, ?]] {
+      type C = C0
+
+      def cost(c: C): FreeK[F, Unit] =
+        FreeK.injLiftF(CostLang.cost[C, FreeK[F, ?]](c))
+
+      def getCost: FreeK[F, C] =
+        FreeK.injLiftF(CostLang.getCost[C, FreeK[F, ?]]())
     }
 }

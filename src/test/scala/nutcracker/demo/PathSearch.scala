@@ -1,7 +1,6 @@
 package nutcracker.demo
 
 import nutcracker._
-import nutcracker.CostLang._
 import nutcracker.PropagationLang._
 import nutcracker.algebraic.NonDecreasingMonoid
 import nutcracker.util.{FreeK, FreeKT, InjectK}
@@ -31,11 +30,13 @@ class PathSearch extends FunSuite {
 
   val P = PromiseOps[FreeK[Lang, ?]]
   val B = Branching[FreeK[Lang, ?]]
+  val C = CostOps[FreeK[Lang, ?]]
 
   implicit val freeKMonad: Monad[FreeKT[Lang, Id, ?]] = FreeKT.freeKTMonad[Lang, Id]
 
   import P._
   import B._
+  import C._
 
 
   type Vertex = Symbol
@@ -112,7 +113,7 @@ class PathSearch extends FunSuite {
     val branches = successors(u) filter {
       case (c, w) => w != u && !visited.contains(w)
     } map {
-      case (c, w) => costF(c) >>> findPath(u::visited, w, v, pr)
+      case (c, w) => cost(c) >>> findPath(u::visited, w, v, pr)
     }
     branchAndExec(branches:_*)
   }
