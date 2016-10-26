@@ -1,10 +1,9 @@
 package nutcracker
 
+import scala.language.higherKinds
 import scala.language.implicitConversions
 
 import nutcracker.Dom.Status
-import nutcracker.PropagationLang._
-import nutcracker.util.FreeK
 
 /** Convenience methods to work with a list as a prepend-only log.
   * Monotonic update is prepending an element to the list.
@@ -19,13 +18,13 @@ object log {
   type LogRef[A] = DRef.Aux[List[A], A, List[A]]
 
   final case class LogOps[A](l: LogRef[A]) extends AnyVal {
-    def write(a: A): FreeK[PropagationLang, Unit] = log(l, a)
+    def write[F[_]: Propagation](a: A): F[Unit] = log(l, a)
   }
 
   implicit def logOps[A](l: LogRef[A]): LogOps[A] = LogOps(l)
 
-  def newLog[A]: FreeK[PropagationLang, LogRef[A]] = cellF(List[A]())
-  def log[A](ref: LogRef[A], a: A): FreeK[PropagationLang, Unit] = updateF(ref)(a)
+  def newLog[F[_], A](implicit P: Propagation[F]): F[LogRef[A]] = P.cell(List[A]())
+  def log[F[_], A](ref: LogRef[A], a: A)(implicit P: Propagation[F]): F[Unit] = P.update(ref)(a)
 
   implicit def logDom[A]: Dom.Aux[List[A], A, List[A]] = new Dom[List[A]] {
     type Update = A
