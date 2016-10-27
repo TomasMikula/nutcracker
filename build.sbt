@@ -11,7 +11,7 @@ resolvers += "bintray/non" at "http://dl.bintray.com/non/maven"
 resolvers += Resolver.sonatypeRepo("releases")
 
 autoCompilerPlugins := true
-addCompilerPlugin("org.spire-math" % "kind-projector" % "0.9.0" cross CrossVersion.binary)
+addCompilerPlugin("org.spire-math" % "kind-projector" % "0.9.2" cross CrossVersion.binary)
 addCompilerPlugin("com.milessabin" % "si2712fix-plugin" % "1.2.0" cross CrossVersion.full)
 addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.15")
 
@@ -40,12 +40,12 @@ lazy val root = (project in file(".")).
   dependsOn(RootProject(uri("https://github.com/TomasMikula/Principled.git")))
 
 libraryDependencies ++= Seq(
-  "org.typelevel" %% "algebra" % "0.5.0",
-  "org.scalaz" %% "scalaz-core" % "7.3.0-M5",
+  "org.typelevel" %% "algebra" % "0.5.1",
+  "org.scalaz" %% "scalaz-core" % "7.3.0-M6",
   "com.chuusai" %% "shapeless" % "2.3.2",
-  "com.github.julien-truffaut"  %%  "monocle-core" % "1.2.2",
+  "com.github.julien-truffaut"  %%  "monocle-core" % "1.3.1",
   "org.scalatest" %% "scalatest" % "3.0.0" % "test",
-  "org.scalacheck" %% "scalacheck" % "1.13.2"
+  "org.scalacheck" %% "scalacheck" % "1.13.3"
 )
 
 fork := true
