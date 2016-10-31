@@ -28,17 +28,17 @@ object DRef {
       type Delta = dom.Delta
     }
 
-  implicit def drefOps[D](ref: DRef[D]) = DRefOps[D, ref.Update, ref.Delta](ref)
+  implicit def drefOps[D](ref: DRef[D])(implicit dom: Dom[D]) = DRefOps[D, dom.Update, dom.Delta](ref)(dom)
 
-  final case class DRefOps[D, U, Δ](ref: DRef.Aux[D, U, Δ]) extends AnyVal {
+  final case class DRefOps[D, U, Δ](ref: DRef[D])(implicit dom: Dom.Aux[D, U, Δ]) {
 
-    def ==>[M[_]: Propagation](target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Join[D], U], dom: Dom.Aux[D, U, Δ]): M[Unit] =
+    def ==>[M[_]: Propagation](target: DRef[D])(implicit inj: Inject[Join[D], U]): M[Unit] =
       Propagation[M].valTrigger(ref){ d => FireReload(FinalVars[M].join(target)(d)) }
 
-    def <=>[M[_]: Propagation: Bind](target: DRef.Aux[D, U, Δ])(implicit inj: Inject[Join[D], U], dom: Dom.Aux[D, U, Δ]): M[Unit] =
+    def <=>[M[_]: Propagation: Bind](target: DRef[D])(implicit inj: Inject[Join[D], U]): M[Unit] =
       (ref ==> target) >> (target ==> ref)
 
-    def >>=[M[_]: Propagation, A](f: A => M[Unit])(implicit fin: Final.Aux[D, A], dom: Dom[D]): M[Unit] =
+    def >>=[M[_]: Propagation, A](f: A => M[Unit])(implicit fin: Final.Aux[D, A]): M[Unit] =
       FinalVars[M].whenFinal(ref).exec(f)
 
     def asCont[M[_]: Propagation](implicit fin: Final[D]): ContU[M, fin.Out] =
@@ -49,7 +49,7 @@ object DRef {
 
   }
 
-  implicit def toCont[M[_], D](ref: DRef[D])(implicit M: Propagation[M], fin: Final[D]): ContU[M, fin.Out] =
+  implicit def toCont[M[_], D](ref: DRef[D])(implicit M: Propagation[M], fin: Final[D], dom: Dom[D]): ContU[M, fin.Out] =
     ref.asCont
 
   implicit def equalInstance[D, U, Δ]: Equal[DRef.Aux[D, U, Δ]] = new Equal[DRef.Aux[D, U, Δ]] {

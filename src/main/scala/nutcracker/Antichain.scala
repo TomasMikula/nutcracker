@@ -22,7 +22,7 @@ object Antichain {
   type Update[A] = Uninhabited
   type Delta[A] = Uninhabited
 
-  type Ref[A] = DRef.Aux[Antichain[A], Update[A], Delta[A]]
+  type Ref[A] = DRef[Antichain[A]]
 
   def map[M[_], A, B](refC: ContU[M, Ref[A]])(f: A => B)(implicit M: Propagation[M], MB: Bind[M]): ContU[M, Ref[B]] = for {
     ref <- refC

@@ -14,7 +14,7 @@ final class PromiseOps[M[_]](implicit M: Propagation[M]) {
 
   def promise[A: Equal]: M[Promise.Ref[A]] = M.cell(Promise.empty[A])
 
-  def complete[A: Equal](p: Promise.Ref[A], a: A): M[Unit] = M.update(p)(Promise.Complete(a))
+  def complete[A: Equal](p: Promise.Ref[A], a: A): M[Unit] = M.update(p).by(Promise.Complete(a))
 
   def promiseC[A: Equal](cont: Cont[M[Unit], A])(implicit MB: Bind[M]): M[Promise.Ref[A]] =
     promise[A] >>= (pa => MB.map(cont(complete(pa, _)))((_: Unit) => pa))
@@ -23,7 +23,7 @@ final class PromiseOps[M[_]](implicit M: Propagation[M]) {
   // so we provide this API for convenience.
   def promiseC(implicit MB: Bind[M]): PromiseContBuilder = new PromiseContBuilder()
 
-  def promiseResults[D, A](cells: Vector[DRef[D]])(implicit fin: Final.Aux[D, A], EqA: Equal[A], MB: Bind[M]): M[Promise.Ref[Vector[fin.Out]]] = {
+  def promiseResults[D, A](cells: Vector[DRef[D]])(implicit fin: Final.Aux[D, A], dom: Dom[D], EqA: Equal[A], MB: Bind[M]): M[Promise.Ref[Vector[fin.Out]]] = {
 
     def go(pr: Promise.Ref[Vector[fin.Out]], tail: List[fin.Out], i: Int): M[Unit] = {
       if (i < 0) {
@@ -39,7 +39,7 @@ final class PromiseOps[M[_]](implicit M: Propagation[M]) {
     } yield pr
   }
 
-  def promiseResults[D, A](cells: DRef[D]*)(implicit fin: Final.Aux[D, A], EqA: Equal[A], MB: Bind[M]): M[Promise.Ref[Vector[fin.Out]]] =
+  def promiseResults[D, A](cells: DRef[D]*)(implicit fin: Final.Aux[D, A], dom: Dom[D], EqA: Equal[A], MB: Bind[M]): M[Promise.Ref[Vector[fin.Out]]] =
     promiseResults(cells.toVector)
 
   final class PromiseContBuilder()(implicit MB: Bind[M]) {

@@ -16,7 +16,7 @@ object Revocable {
   /** When notification of type Delta arrives, it means the value has been revoked. */
   type Delta = Unit
 
-  type Ref[A] = DRef.Aux[Revocable[A], Update, Delta]
+  type Ref[A] = DRef[Revocable[A]]
 
   def apply[A](a: A): Revocable[A] = Valid(a)
 
@@ -24,7 +24,7 @@ object Revocable {
     P.cell(Revocable(a))
 
   def revoke[F[_], A](ref: Ref[A])(implicit P: Propagation[F]): F[Unit] =
-    P.update(ref)(())
+    P.update(ref).by(())
 
   implicit def domInstance[A]: Dom.Aux[Revocable[A], Update, Delta] = new Dom[Revocable[A]] {
     type Update = Revocable.Update

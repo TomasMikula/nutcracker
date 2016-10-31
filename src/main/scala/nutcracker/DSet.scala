@@ -39,7 +39,7 @@ object DSet {
     def apply[D](ref: DRef[D]): Inserted[D] = Inserted(Lst.singleton(ref))
   }
 
-  type DSetRef[D] = DRef.Aux[DSet[D], Update[D], Inserted[D]]
+  type DSetRef[D] = DRef[DSet[D]]
 
   def empty[D]: DSet[D] = DSet(Set.empty, Set.empty)
 
@@ -57,9 +57,9 @@ object DSet {
 
   def insert[F[_], D](ref: DRef[D], into: DSetRef[D])(implicit dom: Dom[D], P: Propagation[F]): F[Unit] =
     P.valTrigger(ref)(d => dom.assess(d) match {
-      case Dom.Failed => Fire(P.update(into)(Failed(ref)))
-      case Dom.Unrefined(_) => FireReload(P.update(into)(Unrefined(ref)))
-      case Dom.Refined => FireReload(P.update(into)(Refined(ref)))
+      case Dom.Failed => Fire(P.update(into).by(Failed(ref)))
+      case Dom.Unrefined(_) => FireReload(P.update(into).by(Unrefined(ref)))
+      case Dom.Refined => FireReload(P.update(into).by(Refined(ref)))
     })
 
   implicit def domInstance[D]: Dom.Aux[DSet[D], Update[D], Inserted[D]] =

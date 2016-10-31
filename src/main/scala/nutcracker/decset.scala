@@ -29,7 +29,7 @@ object DecSet {
   def wrap[A](as: Set[A]): DecSet[A] = new DecSet(as)
 
   type Dom[A] = JoinDom.Aux[DecSet[A], Update[A], Delta[A]]
-  type Ref[A] = DRef.Aux[DecSet[A], Update[A], Delta[A]]
+  type Ref[A] = DRef[DecSet[A]]
 
   implicit def domInstance[A]: DecSet.Dom[A] = new nutcracker.JoinDom[DecSet[A]] {
     type Update = DecSet.Update[A]

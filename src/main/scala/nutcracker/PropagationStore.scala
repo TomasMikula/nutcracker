@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMapB, Lst, StateInterpreter, Step, Uncons, ValA, WriterState}
+import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMap, KMapB, Lst, StateInterpreter, Step, Uncons, ValA, WriterState}
 
 import scalaz.Id._
 import scalaz.{Monad, StateT, |>=|}
@@ -12,7 +12,7 @@ import shapeless.{HList, Nat, Sized}
 
 case class PropagationStore[K] private(
   nextId: Long,
-  domains: K3Map[DRef.Aux, λ[(D, U, Δ) => (D, Dom.Aux[D, U, Δ])]],
+  domains: KMap[DRef, λ[D => (D, Dom[D])]],
   domainTriggers: K3Map[DRef.Aux, λ[(D, U, Δ) => List[(D, Δ) => Trigger[K]]]],
   selTriggers: KMapB[Sel, λ[L => List[L => Trigger[K]]], HList],
   cellsToSels: Index[DRef[_], Sel[_ <: HList]],
@@ -45,7 +45,7 @@ case class PropagationStore[K] private(
   def fetchVector[D, N <: Nat](refs: Sized[Vector[DRef[D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))
 
-  private def update[D, U, Δ](ref: DRef.Aux[D, U, Δ], u: U)(implicit dom: Dom.Aux[D, U, Δ]): PropagationStore[K] = {
+  private def update[D, U, Δ](ref: DRef[D], u: U)(implicit dom: Dom.Aux[D, U, Δ]): PropagationStore[K] = {
     val d0 = domains(ref)._1
     dom.update(d0, u) match {
       case None => this
@@ -56,16 +56,16 @@ case class PropagationStore[K] private(
           case Dom.Unrefined(_) => (unresolvedVars, failedVars)
         }
         val domains1 = domains.put(ref)((d1, dom))
-        val dirtyDomains1 = dirtyDomains.updated(ref)(diff1)(dom.combineDeltas)
+        val dirtyDomains1 = dirtyDomains.updated(ref.infer)(diff1)(dom.combineDeltas)
         copy(domains = domains1, unresolvedVars = unresolvedVars1, failedVars = failedVars1, dirtyDomains = dirtyDomains1)
     }
   }
 
-  def addDomainTrigger[D, U, Δ](ref: DRef.Aux[D, U, Δ], t: D => (Option[K], Option[(D, Δ) => Trigger[K]])): (PropagationStore[K], Lst[K]) = {
+  def addDomainTrigger[D, U, Δ](ref: DRef[D], t: D => (Option[K], Option[(D, Δ) => Trigger[K]]))(implicit dom: Dom.Aux[D, U, Δ]): (PropagationStore[K], Lst[K]) = {
     val (now, onChange) = t(fetch(ref))
     onChange match {
       case Some(action) =>
-        val (s1, ks) = addDomainTrigger0(ref, action)
+        val (s1, ks) = addDomainTrigger0(ref.infer, action)
         (s1, now ?+: ks)
       case None => (this, Lst.maybe(now))
     }
@@ -166,7 +166,7 @@ object PropagationStore {
 
   def empty[K] = PropagationStore[K](
     nextId = 0L,
-    domains = K3Map[DRef.Aux, λ[(D, U, Δ) => (D, Dom.Aux[D, U, Δ])]](),
+    domains = KMap[DRef, λ[D => (D, Dom[D])]](),
     domainTriggers = K3Map[DRef.Aux, λ[(D, U, Δ) => List[(D, Δ) => Trigger[K]]]](),
     selTriggers = KMapB[Sel, λ[L => List[L => Trigger[K]]], HList](),
     cellsToSels = Index.empty(sel => sel.cells),
@@ -190,7 +190,7 @@ object PropagationStore {
               case Cell(d, dom) => s.addVariable(d, dom) match {
                 case (s1, ref) => (Lst.empty, s1, ref)
               }
-              case DomTrigger(ref, f) => s.addDomainTrigger(ref, f) match {
+              case DomTrigger(ref, f, dom) => s.addDomainTrigger(ref, f)(dom) match {
                 case (s1, ks) => (ks, s1, ())
               }
               case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
@@ -215,7 +215,7 @@ object PropagationStore {
       def splitDomain[D](ref: DRef[D]): Option[List[K[Unit]]] = {
         val (d, domain) = s.domains(ref: DRef.Aux[D, ref.Update, ref.Delta])
         domain.assess(d) match {
-          case Dom.Unrefined(choices) => choices() map { _ map { ui => ord(update(ref)(ui)(domain)) } }
+          case Dom.Unrefined(choices) => choices() map { _ map { ui => ord(update(ref)(domain).by(ui)) } }
           case _ => sys.error("splitDomain should be called on unresolved variables only.")
         }
       }

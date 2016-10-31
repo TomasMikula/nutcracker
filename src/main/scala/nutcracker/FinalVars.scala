@@ -20,23 +20,22 @@ class FinalVars[M[_]](implicit M: Propagation[M]) {
 
   def variable[A]: VarBuilder[M, A] = new VarBuilder[M, A]
 
-  def whenFinal[D](ref: DRef[D])(implicit fin: Final[D]): WhenFinal[M, D, fin.Out] =
+  def whenFinal[D](ref: DRef[D])(implicit fin: Final[D], dom: Dom[D]): WhenFinal[M, D, fin.Out] =
     WhenFinal[M, D, fin.Out](ref, fin)
 
-  def join[D](ref: DRef[D])(d: D)(implicit inj: Inject[Join[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): M[Unit] =
-    update(ref)(inj(Join(d)))
+  def join[D, U, Δ](ref: DRef[D])(d: D)(implicit inj: Inject[Join[D], U], dom: Dom.Aux[D, U, Δ]): M[Unit] =
+    update(ref).by(inj(Join(d)))
 
-  def set[A, D](ref: DRef[D], a: A)(implicit fin: Final.Aux[D, A], inj: Inject[Join[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): M[Unit] =
+  def set[A, D, U, Δ](ref: DRef[D], a: A)(implicit fin: Final.Aux[D, A], dom: Dom.Aux[D, U, Δ], inj: Inject[Join[D], U]): M[Unit] =
     join(ref)(fin.embed(a))
 
-  def remove[D](ref: DRef[D], d: D)(implicit inj: Inject[Diff[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): M[Unit] =
-    update[D](ref)(inj(Diff(d)))
+  def remove[D, U, Δ](ref: DRef[D], d: D)(implicit dom: Dom.Aux[D, U, Δ], inj: Inject[Diff[D], U]): M[Unit] =
+    update[D](ref).by(inj(Diff(d)))
 
-  def exclude[A, D](ref: DRef[D], a: A)(implicit fin: Final.Aux[D, A], inj: Inject[Diff[D], ref.Update], dom: Dom.Aux[D, ref.Update, ref.Delta]): M[Unit] =
+  def exclude[A, D, U, Δ](ref: DRef[D], a: A)(implicit fin: Final.Aux[D, A], dom: Dom.Aux[D, U, Δ], inj: Inject[Diff[D], U]): M[Unit] =
     remove(ref, fin.embed(a))
 
-  def different[D, U, Δ](d1: DRef.Aux[D, U, Δ], d2: DRef.Aux[D, U, Δ])(
-    implicit
+  def different[D, U, Δ](d1: DRef.Aux[D, U, Δ], d2: DRef.Aux[D, U, Δ])(implicit
     dom: Dom.Aux[D, U, Δ],
     fin: Final[D],
     inj: Inject[Diff[D], U],
@@ -52,7 +51,7 @@ class FinalVars[M[_]](implicit M: Propagation[M]) {
     }
   }
 
-  def allDifferent[D, U, Δ](doms: DRef.Aux[D, U, Δ]*)(
+  def allDifferent[D, U, Δ](doms: DRef[D]*)(
     implicit
     dom: Dom.Aux[D, U, Δ],
     fin: Final[D],
@@ -95,11 +94,11 @@ object FinalVars {
     def apply[D]()(implicit
       ex: Final.Aux[D, A],
       dom: DomWithBottom[D]
-    ): M[DRef.Aux[D, dom.Update, dom.Delta]] = any()
+    ): M[DRef[D]] = any()
     def any[D]()(implicit
       ex: Final.Aux[D, A],
       dom: DomWithBottom[D]
-    ): M[DRef.Aux[D, dom.Update, dom.Delta]] = M.cell(dom.bottom)
+    ): M[DRef[D]] = M.cell(dom.bottom)
 
     def oneOf(as: Set[A]): M[DecSet.Ref[A]] = M.cell(DecSet.wrap(as))
     def oneOf(as: A*): M[DecSet.Ref[A]] = oneOf(as.toSet)
@@ -112,18 +111,18 @@ object FinalVars {
       ee: Final.Aux[D, A],
       dom: DomWithBottom[D],
       MA: Applicative[M]
-    ): M[Vector[DRef.Aux[D, dom.Update, dom.Delta]]] = any()
+    ): M[Vector[DRef[D]]] = any()
     def any[D]()(implicit
       ee: Final.Aux[D, A],
       dom: DomWithBottom[D],
       MA: Applicative[M]
-    ): M[Vector[DRef.Aux[D, dom.Update, dom.Delta]]] = M.cells(dom.bottom, n)
+    ): M[Vector[DRef[D]]] = M.cells(dom.bottom, n)
 
     def oneOf(as: Set[A])(implicit MA: Applicative[M]): M[Vector[DecSet.Ref[A]]] = M.cells(DecSet.wrap(as), n)
     def oneOf(as: A*)(implicit MA: Applicative[M]): M[Vector[DecSet.Ref[A]]] = oneOf(as.toSet)
   }
 
-  final case class WhenFinal[M[_], D, A] private[nutcracker](ref: DRef[D], fin: Final.Aux[D, A])(implicit M: Propagation[M]) {
+  final case class WhenFinal[M[_], D, A] private[nutcracker](ref: DRef[D], fin: Final.Aux[D, A])(implicit dom: Dom[D], M: Propagation[M]) {
     def exec(f: A => M[Unit]): M[Unit] =
       M.valTrigger[D](ref)(d => fin.extract(d) match {
         case Some(a) => Fire[M[Unit]](f(a))

@@ -15,7 +15,7 @@ import nutcracker.Dom.Status
   */
 object log {
 
-  type LogRef[A] = DRef.Aux[List[A], A, List[A]]
+  type LogRef[A] = DRef[List[A]]
 
   final case class LogOps[A](l: LogRef[A]) extends AnyVal {
     def write[F[_]: Propagation](a: A): F[Unit] = log(l, a)
@@ -24,7 +24,7 @@ object log {
   implicit def logOps[A](l: LogRef[A]): LogOps[A] = LogOps(l)
 
   def newLog[F[_], A](implicit P: Propagation[F]): F[LogRef[A]] = P.cell(List[A]())
-  def log[F[_], A](ref: LogRef[A], a: A)(implicit P: Propagation[F]): F[Unit] = P.update(ref)(a)
+  def log[F[_], A](ref: LogRef[A], a: A)(implicit P: Propagation[F]): F[Unit] = P.update(ref).by(a)
 
   implicit def logDom[A]: Dom.Aux[List[A], A, List[A]] = new Dom[List[A]] {
     type Update = A

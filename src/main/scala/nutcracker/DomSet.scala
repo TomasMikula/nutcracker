@@ -25,7 +25,7 @@ object DomSet {
 
   type Delta[A] = Inserted[A]
 
-  type Ref[A] = DRef.Aux[DomSet[A], Update[A], Delta[A]]
+  type Ref[A] = DRef[DomSet[A]]
 
 
   def empty[A]: DomSet[A] = DomSet(Set.empty)
@@ -44,8 +44,8 @@ object DomSet {
 
   def insert[F[_], A](ref: DRef[A], into: Ref[A])(implicit P: Propagation[F], dom: Dom[A]): F[Unit] =
     P.valTrigger(ref)(d => dom.assess(d) match {
-      case Dom.Failed => Fire(P.update(into)(Failed(ref)))
-      case _ => FireReload(P.update(into)(Insert(ref)))
+      case Dom.Failed => Fire(P.update(into).by(Failed(ref)))
+      case _ => FireReload(P.update(into).by(Insert(ref)))
     })
 
   implicit def domInstance[A]: Dom.Aux[DomSet[A], Update[A], Delta[A]] = new Dom[DomSet[A]] {

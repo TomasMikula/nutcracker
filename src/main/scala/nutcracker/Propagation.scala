@@ -10,22 +10,37 @@ trait Propagation[M[_]] {
 
   // basic instructions
 
-  def cell[D](d: D)(implicit dom: Dom[D]): M[DRef.Aux[D, dom.Update, dom.Delta]]
+  def cell[D](d: D)(implicit dom: Dom[D]): M[DRef[D]]
 
-  def update[D](ref: DRef[D])(u: ref.Update)(implicit dom: Dom.Aux[D, ref.Update, ref.Delta]): M[Unit]
+  def updateImpl[D, U, Δ](ref: DRef[D])(u: U)(implicit dom: Dom.Aux[D, U, Δ]): M[Unit]
 
-  def domTrigger[D](ref: DRef[D])(f: D => (Option[M[Unit]], Option[(D, ref.Delta) => Trigger[M[Unit]]])): M[Unit]
+  def domTriggerImpl[D, U, Δ](ref: DRef[D])(f: D => (Option[M[Unit]], Option[(D, Δ) => Trigger[M[Unit]]]))(implicit dom: Dom.Aux[D, U, Δ]): M[Unit]
 
   def selTrigger[L <: HList](sel: Sel[L])(f: L => Trigger[M[Unit]]): M[Unit]
 
 
+  def update[D](ref: DRef[D])(implicit dom: Dom[D]): UpdateSyntaxHelper[D, dom.Update, dom.Delta] =
+    new UpdateSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
+
+  def domTrigger[D](ref: DRef[D])(implicit dom: Dom[D]): DomTriggerSyntaxHelper[D, dom.Update, dom.Delta] =
+    new DomTriggerSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
+
+  final class UpdateSyntaxHelper[D, U, Δ](ref: DRef[D])(implicit dom: Dom.Aux[D, U, Δ]) {
+    def by(u: U): M[Unit] = updateImpl(ref)(u)
+  }
+
+  final class DomTriggerSyntaxHelper[D, U, Δ](ref: DRef[D])(implicit dom: Dom.Aux[D, U, Δ]) {
+    def by(f: D => (Option[M[Unit]], Option[(D, Δ) => Trigger[M[Unit]]])): M[Unit] = domTriggerImpl(ref)(f)
+  }
+
+
   // derived methods
 
-  def cells[D](d: D, n: Int)(implicit dom: Dom[D], M: Applicative[M]): M[Vector[DRef.Aux[D, dom.Update, dom.Delta]]] =
+  def cells[D](d: D, n: Int)(implicit dom: Dom[D], M: Applicative[M]): M[Vector[DRef[D]]] =
     Traverse[Vector].sequence(Vector.fill(n)(cell(d)))
 
-  def valTrigger[D](ref: DRef[D])(f: D => Trigger[M[Unit]]): M[Unit] =
-    domTrigger(ref)(d => f(d) match {
+  def valTrigger[D](ref: DRef[D])(f: D => Trigger[M[Unit]])(implicit dom: Dom[D]): M[Unit] =
+    domTrigger(ref).by(d => f(d) match {
       case FireReload(k) => (Some(k), Some((d, δ) => f(d)))
       case Fire(k) => (Some(k), None)
       case Sleep() => (None, Some((d, δ) => f(d)))
@@ -35,7 +50,7 @@ trait Propagation[M[_]] {
   def selTrigger2[D1, D2](ref1: DRef[D1], ref2: DRef[D2])(f: (D1, D2) => Trigger[M[Unit]]): M[Unit] =
     selTrigger[D1 :: D2 :: HNil](Sel(ref1, ref2))(l => f(l.head, l.tail.head))
 
-  def peek[D](ref: DRef[D])(f: D => M[Unit]): M[Unit] =
+  def peek[D](ref: DRef[D])(f: D => M[Unit])(implicit dom: Dom[D]): M[Unit] =
     valTrigger(ref)(d => Fire(f(d)))
 
   def alternate[D1, D2, L, R](ref1: DRef[D1], ref2: DRef[D2])(
@@ -46,6 +61,8 @@ trait Propagation[M[_]] {
     onSwitchToRight: L => M[R],
     onStop: Option[Either[L, R]] => M[Unit]
   )(implicit
+    dom1: Dom[D1],
+    dom2: Dom[D2],
     M: Bind[M]
   ): M[Unit] = {
     def observeLeft(d2: D2, l: L): M[Unit] = valTrigger(ref1)(d1 => f(d1, d2) match {
@@ -75,6 +92,8 @@ trait Propagation[M[_]] {
     onSwitchToRight: M[Unit],
     onStop: M[Unit]
   )(implicit
+    dom1: Dom[D1],
+    dom2: Dom[D2],
     M: Bind[M]
   ): M[Unit] =
     alternate[D1, D2, Unit, Unit](ref1, ref2)(

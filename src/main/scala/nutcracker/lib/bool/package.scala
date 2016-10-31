@@ -6,6 +6,6 @@ import scalaz.\/
 package object bool {
 
   type BoolDom = DomWithBottom.Aux[BoolDomain, Join[BoolDomain] \/ Diff[BoolDomain], Unit]
-  type BoolRef = DRef.Aux[BoolDomain, Join[BoolDomain] \/ Diff[BoolDomain], Unit]
+  type BoolRef = DRef[BoolDomain]
 
 }
