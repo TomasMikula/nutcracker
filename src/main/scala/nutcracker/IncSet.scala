@@ -59,7 +59,7 @@ object IncSet {
     */
   def forEach[F[_], A](ref: IncSetRef[A])(implicit P: Propagation[F], A: Applicative[F]): ContU[F, A] = {
     import scalaz.syntax.traverse._
-    ContU(f => P.domTrigger(ref).by(as => {
+    ContU(f => P.observe(ref).by(as => {
       val now = as.toList.traverse_(f)
       val onChange = (as: IncSet[A], delta: Diff[Set[A]]) => Trigger.fireReload(delta.value.toList.traverse_(f))
       (Some(now), Some(onChange))
@@ -73,7 +73,7 @@ object IncSet {
     P.update(into).by(Join(wrap(add)))
 
   def include[F[_], A](sub: IncSetRef[A], sup: IncSetRef[A])(implicit P: Propagation[F]): F[Unit] =
-    P.domTrigger(sub).by((sa: IncSet[A]) => {
+    P.observe(sub).by((sa: IncSet[A]) => {
       val now = Some(insertAll(sa.value, sup))
       val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(insertAll(delta.value, sup)))
       (now, onChange)
@@ -101,7 +101,7 @@ object IncSet {
     import scalaz.syntax.traverse._
     for {
       res <- init[F, B]
-      _ <- P.domTrigger[IncSet[A]](sref).by((sa: IncSet[A]) => {
+      _ <- P.observe[IncSet[A]](sref).by((sa: IncSet[A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
         val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res)))))
         (Some(now), onChange)

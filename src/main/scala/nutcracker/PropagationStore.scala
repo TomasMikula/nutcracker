@@ -13,7 +13,7 @@ import shapeless.{HList, Nat, Sized}
 case class PropagationStore[K] private(
   nextId: Long,
   domains: KMap[DRef, λ[D => (D, Dom[D])]],
-  domainTriggers: K3Map[DRef.Aux, λ[(D, U, Δ) => List[(D, Δ) => Trigger[K]]]],
+  domainObservers: K3Map[DRef.Aux, λ[(D, U, Δ) => List[(D, Δ) => Trigger[K]]]],
   selTriggers: KMapB[Sel, λ[L => List[L => Trigger[K]]], HList],
   cellsToSels: Index[DRef[_], Sel[_ <: HList]],
   unresolvedVars: Set[DRef[D] forSome { type D }],
@@ -61,11 +61,11 @@ case class PropagationStore[K] private(
     }
   }
 
-  def addDomainTrigger[D, U, Δ](ref: DRef[D], t: D => (Option[K], Option[(D, Δ) => Trigger[K]]))(implicit dom: Dom.Aux[D, U, Δ]): (PropagationStore[K], Lst[K]) = {
-    val (now, onChange) = t(fetch(ref))
+  def addDomainObserver[D, U, Δ](ref: DRef[D], f: D => (Option[K], Option[(D, Δ) => Trigger[K]]))(implicit dom: Dom.Aux[D, U, Δ]): (PropagationStore[K], Lst[K]) = {
+    val (now, onChange) = f(fetch(ref))
     onChange match {
       case Some(action) =>
-        val (s1, ks) = addDomainTrigger0(ref.infer, action)
+        val (s1, ks) = addDomainObserver0(ref.infer, action)
         (s1, now ?+: ks)
       case None => (this, Lst.maybe(now))
     }
@@ -80,15 +80,15 @@ case class PropagationStore[K] private(
     }
   }
 
-  private def addDomainTrigger0[D, U, Δ](ref: DRef.Aux[D, U, Δ], t: (D, Δ) => Trigger[K]): (PropagationStore[K], Lst[K]) = {
-    val triggers = domainTriggers.getOrElse(ref)(Nil)
+  private def addDomainObserver0[D, U, Δ](ref: DRef.Aux[D, U, Δ], f: (D, Δ) => Trigger[K]): (PropagationStore[K], Lst[K]) = {
+    val triggers = domainObservers.getOrElse(ref)(Nil)
     val (remainingTriggers, firedTriggers) = dirtyDomains.get(ref) match {
-      case Some(δ) => collectDomTriggers(fetch(ref), δ, triggers)
+      case Some(δ) => collectDomObservers(fetch(ref), δ, triggers)
       case None => (triggers, Lst.empty)
     }
     (
       copy(
-        domainTriggers = domainTriggers.put(ref)(t :: remainingTriggers),
+        domainObservers = domainObservers.put(ref)(f :: remainingTriggers),
         dirtyDomains = dirtyDomains - ref
       ),
       firedTriggers
@@ -103,9 +103,9 @@ case class PropagationStore[K] private(
   }
 
   private def triggersForDomain[D, U, Δ](ref: DRef.Aux[D, U, Δ], δ: Δ): (PropagationStore[K], Lst[K]) =
-    collectDomTriggers(fetch(ref), δ, domainTriggers.getOrElse(ref)(Nil)) match {
-      case (Nil, fired) => (copy(domainTriggers = domainTriggers - ref), fired)
-      case (forLater, fired) => (copy(domainTriggers = domainTriggers.put(ref)(forLater)), fired)
+    collectDomObservers(fetch(ref), δ, domainObservers.getOrElse(ref)(Nil)) match {
+      case (Nil, fired) => (copy(domainObservers = domainObservers - ref), fired)
+      case (forLater, fired) => (copy(domainObservers = domainObservers.put(ref)(forLater)), fired)
     }
 
   private def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], Lst[K]) = {
@@ -118,11 +118,11 @@ case class PropagationStore[K] private(
 
   private def getSelsForCell(ref: DRef[_]): Set[Sel[_ <: HList]] = cellsToSels.get(ref)
 
-  private def collectDomTriggers[D, Δ](d: D, δ: Δ, triggers: List[(D, Δ) => Trigger[K]]): (List[(D, Δ) => Trigger[K]], Lst[K]) =
+  private def collectDomObservers[D, Δ](d: D, δ: Δ, triggers: List[(D, Δ) => Trigger[K]]): (List[(D, Δ) => Trigger[K]], Lst[K]) =
     triggers match {
       case Nil => (Nil, Lst.empty)
       case t :: ts =>
-        val (ts1, conts) = collectDomTriggers(d, δ, ts)
+        val (ts1, conts) = collectDomObservers(d, δ, ts)
         t(d, δ) match {
           case Discard() => (ts1, conts)
           case Sleep() => (t :: ts1, conts)
@@ -167,7 +167,7 @@ object PropagationStore {
   def empty[K] = PropagationStore[K](
     nextId = 0L,
     domains = KMap[DRef, λ[D => (D, Dom[D])]](),
-    domainTriggers = K3Map[DRef.Aux, λ[(D, U, Δ) => List[(D, Δ) => Trigger[K]]]](),
+    domainObservers = K3Map[DRef.Aux, λ[(D, U, Δ) => List[(D, Δ) => Trigger[K]]]](),
     selTriggers = KMapB[Sel, λ[L => List[L => Trigger[K]]], HList](),
     cellsToSels = Index.empty(sel => sel.cells),
     unresolvedVars = Set(),
@@ -190,7 +190,7 @@ object PropagationStore {
               case Cell(d, dom) => s.addVariable(d, dom) match {
                 case (s1, ref) => (Lst.empty, s1, ref)
               }
-              case DomTrigger(ref, f, dom) => s.addDomainTrigger(ref, f)(dom) match {
+              case Observe(ref, f, dom) => s.addDomainObserver(ref, f)(dom) match {
                 case (s1, ks) => (ks, s1, ())
               }
               case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {

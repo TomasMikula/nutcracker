@@ -14,7 +14,7 @@ trait Propagation[M[_]] {
 
   def updateImpl[D, U, Δ](ref: DRef[D])(u: U)(implicit dom: Dom.Aux[D, U, Δ]): M[Unit]
 
-  def domTriggerImpl[D, U, Δ](ref: DRef[D])(f: D => (Option[M[Unit]], Option[(D, Δ) => Trigger[M[Unit]]]))(implicit dom: Dom.Aux[D, U, Δ]): M[Unit]
+  def observeImpl[D, U, Δ](ref: DRef[D])(f: D => (Option[M[Unit]], Option[(D, Δ) => Trigger[M[Unit]]]))(implicit dom: Dom.Aux[D, U, Δ]): M[Unit]
 
   def selTrigger[L <: HList](sel: Sel[L])(f: L => Trigger[M[Unit]]): M[Unit]
 
@@ -22,15 +22,15 @@ trait Propagation[M[_]] {
   def update[D](ref: DRef[D])(implicit dom: Dom[D]): UpdateSyntaxHelper[D, dom.Update, dom.Delta] =
     new UpdateSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
 
-  def domTrigger[D](ref: DRef[D])(implicit dom: Dom[D]): DomTriggerSyntaxHelper[D, dom.Update, dom.Delta] =
-    new DomTriggerSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
+  def observe[D](ref: DRef[D])(implicit dom: Dom[D]): ObserveSyntaxHelper[D, dom.Update, dom.Delta] =
+    new ObserveSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
 
   final class UpdateSyntaxHelper[D, U, Δ](ref: DRef[D])(implicit dom: Dom.Aux[D, U, Δ]) {
     def by(u: U): M[Unit] = updateImpl(ref)(u)
   }
 
-  final class DomTriggerSyntaxHelper[D, U, Δ](ref: DRef[D])(implicit dom: Dom.Aux[D, U, Δ]) {
-    def by(f: D => (Option[M[Unit]], Option[(D, Δ) => Trigger[M[Unit]]])): M[Unit] = domTriggerImpl(ref)(f)
+  final class ObserveSyntaxHelper[D, U, Δ](ref: DRef[D])(implicit dom: Dom.Aux[D, U, Δ]) {
+    def by(f: D => (Option[M[Unit]], Option[(D, Δ) => Trigger[M[Unit]]])): M[Unit] = observeImpl(ref)(f)
   }
 
 
@@ -40,7 +40,7 @@ trait Propagation[M[_]] {
     Traverse[Vector].sequence(Vector.fill(n)(cell(d)))
 
   def valTrigger[D](ref: DRef[D])(f: D => Trigger[M[Unit]])(implicit dom: Dom[D]): M[Unit] =
-    domTrigger(ref).by(d => f(d) match {
+    observe(ref).by(d => f(d) match {
       case FireReload(k) => (Some(k), Some((d, δ) => f(d)))
       case Fire(k) => (Some(k), None)
       case Sleep() => (None, Some((d, δ) => f(d)))
