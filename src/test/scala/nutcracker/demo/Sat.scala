@@ -13,9 +13,9 @@ import scalaz.std.anyVal._
 import scalaz.std.vector._
 
 class Sat extends FunSpec {
-  val V = FinalVars[FreeK[PropagationLang, ?]]
-  val B = BoolOps[FreeK[PropagationLang, ?]]
-  val P = PromiseOps[FreeK[PropagationLang, ?]]
+  val V = FinalVars[FreeK[PropagationLang, ?], DRef]
+  val B = BoolOps[FreeK[PropagationLang, ?], DRef]
+  val P = PromiseOps[FreeK[PropagationLang, ?], DRef]
 
   import V._
   import B._

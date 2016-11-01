@@ -13,9 +13,9 @@ import scalaz.Monad
 import scalaz.std.anyVal._
 
 class Sudoku extends FunSuite {
-  val P1 = Propagation[FreeK[PropagationLang, ?]]
-  val P2 = PromiseOps[FreeK[PropagationLang, ?]]
-  val V = FinalVars[FreeK[PropagationLang, ?]]
+  val P1 = Propagation[FreeK[PropagationLang, ?], DRef]
+  val P2 = PromiseOps[FreeK[PropagationLang, ?], DRef]
+  val V = FinalVars[FreeK[PropagationLang, ?], DRef]
 
   import P1._
   import P2._
@@ -26,7 +26,7 @@ class Sudoku extends FunSuite {
 
   val solver = PropagationStore.dfsSolver
 
-  type Cell = DecSet.Ref[Int]
+  type Cell = DRef[DecSet[Int]]
   type Cells = Vector[Cell]
 
   /** A program that sets up an empty Sudoku, that is 81 integer variables

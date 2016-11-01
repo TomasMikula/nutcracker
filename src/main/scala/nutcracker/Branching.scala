@@ -6,16 +6,16 @@ import scalaz.{Bind, Cont}
 import scalaz.syntax.bind._
 
 /** API for branching as a special kind of lattice. */
-class Branching[M[_]](implicit MP: Propagation[M]) {
-  val MV = FinalVars[M]
+class Branching[M[_], Ref[_]](implicit MP: Propagation[M, Ref]) {
+  val MV = FinalVars[M, Ref]
 
   /** Convenience method to add an exclusive choice of multiple possibilities.
     * This is a shorthand for adding a cell whose semi-lattice is the lattice
     * of finite sets of elements of type A, initialized to the given set of
     * elements.
     */
-  def branch[A](as: Set[A]): M[DecSet.Ref[A]] = MV.variable[A].oneOf(as)
-  def branch[A](as: A*): M[DecSet.Ref[A]] = branch(as.toSet)
+  def branch[A](as: Set[A]): M[Ref[DecSet[A]]] = MV.variable[A].oneOf(as)
+  def branch[A](as: A*): M[Ref[DecSet[A]]] = branch(as.toSet)
 
   /** Convenience method to add an exclusive choice of arbitrary free programs
     * to continue. When the choice is made, the chosen program is executed.
@@ -40,5 +40,5 @@ class Branching[M[_]](implicit MP: Propagation[M]) {
 }
 
 object Branching {
-  def apply[M[_]: Propagation]: Branching[M] = new Branching[M]()
+  def apply[M[_], Ref[_]](implicit P: Propagation[M, Ref]): Branching[M, Ref] = new Branching[M, Ref]
 }

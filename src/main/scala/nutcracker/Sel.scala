@@ -1,5 +1,7 @@
 package nutcracker
 
+import scala.language.higherKinds
+
 import nutcracker.util.Mapped
 import shapeless._
 import shapeless.PolyDefns.~>
@@ -7,27 +9,27 @@ import shapeless.PolyDefns.~>
 /**
   * Selection of cells.
   */
-trait Sel[L <: HList] {
+trait Sel[Ref[_], L <: HList] {
   type Refs <: HList
   def refs: Refs
-  def mapped: Mapped.Aux[L, DRef, Refs]
+  def mapped: Mapped.Aux[L, Ref, Refs]
 
-  def cells: Seq[DRef[_]] = mapped.toList(refs)
+  def cells: Seq[Ref[_]] = mapped.toList(refs)
 
-  def fetch(f: DRef ~> Id): L = {
+  def fetch(f: Ref ~> Id): L = {
     mapped.extract(refs, f)
   }
 }
 
 object Sel {
-  type Aux[L <: HList, R <: HList] = Sel[L] { type Refs = R }
+  type Aux[Ref[_], L <: HList, R <: HList] = Sel[Ref, L] { type Refs = R }
 
-  def apply[L <: HList, Refs0 <: HList](refs0: Refs0)(implicit m: Mapped.Aux[L, DRef, Refs0]): Sel.Aux[L, Refs0] = new Sel[L] {
+  def apply[Ref[_], L <: HList, Refs0 <: HList](refs0: Refs0)(implicit m: Mapped.Aux[L, Ref, Refs0]): Sel.Aux[Ref, L, Refs0] = new Sel[Ref, L] {
     type Refs = Refs0
     def refs = refs0
     def mapped = m
   }
 
-  def apply[D](ref: DRef[D]): Sel[D :: HNil] = apply(ref :: HNil)
-  def apply[D1, D2](ref1: DRef[D1], ref2: DRef[D2]): Sel[D1 :: D2 :: HNil] = apply(ref1 :: ref2 :: HNil)
+  def apply[Ref[_], D](ref: Ref[D]): Sel[Ref, D :: HNil] = apply(ref :: HNil)
+  def apply[Ref[_], D1, D2](ref1: Ref[D1], ref2: Ref[D2]): Sel[Ref, D1 :: D2 :: HNil] = apply(ref1 :: ref2 :: HNil)
 }

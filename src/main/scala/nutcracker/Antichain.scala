@@ -22,30 +22,28 @@ object Antichain {
   type Update[A] = Uninhabited
   type Delta[A] = Uninhabited
 
-  type Ref[A] = DRef[Antichain[A]]
-
-  def map[M[_], A, B](refC: ContU[M, Ref[A]])(f: A => B)(implicit M: Propagation[M], MB: Bind[M]): ContU[M, Ref[B]] = for {
+  def map[M[_], Ref[_], A, B](refC: ContU[M, Ref[Antichain[A]]])(f: A => B)(implicit M: Propagation[M, Ref], MB: Bind[M]): ContU[M, Ref[Antichain[B]]] = for {
     ref <- refC
     a   <- ref.asCont[M]
     res <- cellC(f(a))
   } yield res
 
-  def mapC[M[_]: Propagation, A, B](ref: Ref[A])(f: A => ContU[M, Ref[B]]): ContU[M, Ref[B]] = for {
+  def mapC[M[_], Ref[_]: Propagation[M, ?[_]], A, B](ref: Ref[Antichain[A]])(f: A => ContU[M, Ref[Antichain[B]]]): ContU[M, Ref[Antichain[B]]] = for {
     a   <- ref.asCont[M]
     res <- f(a)
   } yield res
 
-  def filterMap[M[_], A, B](refC: ContT[M, Unit, Ref[A]])(f: A => Option[B])(implicit P: Propagation[M], M: Monad[M]): ContT[M, Unit, Ref[B]] = for {
+  def filterMap[M[_], Ref[_], A, B](refC: ContT[M, Unit, Ref[Antichain[A]]])(f: A => Option[B])(implicit P: Propagation[M, Ref], M: Monad[M]): ContT[M, Unit, Ref[Antichain[B]]] = for {
     ref <- refC
     a   <- ref.asCont[M]
     res <- f(a) match {
       case Some(b) => ContU.liftM(P.cell(Antichain(b)))
-      case None    => ContU.noop[M, Ref[B]]
+      case None    => ContU.noop[M, Ref[Antichain[B]]]
     }
   } yield res
 
-  def cellC[M[_], A](a: A)(implicit M: Propagation[M], MB: Bind[M]): ContT[M, Unit, Ref[A]] =
-    ContT.liftM[Id, M, Unit, Ref[A]](M.cell(Antichain(a)))
+  def cellC[M[_], Ref[_], A](a: A)(implicit M: Propagation[M, Ref], MB: Bind[M]): ContT[M, Unit, Ref[Antichain[A]]] =
+    ContT.liftM[Id, M, Unit, Ref[Antichain[A]]](M.cell(Antichain(a)))
 
   implicit def domInstance[A]: Dom.Aux[Antichain[A], Update[A], Delta[A]] = new Dom[Antichain[A]] {
     type Update = Antichain.Update[A]

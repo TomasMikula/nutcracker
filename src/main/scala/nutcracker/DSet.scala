@@ -2,7 +2,6 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.Dom.Status
-import nutcracker.PropagationLang._
 import nutcracker.util.{ContU, Lst}
 
 import scalaz.Bind
@@ -20,54 +19,52 @@ import scalaz.syntax.monad._
   * Unrefined -> Refined -> Failed, since a refined state can go to unrefined
   * when all the refined members become failed.
   */
-case class DSet[D] private(unrefined: Set[DRef[D]], refined: Set[DRef[D]])
+case class DSet[Ref[_], D] private(unrefined: Set[Ref[D]], refined: Set[Ref[D]])
 
 object DSet {
 
-  sealed trait Update[D] {
-    def ref: DRef[D]
+  sealed trait Update[Ref[_], D] {
+    def ref: Ref[D]
   }
-  case class Unrefined[D](ref: DRef[D]) extends Update[D]
-  case class Refined  [D](ref: DRef[D]) extends Update[D]
-  case class Failed   [D](ref: DRef[D]) extends Update[D]
+  case class Unrefined[Ref[_], D](ref: Ref[D]) extends Update[Ref, D]
+  case class Refined  [Ref[_], D](ref: Ref[D]) extends Update[Ref, D]
+  case class Failed   [Ref[_], D](ref: Ref[D]) extends Update[Ref, D]
 
-  case class Inserted[D](refs: Lst[DRef[D]]) extends AnyVal {
-    def +(that: Inserted[D]): Inserted[D] = Inserted(this.refs ++ that.refs)
+  case class Inserted[Ref[_], D](refs: Lst[Ref[D]]) extends AnyVal {
+    def +(that: Inserted[Ref, D]): Inserted[Ref, D] = Inserted(this.refs ++ that.refs)
   }
 
   object Inserted {
-    def apply[D](ref: DRef[D]): Inserted[D] = Inserted(Lst.singleton(ref))
+    def apply[Ref[_], D](ref: Ref[D]): Inserted[Ref, D] = Inserted(Lst.singleton(ref))
   }
 
-  type DSetRef[D] = DRef[DSet[D]]
+  def empty[Ref[_], D]: DSet[Ref, D] = DSet(Set.empty, Set.empty)
 
-  def empty[D]: DSet[D] = DSet(Set.empty, Set.empty)
+  def init[F[_], Ref[_], D](implicit P: Propagation[F, Ref]): F[Ref[DSet[Ref, D]]] =
+    P.cell(empty[Ref, D])
 
-  def init[F[_], D](implicit P: Propagation[F]): F[DSetRef[D]] =
-    P.cell(empty[D])
-
-  def includeC[F[_], D](cps: ContU[F, _ <: DRef[D]], ref: DSetRef[D])(implicit dom: Dom[D], P: Propagation[F]): F[Unit] =
+  def includeC[F[_], Ref[_], D](cps: ContU[F, _ <: Ref[D]], ref: Ref[DSet[Ref, D]])(implicit dom: Dom[D], P: Propagation[F, Ref]): F[Unit] =
     cps(dref => insert(dref, ref))
 
-  def collect[F[_], D](cps: ContU[F, _ <: DRef[D]])(implicit dom: Dom[D], P: Propagation[F], B: Bind[F]): F[DSetRef[D]] =
+  def collect[F[_], Ref[_], D](cps: ContU[F, _ <: Ref[D]])(implicit dom: Dom[D], P: Propagation[F, Ref], B: Bind[F]): F[Ref[DSet[Ref, D]]] =
     for {
-      res <- init[F, D]
+      res <- init[F, Ref, D]
         _ <- includeC(cps, res)
     } yield res
 
-  def insert[F[_], D](ref: DRef[D], into: DSetRef[D])(implicit dom: Dom[D], P: Propagation[F]): F[Unit] =
+  def insert[F[_], Ref[_], D](ref: Ref[D], into: Ref[DSet[Ref, D]])(implicit dom: Dom[D], P: Propagation[F, Ref]): F[Unit] =
     P.valTrigger(ref)(d => dom.assess(d) match {
       case Dom.Failed => Fire(P.update(into).by(Failed(ref)))
       case Dom.Unrefined(_) => FireReload(P.update(into).by(Unrefined(ref)))
       case Dom.Refined => FireReload(P.update(into).by(Refined(ref)))
     })
 
-  implicit def domInstance[D]: Dom.Aux[DSet[D], Update[D], Inserted[D]] =
-    new Dom[DSet[D]] {
-      type Update = DSet.Update[D]
-      type Delta = DSet.Inserted[D]
+  implicit def domInstance[Ref[_], D]: Dom.Aux[DSet[Ref, D], Update[Ref, D], Inserted[Ref, D]] =
+    new Dom[DSet[Ref, D]] {
+      type Update = DSet.Update[Ref, D]
+      type Delta = DSet.Inserted[Ref, D]
 
-      def update(d: DSet[D], u: Update): Option[(DSet[D], Delta)] = {
+      def update(d: DSet[Ref, D], u: Update): Option[(DSet[Ref, D], Delta)] = {
         val (unrefined, refined) = u match {
           case Unrefined(ref) => (d.unrefined + ref, d.refined - ref)
           case Refined(ref)   => (d.unrefined - ref, d.refined + ref)
@@ -85,7 +82,7 @@ object DSet {
       /** DSet is considered refined if at least one of the contained
         * domains is refined.
         */
-      def assess(d: DSet[D]): Status[Update] =
+      def assess(d: DSet[Ref, D]): Status[Update] =
         if(d.refined.nonEmpty) Dom.Refined
         else Dom.Unrefined(() => None)
     }

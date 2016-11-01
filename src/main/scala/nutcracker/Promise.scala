@@ -29,7 +29,6 @@ object Promise {
 
   type Update[A] = Complete[A]
   type Delta[A] = Unit
-  type Ref[A] = DRef[Promise[A]]
 
   def empty[A]: Promise[A] = Empty
   def completed[A](a: A): Promise[A] = Completed(a)

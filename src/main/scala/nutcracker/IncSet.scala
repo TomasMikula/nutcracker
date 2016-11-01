@@ -1,7 +1,6 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.PropagationLang._
 import nutcracker.util.ContU
 
 import scalaz.{Applicative, Bind, Monad}
@@ -30,7 +29,6 @@ object IncSet {
   type Delta[A] = Diff[Set[A]]
 
   type IncSetDom[A] = Dom.Aux[IncSet[A], Join[IncSet[A]], Diff[Set[A]]]
-  type IncSetRef[A] = DRef[IncSet[A]]
 
   implicit def domInstance[A]: IncSetDom[A] = new Dom[IncSet[A]] {
     type Update = IncSet.Update[A]
@@ -51,13 +49,13 @@ object IncSet {
       Diff(d1.value union d2.value)
   }
 
-  def init[F[_], A](implicit P: Propagation[F]): F[IncSetRef[A]] =
+  def init[F[_], Ref[_], A](implicit P: Propagation[F, Ref]): F[Ref[IncSet[A]]] =
     P.cell(IncSet.empty[A])
 
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
     */
-  def forEach[F[_], A](ref: IncSetRef[A])(implicit P: Propagation[F], A: Applicative[F]): ContU[F, A] = {
+  def forEach[F[_], Ref[_], A](ref: Ref[IncSet[A]])(implicit P: Propagation[F, Ref], A: Applicative[F]): ContU[F, A] = {
     import scalaz.syntax.traverse._
     ContU(f => P.observe(ref).by(as => {
       val now = as.toList.traverse_(f)
@@ -66,41 +64,41 @@ object IncSet {
     }))
   }
 
-  def insert[F[_]: Propagation, A](a: A, into: IncSetRef[A]): F[Unit] =
+  def insert[F[_], Ref[_], A](a: A, into: Ref[IncSet[A]])(implicit P: Propagation[F, Ref]): F[Unit] =
     insertAll(Set(a), into)
 
-  def insertAll[F[_], A](add: Set[A], into: IncSetRef[A])(implicit P: Propagation[F]): F[Unit] =
+  def insertAll[F[_], Ref[_], A](add: Set[A], into: Ref[IncSet[A]])(implicit P: Propagation[F, Ref]): F[Unit] =
     P.update(into).by(Join(wrap(add)))
 
-  def include[F[_], A](sub: IncSetRef[A], sup: IncSetRef[A])(implicit P: Propagation[F]): F[Unit] =
+  def include[F[_], Ref[_], A](sub: Ref[IncSet[A]], sup: Ref[IncSet[A]])(implicit P: Propagation[F, Ref]): F[Unit] =
     P.observe(sub).by((sa: IncSet[A]) => {
       val now = Some(insertAll(sa.value, sup))
       val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(insertAll(delta.value, sup)))
       (now, onChange)
     })
 
-  def includeC[F[_]: Propagation, A](cps: ContU[F, A], ref: IncSetRef[A]): F[Unit] =
+  def includeC[F[_], Ref[_], A](cps: ContU[F, A], ref: Ref[IncSet[A]])(implicit P: Propagation[F, Ref]): F[Unit] =
     cps(a => IncSet.insert(a, ref))
 
-  def collect[F[_]: Propagation: Bind, A](cps: ContU[F, A]): F[IncSetRef[A]] = for {
-    res <- IncSet.init[F, A]
+  def collect[F[_]: Bind, Ref[_], A](cps: ContU[F, A])(implicit P: Propagation[F, Ref]): F[Ref[IncSet[A]]] = for {
+    res <- IncSet.init[F, Ref, A]
     _   <- includeC(cps, res)
   } yield res
 
-  def collectAll[F[_]: Propagation: Monad, A](cps: ContU[F, A]*): F[IncSetRef[A]] =
+  def collectAll[F[_]: Monad, Ref[_], A](cps: ContU[F, A]*)(implicit P: Propagation[F, Ref]): F[Ref[IncSet[A]]] =
     collectAll(cps)
 
-  def collectAll[F[_]: Propagation: Monad, A](cps: Iterable[ContU[F, A]]): F[IncSetRef[A]] =
+  def collectAll[F[_]: Monad, Ref[_], A](cps: Iterable[ContU[F, A]])(implicit P: Propagation[F, Ref]): F[Ref[IncSet[A]]] =
     collect(ContU.sequence(cps))
 
-  /** Relative monadic bind. [[nutcracker.IncSet.IncSetRef]] is a monad relative to `FreeK[F, ?]`,
+  /** Relative monadic bind. `Ref[IncSet[A]]` is a monad relative to `FreeK[F, ?]`,
     * i.e. we can implement `bind` if additional effects of type `FreeK[F, ?]` are allowed.
     * This is equivalent to having a monad instance for `λ[A => FreeK[F, IncSetRef[A]]]`.
     */
-  def relBind[F[_], A, B](sref: IncSetRef[A])(f: A => F[IncSetRef[B]])(implicit P: Propagation[F], M: Monad[F]): F[IncSetRef[B]] = {
+  def relBind[F[_], Ref[_], A, B](sref: Ref[IncSet[A]])(f: A => F[Ref[IncSet[B]]])(implicit P: Propagation[F, Ref], M: Monad[F]): F[Ref[IncSet[B]]] = {
     import scalaz.syntax.traverse._
     for {
-      res <- init[F, B]
+      res <- init[F, Ref, B]
       _ <- P.observe[IncSet[A]](sref).by((sa: IncSet[A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
         val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res)))))
@@ -109,11 +107,11 @@ object IncSet {
     } yield res
   }
 
-  implicit def monad[F[_]](implicit P: Propagation[F], M: Monad[F]): Monad[λ[A => F[IncSetRef[A]]]] =
-    new Monad[λ[A => F[IncSetRef[A]]]] {
-      def point[A](a: => A): F[IncSetRef[A]] = P.cell(singleton(a))
+  implicit def monad[F[_], Ref[_]](implicit P: Propagation[F, Ref], M: Monad[F]): Monad[λ[A => F[Ref[IncSet[A]]]]] =
+    new Monad[λ[A => F[Ref[IncSet[A]]]]] {
+      def point[A](a: => A): F[Ref[IncSet[A]]] = P.cell(singleton(a))
 
-      def bind[A, B](fa: F[IncSetRef[A]])(f: A => F[IncSetRef[B]]): F[IncSetRef[B]] =
+      def bind[A, B](fa: F[Ref[IncSet[A]]])(f: A => F[Ref[IncSet[B]]]): F[Ref[IncSet[B]]] =
         fa.flatMap(sa => relBind(sa)(f))
     }
 }

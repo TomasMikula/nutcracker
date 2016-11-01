@@ -1,6 +1,6 @@
 package nutcracker.demo
 
-import nutcracker.{FinalVars, PromiseOps, PropagationLang, PropagationStore}
+import nutcracker.{DRef, FinalVars, PromiseOps, PropagationLang, PropagationStore}
 import nutcracker.lib.bool.BoolDomain._
 import nutcracker.lib.bool._
 import nutcracker.util._
@@ -19,9 +19,9 @@ import scalaz.std.anyVal._
 // the inhabitants' type from their statements.
 
 class KnightsAndKnaves extends FreeSpec {
-  val V = FinalVars[FreeK[PropagationLang, ?]]
-  val B = BoolOps[FreeK[PropagationLang, ?]]
-  val P = PromiseOps[FreeK[PropagationLang, ?]]
+  val V = FinalVars[FreeK[PropagationLang, ?], DRef]
+  val B = BoolOps[FreeK[PropagationLang, ?], DRef]
+  val P = PromiseOps[FreeK[PropagationLang, ?], DRef]
 
   import V._
   import B._
@@ -42,10 +42,10 @@ class KnightsAndKnaves extends FreeSpec {
       c <- variable[Boolean]()
 
       // b says (a says knave(a))
-      _ <- B.presume(b =?= (a =?= neg(a)))
+      _ <- B.presume(b =??= (a =??= neg(a)))
 
       // c says knave(b)
-      _ <- presume(c =?= neg(b))
+      _ <- presume(c =??= neg(b))
 
       pr <- promiseResults(a, b, c)
     } yield pr
@@ -73,7 +73,7 @@ class KnightsAndKnaves extends FreeSpec {
       b <- variable[Boolean]()
 
       // a says (knave(a) ∨ knave(b))
-      _ <- presume(a =?= (neg(a) ∨ neg(b)))
+      _ <- presume(a =??= (neg(a) || neg(b)))
 
     } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b) }
 
@@ -98,7 +98,7 @@ class KnightsAndKnaves extends FreeSpec {
       b <- variable[Boolean]()
 
       // a says (knave(a) ∧ knave(b))
-      _ <- presume(a =?= (neg(a) ∧ neg(b)))
+      _ <- presume(a =??= (neg(a) && neg(b)))
 
     } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b) }
 
@@ -125,10 +125,10 @@ class KnightsAndKnaves extends FreeSpec {
       b <- variable[Boolean]()
 
       // a says (kind(a) = kind(b))
-      _ <- presume(a =?= (a =?= b))
+      _ <- presume(a =??= (a =?= b))
 
       // b says (kind(a) ≠ kind(b)
-      _ <- presume(b =?= neg(a =?= b))
+      _ <- presume(b =??= negM(a =?= b))
 
     } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b) }
 

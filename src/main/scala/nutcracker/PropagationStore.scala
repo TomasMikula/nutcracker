@@ -14,12 +14,12 @@ case class PropagationStore[K] private(
   nextId: Long,
   domains: KMap[DRef, λ[D => (D, Dom[D])]],
   domainObservers: K3Map[DRef.Aux, λ[(D, U, Δ) => List[(D, Δ) => Trigger[K]]]],
-  selTriggers: KMapB[Sel, λ[L => List[L => Trigger[K]]], HList],
-  cellsToSels: Index[DRef[_], Sel[_ <: HList]],
+  selTriggers: KMapB[λ[`L <: HList` => Sel[DRef, L]], λ[L => List[L => Trigger[K]]], HList],
+  cellsToSels: Index[DRef[_], Sel[DRef, _ <: HList]],
   unresolvedVars: Set[DRef[D] forSome { type D }],
   failedVars: Set[Long],
   dirtyDomains: K3Map[DRef.Aux, λ[(D, U, Δ) => Δ]],
-  dirtySelections: Set[Sel[_ <: HList]]
+  dirtySelections: Set[Sel[DRef, _ <: HList]]
 ) {
   import shapeless.PolyDefns.~>
 
@@ -71,7 +71,7 @@ case class PropagationStore[K] private(
     }
   }
 
-  def addSelTrigger[L <: HList](sel: Sel[L], t: L => Trigger[K]): (PropagationStore[K], Option[K]) = {
+  def addSelTrigger[L <: HList](sel: Sel[DRef, L], t: L => Trigger[K]): (PropagationStore[K], Option[K]) = {
     t(sel.fetch(cellFetcher)) match {
       case Discard() => (this, None)
       case Sleep() => (addSelTrigger0(sel, t), None)
@@ -95,7 +95,7 @@ case class PropagationStore[K] private(
     )
   }
 
-  private def addSelTrigger0[L <: HList](sel: Sel[L], t: L => Trigger[K]): PropagationStore[K] = {
+  private def addSelTrigger0[L <: HList](sel: Sel[DRef, L], t: L => Trigger[K]): PropagationStore[K] = {
     copy(
       selTriggers = selTriggers.put(sel)(t :: selTriggers.getOrElse(sel)(Nil)),
       cellsToSels = cellsToSels.add(sel)
@@ -108,7 +108,7 @@ case class PropagationStore[K] private(
       case (forLater, fired) => (copy(domainObservers = domainObservers.put(ref)(forLater)), fired)
     }
 
-  private def triggersForSel[L <: HList](sel: Sel[L]): (PropagationStore[K], Lst[K]) = {
+  private def triggersForSel[L <: HList](sel: Sel[DRef, L]): (PropagationStore[K], Lst[K]) = {
     val d = sel.fetch(cellFetcher)
     collectSelTriggers(d, selTriggers.getOrElse(sel)(Nil)) match {
       case (Nil, fired) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), fired)
@@ -116,7 +116,7 @@ case class PropagationStore[K] private(
     }
   }
 
-  private def getSelsForCell(ref: DRef[_]): Set[Sel[_ <: HList]] = cellsToSels.get(ref)
+  private def getSelsForCell(ref: DRef[_]): Set[Sel[DRef, _ <: HList]] = cellsToSels.get(ref)
 
   private def collectDomObservers[D, Δ](d: D, δ: Δ, triggers: List[(D, Δ) => Trigger[K]]): (List[(D, Δ) => Trigger[K]], Lst[K]) =
     triggers match {
@@ -161,14 +161,14 @@ case class PropagationStore[K] private(
 object PropagationStore {
   import scalaz.~>
 
-  private val P = Propagation[FreeK[PropagationLang, ?]]
+  private val P = Propagation[FreeK[PropagationLang, ?], DRef]
   import P._
 
   def empty[K] = PropagationStore[K](
     nextId = 0L,
     domains = KMap[DRef, λ[D => (D, Dom[D])]](),
     domainObservers = K3Map[DRef.Aux, λ[(D, U, Δ) => List[(D, Δ) => Trigger[K]]]](),
-    selTriggers = KMapB[Sel, λ[L => List[L => Trigger[K]]], HList](),
+    selTriggers = KMapB[λ[`L <: HList` => Sel[DRef, L]], λ[L => List[L => Trigger[K]]], HList](),
     cellsToSels = Index.empty(sel => sel.cells),
     unresolvedVars = Set(),
     failedVars = Set(),
@@ -233,12 +233,13 @@ object PropagationStore {
     s => (naiveAssess[K](ord))(lens.get(s))
 
 
-  private def fetch: Promise.Ref ~> (PropagationStore[FreeK[PropagationLang, Unit]] => ?) = new ~>[Promise.Ref, PropagationStore[FreeK[PropagationLang, Unit]] => ?] {
-    def apply[A](pa: Promise.Ref[A]): (PropagationStore[FreeK[PropagationLang, Unit]] => A) = s => s.fetchResult(pa).get
-  }
-  def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Id, Promise.Ref] = {
+  private def fetch: λ[A => DRef[Promise[A]]] ~> (PropagationStore[FreeK[PropagationLang, Unit]] => ?) =
+    λ[λ[A => DRef[Promise[A]]] ~> (PropagationStore[FreeK[PropagationLang, Unit]] => ?)](
+      pa => s => s.fetchResult(pa).get
+    )
+  def dfsSolver: DFSSolver[PropagationLang, PropagationStore, Id, λ[A => DRef[Promise[A]]]] = {
     implicit val mfp: Monad[FreeKT[PropagationLang, Id, ?]] = FreeKT.freeKTMonad[PropagationLang, Id] // scalac, why can't thou find this yourself?
-    new DFSSolver[PropagationLang, PropagationStore, Id, Promise.Ref](
+    new DFSSolver[PropagationLang, PropagationStore, Id, λ[A => DRef[Promise[A]]]](
       interpreter.freeInstance,
       emptyF[PropagationLang],
       naiveAssess[FreeK[PropagationLang, ?]],

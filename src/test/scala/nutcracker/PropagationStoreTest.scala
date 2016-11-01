@@ -8,15 +8,15 @@ import nutcracker.util.FreeK
 class PropagationStoreTest extends FunSuite {
   type Prg[A] = FreeK[PropagationLang, A]
 
-  val P = Propagation[Prg]
-  val V = FinalVars[Prg]
+  val P = Propagation[Prg, DRef]
+  val V = FinalVars[Prg, DRef]
   import P._
   import V._
 
   test("diff accumulation") {
     val prg = for {
       ref <- variable[Int].oneOf(1, 2, 3, 4, 5)
-      log <- newLog[Prg, Diff[Set[Int]]]
+      log <- newLog[Prg, DRef, Diff[Set[Int]]]
       _   <- observe(ref).by(s => (None, Some((s: DecSet[Int], d: Diff[Set[Int]]) => fireReload(log.write[Prg](d)))))
       _   <- remove(ref, DecSet(1, 2))
       _   <- remove(ref, DecSet(4, 5))
@@ -30,7 +30,7 @@ class PropagationStoreTest extends FunSuite {
   test("delta is cleared after being handled") {
     val prg1 = for {
       ref <- variable[Int].oneOf(1, 2, 3, 4, 5)
-      log <- newLog[Prg, Diff[Set[Int]]]
+      log <- newLog[Prg, DRef, Diff[Set[Int]]]
       _   <- observe(ref).by(s => (None, Some((s: DecSet[Int], d: Diff[Set[Int]]) => fireReload(log.write[Prg](d)))))
       _   <- remove(ref, DecSet(1, 2))
     } yield (ref, log)
@@ -51,7 +51,7 @@ class PropagationStoreTest extends FunSuite {
     val prg = for {
       ref <- variable[Int].oneOf(1, 2, 3, 4, 5)
       _   <- remove(ref, DecSet(4, 5, 6, 7)) // should not be logged
-      log <- newLog[Prg, Diff[Set[Int]]]
+      log <- newLog[Prg, DRef, Diff[Set[Int]]]
       _   <- observe(ref).by(s => (None, Some((s: DecSet[Int], d: Diff[Set[Int]]) => fireReload(log.write[Prg](d)))))
       _   <- remove(ref, DecSet(2, 3, 4, 5)) // only removal of {2, 3} should be logged
     } yield log
