@@ -1,7 +1,7 @@
 package nutcracker.demo
 
 import nutcracker.{DRef, FinalVars, PromiseOps, PropagationLang, PropagationStore}
-import nutcracker.lib.bool.BoolDomain._
+import nutcracker.lib.bool.Bool._
 import nutcracker.lib.bool._
 import nutcracker.util._
 import org.scalatest.FreeSpec

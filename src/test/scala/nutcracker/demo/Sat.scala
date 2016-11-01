@@ -2,7 +2,7 @@ package nutcracker.demo
 
 import nutcracker.PropagationLang._
 import nutcracker._
-import nutcracker.lib.bool.BoolDomain._
+import nutcracker.lib.bool.Bool._
 import nutcracker.lib.bool._
 import nutcracker.util.{FreeK, FreeKT}
 import org.scalatest.FunSpec

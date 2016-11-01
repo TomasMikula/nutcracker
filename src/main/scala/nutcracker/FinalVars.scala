@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.lib.bool._
-import nutcracker.lib.bool.BoolDomain._
+import nutcracker.lib.bool.Bool._
 import nutcracker.util.Inject
 
 import scalaz.{Applicative, Bind, Monad, Traverse}
@@ -73,7 +73,7 @@ class FinalVars[M[_], Ref[_]](implicit M: Propagation[M, Ref]) {
     injd: Inject[Diff[D], U],
     injm: Inject[Join[D], U],
     MB: Bind[M]
-  ): M[Ref[BoolDomain]] =
+  ): M[Ref[Bool]] =
     for {
       res <- variable[Boolean]()
       _ <- whenFinal(res).exec(r => if (r) different(d1, d2) else d1 <=> d2)
