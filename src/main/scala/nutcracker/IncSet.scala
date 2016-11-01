@@ -48,14 +48,18 @@ object IncSet {
     override def combineDeltas(d1: Diff[Set[A]], d2: Diff[Set[A]]): Diff[Set[A]] =
       Diff(d1.value union d2.value)
   }
+}
 
-  def init[F[_], Ref[_], A](implicit P: Propagation[F, Ref]): F[Ref[IncSet[A]]] =
+
+class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
+
+  def init[A]: F[Ref[IncSet[A]]] =
     P.cell(IncSet.empty[A])
 
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
     */
-  def forEach[F[_], Ref[_], A](ref: Ref[IncSet[A]])(implicit P: Propagation[F, Ref], A: Applicative[F]): ContU[F, A] = {
+  def forEach[A](ref: Ref[IncSet[A]])(implicit A: Applicative[F]): ContU[F, A] = {
     import scalaz.syntax.traverse._
     ContU(f => P.observe(ref).by(as => {
       val now = as.toList.traverse_(f)
@@ -64,41 +68,41 @@ object IncSet {
     }))
   }
 
-  def insert[F[_], Ref[_], A](a: A, into: Ref[IncSet[A]])(implicit P: Propagation[F, Ref]): F[Unit] =
+  def insert[A](a: A, into: Ref[IncSet[A]]): F[Unit] =
     insertAll(Set(a), into)
 
-  def insertAll[F[_], Ref[_], A](add: Set[A], into: Ref[IncSet[A]])(implicit P: Propagation[F, Ref]): F[Unit] =
-    P.update(into).by(Join(wrap(add)))
+  def insertAll[A](add: Set[A], into: Ref[IncSet[A]]): F[Unit] =
+    P.update(into).by(Join(IncSet.wrap(add)))
 
-  def include[F[_], Ref[_], A](sub: Ref[IncSet[A]], sup: Ref[IncSet[A]])(implicit P: Propagation[F, Ref]): F[Unit] =
+  def include[A](sub: Ref[IncSet[A]], sup: Ref[IncSet[A]]): F[Unit] =
     P.observe(sub).by((sa: IncSet[A]) => {
       val now = Some(insertAll(sa.value, sup))
       val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(insertAll(delta.value, sup)))
       (now, onChange)
     })
 
-  def includeC[F[_], Ref[_], A](cps: ContU[F, A], ref: Ref[IncSet[A]])(implicit P: Propagation[F, Ref]): F[Unit] =
-    cps(a => IncSet.insert(a, ref))
+  def includeC[A](cps: ContU[F, A], ref: Ref[IncSet[A]]): F[Unit] =
+    cps(a => insert(a, ref))
 
-  def collect[F[_]: Bind, Ref[_], A](cps: ContU[F, A])(implicit P: Propagation[F, Ref]): F[Ref[IncSet[A]]] = for {
-    res <- IncSet.init[F, Ref, A]
+  def collect[A](cps: ContU[F, A])(implicit B: Bind[F]): F[Ref[IncSet[A]]] = for {
+    res <- init[A]
     _   <- includeC(cps, res)
   } yield res
 
-  def collectAll[F[_]: Monad, Ref[_], A](cps: ContU[F, A]*)(implicit P: Propagation[F, Ref]): F[Ref[IncSet[A]]] =
+  def collectAll[A](cps: ContU[F, A]*)(implicit M: Monad[F]): F[Ref[IncSet[A]]] =
     collectAll(cps)
 
-  def collectAll[F[_]: Monad, Ref[_], A](cps: Iterable[ContU[F, A]])(implicit P: Propagation[F, Ref]): F[Ref[IncSet[A]]] =
+  def collectAll[A](cps: Iterable[ContU[F, A]])(implicit M: Monad[F]): F[Ref[IncSet[A]]] =
     collect(ContU.sequence(cps))
 
   /** Relative monadic bind. `Ref[IncSet[A]]` is a monad relative to `FreeK[F, ?]`,
     * i.e. we can implement `bind` if additional effects of type `FreeK[F, ?]` are allowed.
     * This is equivalent to having a monad instance for `λ[A => FreeK[F, IncSetRef[A]]]`.
     */
-  def relBind[F[_], Ref[_], A, B](sref: Ref[IncSet[A]])(f: A => F[Ref[IncSet[B]]])(implicit P: Propagation[F, Ref], M: Monad[F]): F[Ref[IncSet[B]]] = {
+  def relBind[A, B](sref: Ref[IncSet[A]])(f: A => F[Ref[IncSet[B]]])(implicit M: Monad[F]): F[Ref[IncSet[B]]] = {
     import scalaz.syntax.traverse._
     for {
-      res <- init[F, Ref, B]
+      res <- init[B]
       _ <- P.observe[IncSet[A]](sref).by((sa: IncSet[A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
         val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => FireReload(delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res)))))
@@ -107,9 +111,9 @@ object IncSet {
     } yield res
   }
 
-  implicit def monad[F[_], Ref[_]](implicit P: Propagation[F, Ref], M: Monad[F]): Monad[λ[A => F[Ref[IncSet[A]]]]] =
+  implicit def monad(implicit M: Monad[F]): Monad[λ[A => F[Ref[IncSet[A]]]]] =
     new Monad[λ[A => F[Ref[IncSet[A]]]]] {
-      def point[A](a: => A): F[Ref[IncSet[A]]] = P.cell(singleton(a))
+      def point[A](a: => A): F[Ref[IncSet[A]]] = P.cell(IncSet.singleton(a))
 
       def bind[A, B](fa: F[Ref[IncSet[A]]])(f: A => F[Ref[IncSet[B]]]): F[Ref[IncSet[B]]] =
         fa.flatMap(sa => relBind(sa)(f))
