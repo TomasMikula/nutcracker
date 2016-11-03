@@ -1,5 +1,7 @@
 package nutcracker
 
+import nutcracker.util.EqualK
+
 import scalaz.{Equal, Show}
 
 sealed abstract class DRef[D](private[nutcracker] val domainId: Long) {
@@ -24,6 +26,10 @@ object DRef {
 
   implicit def equalInstance[D, U, Δ]: Equal[DRef.Aux[D, U, Δ]] = new Equal[DRef.Aux[D, U, Δ]] {
     def equal(r1: Aux[D, U, Δ], r2: Aux[D, U, Δ]): Boolean = r1.domainId == r2.domainId
+  }
+
+  implicit def equalKInstance[D]: EqualK[DRef] = new EqualK[DRef] {
+    def equal[A](f1: DRef[A], f2: DRef[A]): Boolean = f1.domainId == f2.domainId
   }
 
   implicit def showInstance[D, U, Δ]: Show[DRef.Aux[D, U, Δ]] = new Show[DRef.Aux[D, U, Δ]] {
