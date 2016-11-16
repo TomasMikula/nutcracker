@@ -66,10 +66,10 @@ object DeepEqual {
         if(p1_eq.find(ep2 => eq2.hEqual(ep2.value, p2)).isDefined) deepEqual(Const(true), γ, stack)(deref1, deref2)
         else deepEqual(ev.equal(deref1(p1), deref2(p2)), γ.put(p1)(Exists(p2) :: p1_eq), stack)(deref1, deref2)
       case And(e1, e2) =>
-        val cont: StackFrame[Ptr1, Ptr2] = if(_) (e2, γ) else (Const(false), γ)
+        val cont: StackFrame[Ptr1, Ptr2] = if(_) (e2(), γ) else (Const(false), γ)
         deepEqual(e1, γ, cont :: stack)(deref1, deref2)
       case Or(e1, e2) =>
-        val cont: StackFrame[Ptr1, Ptr2] = if(_) (Const(true), γ) else (e2, γ)
+        val cont: StackFrame[Ptr1, Ptr2] = if(_) (Const(true), γ) else (e2(), γ)
         deepEqual(e1, γ, cont :: stack)(deref1, deref2)
     }
   }
@@ -90,15 +90,15 @@ trait DeepEqualK[F1[_[_]], F2[_[_]]] {
 sealed trait IsEqual[Ptr1[_], Ptr2[_]] {
   import IsEqual._
 
-  def &&(that: IsEqual[Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = And(this, that)
-  def ||(that: IsEqual[Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = Or(this, that)
+  def &&(that: => IsEqual[Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = And(this, () => that)
+  def ||(that: => IsEqual[Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = Or(this, () => that)
 }
 
 object IsEqual {
   private[util] case class Const[Ptr1[_], Ptr2[_]](value: Boolean) extends IsEqual[Ptr1, Ptr2]
   private[util] case class Indirect[Ptr1[_], Ptr2[_], X, Y](p1: Ptr1[X], p2: Ptr2[Y], ev: DeepEqual[X, Y, Ptr1, Ptr2]) extends IsEqual[Ptr1, Ptr2]
-  private[util] case class And[Ptr1[_], Ptr2[_]](e1: IsEqual[Ptr1, Ptr2], e2: IsEqual[Ptr1, Ptr2]) extends IsEqual[Ptr1, Ptr2]
-  private[util] case class Or[Ptr1[_], Ptr2[_]](e1: IsEqual[Ptr1, Ptr2], e2: IsEqual[Ptr1, Ptr2]) extends IsEqual[Ptr1, Ptr2]
+  private[util] case class And[Ptr1[_], Ptr2[_]](e1: IsEqual[Ptr1, Ptr2], e2: () => IsEqual[Ptr1, Ptr2]) extends IsEqual[Ptr1, Ptr2]
+  private[util] case class Or[Ptr1[_], Ptr2[_]](e1: IsEqual[Ptr1, Ptr2], e2: () => IsEqual[Ptr1, Ptr2]) extends IsEqual[Ptr1, Ptr2]
 
   def apply[Ptr1[_], Ptr2[_]](value: Boolean): IsEqual[Ptr1, Ptr2] = Const(value)
   def apply[Ptr1[_], Ptr2[_], X, Y](p1: Ptr1[X], p2: Ptr2[Y])(implicit ev: DeepEqual[X, Y, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = Indirect(p1, p2, ev)
