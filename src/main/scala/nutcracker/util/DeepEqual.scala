@@ -102,4 +102,44 @@ object IsEqual {
 
   def apply[Ptr1[_], Ptr2[_]](value: Boolean): IsEqual[Ptr1, Ptr2] = Const(value)
   def apply[Ptr1[_], Ptr2[_], X, Y](p1: Ptr1[X], p2: Ptr2[Y])(implicit ev: DeepEqual[X, Y, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = Indirect(p1, p2, ev)
+
+  def equal[Ptr1[_], Ptr2[_], A1, A2](a1: A1, a2: A2)(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = ev.equal(a1, a2)
+
+  def listEqual[Ptr1[_], Ptr2[_], A1, A2](l1: List[A1], l2: List[A2])(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
+    if(l1.size != l2.size) Const(false)
+    else {
+      def go(l1: List[A1], l2: List[A2]): IsEqual[Ptr1, Ptr2] = (l1, l2) match {
+        case (a :: as, b :: bs) => ev.equal(a, b) && go(as, bs)
+        case _ => Const(true)
+      }
+      go(l1, l2)
+    }
+
+  def unorderedListEqual[Ptr1[_], Ptr2[_], A1, A2](l1: List[A1], l2: List[A2])(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
+    if(l1.size != l2.size) IsEqual(false)
+    else {
+      def proceed(l1: List[A1], l2: List[A2]): IsEqual[Ptr1, Ptr2] = {
+        assert(l1.size == l2.size)
+        l1 match {
+          case h :: t => locate(h, t, Nil, l2)
+          case Nil => IsEqual(true)
+        }
+      }
+
+      // finds the first occurrence of h1 in r2 and then proceeds with equating t1 with (l2 ++ (r2 - h1))
+      def locate(h1: A1, t1: List[A1], l2: List[A2], r2: List[A2]): IsEqual[Ptr1, Ptr2] = {
+        assert(1 + t1.size == l2.size + r2.size)
+        r2 match {
+          case e2 :: r2 => ev.equal(h1, e2) && proceed(t1, l2 reverse_::: r2) || locate(h1, t1, e2 :: l2, r2)
+          case Nil => IsEqual(false)
+        }
+
+      }
+
+      proceed(l1, l2)
+    }
+
+  def setEqual[Ptr1[_], Ptr2[_], A1, A2](s1: Set[A1], s2: Set[A2])(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
+    unorderedListEqual(s1.toList, s2.toList)
+
 }
