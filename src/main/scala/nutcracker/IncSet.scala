@@ -1,7 +1,7 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.util.ContU
+import nutcracker.util.{ContU, DeepEqual, IsEqual}
 
 import scalaz.{Applicative, Bind, Monad}
 import scalaz.std.list._
@@ -48,6 +48,32 @@ object IncSet {
     override def combineDeltas(d1: Diff[Set[A]], d2: Diff[Set[A]]): Diff[Set[A]] =
       Diff(d1.value union d2.value)
   }
+
+  implicit def deepEqual[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[IncSet[A1], IncSet[A2], Ptr1, Ptr2] =
+    new DeepEqual[IncSet[A1], IncSet[A2], Ptr1, Ptr2] {
+      def equal(s1: IncSet[A1], s2: IncSet[A2]): IsEqual[Ptr1, Ptr2] =
+        if(s1.size != s2.size) IsEqual(false)
+        else {
+          def listEqual(l1: List[A1], l2: List[A2]): IsEqual[Ptr1, Ptr2] = {
+            assert(l1.size == l2.size)
+            l1 match {
+              case h :: t => go(h, t, Nil, l2)
+              case Nil => IsEqual(true)
+            }
+          }
+
+          def go(h1: A1, t1: List[A1], l2: List[A2], r2: List[A2]): IsEqual[Ptr1, Ptr2] = {
+            assert(1 + t1.size == l2.size + r2.size)
+            r2 match {
+              case e2 :: r2 => ev.equal(h1, e2) && listEqual(t1, l2 reverse_::: r2) || go(h1, t1, e2 :: l2, r2)
+              case Nil => IsEqual(false)
+            }
+
+          }
+
+          listEqual(s1.toList, s2.toList)
+        }
+    }
 }
 
 
