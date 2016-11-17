@@ -104,6 +104,56 @@ object DeepEqual {
     new DeepEqual[Set[A1], Set[A2], Ptr1, Ptr2] {
       def equal(a1: Set[A1], a2: Set[A2]): IsEqual[Ptr1, Ptr2] = IsEqual.setEqual(a1, a2)
     }
+
+  implicit def tuple2Instance[Ptr1[_], Ptr2[_], A1, B1, A2, B2](implicit
+    eva: DeepEqual[A1, A2, Ptr1, Ptr2],
+    evb: DeepEqual[B1, B2, Ptr1, Ptr2]
+  ): DeepEqual[(A1, B1), (A2, B2), Ptr1, Ptr2] =
+    new DeepEqual[(A1, B1), (A2, B2), Ptr1, Ptr2] {
+      def equal(a1: (A1, B1), a2: (A2, B2)): IsEqual[Ptr1, Ptr2] = IsEqual.tuple2(a1, a2)
+    }
+
+  implicit def tuple3Instance[Ptr1[_], Ptr2[_], A1, B1, C1, A2, B2, C2](implicit
+    eva: DeepEqual[A1, A2, Ptr1, Ptr2],
+    evb: DeepEqual[B1, B2, Ptr1, Ptr2],
+    evc: DeepEqual[C1, C2, Ptr1, Ptr2]
+  ): DeepEqual[(A1, B1, C1), (A2, B2, C2), Ptr1, Ptr2] =
+    new DeepEqual[(A1, B1, C1), (A2, B2, C2), Ptr1, Ptr2] {
+      def equal(a1: (A1, B1, C1), a2: (A2, B2, C2)): IsEqual[Ptr1, Ptr2] = IsEqual.tuple3(a1, a2)
+    }
+
+  implicit def tuple4Instance[Ptr1[_], Ptr2[_], A1, B1, C1, D1, A2, B2, C2, D2](implicit
+    eva: DeepEqual[A1, A2, Ptr1, Ptr2],
+    evb: DeepEqual[B1, B2, Ptr1, Ptr2],
+    evc: DeepEqual[C1, C2, Ptr1, Ptr2],
+    evd: DeepEqual[D1, D2, Ptr1, Ptr2]
+  ): DeepEqual[(A1, B1, C1, D1), (A2, B2, C2, D2), Ptr1, Ptr2] =
+    new DeepEqual[(A1, B1, C1, D1), (A2, B2, C2, D2), Ptr1, Ptr2] {
+      def equal(a1: (A1, B1, C1, D1), a2: (A2, B2, C2, D2)): IsEqual[Ptr1, Ptr2] = IsEqual.tuple4(a1, a2)
+    }
+
+  implicit def tuple5Instance[Ptr1[_], Ptr2[_], A1, B1, C1, D1, E1, A2, B2, C2, D2, E2](implicit
+    eva: DeepEqual[A1, A2, Ptr1, Ptr2],
+    evb: DeepEqual[B1, B2, Ptr1, Ptr2],
+    evc: DeepEqual[C1, C2, Ptr1, Ptr2],
+    evd: DeepEqual[D1, D2, Ptr1, Ptr2],
+    eve: DeepEqual[E1, E2, Ptr1, Ptr2]
+  ): DeepEqual[(A1, B1, C1, D1, E1), (A2, B2, C2, D2, E2), Ptr1, Ptr2] =
+    new DeepEqual[(A1, B1, C1, D1, E1), (A2, B2, C2, D2, E2), Ptr1, Ptr2] {
+      def equal(a1: (A1, B1, C1, D1, E1), a2: (A2, B2, C2, D2, E2)): IsEqual[Ptr1, Ptr2] = IsEqual.tuple5(a1, a2)
+    }
+
+  implicit def tuple6Instance[Ptr1[_], Ptr2[_], A1, B1, C1, D1, E1, F1, A2, B2, C2, D2, E2, F2](implicit
+    eva: DeepEqual[A1, A2, Ptr1, Ptr2],
+    evb: DeepEqual[B1, B2, Ptr1, Ptr2],
+    evc: DeepEqual[C1, C2, Ptr1, Ptr2],
+    evd: DeepEqual[D1, D2, Ptr1, Ptr2],
+    eve: DeepEqual[E1, E2, Ptr1, Ptr2],
+    evf: DeepEqual[F1, F2, Ptr1, Ptr2]
+  ): DeepEqual[(A1, B1, C1, D1, E1, F1), (A2, B2, C2, D2, E2, F2), Ptr1, Ptr2] =
+    new DeepEqual[(A1, B1, C1, D1, E1, F1), (A2, B2, C2, D2, E2, F2), Ptr1, Ptr2] {
+      def equal(a1: (A1, B1, C1, D1, E1, F1), a2: (A2, B2, C2, D2, E2, F2)): IsEqual[Ptr1, Ptr2] = IsEqual.tuple6(a1, a2)
+    }
 }
 
 trait DeepEqualK[F1[_[_]], F2[_[_]]] {
@@ -193,5 +243,45 @@ object IsEqual {
 
   def setEqual[Ptr1[_], Ptr2[_], A1, A2](s1: Set[A1], s2: Set[A2])(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
     unorderedListEqual(s1.toList, s2.toList)
+
+  def tuple2[Ptr1[_], Ptr2[_], A1, B1, A2, B2](t1: (A1, B1), t2: (A2, B2))(implicit
+    eva: DeepEqual[A1, A2, Ptr1, Ptr2],
+    evb: DeepEqual[B1, B2, Ptr1, Ptr2]
+  ): IsEqual[Ptr1, Ptr2] =
+    eva.equal(t1._1, t2._1) && evb.equal(t1._2, t2._2)
+
+  def tuple3[Ptr1[_], Ptr2[_], A1, B1, C1, A2, B2, C2](t1: (A1, B1, C1), t2: (A2, B2, C2))(implicit
+    eva: DeepEqual[A1, A2, Ptr1, Ptr2],
+    evb: DeepEqual[B1, B2, Ptr1, Ptr2],
+    evc: DeepEqual[C1, C2, Ptr1, Ptr2]
+  ): IsEqual[Ptr1, Ptr2] =
+    eva.equal(t1._1, t2._1) && evb.equal(t1._2, t2._2) && evc.equal(t1._3, t2._3)
+
+  def tuple4[Ptr1[_], Ptr2[_], A1, B1, C1, D1, A2, B2, C2, D2](t1: (A1, B1, C1, D1), t2: (A2, B2, C2, D2))(implicit
+    eva: DeepEqual[A1, A2, Ptr1, Ptr2],
+    evb: DeepEqual[B1, B2, Ptr1, Ptr2],
+    evc: DeepEqual[C1, C2, Ptr1, Ptr2],
+    evd: DeepEqual[D1, D2, Ptr1, Ptr2]
+  ): IsEqual[Ptr1, Ptr2] =
+    eva.equal(t1._1, t2._1) && evb.equal(t1._2, t2._2) && evc.equal(t1._3, t2._3) && evd.equal(t1._4, t2._4)
+
+  def tuple5[Ptr1[_], Ptr2[_], A1, B1, C1, D1, E1, A2, B2, C2, D2, E2](t1: (A1, B1, C1, D1, E1), t2: (A2, B2, C2, D2, E2))(implicit
+    eva: DeepEqual[A1, A2, Ptr1, Ptr2],
+    evb: DeepEqual[B1, B2, Ptr1, Ptr2],
+    evc: DeepEqual[C1, C2, Ptr1, Ptr2],
+    evd: DeepEqual[D1, D2, Ptr1, Ptr2],
+    eve: DeepEqual[E1, E2, Ptr1, Ptr2]
+  ): IsEqual[Ptr1, Ptr2] =
+    eva.equal(t1._1, t2._1) && evb.equal(t1._2, t2._2) && evc.equal(t1._3, t2._3) && evd.equal(t1._4, t2._4) && eve.equal(t1._5, t2._5)
+
+  def tuple6[Ptr1[_], Ptr2[_], A1, B1, C1, D1, E1, F1, A2, B2, C2, D2, E2, F2](t1: (A1, B1, C1, D1, E1, F1), t2: (A2, B2, C2, D2, E2, F2))(implicit
+    eva: DeepEqual[A1, A2, Ptr1, Ptr2],
+    evb: DeepEqual[B1, B2, Ptr1, Ptr2],
+    evc: DeepEqual[C1, C2, Ptr1, Ptr2],
+    evd: DeepEqual[D1, D2, Ptr1, Ptr2],
+    eve: DeepEqual[E1, E2, Ptr1, Ptr2],
+    evf: DeepEqual[F1, F2, Ptr1, Ptr2]
+  ): IsEqual[Ptr1, Ptr2] =
+    eva.equal(t1._1, t2._1) && evb.equal(t1._2, t2._2) && evc.equal(t1._3, t2._3) && evd.equal(t1._4, t2._4) && eve.equal(t1._5, t2._5) && evf.equal(t1._6, t2._6)
 
 }
