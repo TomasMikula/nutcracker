@@ -79,6 +79,26 @@ object DeepEqual {
 
   implicit def specialize[Ptr1[_], Ptr2[_], A1[_[_]], A2[_[_]]](implicit ev: DeepEqualK[A1, A2]): DeepEqual[A1[Ptr1], A2[Ptr2], Ptr1, Ptr2] =
     ev.specialize
+
+  implicit def optionInstance[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[Option[A1], Option[A2], Ptr1, Ptr2] =
+    new DeepEqual[Option[A1], Option[A2], Ptr1, Ptr2] {
+      def equal(a1: Option[A1], a2: Option[A2]): IsEqual[Ptr1, Ptr2] = IsEqual.optionEqual(a1, a2)
+    }
+
+  implicit def listInstance[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[List[A1], List[A2], Ptr1, Ptr2] =
+    new DeepEqual[List[A1], List[A2], Ptr1, Ptr2] {
+      def equal(a1: List[A1], a2: List[A2]): IsEqual[Ptr1, Ptr2] = IsEqual.listEqual(a1, a2)
+    }
+
+  implicit def vectorInstance[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[Vector[A1], Vector[A2], Ptr1, Ptr2] =
+    new DeepEqual[Vector[A1], Vector[A2], Ptr1, Ptr2] {
+      def equal(a1: Vector[A1], a2: Vector[A2]): IsEqual[Ptr1, Ptr2] = IsEqual.vectorEqual(a1, a2)
+    }
+
+  implicit def setInstance[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[Set[A1], Set[A2], Ptr1, Ptr2] =
+    new DeepEqual[Set[A1], Set[A2], Ptr1, Ptr2] {
+      def equal(a1: Set[A1], a2: Set[A2]): IsEqual[Ptr1, Ptr2] = IsEqual.setEqual(a1, a2)
+    }
 }
 
 trait DeepEqualK[F1[_[_]], F2[_[_]]] {
