@@ -85,6 +85,11 @@ object DeepEqual {
       def equal(a1: Option[A1], a2: Option[A2]): IsEqual[Ptr1, Ptr2] = IsEqual.optionEqual(a1, a2)
     }
 
+  implicit def eitherInstance[Ptr1[_], Ptr2[_], A1, B1, A2, B2](implicit eva: DeepEqual[A1, A2, Ptr1, Ptr2], evb: DeepEqual[B1, B2, Ptr1, Ptr2]): DeepEqual[Either[A1, B1], Either[A2, B2], Ptr1, Ptr2] =
+    new DeepEqual[Either[A1, B1], Either[A2, B2], Ptr1, Ptr2] {
+      def equal(a1: Either[A1, B1], a2: Either[A2, B2]): IsEqual[Ptr1, Ptr2] = IsEqual.eitherEqual(a1, a2)
+    }
+
   implicit def listInstance[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[List[A1], List[A2], Ptr1, Ptr2] =
     new DeepEqual[List[A1], List[A2], Ptr1, Ptr2] {
       def equal(a1: List[A1], a2: List[A2]): IsEqual[Ptr1, Ptr2] = IsEqual.listEqual(a1, a2)
@@ -132,6 +137,13 @@ object IsEqual {
     (o1, o2) match {
       case (Some(a1), Some(a2)) => ev.equal(a1, a2)
       case (None, None) => Const(true)
+      case _ => Const(false)
+    }
+
+  def eitherEqual[Ptr1[_], Ptr2[_], A1, B1, A2, B2](e1: Either[A1, B1], e2: Either[A2, B2])(implicit eva: DeepEqual[A1, A2, Ptr1, Ptr2], evb: DeepEqual[B1, B2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
+    (e1, e2) match {
+      case (Left(a1), Left(a2)) => eva.equal(a1, a2)
+      case (Right(b1), Right(b2)) => evb.equal(b1, b2)
       case _ => Const(false)
     }
 
