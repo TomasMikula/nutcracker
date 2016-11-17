@@ -1,6 +1,9 @@
 package nutcracker
 
+import scala.language.higherKinds
+
 import nutcracker.Promise.Empty
+import nutcracker.util.{DeepEqual, IsEqual}
 
 import scalaz.Equal
 import scalaz.syntax.equal._
@@ -88,4 +91,14 @@ object Promise {
       case _ => false
     }
   }
+
+  implicit def deepEqualInstance[A, B, Ptr1[_], Ptr2[_]](implicit ev: DeepEqual[A, B, Ptr1, Ptr2]): DeepEqual[Promise[A], Promise[B], Ptr1, Ptr2] =
+    new DeepEqual[Promise[A], Promise[B], Ptr1, Ptr2] {
+      def equal(p1: Promise[A], p2: Promise[B]): IsEqual[Ptr1, Ptr2] = (p1, p2) match {
+        case (Completed(a1), Completed(a2)) => ev.equal(a1, a2)
+        case (Empty, Empty) => IsEqual(true)
+        case (Conflict, Conflict) => IsEqual(true)
+        case _ => IsEqual(false)
+      }
+    }
 }
