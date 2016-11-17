@@ -76,6 +76,9 @@ object DeepEqual {
 
   implicit def lift[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[Ptr1[A1], Ptr2[A2], Ptr1, Ptr2] =
     ev.lift
+
+  implicit def specialize[Ptr1[_], Ptr2[_], A1[_[_]], A2[_[_]]](implicit ev: DeepEqualK[A1, A2]): DeepEqual[A1[Ptr1], A2[Ptr2], Ptr1, Ptr2] =
+    ev.specialize
 }
 
 trait DeepEqualK[F1[_[_]], F2[_[_]]] {
@@ -105,6 +108,13 @@ object IsEqual {
 
   def equal[Ptr1[_], Ptr2[_], A1, A2](a1: A1, a2: A2)(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = ev.equal(a1, a2)
 
+  def optionEqual[Ptr1[_], Ptr2[_], A1, A2](o1: Option[A1], o2: Option[A2])(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
+    (o1, o2) match {
+      case (Some(a1), Some(a2)) => ev.equal(a1, a2)
+      case (None, None) => Const(true)
+      case _ => Const(false)
+    }
+
   def listEqual[Ptr1[_], Ptr2[_], A1, A2](l1: List[A1], l2: List[A2])(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
     if(l1.size != l2.size) Const(false)
     else {
@@ -113,6 +123,16 @@ object IsEqual {
         case _ => Const(true)
       }
       go(l1, l2)
+    }
+
+  def vectorEqual[Ptr1[_], Ptr2[_], A1, A2](v1: Vector[A1], v2: Vector[A2])(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
+    if(v1.size != v2.size) Const(false)
+    else {
+      def go(i: Int): IsEqual[Ptr1, Ptr2] =
+        if(i >= 0) ev.equal(v1(i), v2(i)) && go(i-1)
+        else Const(true)
+
+      go(v1.size - 1)
     }
 
   def unorderedListEqual[Ptr1[_], Ptr2[_], A1, A2](l1: List[A1], l2: List[A2])(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
