@@ -1,7 +1,7 @@
 package nutcracker
 
 import nutcracker.Dom.{Refined, Status}
-import nutcracker.util.{ContU, Uninhabited}
+import nutcracker.util.{ContU, DeepEqual, IsEqual, Uninhabited}
 
 import scala.language.higherKinds
 import scalaz.{Bind, ContT, Monad, Show}
@@ -17,7 +17,7 @@ import scalaz.Id.Id
   */
 final case class Antichain[A](value: A) extends AnyVal
 
-object Antichain {
+object Antichain extends AntichainInstances {
 
   type Update[A] = Uninhabited
   type Delta[A] = Uninhabited
@@ -65,5 +65,23 @@ object Antichain {
   implicit def showInstance[A](implicit A: Show[A]): Show[Antichain[A]] = new Show[Antichain[A]] {
     override def shows(a: Antichain[A]): String = A.shows(a.value)
   }
+
+}
+
+trait AntichainInstances extends AntichainInstances1 {
+
+  implicit def deepEqualInstance1[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[Antichain[A1], A2, Ptr1, Ptr2] =
+    new DeepEqual[Antichain[A1], A2, Ptr1, Ptr2] {
+      def equal(a1: Antichain[A1], a2: A2): IsEqual[Ptr1, Ptr2] = ev.equal(a1.value, a2)
+    }
+
+}
+
+trait AntichainInstances1 {
+
+  implicit def deepEqualInstance2[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[A1, Antichain[A2], Ptr1, Ptr2] =
+    new DeepEqual[A1, Antichain[A2], Ptr1, Ptr2] {
+      def equal(a1: A1, a2: Antichain[A2]): IsEqual[Ptr1, Ptr2] = ev.equal(a1, a2.value)
+    }
 
 }
