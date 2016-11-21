@@ -13,8 +13,8 @@ package object util {
   // suggested by Miles Sabin in the comments
   type Uninhabited = Nothing { type T = Unit }
 
-  type ≈>[F[_[_]], G[_[_]]] = FunctionK[F, G]
-  type ≈~>[F[_[_], _], G[_[_], _]] = FunctionKA[F, G]
+  type ≈>[F[_[_]], G[_[_]]] = `FunctionK{(* -> *) -> *}`[F, G]
+  type ≈~>[F[_[_], _], G[_[_], _]] = `FunctionK{(* -> *) -> * -> *}`[F, G]
   type ≈>>[F[_[_], _], G[_]] = F ≈~> λ[(K[_], A) => G[A]]
 
   /** Continuation monad with result type `M[Unit]`. */
