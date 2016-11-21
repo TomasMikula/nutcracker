@@ -15,7 +15,7 @@ object EqualK {
   implicit def specialize[F[_], A](implicit ev: EqualK[F]): Equal[F[A]] = ev.specialize[A]
 }
 
-/** Equality for heterogenous types. */
+/** Equality for type constructors of kind `* -> *` applied to possibly heterogenous types. */
 trait HEqualK[F[_]] extends EqualK[F] {
   def hEqual[A, B](fa: F[A], fb: F[B]): Boolean
 
