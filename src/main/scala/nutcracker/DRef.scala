@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.util.{EqualK, HEqualK}
+import nutcracker.util.HEqualK
 
 import scalaz.{Equal, Show}
 
@@ -28,7 +28,7 @@ object DRef {
     def equal(r1: Aux[D, U, Δ], r2: Aux[D, U, Δ]): Boolean = r1.domainId == r2.domainId
   }
 
-  implicit def equalKInstance[D]: HEqualK[DRef] = new HEqualK[DRef] {
+  implicit val equalKInstance: HEqualK[DRef] = new HEqualK[DRef] {
     def hEqual[A, B](f1: DRef[A], f2: DRef[B]): Boolean = f1.domainId == f2.domainId
   }
 
