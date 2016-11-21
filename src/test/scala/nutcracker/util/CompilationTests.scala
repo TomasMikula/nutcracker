@@ -71,9 +71,9 @@ object CompilationTests {
     implicitly[Lenz[FooBarQuxS[Int], BarS[Int]]]
     implicitly[Lenz[FooBarQuxS[Int], QuxS[Int]]]
 
-    implicitly[ValA[λ[K => Lenz[FooBarQuxS[K], FooS[K]]]]]
-    implicitly[ValA[λ[K => Lenz[FooBarQuxS[K], BarS[K]]]]]
-    implicitly[ValA[λ[K => Lenz[FooBarQuxS[K], QuxS[K]]]]]
+    implicitly[`Forall{* -> *}`[λ[K => Lenz[FooBarQuxS[K], FooS[K]]]]]
+    implicitly[`Forall{* -> *}`[λ[K => Lenz[FooBarQuxS[K], BarS[K]]]]]
+    implicitly[`Forall{* -> *}`[λ[K => Lenz[FooBarQuxS[K], QuxS[K]]]]]
 
     ()
   }

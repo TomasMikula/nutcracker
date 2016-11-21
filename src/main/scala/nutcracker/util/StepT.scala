@@ -101,7 +101,7 @@ object StepT {
       new StateInterpreterT[M, H, U] {
         def step: StepT[M, H, U] = ig.step :&: self
         def uncons: Uncons[U] =
-          ig.uncons.zoomOut[U](implicitly[ValA[λ[K => Lens[U[K], T[K]]]]])
+          ig.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], T[K]]]]])
       }
     }
 

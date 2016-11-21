@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 import nutcracker.DeferLang.Delay
 import nutcracker.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
-import nutcracker.util.{Lst, StateInterpreter, Step, Uncons, ValA, WriterState}
+import nutcracker.util.{Lst, StateInterpreter, Step, Uncons, `Forall{* -> *}`, WriterState}
 
 import scalaz.{Heap, Order, StateT}
 import scalaz.std.option._
@@ -40,7 +40,7 @@ object DeferStore {
           })
       }
 
-      def uncons: Uncons[DeferStore[D, ?]] = Uncons(new ValA[λ[K => StateT[Option, DeferStore[D, K], Lst[K]]]] {
+      def uncons: Uncons[DeferStore[D, ?]] = Uncons(new `Forall{* -> *}`[λ[K => StateT[Option, DeferStore[D, K], Lst[K]]]] {
         protected def compute[K]: StateT[Option, DeferStore[D, K], Lst[K]] =
           StateT(_.uncons)
       })

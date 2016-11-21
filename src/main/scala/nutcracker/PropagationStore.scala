@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMap, KMapB, Lst, StateInterpreter, Step, Uncons, ValA, WriterState}
+import nutcracker.util.{FreeK, FreeKT, Index, K3Map, KMap, KMapB, Lst, StateInterpreter, Step, Uncons, `Forall{* -> *}`, WriterState}
 
 import scalaz.Id._
 import scalaz.{Monad, StateT, |>=|}
@@ -202,7 +202,7 @@ object PropagationStore {
         }
 
       def uncons: Uncons[PropagationStore] = Uncons[PropagationStore](
-        new ValA[λ[K => StateT[Option, PropagationStore[K], Lst[K]]]] {
+        new `Forall{* -> *}`[λ[K => StateT[Option, PropagationStore[K], Lst[K]]]] {
           override def compute[K]: StateT[Option, PropagationStore[K], Lst[K]] =
             StateT(_.uncons)
         })

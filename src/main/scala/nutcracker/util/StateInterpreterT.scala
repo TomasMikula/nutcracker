@@ -20,8 +20,8 @@ trait StateInterpreterT[M[_], F[_[_], _], S[_]] { self =>
       def step: StepT[M, H, U] = that.step :&&: self.step
 
       def uncons: Uncons[U] = {
-        val uncons1 = that.uncons.zoomOut[U](implicitly[ValA[λ[K => Lens[U[K], T[K]]]]])
-        val uncons2 = self.uncons.zoomOut[U](implicitly[ValA[λ[K => Lens[U[K], S[K]]]]])
+        val uncons1 = that.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], T[K]]]]])
+        val uncons2 = self.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], S[K]]]]])
         uncons1 orElse uncons2
       }
     }
@@ -36,7 +36,7 @@ trait StateInterpreterT[M[_], F[_[_], _], S[_]] { self =>
     type U[K] = Cons[T, Just[S, ?], K]
     new StateInterpreterT[M, H, U] {
       def step: StepT[M, H, U] = i2 :&&: self.step
-      def uncons: Uncons[U] = self.uncons.zoomOut[U](implicitly[ValA[λ[K => Lens[U[K], S[K]]]]])
+      def uncons: Uncons[U] = self.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], S[K]]]]])
     }
   }
 
@@ -128,7 +128,7 @@ object StateInterpreterT {
       new StateInterpreterT[M, H, U] {
         def step: StepT[M, H, U] = that :&: self.step
         def uncons: Uncons[U] =
-          self.uncons.zoomOut[U](implicitly[ValA[λ[K => Lens[U[K], S[K]]]]])
+          self.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], S[K]]]]])
       }
     }
 
@@ -140,8 +140,8 @@ object StateInterpreterT {
         def step: StepT[M, H, U] = that.step :&: self.step
 
         def uncons: Uncons[U] = {
-          val uncons1 = that.uncons.zoomOut[U](implicitly[ValA[λ[K => Lens[U[K], T[K]]]]])
-          val uncons2 = self.uncons.zoomOut[U](implicitly[ValA[λ[K => Lens[U[K], S[K]]]]])
+          val uncons1 = that.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], T[K]]]]])
+          val uncons2 = self.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], S[K]]]]])
           uncons1 orElse uncons2
         }
       }

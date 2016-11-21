@@ -47,26 +47,26 @@ object KList {
   implicit def recTailLenz[F[_], G[_] <: KList[_], A, B](implicit gab: Lenz[G[A], B]): Lenz[Cons[F, G, A], B] =
     Lenz[Cons[F, G, A], B](la => Store(b => Cons(la.head, gab.set(la.tail, b)), gab.get(la.tail)))
 
-  implicit def justLenzK[F[_]]: ValA[λ[A => Lenz[Just[F, A], F[A]]]] =
-    new ValA[λ[A => Lenz[Just[F, A], F[A]]]] {
+  implicit def justLenzK[F[_]]: `Forall{* -> *}`[λ[A => Lenz[Just[F, A], F[A]]]] =
+    new `Forall{* -> *}`[λ[A => Lenz[Just[F, A], F[A]]]] {
       def compute[A]: Lenz[Just[F, A], F[A]] =
         Lenz[Just[F, A], F[A]](la => Store(fa => Just(fa), la.value))
     }
 
-  implicit def headLenzK[F[_], G[_] <: KList[_]]: ValA[λ[A => Lenz[Cons[F, G, A], F[A]]]] =
-    new ValA[λ[A => Lenz[Cons[F, G, A], F[A]]]] {
+  implicit def headLenzK[F[_], G[_] <: KList[_]]: `Forall{* -> *}`[λ[A => Lenz[Cons[F, G, A], F[A]]]] =
+    new `Forall{* -> *}`[λ[A => Lenz[Cons[F, G, A], F[A]]]] {
       def compute[A]: Lenz[Cons[F, G, A], F[A]] =
         Lenz[Cons[F, G, A], F[A]](la => Store(fa => Cons(fa, la.tail), la.head))
     }
 
-  implicit def tailLenzK[F[_], G[_] <: KList[_]]: ValA[λ[A => Lenz[Cons[F, G, A], G[A]]]] =
-    new ValA[λ[A => Lenz[Cons[F, G, A], G[A]]]] {
+  implicit def tailLenzK[F[_], G[_] <: KList[_]]: `Forall{* -> *}`[λ[A => Lenz[Cons[F, G, A], G[A]]]] =
+    new `Forall{* -> *}`[λ[A => Lenz[Cons[F, G, A], G[A]]]] {
       def compute[A]: Lenz[Cons[F, G, A], G[A]] =
         Lenz[Cons[F, G, A], G[A]](la => Store(ga => Cons(la.head, ga), la.tail))
     }
 
-  implicit def recTailLenzK[F[_], G[_] <: KList[_], H[_]](implicit gh: ValA[λ[A => Lenz[G[A], H[A]]]]): ValA[λ[A => Lenz[Cons[F, G, A], H[A]]]] =
-    new ValA[λ[A => Lenz[Cons[F, G, A], H[A]]]] {
+  implicit def recTailLenzK[F[_], G[_] <: KList[_], H[_]](implicit gh: `Forall{* -> *}`[λ[A => Lenz[G[A], H[A]]]]): `Forall{* -> *}`[λ[A => Lenz[Cons[F, G, A], H[A]]]] =
+    new `Forall{* -> *}`[λ[A => Lenz[Cons[F, G, A], H[A]]]] {
       def compute[A]: Lenz[Cons[F, G, A], H[A]] =
         Lenz[Cons[F, G, A], H[A]](la => Store(ha => Cons(la.head, gh[A].set(la.tail, ha)), gh[A].get(la.tail)))
     }
