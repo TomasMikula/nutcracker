@@ -21,7 +21,7 @@ trait DeepEqual[A1, A2, Ptr1[_], Ptr2[_]] {
 
   final def lift: DeepEqual[Ptr1[A1], Ptr2[A2], Ptr1, Ptr2] =
     new DeepEqual[Ptr1[A1], Ptr2[A2], Ptr1, Ptr2] {
-      def equal(p1: Ptr1[A1], p2: Ptr2[A2]): IsEqual[Ptr1, Ptr2] = IsEqual(p1, p2)(DeepEqual.this)
+      def equal(p1: Ptr1[A1], p2: Ptr2[A2]): IsEqual[Ptr1, Ptr2] = IsEqual.refs(p1, p2)(DeepEqual.this)
     }
 }
 
@@ -179,9 +179,9 @@ object IsEqual {
   private[util] case class Or[Ptr1[_], Ptr2[_]](e1: IsEqual[Ptr1, Ptr2], e2: () => IsEqual[Ptr1, Ptr2]) extends IsEqual[Ptr1, Ptr2]
 
   def apply[Ptr1[_], Ptr2[_]](value: Boolean): IsEqual[Ptr1, Ptr2] = Const(value)
-  def apply[Ptr1[_], Ptr2[_], X, Y](p1: Ptr1[X], p2: Ptr2[Y])(implicit ev: DeepEqual[X, Y, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = Indirect(p1, p2, ev)
+  def apply[Ptr1[_], Ptr2[_], A1, A2](a1: A1, a2: A2)(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = ev.equal(a1, a2)
 
-  def equal[Ptr1[_], Ptr2[_], A1, A2](a1: A1, a2: A2)(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = ev.equal(a1, a2)
+  def refs[Ptr1[_], Ptr2[_], X, Y](p1: Ptr1[X], p2: Ptr2[Y])(implicit ev: DeepEqual[X, Y, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = Indirect(p1, p2, ev)
 
   def apply[Ptr1[_], Ptr2[_]]: PApplied[Ptr1, Ptr2] = new PApplied[Ptr1, Ptr2]
   final class PApplied[Ptr1[_], Ptr2[_]] private[IsEqual] {
