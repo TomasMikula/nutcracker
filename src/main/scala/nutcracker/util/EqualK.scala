@@ -2,6 +2,7 @@ package nutcracker.util
 
 import scala.language.higherKinds
 import scalaz.Equal
+import scalaz.Id.Id
 
 trait EqualK[F[_]] {
   def equal[A](f1: F[A], f2: F[A]): Boolean
@@ -24,5 +25,19 @@ trait HEqualK[F[_]] {
   def homogenize: EqualK[F] = new EqualK[F] {
     override def equal[A](f1: F[A], f2: F[A]): Boolean =
       hEqual(f1, f2)
+  }
+}
+
+object HEqualK {
+
+  /** Reference comparison. For value types might return `false` even for equal
+    * values, since they must be boxed before reference comparison can take place.
+    */
+  implicit val referenceEquality: HEqualK[Id] = new HEqualK[Id] {
+    def hEqual[A, B](fa: Id[A], fb: Id[B]): Boolean = {
+      val (a: A) = fa
+      val (b: B) = fb
+      a.asInstanceOf[AnyRef] eq b.asInstanceOf[AnyRef]
+    }
   }
 }
