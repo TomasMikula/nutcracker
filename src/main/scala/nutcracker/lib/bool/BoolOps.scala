@@ -2,9 +2,10 @@ package nutcracker.lib.bool
 
 import scala.language.higherKinds
 
-import nutcracker._
+import nutcracker.{FinalVars, Propagation}
 import nutcracker.Trigger._
 import nutcracker.lib.bool.Bool._
+import nutcracker.ops._
 
 import scalaz.{Bind, Monad}
 import scalaz.syntax.bind._

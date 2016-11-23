@@ -1,6 +1,7 @@
 package nutcracker
 
 import nutcracker.Dom.{Refined, Status}
+import nutcracker.ops._
 import nutcracker.util.{ContU, DeepEqual, IsEqual, Uninhabited}
 
 import scala.language.higherKinds

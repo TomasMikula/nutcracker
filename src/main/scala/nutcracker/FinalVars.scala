@@ -3,6 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 import nutcracker.lib.bool._
 import nutcracker.lib.bool.Bool._
+import nutcracker.ops._
 import nutcracker.util.Inject
 
 import scalaz.{Applicative, Bind, Monad, Traverse}

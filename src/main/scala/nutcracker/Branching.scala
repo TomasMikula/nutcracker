@@ -2,6 +2,8 @@ package nutcracker
 
 import scala.language.higherKinds
 
+import nutcracker.ops._
+
 import scalaz.{Bind, Cont}
 import scalaz.syntax.bind._
 
