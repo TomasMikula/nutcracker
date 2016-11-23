@@ -1,5 +1,3 @@
 package nutcracker
 
-package object ops extends ToRefOps {
-
-}
+package object ops extends ToRefOps
