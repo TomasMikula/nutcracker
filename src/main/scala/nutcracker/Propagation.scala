@@ -6,7 +6,7 @@ import scalaz.std.vector._
 import scalaz.syntax.bind._
 import shapeless.{::, HList, HNil}
 
-trait Propagation[M[_], Ref[_]] {
+trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
 
   // basic instructions
 
@@ -14,23 +14,14 @@ trait Propagation[M[_], Ref[_]] {
 
   def updateImpl[D, U, Δ](ref: Ref[D])(u: U)(implicit dom: Dom.Aux[D, U, Δ]): M[Unit]
 
-  def observeImpl[D, U, Δ](ref: Ref[D])(f: D => (Option[M[Unit]], Option[(D, Δ) => Trigger[M[Unit]]]))(implicit dom: Dom.Aux[D, U, Δ]): M[Unit]
-
   def selTrigger[L <: HList](sel: Sel[Ref, L])(f: L => Trigger[M[Unit]]): M[Unit]
 
 
   def update[D](ref: Ref[D])(implicit dom: Dom[D]): UpdateSyntaxHelper[D, dom.Update, dom.Delta] =
     new UpdateSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
 
-  def observe[D](ref: Ref[D])(implicit dom: Dom[D]): ObserveSyntaxHelper[D, dom.Update, dom.Delta] =
-    new ObserveSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
-
   final class UpdateSyntaxHelper[D, U, Δ](ref: Ref[D])(implicit dom: Dom.Aux[D, U, Δ]) {
     def by(u: U): M[Unit] = updateImpl(ref)(u)
-  }
-
-  final class ObserveSyntaxHelper[D, U, Δ](ref: Ref[D])(implicit dom: Dom.Aux[D, U, Δ]) {
-    def by(f: D => (Option[M[Unit]], Option[(D, Δ) => Trigger[M[Unit]]])): M[Unit] = observeImpl(ref)(f)
   }
 
 

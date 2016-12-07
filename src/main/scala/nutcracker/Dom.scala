@@ -1,7 +1,8 @@
 package nutcracker
 
-import scalaz.{Semigroup, \&/}
+import scalaz.{Leibniz, Semigroup, \&/}
 import scalaz.Isomorphism.<=>
+import scalaz.Leibniz.===
 
 trait Dom[D] {
   type Update
@@ -48,6 +49,12 @@ object Dom {
   case class Unrefined[U](xor: () => Option[List[U]]) extends Status[U]
   case object Refined extends Status[Nothing]
   case object Failed extends Status[Nothing]
+
+  def relateUpdates[D](d1: Dom[D], d2: Dom[D]): d1.Update === d2.Update = // linter:ignore UnusedParameter
+    Leibniz.force[Nothing, Any, d1.Update, d2.Update]
+
+  def relateDeltas[D](d1: Dom[D], d2: Dom[D]): d1.Delta === d2.Delta = // linter:ignore UnusedParameter
+    Leibniz.force[Nothing, Any, d1.Delta, d2.Delta]
 
   def via[A, B](iso: A <=> B)(implicit domB: Dom[B]): Dom.Aux[A, domB.Update, domB.Delta] =
     new Dom[A] {

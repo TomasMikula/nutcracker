@@ -130,7 +130,7 @@ object FinalVars {
         case None => Sleep[M[Unit]]()
       })
 
-    def exec0[F[_[_], _]](f: D => M[Unit]): M[Unit] =
+    def exec0(f: D => M[Unit]): M[Unit] =
       M.valTrigger[D](ref)(d =>
         if(fin.isFinal(d)) Fire[M[Unit]](f(d))
         else Sleep[M[Unit]]()
