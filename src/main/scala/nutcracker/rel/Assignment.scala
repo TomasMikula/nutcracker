@@ -1,6 +1,6 @@
 package nutcracker.rel
 
-import nutcracker.util.{Mapped, Ptr, Choose}
+import nutcracker.util.{Mapped, ListPtr, Choose}
 
 import scala.annotation.tailrec
 import scalaz.std.option._
@@ -21,8 +21,8 @@ case class Assignment[L <: HList] private (values: Vector[Option[_]]) extends An
     if(matchesAt(ch)(c)) Some(set1(ch.vertices, c))
     else None
 
-  def get(ptr: Ptr[L, _]): Option[ptr.Out] = values(ptr.index).asInstanceOf[Option[ptr.Out]]
-  def set(ptr: Ptr[L, _])(a: ptr.Out): Assignment[L] = set0(ptr.index, a)
+  def get(ptr: ListPtr[L, _]): Option[ptr.Out] = values(ptr.index).asInstanceOf[Option[ptr.Out]]
+  def set(ptr: ListPtr[L, _])(a: ptr.Out): Assignment[L] = set0(ptr.index, a)
 
   def matches(l: L): Boolean = matches0(l, 0)
   def matchesAt[C <: HList](ch: Choose[L, C])(c: C): Boolean = matches0(ch.vertices, c)

@@ -40,10 +40,10 @@ object Pointers0 {
     d: Drop.Aux[L, N, H :: T],
     n: ToInt[N],
     tp: Pointers0[L, T, Succ[N]]
-  ): Aux[L, H :: T, N, Ptr.Aux[L, N, H] :: tp.Out] = new Pointers0[L, H :: T, N] {
-    type Out = Ptr.Aux[L, N, H] :: tp.Out
+  ): Aux[L, H :: T, N, ListPtr.Aux[L, N, H] :: tp.Out] = new Pointers0[L, H :: T, N] {
+    type Out = ListPtr.Aux[L, N, H] :: tp.Out
 
-    def get = new Ptr[L, N] {
+    def get = new ListPtr[L, N] {
       type Out = H
 
       def index: Int = n()

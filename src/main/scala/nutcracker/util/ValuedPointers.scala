@@ -13,10 +13,10 @@ object ValuedPointers {
     def apply(pa: HNil): (Choose[V, HNil], HNil) = (Choose[V], HNil)
   }
 
-  implicit def hconsPointers[V <: HList, N <: Nat, H, PT <: HList](implicit vp: ValuedPointers[V, PT]): ValuedPointers[V, (Ptr.Aux[V, N, H], H) :: PT] =
-    new ValuedPointers[V, (Ptr.Aux[V, N, H], H) :: PT] {
+  implicit def hconsPointers[V <: HList, N <: Nat, H, PT <: HList](implicit vp: ValuedPointers[V, PT]): ValuedPointers[V, (ListPtr.Aux[V, N, H], H) :: PT] =
+    new ValuedPointers[V, (ListPtr.Aux[V, N, H], H) :: PT] {
       type Values = H :: vp.Values
-      def apply(pa: (Ptr.Aux[V, N, H], H) :: PT): (Choose[V, Values], Values) = {
+      def apply(pa: (ListPtr.Aux[V, N, H], H) :: PT): (Choose[V, Values], Values) = {
         val (ch, c) = vp(pa.tail)
         (pa.head._1 :: ch, pa.head._2 :: c)
       }
