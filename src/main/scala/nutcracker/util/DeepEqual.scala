@@ -5,8 +5,13 @@ import scala.language.higherKinds
 import scalaz.Id._
 import scalaz.{ICons, IList, INil, ~>}
 
-/**
-  * XXX: Relies on meaningful hashCode and equal for Ptr1
+/** Comparing of (potentially cyclic) object graphs for equality.
+  * Features:
+  *  - abstracted over pointers;
+  *  - termination and correctness in presence of cycles;
+  *  - stack safety.
+  *
+  * XXX: Relies on meaningful hashCode and equals for Ptr1
   * @tparam A1
   * @tparam A2
   * @tparam Ptr1
