@@ -1,9 +1,7 @@
 package nutcracker.util
 
-import nutcracker.util.DeepShow.Desc
-
 import scalaz.Free.Trampoline
-import scalaz.{Free, Trampoline, WriterT, ~>}
+import scalaz.{Trampoline, ~>}
 import scalaz.Id._
 
 /** Printing of (potentially cyclic) object graphs.
@@ -13,49 +11,68 @@ import scalaz.Id._
   *  - stack safety.
   */
 trait DeepShow[A, Ptr[_]] {
-  def show(a: A): Free[Desc[Ptr, ?], String]
+  import DeepShow._
+
+  def show(a: A): Desc[Ptr]
 
   final def deepShow(a: A)(deref: Ptr ~> Id)(
-    decorateReferenced: (String, => String) => String = (str, ref) => s"<def $ref>$str</def>",
-    decorateUnreferenced: (String, => String) => String = (str, ref) => str,
+    decorateReferenced: (=> String) => (String, String) = ref => (s"<def $ref>", "</def>"),
+    decorateUnreferenced: (=> String) => (String, String) = ref => ("", ""),
     decorateReference: String => String = ref => s"<ref $ref/>"
   )(implicit S: ShowK[Ptr], E: HEqualK[Ptr]): String =
     DeepShow.deepShow(show(a), deref)(decorateReferenced, decorateUnreferenced, decorateReference)
 }
 
 object DeepShow {
-  sealed trait Desc[Ptr[_], A]
-  private final case class Referenced[Ptr[_], A](pa: Ptr[A], ev: DeepShow[A, Ptr]) extends Desc[Ptr, String]
+  sealed trait Desc[Ptr[_]] {
+    def +(that: Desc[Ptr]): Desc[Ptr] = Concat(this, that)
+  }
+  private final case class Referenced[Ptr[_], A](pa: Ptr[A], ev: DeepShow[A, Ptr]) extends Desc[Ptr]
+  private final case class Write[Ptr[_]](s: String) extends Desc[Ptr]
+  private final case class Concat[Ptr[_]](l: Desc[Ptr], r: Desc[Ptr]) extends Desc[Ptr]
 
   object Desc {
-    def apply[Ptr[_], A](pa: Ptr[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr, String] =
+    def apply[Ptr[_], A](a: A)(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
+      ev.show(a)
+
+    def ref[Ptr[_], A](pa: Ptr[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
       Referenced(pa, ev)
+
+    def done[Ptr[_]](s: String): Desc[Ptr] =
+      Write(s)
   }
 
-  private[DeepShow] def deepShow[Ptr[_]](fa: Free[Desc[Ptr, ?], String], deref: Ptr ~> Id)(
-    decorateReferenced: (String, => String) => String,
-    decorateUnreferenced: (String, => String) => String,
+  def deepShow[Ptr[_], A](a: A)(deref: Ptr ~> Id)(implicit ev: DeepShow[A, Ptr], S: ShowK[Ptr], E: HEqualK[Ptr]): String =
+    ev.deepShow(a)(deref)()
+
+  private[DeepShow] def deepShow[Ptr[_]](fa: Desc[Ptr], deref: Ptr ~> Id)(
+    decorateReferenced: (=> String) => (String, String),
+    decorateUnreferenced: (=> String) => (String, String),
     decorateReference: String => String
   )(implicit S: ShowK[Ptr], E: HEqualK[Ptr]): String = {
-    type Γ = List[Ptr[_]]
+    type Γ = List[Ptr[_]] // context, i.e. all parents
+    type R = Lst[Ptr[_]]  // referenced within the subgraph
 
-    import scalaz.std.list._
+    def go(node: Desc[Ptr], visited: Γ): Trampoline[(Lst[String], R)] = node match {
+      case Write(s) => Trampoline.done((Lst.singleton(s), Lst.empty))
+      case Referenced(pa, ev) =>
+        if(visited.exists(E.hEqual(_, pa))) Trampoline.done((Lst.singleton(decorateReference(S.shows(pa))), Lst.singleton(pa)))
+        else Trampoline.suspend(go(ev.show(deref(pa)), pa :: visited)) map {
+          case (res, referenced) =>
+            val referenced1 = referenced.filterNot(E.hEqual(_, pa))
+            val (pre, post) = if(referenced1.size < referenced.size) decorateReferenced(S.shows(pa)) else decorateUnreferenced(S.shows(pa))
+            (pre +: res :+ post, referenced1)
+        }
+      case Concat(l, r) =>
+        Trampoline.suspend(go(l, visited)) flatMap { case (res1, ref1) =>
+          go(r, visited) map { case (res2, ref2) => (res1 ++ res2, ref1 ++ ref2) }
+        }
+    }
 
-    def interpret(visited: Γ): Desc[Ptr, ?] ~> WriterT[Trampoline, Γ, ?] =
-      λ[Desc[Ptr, ?] ~> WriterT[Trampoline, Γ, ?]](_ match {
-        case Referenced(pa, ev) =>
-          if(visited.exists(E.hEqual(_, pa))) WriterT(Trampoline.done((List(pa), decorateReference(S.shows(pa)))))
-          else WriterT(Trampoline.suspend({
-            ev.show(deref(pa)).foldMap(interpret(pa :: visited)).run map {
-              case (referenced, str) =>
-                val referenced1 = referenced.filterNot(E.hEqual(_, pa))
-                if(referenced1.size < referenced.size) (referenced1, decorateReferenced(str, S.shows(pa)))
-                else (referenced1, decorateUnreferenced(str, S.shows(pa)))
-            }
-          }))
-      })
+    val (res, ref) = go(fa, Nil).run
 
-    fa.foldMap(interpret(List())).run.run._2
+    assert(ref.isEmpty)
+
+    res.foldLeft(new StringBuilder)((acc, s) => acc.append(s)).toString
   }
 }
-

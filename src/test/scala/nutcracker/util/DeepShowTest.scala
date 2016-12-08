@@ -3,7 +3,7 @@ package nutcracker.util
 import nutcracker.util.DeepShow.Desc
 import org.scalatest.FunSuite
 
-import scalaz.{Free, NaturalTransformation}
+import scalaz.{NaturalTransformation}
 import scalaz.Id.Id
 
 class DeepShowTest extends FunSuite {
@@ -16,10 +16,10 @@ class DeepShowTest extends FunSuite {
     val l = (1 to 10000).toList
 
     implicit val ds: DeepShow[List[Int], Id] = new DeepShow[List[Int], Id] {
-      def show(is: List[Int]): Free[Desc[Id, ?], String] = is match {
-        case Nil => Free.pure("")
-        case i :: Nil => Free.pure(i.toString)
-        case i :: is => Free.liftF(Desc[Id, List[Int]](is)(this)) map { tail => s"$i, $tail" }
+      def show(is: List[Int]): Desc[Id] = is match {
+        case Nil => Desc.done("")
+        case i :: Nil => Desc.done(i.toString)
+        case i :: is => Desc.done(i.toString) + Desc.done(", ") + Desc.ref[Id, List[Int]](is)(this)
       }
     }
 
@@ -35,12 +35,12 @@ class DeepShowTest extends FunSuite {
     l.tail = l
 
     implicit val ds: DeepShow[Lst, Id] = new DeepShow[Lst, Id] {
-      def show(is: Lst): Free[Desc[Id, ?], String] =
-        Free.liftF(Desc[Id, Lst](is.tail)(this)) map { tail => s"${is.i}, $tail" }
+      def show(is: Lst): Desc[Id] =
+        Desc.done(is.i.toString + ", ") + Desc.ref[Id, Lst](is.tail)(this)
     }
 
     val s = ds.deepShow(l)(NaturalTransformation.refl[Id])(
-      decorateReferenced = (str, ref) => str,
+      decorateReferenced = ref => ("", ""),
       decorateReference = ref => "@"
     )
 
