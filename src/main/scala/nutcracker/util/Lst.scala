@@ -20,7 +20,18 @@ sealed abstract class Lst[+A] {
     }
   }
 
+  final def isEmpty: Boolean = this match {
+    case Nil => true
+    case _ => false
+  }
+
+  final def size: Int =
+    foldLeft(0)((n, _) => n + 1)
+
   final def ::[B >: A](h: B): Lst[B] = Cons(h, this)
+
+  final def +:[B >: A](b: B): Lst[B] = Cons(b, this)
+  final def :+[B >: A](b: B): Lst[B] = this ++ singleton(b)
 
   final def rev_:::[B >: A](bs: Iterable[B]): Lst[B] =
     revPrepend(bs, this)
@@ -76,6 +87,25 @@ sealed abstract class Lst[+A] {
     }
 
     go(this)
+  }
+
+  final def filter(p: A => Boolean): Lst[A] =
+    foldLeft(Buffer[A]())((buf, a) => if (p(a)) (buf += a) else buf).foldRight(Lst.empty[A])((a, l) => a :: l)
+
+  final def filterNot(p: A => Boolean): Lst[A] =
+    filter(!p(_))
+
+  final def foldLeft[B](b: B)(f: (B, A) => B): B = {
+    @tailrec def go(acc: B, cur: Lst[A], tail: List[Lst[A]]): B = cur match {
+      case Cat(y, z) => go(acc, y, z :: tail)
+      case Cons(x, y) => go(f(acc, x), y, tail)
+      case Nil => tail match {
+        case l :: ls => go(acc, l, ls)
+        case nil => acc
+      }
+    }
+
+    go(b, this, List())
   }
 
   @tailrec
