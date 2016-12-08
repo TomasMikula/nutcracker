@@ -87,4 +87,17 @@ object DeepShow {
     } else
       Desc.done("")
   }
+
+  implicit def specialize[A[_[_]], Ptr[_]](implicit ev: DeepShowK[A]): DeepShow[A[Ptr], Ptr] =
+    ev.specialize[Ptr]
+}
+
+trait DeepShowK[A[_[_]]] {
+  import nutcracker.util.DeepShow.Desc
+
+  def show[Ptr[_]](a: A[Ptr]): Desc[Ptr]
+
+  def specialize[Ptr[_]]: DeepShow[A[Ptr], Ptr] = new DeepShow[A[Ptr], Ptr] {
+    def show(a: A[Ptr]): Desc[Ptr] = DeepShowK.this.show(a)
+  }
 }
