@@ -75,4 +75,16 @@ object DeepShow {
 
     res.foldLeft(new StringBuilder)((acc, s) => acc.append(s)).toString
   }
+
+  def setDesc[Ptr[_], A](sa: Set[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
+    Desc.done("{") + mkString(sa)(", ") + Desc.done("}")
+
+  def mkString[Ptr[_], A](sa: Iterable[A])(sep: String)(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] = {
+    val it = sa.iterator
+    if (it.hasNext) {
+      val h = it.next()
+      it.foldLeft(ev.show(h))((acc, a) => acc + Desc.done(sep) + ev.show(a))
+    } else
+      Desc.done("")
+  }
 }

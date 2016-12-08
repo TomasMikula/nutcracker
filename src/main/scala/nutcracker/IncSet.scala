@@ -1,7 +1,9 @@
 package nutcracker
 
+import nutcracker.util.DeepShow.Desc
+
 import scala.language.higherKinds
-import nutcracker.util.{ContU, DeepEqual, IsEqual}
+import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual}
 
 import scalaz.{Applicative, Bind, Monad}
 import scalaz.std.list._
@@ -52,6 +54,11 @@ object IncSet {
   implicit def deepEqual[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[IncSet[A1], IncSet[A2], Ptr1, Ptr2] =
     new DeepEqual[IncSet[A1], IncSet[A2], Ptr1, Ptr2] {
       def equal(s1: IncSet[A1], s2: IncSet[A2]): IsEqual[Ptr1, Ptr2] = IsEqual.setEqual(s1.value, s2.value)
+    }
+
+  implicit def deepShow[Ptr[_], A](implicit ev: DeepShow[A, Ptr]): DeepShow[IncSet[A], Ptr] =
+    new DeepShow[IncSet[A], Ptr] {
+      def show(a: IncSet[A]): Desc[Ptr] = DeepShow.setDesc(a.value)
     }
 }
 
