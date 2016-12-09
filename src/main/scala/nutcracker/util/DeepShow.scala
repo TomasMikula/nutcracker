@@ -26,6 +26,8 @@ trait DeepShow[A, Ptr[_]] {
 object DeepShow {
   sealed trait Desc[Ptr[_]] {
     def +(that: Desc[Ptr]): Desc[Ptr] = Concat(this, that)
+    def :+(s: String): Desc[Ptr] = Concat(this, Write(s))
+    def +:(s: String): Desc[Ptr] = Concat(Write(s), this)
   }
   private final case class Referenced[Ptr[_], A](pa: Ptr[A], ev: DeepShow[A, Ptr]) extends Desc[Ptr]
   private final case class RefString[Ptr[_], A](p: Ptr[A]) extends Desc[Ptr]
