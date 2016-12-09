@@ -28,6 +28,7 @@ object DeepShow {
     def +(that: Desc[Ptr]): Desc[Ptr] = Concat(this, that)
   }
   private final case class Referenced[Ptr[_], A](pa: Ptr[A], ev: DeepShow[A, Ptr]) extends Desc[Ptr]
+  private final case class RefString[Ptr[_], A](p: Ptr[A]) extends Desc[Ptr]
   private final case class Write[Ptr[_]](s: String) extends Desc[Ptr]
   private final case class Concat[Ptr[_]](l: Desc[Ptr], r: Desc[Ptr]) extends Desc[Ptr]
 
@@ -37,6 +38,9 @@ object DeepShow {
 
     def ref[Ptr[_], A](pa: Ptr[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
       Referenced(pa, ev)
+
+    def refString[Ptr[_], A](pa: Ptr[A]): Desc[Ptr] =
+      RefString(pa)
 
     def done[Ptr[_]](s: String): Desc[Ptr] =
       Write(s)
@@ -55,6 +59,7 @@ object DeepShow {
 
     def go(node: Desc[Ptr], visited: Γ): Trampoline[(Lst[String], R)] = node match {
       case Write(s) => Trampoline.done((Lst.singleton(s), Lst.empty))
+      case RefString(pa) => Trampoline.done((Lst.singleton(S.shows(pa)), Lst.empty))
       case Referenced(pa, ev) =>
         if(visited.exists(E.hEqual(_, pa))) Trampoline.done((Lst.singleton(decorateReference(S.shows(pa))), Lst.singleton(pa)))
         else Trampoline.suspend(go(ev.show(deref(pa)), pa :: visited)) map {
