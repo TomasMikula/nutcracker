@@ -100,10 +100,18 @@ object Desc {
     Desc.done("{") + mkString(sa)(", ") + Desc.done("}")
 
   def mkString[Ptr[_], A](sa: Iterable[A])(sep: String)(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] = {
-    val it = sa.iterator
+    val it = sa.iterator.map(ev.show)
+    join(it)(sep)
+  }
+
+  def join[Ptr[_]](descs: Iterable[Desc[Ptr]])(sep: String): Desc[Ptr] = {
+    join(descs.iterator)(sep)
+  }
+
+  private def join[Ptr[_]](it: Iterator[Desc[Ptr]])(sep: String): Desc[Ptr] = {
     if (it.hasNext) {
       val h = it.next()
-      it.foldLeft(ev.show(h))((acc, a) => acc + Desc.done(sep) + ev.show(a))
+      it.foldLeft(h)((acc, d) => acc + Desc.done(sep) + d)
     } else
       Desc.done("")
   }
