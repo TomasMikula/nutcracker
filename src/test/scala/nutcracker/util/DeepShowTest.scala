@@ -1,6 +1,5 @@
 package nutcracker.util
 
-import nutcracker.util.DeepShow.Desc
 import org.scalatest.FunSuite
 
 import scalaz.{NaturalTransformation}

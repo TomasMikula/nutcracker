@@ -11,8 +11,6 @@ import scalaz.Id._
   *  - stack safety.
   */
 trait DeepShow[A, Ptr[_]] {
-  import DeepShow._
-
   def show(a: A): Desc[Ptr]
 
   final def deepShow(a: A)(deref: Ptr ~> Id)(
@@ -20,38 +18,34 @@ trait DeepShow[A, Ptr[_]] {
     decorateUnreferenced: (=> String) => (String, String) = ref => ("", ""),
     decorateReference: String => String = ref => s"<ref $ref/>"
   )(implicit S: ShowK[Ptr], E: HEqualK[Ptr]): String =
-    DeepShow.deepShow(show(a), deref)(decorateReferenced, decorateUnreferenced, decorateReference)
+    show(a).eval(deref)(decorateReferenced, decorateUnreferenced, decorateReference)
 }
 
 object DeepShow {
-  sealed trait Desc[Ptr[_]] {
-    def +(that: Desc[Ptr]): Desc[Ptr] = Concat(this, that)
-    def :+(s: String): Desc[Ptr] = Concat(this, Write(s))
-    def +:(s: String): Desc[Ptr] = Concat(Write(s), this)
-  }
-  private final case class Referenced[Ptr[_], A](pa: Ptr[A], ev: DeepShow[A, Ptr]) extends Desc[Ptr]
-  private final case class RefString[Ptr[_], A](p: Ptr[A]) extends Desc[Ptr]
-  private final case class Write[Ptr[_]](s: String) extends Desc[Ptr]
-  private final case class Concat[Ptr[_]](l: Desc[Ptr], r: Desc[Ptr]) extends Desc[Ptr]
-
-  object Desc {
-    def apply[Ptr[_], A](a: A)(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
-      ev.show(a)
-
-    def ref[Ptr[_], A](pa: Ptr[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
-      Referenced(pa, ev)
-
-    def refString[Ptr[_], A](pa: Ptr[A]): Desc[Ptr] =
-      RefString(pa)
-
-    def done[Ptr[_]](s: String): Desc[Ptr] =
-      Write(s)
-  }
 
   def deepShow[Ptr[_], A](a: A)(deref: Ptr ~> Id)(implicit ev: DeepShow[A, Ptr], S: ShowK[Ptr], E: HEqualK[Ptr]): String =
     ev.deepShow(a)(deref)()
 
-  private[DeepShow] def deepShow[Ptr[_]](fa: Desc[Ptr], deref: Ptr ~> Id)(
+  implicit def specialize[A[_[_]], Ptr[_]](implicit ev: DeepShowK[A]): DeepShow[A[Ptr], Ptr] =
+    ev.specialize[Ptr]
+}
+
+trait DeepShowK[A[_[_]]] {
+  def show[Ptr[_]](a: A[Ptr]): Desc[Ptr]
+
+  def specialize[Ptr[_]]: DeepShow[A[Ptr], Ptr] = new DeepShow[A[Ptr], Ptr] {
+    def show(a: A[Ptr]): Desc[Ptr] = DeepShowK.this.show(a)
+  }
+}
+
+sealed trait Desc[Ptr[_]] {
+  import Desc._
+
+  def +(that: Desc[Ptr]): Desc[Ptr] = Concat(this, that)
+  def :+(s: String): Desc[Ptr] = Concat(this, Write(s))
+  def +:(s: String): Desc[Ptr] = Concat(Write(s), this)
+
+  def eval(deref: Ptr ~> Id)(
     decorateReferenced: (=> String) => (String, String),
     decorateUnreferenced: (=> String) => (String, String),
     decorateReference: String => String
@@ -76,12 +70,31 @@ object DeepShow {
         }
     }
 
-    val (res, ref) = go(fa, Nil).run
+    val (res, ref) = go(this, Nil).run
 
     assert(ref.isEmpty)
 
     res.foldLeft(new StringBuilder)((acc, s) => acc.append(s)).toString
   }
+}
+
+object Desc {
+  private[Desc] final case class Referenced[Ptr[_], A](pa: Ptr[A], ev: DeepShow[A, Ptr]) extends Desc[Ptr]
+  private[Desc] final case class RefString[Ptr[_], A](p: Ptr[A]) extends Desc[Ptr]
+  private[Desc] final case class Write[Ptr[_]](s: String) extends Desc[Ptr]
+  private[Desc] final case class Concat[Ptr[_]](l: Desc[Ptr], r: Desc[Ptr]) extends Desc[Ptr]
+
+  def apply[Ptr[_], A](a: A)(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
+    ev.show(a)
+
+  def ref[Ptr[_], A](pa: Ptr[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
+    Referenced(pa, ev)
+
+  def refString[Ptr[_], A](pa: Ptr[A]): Desc[Ptr] =
+    RefString(pa)
+
+  def done[Ptr[_]](s: String): Desc[Ptr] =
+    Write(s)
 
   def setDesc[Ptr[_], A](sa: Set[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
     Desc.done("{") + mkString(sa)(", ") + Desc.done("}")
@@ -93,18 +106,5 @@ object DeepShow {
       it.foldLeft(ev.show(h))((acc, a) => acc + Desc.done(sep) + ev.show(a))
     } else
       Desc.done("")
-  }
-
-  implicit def specialize[A[_[_]], Ptr[_]](implicit ev: DeepShowK[A]): DeepShow[A[Ptr], Ptr] =
-    ev.specialize[Ptr]
-}
-
-trait DeepShowK[A[_[_]]] {
-  import nutcracker.util.DeepShow.Desc
-
-  def show[Ptr[_]](a: A[Ptr]): Desc[Ptr]
-
-  def specialize[Ptr[_]]: DeepShow[A[Ptr], Ptr] = new DeepShow[A[Ptr], Ptr] {
-    def show(a: A[Ptr]): Desc[Ptr] = DeepShowK.this.show(a)
   }
 }
