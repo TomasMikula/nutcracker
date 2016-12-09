@@ -41,7 +41,7 @@ trait DeepShowK[A[_[_]]] {
 sealed trait Desc[Ptr[_]] {
   import Desc._
 
-  def +(that: Desc[Ptr]): Desc[Ptr] = Concat(this, that)
+  def ++(that: Desc[Ptr]): Desc[Ptr] = Concat(this, that)
   def :+(s: String): Desc[Ptr] = Concat(this, Write(s))
   def +:(s: String): Desc[Ptr] = Concat(Write(s), this)
 
@@ -97,7 +97,7 @@ object Desc {
     Write(s)
 
   def setDesc[Ptr[_], A](sa: Set[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
-    Desc.done("{") + mkString(sa)(", ") + Desc.done("}")
+    Desc.done("{") ++ mkString(sa)(", ") ++ Desc.done("}")
 
   def mkString[Ptr[_], A](sa: Iterable[A])(sep: String)(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] = {
     val it = sa.iterator.map(ev.show)
@@ -111,7 +111,7 @@ object Desc {
   private def join[Ptr[_]](it: Iterator[Desc[Ptr]])(sep: String): Desc[Ptr] = {
     if (it.hasNext) {
       val h = it.next()
-      it.foldLeft(h)((acc, d) => acc + Desc.done(sep) + d)
+      it.foldLeft(h)((acc, d) => acc ++ Desc.done(sep) ++ d)
     } else
       Desc.done("")
   }

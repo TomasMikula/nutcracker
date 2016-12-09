@@ -18,7 +18,7 @@ class DeepShowTest extends FunSuite {
       def show(is: List[Int]): Desc[Id] = is match {
         case Nil => Desc.done("")
         case i :: Nil => Desc.done(i.toString)
-        case i :: is => Desc.done(i.toString) + Desc.done(", ") + Desc.ref[Id, List[Int]](is)(this)
+        case i :: is => Desc.done(i.toString) ++ Desc.done(", ") ++ Desc.ref[Id, List[Int]](is)(this)
       }
     }
 
@@ -35,7 +35,7 @@ class DeepShowTest extends FunSuite {
 
     implicit val ds: DeepShow[Lst, Id] = new DeepShow[Lst, Id] {
       def show(is: Lst): Desc[Id] =
-        Desc.done(is.i.toString + ", ") + Desc.ref[Id, Lst](is.tail)(this)
+        Desc.done(is.i.toString + ", ") ++ Desc.ref[Id, Lst](is.tail)(this)
     }
 
     val s = ds.deepShow(l)(NaturalTransformation.refl[Id])(
