@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.util.HEqualK
+import nutcracker.util.{HEqualK, ShowK}
 
 import scalaz.{Equal, Show}
 
@@ -34,5 +34,9 @@ object DRef {
 
   implicit def showInstance[D, U, Δ]: Show[DRef.Aux[D, U, Δ]] = new Show[DRef.Aux[D, U, Δ]] {
     override def shows(ref: DRef.Aux[D, U, Δ]): String = s"ref${ref.domainId}"
+  }
+
+  implicit def showKInstance: ShowK[DRef] = new ShowK[DRef] {
+    def shows[A](ref: DRef[A]): String = s"ref${ref.domainId}"
   }
 }
