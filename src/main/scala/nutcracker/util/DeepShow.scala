@@ -1,7 +1,7 @@
 package nutcracker.util
 
 import scalaz.Free.Trampoline
-import scalaz.{Trampoline, ~>}
+import scalaz.{Semigroup, Trampoline, ~>}
 import scalaz.Id._
 
 /** Printing of (potentially cyclic) object graphs.
@@ -114,5 +114,9 @@ object Desc {
       it.foldLeft(h)((acc, d) => acc ++ Desc.done(sep) ++ d)
     } else
       Desc.done("")
+  }
+
+  implicit def descSemigroup[Ptr[_]]: Semigroup[Desc[Ptr]] = new Semigroup[Desc[Ptr]] {
+    def append(f1: Desc[Ptr], f2: => Desc[Ptr]): Desc[Ptr] = f1 ++ f2
   }
 }
