@@ -119,4 +119,11 @@ object Desc {
   implicit def descSemigroup[Ptr[_]]: Semigroup[Desc[Ptr]] = new Semigroup[Desc[Ptr]] {
     def append(f1: Desc[Ptr], f2: => Desc[Ptr]): Desc[Ptr] = f1 ++ f2
   }
+
+  implicit def stringAggregator[Ptr[_]]: Aggregator[Desc[Ptr], String] =
+    Aggregator(_ :+ _)
+
+  implicit def refStringAggregator[Ptr[_]]: AggregatorK[Desc[Ptr], Ptr] = new AggregatorK[Desc[Ptr], Ptr] {
+    def apply[A](dsc: Desc[Ptr], pa: Ptr[A]): Desc[Ptr] = dsc ++ Desc.refString(pa)
+  }
 }
