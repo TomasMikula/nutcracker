@@ -2,9 +2,9 @@ package nutcracker.util.typealigned
 
 import scala.annotation.tailrec
 import scala.language.higherKinds
-
 import nutcracker.util.typealigned.BalancedComposer.Direction
-import scalaz.Compose
+
+import scalaz.{Compose, Semigroup}
 
 
 final class BalancedComposer[F[_, _], A, B, D <: Direction] private(count: Int, stack: AList1[F, A, B]) {
@@ -14,8 +14,8 @@ final class BalancedComposer[F[_, _], A, B, D <: Direction] private(count: Int, 
     add(pair(f, stack), 1, count)
 
   /** Like `+:`, but to be used in post-compose mode. */
-  def :+[Z](f: F[Z, A])(implicit F: Compose[F], post: D =:= Post): BalancedComposer[F, Z, B, D] =
-    add(pair(f, stack), 1, count)
+  def :+[Z](f: F[Z, A])(implicit F: Compose[Op[F, ?, ?]], post: D =:= Post): BalancedComposer[F, Z, B, D] =
+    add(pair(f, stack), 1, count)(unflip(F))
 
   /** Reduction when used as pre-composer. */
   def reduceLeft(implicit F: Compose[F], pre: D =:= Pre): F[A, B] =
@@ -84,4 +84,28 @@ object BalancedPostComposer {
   import BalancedComposer.Post
 
   def apply[F[_, _], A, B](f: F[A, B]): BalancedPostComposer[F, A, B] = BalancedComposer[Op[F, ?, ?], B, A, Post](f)
+}
+
+final case class BalancedAppender[A] private(repr: BalancedPreComposer[λ[(α, β) => A], Nothing, Nothing]) extends AnyVal {
+  def append(a: A)(implicit A: Semigroup[A]): BalancedAppender[A] =
+    BalancedAppender((a +: repr)(A.compose, implicitly))
+
+  def result(implicit A: Semigroup[A]): A = repr.reduceLeft(A.compose, implicitly)
+}
+
+object BalancedAppender {
+  def apply[A](a: A): BalancedAppender[A] =
+    BalancedAppender(BalancedPreComposer[λ[(α, β) => A], Nothing, Nothing](a))
+}
+
+final case class BalancedPrepender[A] private(repr: BalancedPostComposer[λ[(α, β) => A], Nothing, Nothing]) extends AnyVal {
+  def prepend(a: A)(implicit A: Semigroup[A]): BalancedPrepender[A] =
+    BalancedPrepender((repr :+ a)(A.compose, implicitly))
+
+  def result(implicit A: Semigroup[A]): A = repr.reduceRight(A.compose, implicitly)
+}
+
+object BalancedPrepender {
+  def apply[A](a: A): BalancedPrepender[A] =
+    BalancedPrepender(BalancedPostComposer[λ[(α, β) => A], Nothing, Nothing](a))
 }
