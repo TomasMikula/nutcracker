@@ -95,7 +95,7 @@ sealed abstract class AList1[F[_, _], A, B] {
    */
   def reduce(implicit F: Compose[F]): F[A, B] =
     this match {
-      case ACons(f, g) => g.foldLeft[LBinary[F, A, ?]](LBinary(f)).extractL
+      case ACons(f, g) => g.foldLeft[BalancedPostComposer[F, A, ?]](BalancedPostComposer(f)).reduceRight
       case AJust(f) => f
     }
 }

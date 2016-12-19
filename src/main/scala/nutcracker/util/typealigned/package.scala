@@ -2,6 +2,7 @@ package nutcracker.util
 
 import scala.language.higherKinds
 
+import nutcracker.util.typealigned.BalancedComposer.{Post, Pre}
 
 package object typealigned {
 
@@ -14,11 +15,11 @@ package object typealigned {
    * Binary counter-like accumulator for type-aligned binary type constructors,
    * with the most significant bit on the left and addition of new elements (i.e. "increment") from the right.
    */
-  type LBinary[F[_, _], A, B] = Binary[Op[F, ?, ?], B, A]
+  type BalancedPostComposer[F[_, _], A, B] = BalancedComposer[Op[F, ?, ?], B, A, Post]
 
   /**
    * Binary counter-like accumulator for type-aligned binary type constructors,
    * with the most significant bit on the right and addition of new elements (i.e. "increment") from the left.
    */
-  type RBinary[F[_, _], A, B] = Binary[F, A, B]
+  type BalancedPreComposer[F[_, _], A, B] = BalancedComposer[F, A, B, Pre]
 }

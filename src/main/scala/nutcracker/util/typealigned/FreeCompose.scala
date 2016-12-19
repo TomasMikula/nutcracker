@@ -55,7 +55,7 @@ sealed abstract class FreeCompose[=>:[_, _], A, B] {
   @tailrec
   final def reduce(implicit ev: Compose[=>:]): A =>: B = this match {
     case Chain(Chain(f, g), h) => (f >>> (g >>> h)).reduce
-    case Chain(Lift(f), g) => g.foldLeft[LBinary[=>:, A, ?]](LBinary(f)).extractL
+    case Chain(Lift(f), g) => g.foldLeft[BalancedPostComposer[=>:, A, ?]](BalancedPostComposer(f)).reduceRight
     case Lift(f) => f
   }
 }
