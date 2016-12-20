@@ -1,5 +1,7 @@
 package nutcracker.util.typealigned
 
+import nutcracker.util.Aggregator
+
 import scala.annotation.tailrec
 import scala.language.higherKinds
 import nutcracker.util.typealigned.BalancedComposer.Direction
@@ -96,6 +98,9 @@ final case class BalancedAppender[A] private(repr: BalancedPreComposer[λ[(α, �
 object BalancedAppender {
   def apply[A](a: A): BalancedAppender[A] =
     BalancedAppender(BalancedPreComposer[λ[(α, β) => A], Nothing, Nothing](a))
+
+  implicit def aggregator[A](implicit A: Semigroup[A]): Aggregator[BalancedAppender[A], A] =
+    Aggregator[BalancedAppender[A], A](_ append _)
 }
 
 final case class BalancedPrepender[A] private(repr: BalancedPostComposer[λ[(α, β) => A], Nothing, Nothing]) extends AnyVal {
