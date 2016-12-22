@@ -6,17 +6,36 @@ import shapeless.HList
 
 import scalaz.{Functor, ~>}
 
-sealed trait PropagationLang[K[_], A]
+sealed trait PropagationLang[K[_], A] {
+  protected def transform[L[_]](tr: K ~> L): PropagationLang[L, A]
+}
 
 object PropagationLang {
 
   private type FP[A] = FreeK[PropagationLang, A]
 
   // constructors (the instruction set of a free program)
-  case class Cell[K[_], D, U, Δ](d: D, dom: Dom.Aux[D, U, Δ]) extends PropagationLang[K, DRef[D]]
-  case class Update[K[_], D, U, Δ](ref: DRef[D], u: U, dom: Dom.Aux[D, U, Δ]) extends PropagationLang[K, Unit]
-  case class Observe[K[_], D, U, Δ](ref: DRef[D], f: D => (Option[K[Unit]], Option[(D, Δ) => Trigger[K[Unit]]]), dom: Dom.Aux[D, U, Δ]) extends PropagationLang[K, Unit]
-  case class SelTrigger[K[_], L <: HList](sel: Sel[DRef, L], f: L => Trigger[K[Unit]]) extends PropagationLang[K, Unit]
+  case class Cell[K[_], D, U, Δ](d: D, dom: Dom.Aux[D, U, Δ]) extends PropagationLang[K, DRef[D]] {
+    protected def transform[L[_]](tr: K ~> L): PropagationLang[L, DRef[D]] = Cell(d, dom)
+  }
+  case class Update[K[_], D, U, Δ](ref: DRef[D], u: U, dom: Dom.Aux[D, U, Δ]) extends PropagationLang[K, Unit] {
+    protected def transform[L[_]](tr: K ~> L): PropagationLang[L, Unit] = Update(ref, u, dom)
+  }
+  case class Observe[K[_], D, U, Δ](ref: DRef[D], f: D => (Option[K[Unit]], Option[(D, Δ) => Trigger[K[Unit]]]), dom: Dom.Aux[D, U, Δ]) extends PropagationLang[K, Unit] {
+    protected def transform[L[_]](tr: K ~> L): PropagationLang[L, Unit] = {
+
+      def ftr[A, B](f: (A, B) => Trigger[K[Unit]], tr: K ~> L)(implicit ft: Functor[Trigger]): (A, B) => Trigger[L[Unit]] =
+        (a, b) => ft.map(f(a, b))(tr[Unit] _)
+
+      observe(ref){ d =>
+        val (now, onChange) = f(d)
+        (now map (tr(_)), onChange map (action => ftr(action, tr)))
+      }(dom)
+    }
+  }
+  case class SelTrigger[K[_], L <: HList](sel: Sel[DRef, L], f: L => Trigger[K[Unit]]) extends PropagationLang[K, Unit] {
+    protected def transform[K2[_]](tr: K ~> K2): PropagationLang[K2, Unit] = selTrigger(sel){ l => Functor[Trigger].map(f(l))(tr[Unit] _) }
+  }
 
   // constructors returning less specific types, and curried to help with type inference
   def cell[K[_], D](d: D)(implicit dom: Dom[D]): PropagationLang[K, DRef[D]] =
@@ -30,23 +49,7 @@ object PropagationLang {
 
 
   implicit def functorKInstance: FunctorKA[PropagationLang] = new FunctorKA[PropagationLang] {
-
-    private def ftr[A, B, K[_], L[_]](f: (A, B) => Trigger[K[Unit]], tr: K ~> L)(implicit ft: Functor[Trigger]): (A, B) => Trigger[L[Unit]] =
-      (a, b) => ft.map(f(a, b))(tr[Unit] _)
-
-    def transform[K[_], L[_], A](pk: PropagationLang[K, A])(tr: K ~> L): PropagationLang[L, A] = pk match {
-
-      // the interesting cases
-      case Observe(ref, f, dom) => observe(ref){ d =>
-        val (now, onChange) = f(d)
-        (now map (tr(_)), onChange map (action => ftr(action, tr)))
-      }(dom)
-      case SelTrigger(sel, f)   => selTrigger(sel){ l => Functor[Trigger].map(f(l))(tr[Unit] _) }
-
-      // the boring cases
-      case Cell(d, dom)        => Cell(d, dom)
-      case Update(ref, u, dom) => Update(ref, u, dom)
-    }
+    def transform[K[_], L[_], A](pk: PropagationLang[K, A])(tr: K ~> L): PropagationLang[L, A] = pk.transform(tr)
   }
 
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[PropagationLang, F]): Propagation[FreeK[F, ?], DRef] =
