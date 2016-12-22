@@ -2,7 +2,9 @@ package nutcracker.util.free
 
 import scala.annotation.tailrec
 import scala.language.higherKinds
-import scalaz.{Applicative, BindRec, Foldable, Monad, MonadTrans, Monoid, NaturalTransformation, Traverse, \/, ~>}
+
+import nutcracker.util.typealigned.APair
+import scalaz.{-\/, Applicative, BindRec, Foldable, Monad, MonadTrans, Monoid, NaturalTransformation, Traverse, \/, \/-, ~>}
 import scalaz.syntax.foldable._
 import scalaz.syntax.monad._
 
@@ -24,6 +26,16 @@ sealed abstract class FreeBind[F[_], A] {
       }
     }
 
+  @tailrec
+  final def resume: APair[F, ? => FreeBind[F, A]] \/ F[A] =
+    this match {
+      case LiftF(fa) => \/-(fa)
+      case fm @ FlatMap(fz, f) => fz match {
+        case LiftF(fz) => -\/(APair[F, ? => FreeBind[F, A], fm.Pivot](fz, f))
+        case FlatMap(fy, g) => (fy flatMap (y => g(y) flatMap f)).resume
+      }
+    }
+
   def mapF[G[_]](f: F ~> G): FreeBind[G, A] =
     handle(
       fa => LiftF(f(fa)),
@@ -39,6 +51,22 @@ sealed abstract class FreeBind[F[_], A] {
         case (fz, g) => f(fz) map { z => \/.left(g(z)) }
       }
     ))
+
+  def foldMapRec[M[_]](tr: F ~> λ[α => M[FreeBind[F, α] \/ α]])(implicit M: BindRec[M]): M[A] = {
+    @tailrec def go(ffa: FreeBind[F, A]): M[FreeBind[F, A] \/ A] =
+      ffa match {
+        case LiftF(fa) => tr(fa)
+        case FlatMap(fz, f) => fz match {
+          case LiftF(fz) => tr(fz) map {
+            case \/-(z) => -\/(f(z))
+            case -\/(ffz) => -\/(ffz.flatMap(f))
+          }
+          case FlatMap(fy, g) => go((fy flatMap (y => g(y) flatMap f)))
+        }
+      }
+
+    M.tailrecM(this)(go)
+  }
 
   def fold(implicit F: BindRec[F]): F[A] =
     foldMap(NaturalTransformation.refl)
@@ -124,7 +152,9 @@ sealed abstract class FreeBind[F[_], A] {
 
 object FreeBind extends FreeBindInstances {
   private[FreeBind] case class LiftF[F[_], A](fa: F[A]) extends FreeBind[F, A]
-  private[FreeBind] case class FlatMap[F[_], Z, A](fz: FreeBind[F, Z], f: Z => FreeBind[F, A]) extends FreeBind[F, A]
+  private[FreeBind] case class FlatMap[F[_], Z, A](fz: FreeBind[F, Z], f: Z => FreeBind[F, A]) extends FreeBind[F, A] {
+    type Pivot = Z
+  }
 
   def liftF[F[_], A](fa: F[A]): FreeBind[F, A] = LiftF(fa)
   def roll[F[_], A](ffa: F[FreeBind[F, A]]): FreeBind[F, A] = LiftF(ffa).flatMap(identity)

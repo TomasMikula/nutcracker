@@ -1,5 +1,6 @@
 package nutcracker.util.free
 
+import scala.annotation.tailrec
 import scala.language.higherKinds
 import scalaz.{-\/, Applicative, ApplicativePlus, BindRec, Foldable, Monad, MonadPlus, MonadTrans, Monoid, Plus, Traverse, \/, \/-, ~>}
 import scalaz.syntax.monadPlus._
@@ -24,6 +25,27 @@ final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A
       case Left(mx) => mx
       case Right(fx) => f(fx)
     }))
+
+  def foldMapRec(tr: F ~> FreeT[F, M, ?])(implicit M: BindRec[M]): M[A] = {
+    @tailrec def toM[Z](fa: FreeBind[F1, Z]): M[FreeBind[F1, Z] \/ Z] = {
+      fa.resume match {
+        case \/-(f1z) => f1z match {
+          case Left(mz) => M.map(mz)(\/.right)
+          case Right(fz) => toM(tr(fz).unwrap)
+        }
+        case -\/(p) =>
+          val (f1y, f) = (p._1, p._2)
+          f1y match {
+            case Left(my) => M.map(my)(y => -\/(f(y)))
+            case Right(fy) => toM(tr(fy).unwrap.flatMap(f))
+          }
+      }
+    }
+    unwrap.foldMapRec[M](λ[F1 ~> λ[α => M[FreeBind[F1, α] \/ α]]](_ match {
+      case Left(mx) => M.map(mx)(\/.right)
+      case Right(fx) => toM(tr(fx).unwrap)
+    }))
+  }
 
   def cata[B](f: A => B)(implicit F: Foldable[F], M: Foldable[M], B: Monoid[B]): B =
     unwrap.cata(f)
