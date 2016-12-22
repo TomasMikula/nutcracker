@@ -43,6 +43,7 @@ lazy val root = (project in file(".")).
 libraryDependencies ++= Seq(
   "org.typelevel" %% "algebra" % "0.6.0",
   "org.scalaz" %% "scalaz-core" % "7.3.0-M7",
+  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.0-M7",
   "com.chuusai" %% "shapeless" % "2.3.2",
   "com.github.julien-truffaut"  %%  "monocle-core" % "1.4.0-M1",
   "org.scalatest" %% "scalatest" % "3.0.0" % "test",
