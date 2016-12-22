@@ -41,7 +41,13 @@ sealed abstract class Lst[+A] {
 
   @inline
   final def ?+:[B >: A](b: Option[B]): Lst[B] = b match {
-    case Some(x) => x :: this
+    case Some(x) => x +: this
+    case None => this
+  }
+
+  @inline
+  final def :+?[B >: A](b: Option[B]): Lst[B] = b match {
+    case Some(x) => this :+ x
     case None => this
   }
 
