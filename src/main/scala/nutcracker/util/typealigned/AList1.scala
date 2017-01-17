@@ -16,6 +16,11 @@ import scalaz.{Compose, Leibniz}
 sealed abstract class AList1[F[_, _], A, B] {
   import AList1._
 
+  type A1
+
+  def head: F[A, A1]
+  def tail: AList[F, A1, B]
+
   def ::[Z](fza: F[Z, A]): AList1[F, Z, B] =
     ACons(fza, this)
 
@@ -98,10 +103,20 @@ sealed abstract class AList1[F[_, _], A, B] {
       case ACons(f, g) => g.foldLeft[BalancedPostComposer[F, A, ?]](BalancedPostComposer(f)).reduceRight
       case AJust(f) => f
     }
+
+  def toList: AList[F, A, B] = ASome(this)
 }
 
-final case class AJust[F[_, _], A, B](value: F[A, B]) extends AList1[F, A, B]
-final case class ACons[F[_, _], A, B, C](head: F[A, B], tail: AList1[F, B, C]) extends AList1[F, A, C]
+final case class AJust[F[_, _], A, B](value: F[A, B]) extends AList1[F, A, B] {
+  type A1 = B
+  def head = value
+  def tail = AList.empty
+}
+
+final case class ACons[F[_, _], A, B, C](head: F[A, B], tail1: AList1[F, B, C]) extends AList1[F, A, C] {
+  type A1 = B
+  def tail = tail1.toList
+}
 
 object AList1 {
   /**

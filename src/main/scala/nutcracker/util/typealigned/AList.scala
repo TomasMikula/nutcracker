@@ -16,6 +16,8 @@ sealed abstract class AList[F[_, _], A, B] {
       case ASome(list) => fza :: list
     }
 
+  def +:[Z](fza: F[Z, A]): AList[F, Z, B] = (fza :: this).toList
+
   def :::[Z](that: AList[F, Z, A]): AList[F, Z, B] =
     this match {
       case ANil(ev) => ev.subst[AList[F, Z, ?]](that)
