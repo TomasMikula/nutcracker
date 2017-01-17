@@ -2,8 +2,9 @@ package nutcracker.util.free
 
 import scala.annotation.tailrec
 import scala.language.higherKinds
+import nutcracker.util.typealigned.{AList, ANil, APair, ASome}
 
-import nutcracker.util.typealigned.APair
+import scalaz.Leibniz.===
 import scalaz.{-\/, Applicative, BindRec, Foldable, Monad, MonadTrans, Monoid, NaturalTransformation, Traverse, \/, \/-, ~>}
 import scalaz.syntax.foldable._
 import scalaz.syntax.monad._
@@ -80,6 +81,57 @@ sealed abstract class FreeBind[F[_], A] {
         }
       )
     }
+
+  def foldRunRecM[M[_], S](s: S, f: λ[α => (S, F[α])] ~> λ[α => M[(S, FreeBind[F, α], S => S) \/ (S, α)]])(implicit M: BindRec[M]): M[(S, A)] = {
+    sealed trait Tr[α, β]
+    case class StateTr[α, β](tr: S => S, ev: α === β) extends Tr[α, β]
+    case class FlatMap[α, β](f: α => FreeBind[F, β]) extends Tr[α, β]
+    def stateTr[α](tr: S => S): Tr[α, α] = StateTr(tr, implicitly)
+
+    type X0[β] = APair[FreeBind[F, ?], AList[Tr, ?, β]]
+    def X0[α, β](fα: FreeBind[F, α], l: AList[Tr, α, β]): X0[β] = APair[FreeBind[F, ?], AList[Tr, ?, β], α](fα, l)
+
+    def applyTransitions[α, β](s: S, α: α, l: AList[Tr, α, β]): (S, X0[β]) \/ (S, β) =
+      l match {
+        case ANil(ev) => \/-((s, ev(α)))
+        case ASome(l) => l.head match {
+          case StateTr(f, ev) => applyTransitions(f(s), ev(α), l.tail) // XXX: non-stack-safe recursion
+          case FlatMap(f) => -\/((s, X0[l.A1, β](f(α), l.tail)))
+        }
+      }
+
+    type X = X0[A]
+    def X(fa: FreeBind[F, A]): X = APair[FreeBind[F, ?], AList[Tr, ?, A], A](fa, AList.empty[Tr, A])
+
+    M.tailrecM[(S, X), (S, A)]((s, X(this))) { case (s, x) =>
+      x._1.resume match {
+        case \/-(fa) => f((s, fa)) map {
+          case -\/((s, fa, pop)) => -\/((s, APair[FreeBind[F, ?], AList[Tr, ?, A], x.A](fa, stateTr[x.A](pop) +: x._2)))
+          case \/-((s, a)) => x._2 match {
+            case ANil(ev) => \/-((s, ev(a)))
+            case ASome(l) => applyTransitions(s, a, l.toList)
+          }
+        }
+        case -\/(p) => f((s, p._1)) map {
+          case -\/((s, fz, pop)) => -\/((s, APair[FreeBind[F, ?], AList[Tr, ?, A], p.A](fz, stateTr[p.A](pop) +: FlatMap[p.A, x.A](p._2) +: x._2)))
+          case \/-((s, z)) => -\/((s, APair[FreeBind[F, ?], AList[Tr, ?, A], x.A](p._2(z), x._2)))
+        }
+      }
+    }
+  }
+
+  def foldRunRecParM[M[_], S1, S2](s: S1, f: λ[α => (S1, F[α])] ~> λ[α => M[(S1, FreeBind[F, α], S2 => S2) \/ (S2, α)]])(implicit M: BindRec[M], S2: Monoid[S2]): M[(S2, A)] = {
+    import scalaz.syntax.monoid._
+    type S = (S1, S2)
+    val g = λ[λ[α => (S, F[α])] ~> λ[α => M[(S, FreeBind[F, α], S => S) \/ (S, α)]]] {
+      case ((s1, s2), fa) =>
+        f((s1, fa)) map {
+          case -\/((s1_, fa, tr)) => -\/(((s1_, S2.zero), fa, { case (_, s2_) => (s1, s2 |+| tr(s2_)) }))
+          case \/-((s2_, a)) => \/-(((s1, s2 |+| s2_), a))
+        }
+    }
+    foldRunRecM[M, (S1, S2)]((s, S2.zero), g) map { case ((s1, s2), a) => (s2, a) }
+  }
 
   /** foldRunM specialized for `Id` */
   @tailrec final def foldRun[S](s: S, f: λ[α => (S, F[α])] ~> (S, ?)): (S, A) =
