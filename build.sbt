@@ -42,40 +42,12 @@ lazy val root = (project in file(".")).
 
 libraryDependencies ++= Seq(
   "org.typelevel" %% "algebra" % "0.6.0",
-  "org.scalaz" %% "scalaz-core" % "7.3.0-M7",
-  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.0-M7",
+  "org.scalaz" %% "scalaz-core" % "7.3.0-M8",
+  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.0-M8",
   "com.chuusai" %% "shapeless" % "2.3.2",
-  "com.github.julien-truffaut"  %%  "monocle-core" % "1.4.0-M1",
+  "com.github.julien-truffaut"  %%  "monocle-core" % "1.4.0",
   "org.scalatest" %% "scalatest" % "3.0.0" % "test",
   "org.scalacheck" %% "scalacheck" % "1.13.4"
 )
 
 fork := true
-
-// A configuration which is like 'compile' except it performs additional
-// static analysis. Execute static analysis via `lint:compile`
-val LintTarget = config("lint").extend(Compile)
-
-addMainSourcesToLintTarget 
-
-addSlowScalacSwitchesToLintTarget
-
-def addMainSourcesToLintTarget = {
-  inConfig(LintTarget) {
-    Defaults.compileSettings ++ Seq(
-      sources in LintTarget := {
-        val lintSources = (sources in LintTarget).value
-        lintSources ++ (sources in Compile).value
-      }
-    )
-  }
-}
-
-def addSlowScalacSwitchesToLintTarget = {
-  inConfig(LintTarget) {
-    scalacOptions in LintTarget ++= Seq(
-      "-Ywarn-unused-import",
-      "-Ywarn-dead-code"
-    )
-  }
-}
