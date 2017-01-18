@@ -37,17 +37,20 @@ javacOptions ++= Seq(
   "-Xlint:unchecked",
   "-Xlint:deprecation")
 
-lazy val root = (project in file(".")).
-  dependsOn(RootProject(uri("https://github.com/TomasMikula/Principled.git#v0.1")))
+testFrameworks += new TestFramework("scalaprops.ScalapropsFramework")
+
+parallelExecution in Test := false // currently, ScalaProps does not support parallel execution
 
 libraryDependencies ++= Seq(
   "org.typelevel" %% "algebra" % "0.6.0",
   "org.scalaz" %% "scalaz-core" % "7.3.0-M8",
-  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.0-M8",
   "com.chuusai" %% "shapeless" % "2.3.2",
   "com.github.julien-truffaut"  %%  "monocle-core" % "1.4.0",
+  "com.github.scalaprops" %% "scalaprops" % "0.3.5",
+
   "org.scalatest" %% "scalatest" % "3.0.0" % "test",
-  "org.scalacheck" %% "scalacheck" % "1.13.4"
+  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.0-M8" % "test",
+  "org.scalacheck" %% "scalacheck" % "1.13.4" % "test"
 )
 
 fork := true
