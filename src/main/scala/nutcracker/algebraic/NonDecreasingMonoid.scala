@@ -1,7 +1,5 @@
 package nutcracker.algebraic
 
-import org.scalacheck.Arbitrary
-import principled.LawSet
 import scalaz.Monoid
 
 /** Monoid with a property that the result of the monoid operation
@@ -19,13 +17,4 @@ trait NonDecreasingMonoid[A] extends NonDecreasingSemigroup[A] with Monoid[A]
 
 object NonDecreasingMonoid {
   def apply[A](implicit A: NonDecreasingMonoid[A]): NonDecreasingMonoid[A] = A
-
-  case class Laws[A: Arbitrary](M: NonDecreasingMonoid[A]) extends LawSet("NonDecreasingMonoid") {
-
-    override val bases = Seq(
-      "nonDecreasingSemigroup" -> NonDecreasingSemigroup.Laws(M),
-      "monoid" -> MissingLaws.MonoidLaws(M))
-
-    override def props = Seq()
-  }
 }

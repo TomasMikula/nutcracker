@@ -1,8 +1,5 @@
 package nutcracker.algebraic
 
-import principled.LawSet
-import org.scalacheck.Arbitrary
-import org.scalacheck.Prop.forAll
 import scalaz.syntax.order.ToOrderOps
 import scalaz.syntax.semigroup.ToSemigroupOps
 
@@ -19,17 +16,17 @@ trait OrderPreservingSemigroup[A] extends SemigroupWithOrder[A]
 object OrderPreservingSemigroup {
   def apply[A](implicit A: OrderPreservingSemigroup[A]): OrderPreservingSemigroup[A] = A
 
-  case class Laws[A: Arbitrary](S: OrderPreservingSemigroup[A]) extends LawSet("OrderPreservingSemigroup") {
-    implicit def orderedSemigroup = S
+  trait Laws[A] {
+    implicit def A: OrderPreservingSemigroup[A]
 
-    override val bases = Seq(
-      "semigroupWithOrder" -> SemigroupWithOrder.Laws(S)
-    )
+    def leftCompatibility(a: A, b: A, c: A): Boolean =
+      (a cmp b) == ((c |+| a) cmp (c |+| b))
 
-    override val props = Seq(
-      "leftCompatibility" -> forAll((a: A, b: A, c: A) =>
-        (a cmp b) == ((c |+| a) cmp (c |+| b))),
-      "rightCompatibility" -> forAll((a: A, b: A, c: A) =>
-        (a cmp b) == ((a |+| c) cmp (b |+| c))))
+    def rightCompatibility(a: A, b: A, c: A): Boolean =
+      (a cmp b) == ((a |+| c) cmp (b |+| c))
+  }
+
+  def laws[A](implicit ev: OrderPreservingSemigroup[A]): Laws[A] = new Laws[A] {
+    override val A = ev
   }
 }

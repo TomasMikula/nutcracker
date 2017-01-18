@@ -1,8 +1,5 @@
 package nutcracker.algebraic
 
-import org.scalacheck.Arbitrary
-import org.scalacheck.Prop.forAll
-import principled.LawSet
 import scalaz.syntax.order.ToOrderOps
 import scalaz.syntax.semigroup.ToSemigroupOps
 
@@ -18,12 +15,14 @@ trait NonDecreasingSemigroup[A] extends SemigroupWithOrder[A]
 object NonDecreasingSemigroup {
   def apply[A](implicit A: NonDecreasingSemigroup[A]): NonDecreasingSemigroup[A] = A
 
-  case class Laws[A: Arbitrary](S: NonDecreasingSemigroup[A]) extends LawSet("NonDecreasingSemigroup") {
-    implicit val nonDecreasingSemigroup = S
+  trait Laws[A] {
+    implicit def A: NonDecreasingSemigroup[A]
 
-    override val bases = Seq("semigroupWithOrder" -> SemigroupWithOrder.Laws(S))
-    override val props = Seq(
-      "leftAbsorption" -> forAll((a: A, b: A) => a lte (a |+| b)),
-      "rightAbsorption" -> forAll((a: A, b: A) => b lte (a |+| b)))
+    def leftAbsorption(a: A, b: A): Boolean = a lte (a |+| b)
+    def rightAbsorption(a: A, b: A): Boolean = b lte (a |+| b)
+  }
+
+  def laws[A](implicit ev: NonDecreasingSemigroup[A]): Laws[A] = new Laws[A] {
+    override val A = ev
   }
 }
