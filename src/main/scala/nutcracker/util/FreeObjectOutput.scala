@@ -3,7 +3,7 @@ package nutcracker.util
 import nutcracker.util.free.Free
 
 import scalaz.Id.Id
-import scalaz.{-\/, Monoid, \/, \/-, ~>}
+import scalaz.{-\/, Monoid, Writer, \/, \/-, ~>}
 import scalaz.syntax.monad._
 
 final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private val unwrap: Free[FreeObjectOutput.OutputInst[R, Ptr, ?], A]) /* extends AnyVal // can't have nested AnyVals :( */ {
@@ -11,6 +11,12 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
 
   def flatMap[B](f: A => FreeObjectOutput[R, Ptr, B]): FreeObjectOutput[R, Ptr, B] =
     wrap(unwrap flatMap (a => f(a).unwrap))
+
+  private def foldMap(showRef: Ptr ~> λ[α => R]): Lst[R] =
+    unwrap.foldMap[Writer[Lst[R], ?]](λ[OutputInst[R, Ptr, ?] ~> Writer[Lst[R], ?]](_ match {
+      case Write(r) => Writer(Lst.singleton(r), ())
+      case WriteObject(pa, _) => Writer(Lst.singleton(showRef(pa)), ())
+    })).run._1
 
   /**
     *
@@ -53,6 +59,9 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
       }
     })._1
   }
+
+  def show(showReference: Ptr ~> λ[α => R]): Lst[R] =
+    foldMap(showReference)
 
   /** Serialize, cutting off cycles. Pointers that would cause cycles will be handled by `showReference`. */
   def show(
