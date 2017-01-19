@@ -4,9 +4,13 @@ import nutcracker.util.free.Free
 
 import scalaz.Id.Id
 import scalaz.{-\/, Monoid, \/, \/-, ~>}
+import scalaz.syntax.monad._
 
-final class FreeObjectOutput[R, Ptr[_]] private[FreeObjectOutput] (private val unwrap: Free[FreeObjectOutput.OutputInst[R, Ptr, ?], Unit]) /* extends AnyVal // can't have nested AnyVals :( */ {
+final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private val unwrap: Free[FreeObjectOutput.OutputInst[R, Ptr, ?], A]) /* extends AnyVal // can't have nested AnyVals :( */ {
   import FreeObjectOutput._
+
+  def flatMap[B](f: A => FreeObjectOutput[R, Ptr, B]): FreeObjectOutput[R, Ptr, B] =
+    wrap(unwrap flatMap (a => f(a).unwrap))
 
   /**
     *
@@ -100,9 +104,12 @@ object FreeObjectOutput {
   private[FreeObjectOutput] case class Write[R, Ptr[_]](r: R) extends OutputInst[R, Ptr, Unit]
   private[FreeObjectOutput] case class WriteObject[R, Ptr[_], A](pa: Ptr[A], ser: ObjectSerializer[A, R, Ptr]) extends OutputInst[R, Ptr, Unit]
 
-  def empty[R, Ptr[_]]: FreeObjectOutput[R, Ptr] = new FreeObjectOutput(Free.point[OutputInst[R, Ptr, ?], Unit](()))
-  def write[R, Ptr[_]](r: R): FreeObjectOutput[R, Ptr] = new FreeObjectOutput(Free.liftF[OutputInst[R, Ptr, ?], Unit](Write(r)))
-  def writeObject[R, Ptr[_], A](pa: Ptr[A], ser: ObjectSerializer[A, R, Ptr]): FreeObjectOutput[R, Ptr] = new FreeObjectOutput(Free.liftF[OutputInst[R, Ptr, ?], Unit](WriteObject(pa, ser)))
+  private def wrap[R, Ptr[_], A](fa: Free[FreeObjectOutput.OutputInst[R, Ptr, ?], A]): FreeObjectOutput[R, Ptr, A] = wrap[R, Ptr, A](fa)
+
+  def point[R, Ptr[_], A](a: A): FreeObjectOutput[R, Ptr, A] = wrap(Free.point[OutputInst[R, Ptr, ?], A](a))
+  def empty[R, Ptr[_]]: FreeObjectOutput[R, Ptr, Unit] = point(())
+  def write[R, Ptr[_]](r: R): FreeObjectOutput[R, Ptr, Unit] = wrap(Free.liftF[OutputInst[R, Ptr, ?], Unit](Write(r)))
+  def writeObject[R, Ptr[_], A](pa: Ptr[A], ser: ObjectSerializer[A, R, Ptr]): FreeObjectOutput[R, Ptr, Unit] = wrap(Free.liftF[OutputInst[R, Ptr, ?], Unit](WriteObject(pa, ser)))
 
   sealed abstract class Decoration[+R] {
     def beforeOption: Option[R]
@@ -119,14 +126,29 @@ object FreeObjectOutput {
   case class After[R](r: R) extends Decoration[R] { def beforeOption = None; def afterOption = Some(r) }
   case class BeforeAfter[R](before: R, after: R) extends Decoration[R] { def beforeOption = Some(before); def afterOption = Some(after) }
 
-  implicit def objectOutputInstance[R, Ptr[_]]: ObjectOutput[FreeObjectOutput[R, Ptr], R, Ptr] =
-    new ObjectOutput[FreeObjectOutput[R, Ptr], R, Ptr] {
-      import scalaz.syntax.monad._
+  implicit def objectOutputInstance[R, Ptr[_]]: ObjectOutput[FreeObjectOutput[R, Ptr, Unit], R, Ptr] =
+    new ObjectOutput[FreeObjectOutput[R, Ptr, Unit], R, Ptr] {
 
-      def write(out: FreeObjectOutput[R, Ptr], r: R): FreeObjectOutput[R, Ptr] =
-        new FreeObjectOutput(out.unwrap >> FreeObjectOutput.write(r).unwrap)
+      def write(out: FreeObjectOutput[R, Ptr, Unit], r: R): FreeObjectOutput[R, Ptr, Unit] =
+        wrap(out.unwrap >> FreeObjectOutput.write(r).unwrap)
 
-      def writeObject[A](out: FreeObjectOutput[R, Ptr], pa: Ptr[A])(implicit ser: ObjectSerializer[A, R, Ptr]): FreeObjectOutput[R, Ptr] =
-        new FreeObjectOutput(out.unwrap >> FreeObjectOutput.writeObject(pa, ser).unwrap)
+      def writeObject[A](out: FreeObjectOutput[R, Ptr, Unit], pa: Ptr[A])(implicit ser: ObjectSerializer[A, R, Ptr]): FreeObjectOutput[R, Ptr, Unit] =
+        wrap(out.unwrap >> FreeObjectOutput.writeObject(pa, ser).unwrap)
+    }
+
+  implicit def monadObjectOutputInstance[R, Ptr[_]]: MonadObjectOutput[FreeObjectOutput[R, Ptr, ?], R, Ptr] =
+    new MonadObjectOutput[FreeObjectOutput[R, Ptr, ?], R, Ptr] {
+
+      def writeObject[A](pa: Ptr[A])(implicit ser: ObjectSerializer[A, R, Ptr]): FreeObjectOutput[R, Ptr, Unit] =
+        FreeObjectOutput.writeObject(pa, ser)
+
+      def writer[A](w: R, v: A): FreeObjectOutput[R, Ptr, A] =
+        wrap(FreeObjectOutput.write[R, Ptr](w).unwrap >> FreeObjectOutput.point(v).unwrap)
+
+      def bind[A, B](fa: FreeObjectOutput[R, Ptr, A])(f: A => FreeObjectOutput[R, Ptr, B]): FreeObjectOutput[R, Ptr, B] =
+        fa flatMap f
+
+      def point[A](a: => A): FreeObjectOutput[R, Ptr, A] =
+        FreeObjectOutput.point(a)
     }
 }
