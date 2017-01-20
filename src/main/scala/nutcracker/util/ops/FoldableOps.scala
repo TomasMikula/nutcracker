@@ -1,7 +1,7 @@
 package nutcracker.util.ops
 
 import nutcracker.util.Aggregator
-
+import scala.language.implicitConversions
 import scalaz.Foldable
 
 final case class FoldableOps[F[_], A](fa: F[A]) extends AnyVal {
@@ -12,5 +12,5 @@ final case class FoldableOps[F[_], A](fa: F[A]) extends AnyVal {
 }
 
 trait ToFoldableOps {
-  def toFoldableOps[F[_], A](fa: F[A]): FoldableOps[F, A] = FoldableOps(fa)
+  implicit def toFoldableOps[F[_], A](fa: F[A]): FoldableOps[F, A] = FoldableOps(fa)
 }

@@ -2,7 +2,7 @@ package nutcracker.util
 
 import scala.annotation.tailrec
 import scala.collection.mutable.Buffer
-import scalaz.Monoid
+import scalaz.{Foldable, Monoid}
 
 /** Linked list with O(1) cons, snoc and concatenation
   * and amortized O(1) uncons.
@@ -82,18 +82,8 @@ sealed abstract class Lst[+A] {
     go(this)
   }
 
-  final def map[B](f: A => B): Lst[B] = {
-    val buf = Buffer.empty[B]
-
-    @tailrec def go(as: Lst[A]): Lst[B] = as.toRightAssoc match {
-      case Nil => buf.foldRight(Lst.empty[B])((b, l) => b :: l)
-      case Cons(h, t) => buf += f(h); go(t)
-      case Cat(Cons(h, t1), t2) => buf += f(h); go(t1 ++ t2)
-      case _ => sys.error("Unreachable code")
-    }
-
-    go(this)
-  }
+  final def map[B](f: A => B): Lst[B] =
+    toBuffer.foldRight(Lst.empty[B])((a, bs) => f(a) :: bs)
 
   final def filter(p: A => Boolean): Lst[A] =
     foldLeft(Buffer[A]())((buf, a) => if (p(a)) (buf += a) else buf).foldRight(Lst.empty[A])((a, l) => a :: l)
@@ -114,10 +104,26 @@ sealed abstract class Lst[+A] {
     go(b, this, List())
   }
 
+  final def foldRight[B](b: B)(f: (A, B) => B): B =
+    toBuffer[A].foldRight(b)(f)
+
   @tailrec
   private final def toRightAssoc: Lst[A] = this match {
     case Cat(Cat(x, y), z) => (Cat(x, Cat(y, z)): Lst[A]).toRightAssoc
     case l => l
+  }
+
+  private final def toBuffer[A1 >: A]: Buffer[A1] = {
+    @tailrec def go(as: Lst[A], tail: List[Lst[A]], buf: Buffer[A1]): Buffer[A1] = as match {
+      case Cons(h, t) => go(t, tail, buf += h)
+      case Cat(l, r) => go(l, r::tail, buf)
+      case Nil => tail match {
+        case as :: ass => go(as, ass, buf)
+        case _ => buf
+      }
+    }
+
+    go(this, List.empty, Buffer.empty[A1])
   }
 }
 
@@ -160,5 +166,16 @@ object Lst {
   implicit def monoid[A]: Monoid[Lst[A]] = new Monoid[Lst[A]] {
     def zero: Lst[A] = Nil
     def append(f1: Lst[A], f2: => Lst[A]): Lst[A] = f1 ++ f2
+  }
+
+  implicit val foldable: Foldable[Lst] = new Foldable[Lst] {
+    def foldMap[A, B](fa: Lst[A])(f: A => B)(implicit F: Monoid[B]): B =
+      fa.foldLeft(F.zero)((b, a) => F.append(b, f(a)))
+
+    override def foldLeft[A, B](fa: Lst[A], z: B)(f: (B, A) => B): B =
+      fa.foldLeft(z)(f)
+
+    def foldRight[A, B](fa: Lst[A], z: => B)(f: (A, => B) => B): B =
+      fa.foldRight(z)((a, b) => f(a, b))
   }
 }
