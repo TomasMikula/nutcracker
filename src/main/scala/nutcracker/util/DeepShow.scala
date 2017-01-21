@@ -1,7 +1,8 @@
 package nutcracker.util
 
+import scala.annotation.tailrec
 import scalaz.Free.Trampoline
-import scalaz.{Semigroup, Trampoline, ~>}
+import scalaz.{Semigroup, Show, Trampoline, ~>}
 import scalaz.Id._
 
 /** Printing of (potentially cyclic) object graphs.
@@ -19,6 +20,10 @@ trait DeepShow[A, Ptr[_]] {
     decorateReference: String => String = ref => s"<ref $ref/>"
   )(implicit S: ShowK[Ptr], E: HEqualK[Ptr]): String =
     show(a).eval(deref)(decorateReferenced, decorateUnreferenced, decorateReference)
+
+  def shallow(implicit S: ShowK[Ptr]): Show[A] = new Show[A] {
+    override def shows(a: A): String = DeepShow.this.show(a).shallowEval
+  }
 }
 
 object DeepShow {
@@ -74,6 +79,24 @@ sealed trait Desc[Ptr[_]] {
     assert(ref.isEmpty)
 
     res.foldLeft(new StringBuilder)((acc, s) => acc.append(s)).toString
+  }
+
+  def shallowEval(implicit S: ShowK[Ptr]): String = {
+    @tailrec
+    def go(acc: StringBuilder, d: Desc[Ptr], tail: List[Desc[Ptr]]): String = d match {
+      case Concat(l, r) => go(acc, l, r::tail)
+      case d =>
+        val acc1 = d match {
+          case Write(s) => acc ++= s
+          case Referenced(pa, _) => acc ++= S.shows(pa)
+        }
+        tail match {
+          case d :: ds => go(acc1, d, ds)
+          case Nil => acc1.result()
+        }
+    }
+
+    go(new StringBuilder, this, Nil)
   }
 }
 
