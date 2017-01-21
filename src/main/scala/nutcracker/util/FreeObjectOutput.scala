@@ -1,6 +1,7 @@
 package nutcracker.util
 
 import nutcracker.util.free.Free
+import nutcracker.util.ops.toFoldableOps
 
 import scalaz.Id.Id
 import scalaz.{-\/, Monoid, Writer, \/, \/-, ~>}
@@ -63,6 +64,9 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
   def show(showReference: Ptr ~> λ[α => R]): Lst[R] =
     foldMap(showReference)
 
+  def appendTo[B](b: B, showReference: Ptr ~> λ[α => R])(implicit agg: Aggregator[B, R]): B =
+    show(showReference).aggregateLeft(b)
+
   /** Serialize, cutting off cycles. Pointers that would cause cycles will be handled by `showReference`. */
   def show(
     deref: Ptr ~> Id,
@@ -88,6 +92,18 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     foldBiState[S1, S2](Nil)(step)(deref)
   }
 
+  def appendTo[B](
+    b: B,
+    deref: Ptr ~> Id,
+    decorateReferenced: Ptr ~> λ[α => Decoration[R]],
+    decorateUnreferenced: Ptr ~> λ[α => Decoration[R]],
+    showReference: Ptr ~> λ[α => R]
+  )(implicit
+    agg: Aggregator[B, R],
+    E: HEqualK[Ptr]
+  ): B =
+    show(deref, decorateReferenced, decorateUnreferenced, showReference).aggregateLeft(b)
+
   /** Serialize, cutting off cycles. Pointers that would cause cycles will be handled by `showReference`. */
   def show(
     deref: Ptr ~> Id,
@@ -106,6 +122,17 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
 
     foldState[S](Nil)(step)(deref)
   }
+
+  def appendTo[B](
+    b: B,
+    deref: Ptr ~> Id,
+    decorateContent: Ptr ~> λ[α => Decoration[R]],
+    showReference: Ptr ~> λ[α => R]
+  )(implicit
+    agg: Aggregator[B, R],
+    E: HEqualK[Ptr]
+  ): B =
+    show(deref, decorateContent, showReference).aggregateLeft(b)
 }
 
 object FreeObjectOutput {
