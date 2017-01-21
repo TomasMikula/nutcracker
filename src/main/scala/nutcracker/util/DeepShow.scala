@@ -55,7 +55,6 @@ sealed trait Desc[Ptr[_]] {
 
     def go(node: Desc[Ptr], visited: Γ): Trampoline[(Lst[String], R)] = node match {
       case Write(s) => Trampoline.done((Lst.singleton(s), Lst.empty))
-      case RefString(pa) => Trampoline.done((Lst.singleton(S.shows(pa)), Lst.empty))
       case Referenced(pa, ev) =>
         if(visited.exists(E.hEqual(_, pa))) Trampoline.done((Lst.singleton(decorateReference(S.shows(pa))), Lst.singleton(pa)))
         else Trampoline.suspend(go(ev.show(deref(pa)), pa :: visited)) map {
@@ -80,7 +79,6 @@ sealed trait Desc[Ptr[_]] {
 
 object Desc {
   private[Desc] final case class Referenced[Ptr[_], A](pa: Ptr[A], ev: DeepShow[A, Ptr]) extends Desc[Ptr]
-  private[Desc] final case class RefString[Ptr[_], A](p: Ptr[A]) extends Desc[Ptr]
   private[Desc] final case class Write[Ptr[_]](s: String) extends Desc[Ptr]
   private[Desc] final case class Concat[Ptr[_]](l: Desc[Ptr], r: Desc[Ptr]) extends Desc[Ptr]
 
@@ -89,9 +87,6 @@ object Desc {
 
   def ref[Ptr[_], A](pa: Ptr[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
     Referenced(pa, ev)
-
-  def refString[Ptr[_], A](pa: Ptr[A]): Desc[Ptr] =
-    RefString(pa)
 
   def done[Ptr[_]](s: String): Desc[Ptr] =
     Write(s)
@@ -122,8 +117,4 @@ object Desc {
 
   implicit def stringAggregator[Ptr[_]]: Aggregator[Desc[Ptr], String] =
     Aggregator(_ :+ _)
-
-  implicit def refStringAggregator[Ptr[_]]: AggregatorK[Desc[Ptr], Ptr] = new AggregatorK[Desc[Ptr], Ptr] {
-    def apply[A](dsc: Desc[Ptr], pa: Ptr[A]): Desc[Ptr] = dsc ++ Desc.refString(pa)
-  }
 }
