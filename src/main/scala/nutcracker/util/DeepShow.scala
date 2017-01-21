@@ -21,6 +21,15 @@ trait DeepShow[A, Ptr[_]] {
   )(implicit S: ShowK[Ptr], E: HEqualK[Ptr]): String =
     show(a).eval(deref)(decorateReferenced, decorateUnreferenced, decorateReference)
 
+  def toShow(deref: Ptr ~> Id)(
+    decorateReferenced: (=> String) => (String, String) = ref => (s"<def $ref>", "</def>"),
+    decorateUnreferenced: (=> String) => (String, String) = ref => ("", ""),
+    decorateReference: String => String = ref => s"<ref $ref/>"
+  )(implicit S: ShowK[Ptr], E: HEqualK[Ptr]): Show[A] = new Show[A] {
+    override def shows(a: A): String =
+      DeepShow.this.show(a).eval(deref)(decorateReferenced, decorateUnreferenced, decorateReference)
+  }
+
   def shallow(implicit S: ShowK[Ptr]): Show[A] = new Show[A] {
     override def shows(a: A): String = DeepShow.this.show(a).shallowEval
   }
@@ -30,6 +39,9 @@ object DeepShow {
 
   def deepShow[Ptr[_], A](a: A)(deref: Ptr ~> Id)(implicit ev: DeepShow[A, Ptr], S: ShowK[Ptr], E: HEqualK[Ptr]): String =
     ev.deepShow(a)(deref)()
+
+  def toShow[Ptr[_], A](deref: Ptr ~> Id)(implicit ev: DeepShow[A, Ptr], S: ShowK[Ptr], E: HEqualK[Ptr]): Show[A] =
+    ev.toShow(deref)()
 
   implicit def specialize[A[_[_]], Ptr[_]](implicit ev: DeepShowK[A]): DeepShow[A[Ptr], Ptr] =
     ev.specialize[Ptr]
