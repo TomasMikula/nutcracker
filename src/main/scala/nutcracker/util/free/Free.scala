@@ -20,6 +20,14 @@ final case class Free[F[_], A] private(unwrap: FreeBind[(Id :++: F)#Out, A]) ext
       case Right(fx) => f(fx)
     }))
 
+  def foldRun[S](s: S, f: λ[α => (S, F[α])] ~> (S, ?)): (S, A) =
+    unwrap.foldRun(s, λ[λ[α => (S, F1[α])] ~> (S, ?)]{
+      case (s, f1x) => f1x match {
+        case Left(x) => (s, x)
+        case Right(fx) => f((s, fx))
+      }
+    })
+
   def foldRunRecParM[M[_], S1, S2](s1: S1, f: λ[α => (S1, F[α])] ~> λ[α => M[(S1, Free[F, α], S2 => S2) \/ (S2, α)]])(implicit M0: BindRec[M], M1: Applicative[M], S2: Monoid[S2]): M[(S2, A)] = {
     type F1[X] = this.F1[X] // otherwise scalac error: "private type F1 escapes its defining scope ..."
     unwrap.foldRunRecParM[M, S1, S2](s1, λ[λ[α => (S1, F1[α])] ~> λ[α => M[(S1, FreeBind[F1, α], S2 => S2) \/ (S2, α)]]] {
