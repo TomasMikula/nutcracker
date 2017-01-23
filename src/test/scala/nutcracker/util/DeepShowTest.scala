@@ -8,7 +8,7 @@ import scalaz.Id.Id
 
 class DeepShowTest extends FunSuite {
 
-  implicit val idShowK: ShowK[Id] = new ShowK[Id] {
+  val idShowK: ShowK[Id] = new ShowK[Id] {
     def shows[A](fa: Id[A]): String = System.identityHashCode(fa).formatted("%x")
   }
 
@@ -23,7 +23,7 @@ class DeepShowTest extends FunSuite {
       }
     }
 
-    val res = ds.deepShow(l)(NaturalTransformation.refl[Id], idShowK)()
+    val res = ds.show(l).eval(NaturalTransformation.refl[Id], idShowK)()
     val expected = l.mkString(", ")
 
     assertResult(expected)(res)
@@ -39,7 +39,7 @@ class DeepShowTest extends FunSuite {
         Desc.done(is.i.toString + ", ") ++ Desc.ref[Id, Lst](is.tail)(this)
     }
 
-    val s = ds.deepShow(l)(NaturalTransformation.refl[Id], idShowK)(
+    val s = ds.show(l).eval(NaturalTransformation.refl[Id], idShowK)(
       decorateReferenced = λ[Id ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
       decorateReference = ref => "@"
     )

@@ -17,13 +17,6 @@ trait DeepShow[A, Ptr[_]] extends ObjectSerializer[A, String, Ptr] {
   def write[O](out: O, a: A)(implicit ev: ObjectOutput[O, String, Ptr]): O =
     show(a).writeTo(out)
 
-  final def deepShow(a: A)(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
-    decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
-    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
-    decorateReference: String => String = ref => s"<ref $ref/>"
-  )(implicit E: HEqualK[Ptr]): String =
-    show(a).eval(deref, showRef)(decorateReferenced, decorateUnreferenced, decorateReference)
-
   def toShow(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
     decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
     decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
@@ -39,9 +32,6 @@ trait DeepShow[A, Ptr[_]] extends ObjectSerializer[A, String, Ptr] {
 }
 
 object DeepShow {
-
-  def deepShow[Ptr[_], A](a: A)(deref: Ptr ~> Id)(implicit ev: DeepShow[A, Ptr], S: ShowK[Ptr], E: HEqualK[Ptr]): String =
-    ev.deepShow(a)(deref, S)()
 
   def toShow[Ptr[_], A](deref: Ptr ~> Id)(implicit ev: DeepShow[A, Ptr], S: ShowK[Ptr], E: HEqualK[Ptr]): Show[A] =
     ev.toShow(deref, S)()
@@ -69,9 +59,9 @@ final class Desc[Ptr[_]] private(private val unwrap: FreeObjectOutput[String, Pt
     unwrap.writeTo(out)
 
   def eval(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
-    decorateReferenced: Ptr ~> λ[α => Decoration[String]],
-    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]],
-    decorateReference: String => String
+    decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
+    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
+    decorateReference: String => String = ref => s"<ref $ref/>"
   )(implicit E: HEqualK[Ptr]): String =
     unwrap.appendTo(
       new StringBuilder,
