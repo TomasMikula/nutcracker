@@ -1,7 +1,7 @@
 package nutcracker.util.typealigned
 
 import scala.language.higherKinds
-import scalaz.Leibniz
+import scalaz.{Leibniz, \/, \/-, ~>}
 import Leibniz.===
 
 /**
@@ -34,6 +34,12 @@ sealed abstract class AList[F[_, _], A, B] {
     this match {
       case ANil(ev) => ev.subst(ga)
       case ASome(list) => list.foldLeft(ga)
+    }
+
+  def foldLeftWhile[G[_], H[_]](ga: G[A])(tr: λ[α => APair[G, F[?, α]]] ~> λ[α => H[α] \/ G[α]]): APair[H, AList[F, ?, B]] \/ G[B] =
+    this match {
+      case ANil(ev) => \/-(ev.subst(ga))
+      case ASome(list) => list.foldLeftWhile(ga)(tr)
     }
 
   def foldRight[G[_]](gb: G[B])(implicit G: ContravariantLike[G, F]): G[A] =

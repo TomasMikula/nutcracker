@@ -2,7 +2,7 @@ package nutcracker.util.typealigned
 
 import scala.annotation.tailrec
 import scala.language.higherKinds
-import scalaz.{Compose, Leibniz}
+import scalaz.{-\/, Compose, Leibniz, \/, \/-, ~>}
 
 
 /**
@@ -80,6 +80,27 @@ sealed abstract class AList1[F[_, _], A, B] {
       fs match {
         case AJust(f) => G.map(gx)(f)
         case ACons(f, g) => go(pair(G.map(gx)(f), g))
+      }
+    }
+
+    go(pair(ga, this))
+  }
+
+  def foldLeftWhile[G[_], H[_]](ga: G[A])(tr: λ[α => APair[G, F[?, α]]] ~> λ[α => H[α] \/ G[α]]): APair[H, AList[F, ?, B]] \/ G[B] = {
+    @inline def pair[X](gx: G[X], fb: AList1[F, X, B]) =
+      APair[G, AList1[F, ?, B], X](gx, fb)
+
+    @tailrec def go(p: APair[G, AList1[F, ?, B]]): APair[H, AList[F, ?, B]] \/ G[B] = {
+      val (gx, fs) = (p._1, p._2)
+      fs match {
+        case AJust(f) => tr[B](APair[G, F[?, B], p.A](gx, f)) match {
+          case -\/(hb) => -\/(APair[H, AList[F, ?, B], B](hb, AList.empty[F, B]))
+          case \/-(gb) => \/-(gb)
+        }
+        case fs @ ACons(f, gs) => tr(APair[G, F[?, fs.A1], p.A](gx, f)) match {
+          case -\/(hy) => -\/(APair[H, AList[F, ?, B], fs.A1](hy, gs.toList))
+          case \/-(gy) => go(pair(gy, gs))
+        }
       }
     }
 
