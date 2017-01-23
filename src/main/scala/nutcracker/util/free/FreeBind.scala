@@ -92,13 +92,13 @@ sealed abstract class FreeBind[F[_], A] {
     def X0[α, β](fα: FreeBind[F, α], l: AList[Tr, α, β]): X0[β] = APair[FreeBind[F, ?], AList[Tr, ?, β], α](fα, l)
 
     def applyTransitions[α, β](s: S, α: α, l: AList[Tr, α, β]): (S, X0[β]) \/ (S, β) =
-      l match {
-        case ANil(ev) => \/-((s, ev(α)))
-        case ASome(l) => l.head match {
-          case StateTr(f, ev) => applyTransitions(f(s), ev(α), l.tail) // XXX: non-stack-safe recursion
-          case FlatMap(f) => -\/((s, X0[l.A1, β](f(α), l.tail)))
+      l.foldLeftWhile[(S, ?), λ[α => (S, FreeBind[F, α])]]((s, α))(λ[λ[α => APair[(S, ?), Tr[?, α]]] ~> λ[α => (S, FreeBind[F, α]) \/ (S, α)]](p => {
+        val ((s, x), tr) = (p._1, p._2)
+        tr match {
+          case StateTr(f, ev) => \/-((f(s), ev(x)))
+          case FlatMap(f) => -\/((s, f(x)))
         }
-      }
+      })).leftMap(p => (p._1._1, X0(p._1._2, p._2)))
 
     type X = X0[A]
     def X(fa: FreeBind[F, A]): X = APair[FreeBind[F, ?], AList[Tr, ?, A], A](fa, AList.empty[Tr, A])
