@@ -1,8 +1,9 @@
 package nutcracker.util
 
+import nutcracker.util.FreeObjectOutput.Decoration
 import org.scalatest.FunSuite
 
-import scalaz.{NaturalTransformation}
+import scalaz.{NaturalTransformation, ~>}
 import scalaz.Id.Id
 
 class DeepShowTest extends FunSuite {
@@ -22,7 +23,7 @@ class DeepShowTest extends FunSuite {
       }
     }
 
-    val res = ds.deepShow(l)(NaturalTransformation.refl[Id])()
+    val res = ds.deepShow(l)(NaturalTransformation.refl[Id], idShowK)()
     val expected = l.mkString(", ")
 
     assertResult(expected)(res)
@@ -38,8 +39,8 @@ class DeepShowTest extends FunSuite {
         Desc.done(is.i.toString + ", ") ++ Desc.ref[Id, Lst](is.tail)(this)
     }
 
-    val s = ds.deepShow(l)(NaturalTransformation.refl[Id])(
-      decorateReferenced = ref => ("", ""),
+    val s = ds.deepShow(l)(NaturalTransformation.refl[Id], idShowK)(
+      decorateReferenced = λ[Id ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
       decorateReference = ref => "@"
     )
 

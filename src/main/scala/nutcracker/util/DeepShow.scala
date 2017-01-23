@@ -1,9 +1,10 @@
 package nutcracker.util
 
-import scala.annotation.tailrec
-import scalaz.Free.Trampoline
-import scalaz.{Semigroup, Show, Trampoline, ~>}
+import nutcracker.util.FreeObjectOutput.Decoration
+
+import scalaz.{Semigroup, Show, ~>}
 import scalaz.Id._
+import scalaz.syntax.monad._
 
 /** Printing of (potentially cyclic) object graphs.
   * Features:
@@ -11,23 +12,25 @@ import scalaz.Id._
   *  - termination and correctness in presence of cycles;
   *  - stack safety.
   */
-trait DeepShow[A, Ptr[_]] {
+trait DeepShow[A, Ptr[_]] extends ObjectSerializer[A, String, Ptr] {
   def show(a: A): Desc[Ptr]
+  def write[O](out: O, a: A)(implicit ev: ObjectOutput[O, String, Ptr]): O =
+    show(a).writeTo(out)
 
-  final def deepShow(a: A)(deref: Ptr ~> Id)(
-    decorateReferenced: (=> String) => (String, String) = ref => (s"<def $ref>", "</def>"),
-    decorateUnreferenced: (=> String) => (String, String) = ref => ("", ""),
+  final def deepShow(a: A)(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
+    decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
+    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
     decorateReference: String => String = ref => s"<ref $ref/>"
-  )(implicit S: ShowK[Ptr], E: HEqualK[Ptr]): String =
-    show(a).eval(deref)(decorateReferenced, decorateUnreferenced, decorateReference)
+  )(implicit E: HEqualK[Ptr]): String =
+    show(a).eval(deref, showRef)(decorateReferenced, decorateUnreferenced, decorateReference)
 
-  def toShow(deref: Ptr ~> Id)(
-    decorateReferenced: (=> String) => (String, String) = ref => (s"<def $ref>", "</def>"),
-    decorateUnreferenced: (=> String) => (String, String) = ref => ("", ""),
+  def toShow(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
+    decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
+    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
     decorateReference: String => String = ref => s"<ref $ref/>"
-  )(implicit S: ShowK[Ptr], E: HEqualK[Ptr]): Show[A] = new Show[A] {
+  )(implicit E: HEqualK[Ptr]): Show[A] = new Show[A] {
     override def shows(a: A): String =
-      DeepShow.this.show(a).eval(deref)(decorateReferenced, decorateUnreferenced, decorateReference)
+      DeepShow.this.show(a).eval(deref, showRef)(decorateReferenced, decorateUnreferenced, decorateReference)
   }
 
   def shallow(implicit S: ShowK[Ptr]): Show[A] = new Show[A] {
@@ -38,10 +41,10 @@ trait DeepShow[A, Ptr[_]] {
 object DeepShow {
 
   def deepShow[Ptr[_], A](a: A)(deref: Ptr ~> Id)(implicit ev: DeepShow[A, Ptr], S: ShowK[Ptr], E: HEqualK[Ptr]): String =
-    ev.deepShow(a)(deref)()
+    ev.deepShow(a)(deref, S)()
 
   def toShow[Ptr[_], A](deref: Ptr ~> Id)(implicit ev: DeepShow[A, Ptr], S: ShowK[Ptr], E: HEqualK[Ptr]): Show[A] =
-    ev.toShow(deref)()
+    ev.toShow(deref, S)()
 
   implicit def specialize[A[_[_]], Ptr[_]](implicit ev: DeepShowK[A]): DeepShow[A[Ptr], Ptr] =
     ev.specialize[Ptr]
@@ -55,76 +58,44 @@ trait DeepShowK[A[_[_]]] {
   }
 }
 
-sealed trait Desc[Ptr[_]] {
+final class Desc[Ptr[_]] private(private val unwrap: FreeObjectOutput[String, Ptr, Unit]) extends AnyVal {
   import Desc._
 
-  def ++(that: Desc[Ptr]): Desc[Ptr] = Concat(this, that)
-  def :+(s: String): Desc[Ptr] = Concat(this, Write(s))
-  def +:(s: String): Desc[Ptr] = Concat(Write(s), this)
+  def ++(that: Desc[Ptr]): Desc[Ptr] = wrap(this.unwrap >> that.unwrap)
+  def :+(s: String): Desc[Ptr] = this ++ wrap(FreeObjectOutput.write(s))
+  def +:(s: String): Desc[Ptr] = wrap[Ptr](FreeObjectOutput.write(s)) ++ this
 
-  def eval(deref: Ptr ~> Id)(
-    decorateReferenced: (=> String) => (String, String),
-    decorateUnreferenced: (=> String) => (String, String),
+  def writeTo[O](out: O)(implicit O: ObjectOutput[O, String, Ptr]): O =
+    unwrap.writeTo(out)
+
+  def eval(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
+    decorateReferenced: Ptr ~> λ[α => Decoration[String]],
+    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]],
     decorateReference: String => String
-  )(implicit S: ShowK[Ptr], E: HEqualK[Ptr]): String = {
-    type Γ = List[Ptr[_]] // context, i.e. all parents
-    type R = Lst[Ptr[_]]  // referenced within the subgraph
+  )(implicit E: HEqualK[Ptr]): String =
+    unwrap.appendTo(
+      new StringBuilder,
+      deref,
+      decorateReferenced,
+      decorateUnreferenced,
+      λ[Ptr ~> λ[α => String]](p => decorateReference(showRef(p)))
+    ).result()
 
-    def go(node: Desc[Ptr], visited: Γ): Trampoline[(Lst[String], R)] = node match {
-      case Write(s) => Trampoline.done((Lst.singleton(s), Lst.empty))
-      case Referenced(pa, ev) =>
-        if(visited.exists(E.hEqual(_, pa))) Trampoline.done((Lst.singleton(decorateReference(S.shows(pa))), Lst.singleton(pa)))
-        else Trampoline.suspend(go(ev.show(deref(pa)), pa :: visited)) map {
-          case (res, referenced) =>
-            val referenced1 = referenced.filterNot(E.hEqual(_, pa))
-            val (pre, post) = if(referenced1.size < referenced.size) decorateReferenced(S.shows(pa)) else decorateUnreferenced(S.shows(pa))
-            (pre +: res :+ post, referenced1)
-        }
-      case Concat(l, r) =>
-        Trampoline.suspend(go(l, visited)) flatMap { case (res1, ref1) =>
-          go(r, visited) map { case (res2, ref2) => (res1 ++ res2, ref1 ++ ref2) }
-        }
-    }
-
-    val (res, ref) = go(this, Nil).run
-
-    assert(ref.isEmpty)
-
-    res.foldLeft(new StringBuilder)((acc, s) => acc.append(s)).toString
-  }
-
-  def shallowEval(implicit S: ShowK[Ptr]): String = {
-    @tailrec
-    def go(acc: StringBuilder, d: Desc[Ptr], tail: List[Desc[Ptr]]): String = d match {
-      case Concat(l, r) => go(acc, l, r::tail)
-      case d =>
-        val acc1 = d match {
-          case Write(s) => acc ++= s
-          case Referenced(pa, _) => acc ++= S.shows(pa)
-        }
-        tail match {
-          case d :: ds => go(acc1, d, ds)
-          case Nil => acc1.result()
-        }
-    }
-
-    go(new StringBuilder, this, Nil)
-  }
+  def shallowEval(implicit S: ShowK[Ptr]): String =
+    unwrap.appendTo(new StringBuilder, S).result()
 }
 
 object Desc {
-  private[Desc] final case class Referenced[Ptr[_], A](pa: Ptr[A], ev: DeepShow[A, Ptr]) extends Desc[Ptr]
-  private[Desc] final case class Write[Ptr[_]](s: String) extends Desc[Ptr]
-  private[Desc] final case class Concat[Ptr[_]](l: Desc[Ptr], r: Desc[Ptr]) extends Desc[Ptr]
+  private[Desc] def wrap[Ptr[_]](f: FreeObjectOutput[String, Ptr, Unit]): Desc[Ptr] = new Desc(f)
 
   def apply[Ptr[_], A](a: A)(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
     ev.show(a)
 
   def ref[Ptr[_], A](pa: Ptr[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
-    Referenced(pa, ev)
+    wrap(FreeObjectOutput.writeObject(pa, ev))
 
   def done[Ptr[_]](s: String): Desc[Ptr] =
-    Write(s)
+    wrap(FreeObjectOutput.write(s))
 
   def setDesc[Ptr[_], A](sa: Set[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
     Desc.done("{") ++ mkString(sa)(", ") ++ Desc.done("}")

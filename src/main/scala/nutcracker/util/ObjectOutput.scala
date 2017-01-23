@@ -20,5 +20,5 @@ object ObjectOutput {
       def write(out: O, r: R): O = agg.append(out, r)
       def writeObject[A](out: O, pa: Ptr[A])(implicit ser: ObjectSerializer[A, R, Ptr]): O = agg.append(out, f(pa))
     }
-  
+
 }

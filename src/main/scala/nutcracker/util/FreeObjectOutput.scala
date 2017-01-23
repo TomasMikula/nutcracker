@@ -133,6 +133,14 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     E: HEqualK[Ptr]
   ): B =
     show(deref, decorateContent, showReference).aggregateLeft(b)
+
+  def writeTo[O](out: O)(implicit O: ObjectOutput[O, R, Ptr]): O =
+    unwrap.foldRun[O](out, λ[λ[α => (O, OutputInst[R, Ptr, α])] ~> (O, ?)] {
+      case (out, i) => i match {
+        case Write(r) => (O.write(out, r), ())
+        case WriteObject(pa, ser) => (O.writeObject(out, pa)(ser), ())
+      }
+    })._1
 }
 
 object FreeObjectOutput {
@@ -140,7 +148,7 @@ object FreeObjectOutput {
   private[FreeObjectOutput] case class Write[R, Ptr[_]](r: R) extends OutputInst[R, Ptr, Unit]
   private[FreeObjectOutput] case class WriteObject[R, Ptr[_], A](pa: Ptr[A], ser: ObjectSerializer[A, R, Ptr]) extends OutputInst[R, Ptr, Unit]
 
-  private def wrap[R, Ptr[_], A](fa: Free[FreeObjectOutput.OutputInst[R, Ptr, ?], A]): FreeObjectOutput[R, Ptr, A] = wrap[R, Ptr, A](fa)
+  private def wrap[R, Ptr[_], A](fa: Free[FreeObjectOutput.OutputInst[R, Ptr, ?], A]): FreeObjectOutput[R, Ptr, A] = new FreeObjectOutput(fa)
 
   def point[R, Ptr[_], A](a: A): FreeObjectOutput[R, Ptr, A] = wrap(Free.point[OutputInst[R, Ptr, ?], A](a))
   def empty[R, Ptr[_]]: FreeObjectOutput[R, Ptr, Unit] = point(())
@@ -161,6 +169,12 @@ object FreeObjectOutput {
   case class Before[R](r: R) extends Decoration[R] { def beforeOption = Some(r); def afterOption = None }
   case class After[R](r: R) extends Decoration[R] { def beforeOption = None; def afterOption = Some(r) }
   case class BeforeAfter[R](before: R, after: R) extends Decoration[R] { def beforeOption = Some(before); def afterOption = Some(after) }
+  object Decoration {
+    def naked[R]: Decoration[R] = Naked
+    def apply[R](l: R, r: R): Decoration[R] = BeforeAfter(l, r)
+    def before[R](before: R): Decoration[R] = Before(before)
+    def after[R](after: R): Decoration[R] = After(after)
+  }
 
   implicit def objectOutputInstance[R, Ptr[_]]: ObjectOutput[FreeObjectOutput[R, Ptr, Unit], R, Ptr] =
     new ObjectOutput[FreeObjectOutput[R, Ptr, Unit], R, Ptr] {
