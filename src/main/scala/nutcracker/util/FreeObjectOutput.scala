@@ -67,6 +67,9 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
   def appendTo[B](b: B, showReference: Ptr ~> λ[α => R])(implicit agg: Aggregator[B, R]): B =
     show(showReference).aggregateLeft(b)
 
+  def toString(showReference: Ptr ~> λ[α => R])(implicit agg: Aggregator[StringBuilder, R]): String =
+    appendTo(new StringBuilder, showReference).result()
+
   /** Serialize, cutting off cycles. Pointers that would cause cycles will be handled by `showReference`. */
   def show(
     deref: Ptr ~> Id,
@@ -104,6 +107,17 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
   ): B =
     show(deref, decorateReferenced, decorateUnreferenced, showReference).aggregateLeft(b)
 
+  def toString(
+    deref: Ptr ~> Id,
+    decorateReferenced: Ptr ~> λ[α => Decoration[R]],
+    decorateUnreferenced: Ptr ~> λ[α => Decoration[R]],
+    showReference: Ptr ~> λ[α => R]
+  )(implicit
+    agg: Aggregator[StringBuilder, R],
+    E: HEqualK[Ptr]
+  ): String =
+    appendTo(new StringBuilder, deref, decorateReferenced, decorateUnreferenced, showReference).result()
+
   /** Serialize, cutting off cycles. Pointers that would cause cycles will be handled by `showReference`. */
   def show(
     deref: Ptr ~> Id,
@@ -133,6 +147,16 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     E: HEqualK[Ptr]
   ): B =
     show(deref, decorateContent, showReference).aggregateLeft(b)
+
+  def toString(
+    deref: Ptr ~> Id,
+    decorateContent: Ptr ~> λ[α => Decoration[R]],
+    showReference: Ptr ~> λ[α => R]
+  )(implicit
+    agg: Aggregator[StringBuilder, R],
+    E: HEqualK[Ptr]
+  ): String =
+    appendTo(new StringBuilder, deref, decorateContent, showReference).result()
 
   def writeTo[O](out: O)(implicit O: ObjectOutput[O, R, Ptr]): O =
     unwrap.foldRun[O](out, λ[λ[α => (O, OutputInst[R, Ptr, α])] ~> (O, ?)] {

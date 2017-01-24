@@ -63,16 +63,15 @@ final class Desc[Ptr[_]] private(private val unwrap: FreeObjectOutput[String, Pt
     decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
     decorateReference: String => String = ref => s"<ref $ref/>"
   )(implicit E: HEqualK[Ptr]): String =
-    unwrap.appendTo(
-      new StringBuilder,
+    unwrap.toString(
       deref,
       decorateReferenced,
       decorateUnreferenced,
       λ[Ptr ~> λ[α => String]](p => decorateReference(showRef(p)))
-    ).result()
+    )
 
   def shallowEval(implicit S: ShowK[Ptr]): String =
-    unwrap.appendTo(new StringBuilder, S).result()
+    unwrap.toString(S)
 }
 
 object Desc {
