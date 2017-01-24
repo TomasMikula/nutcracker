@@ -5,6 +5,7 @@ import nutcracker.util.ops.toFoldableOps
 
 import scalaz.Id.Id
 import scalaz.{-\/, BindRec, Monoid, Writer, \/, \/-, ~>}
+import scalaz.Leibniz.===
 import scalaz.syntax.monad._
 
 final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private val unwrap: Free[FreeObjectOutput.OutputInst[R, Ptr, ?], A]) /* extends AnyVal // can't have nested AnyVals :( */ {
@@ -12,6 +13,10 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
 
   def flatMap[B](f: A => FreeObjectOutput[R, Ptr, B]): FreeObjectOutput[R, Ptr, B] =
     wrap(unwrap flatMap (a => f(a).unwrap))
+
+  def ++[B](that: FreeObjectOutput[R, Ptr, B])(implicit ev: A =:= Unit): FreeObjectOutput[R, Ptr, B] = this >> that
+  def :+(r: R)(implicit ev: A =:= Unit): FreeObjectOutput[R, Ptr, Unit] = this ++ write(r)
+  def +:(r: R): FreeObjectOutput[R, Ptr, A] = FreeObjectOutput.write(r) ++ this
 
   private def foldMap(showRef: Ptr ~> λ[α => R]): Lst[R] =
     unwrap.foldMap[Writer[Lst[R], ?]](λ[OutputInst[R, Ptr, ?] ~> Writer[Lst[R], ?]](_ match {
@@ -61,17 +66,17 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     })._1
   }
 
-  def show(showReference: Ptr ~> λ[α => R]): Lst[R] =
+  def eval(showReference: Ptr ~> λ[α => R]): Lst[R] =
     foldMap(showReference)
 
   def appendTo[B](b: B, showReference: Ptr ~> λ[α => R])(implicit agg: Aggregator[B, R]): B =
-    show(showReference).aggregateLeft(b)
+    eval(showReference).aggregateLeft(b)
 
-  def toString(showReference: Ptr ~> λ[α => R])(implicit agg: Aggregator[StringBuilder, R]): String =
+  def showShallow(showReference: Ptr ~> λ[α => R])(implicit agg: Aggregator[StringBuilder, R]): String =
     appendTo(new StringBuilder, showReference).result()
 
   /** Serialize, cutting off cycles. Pointers that would cause cycles will be handled by `showReference`. */
-  def show(
+  def eval(
     deref: Ptr ~> Id,
     decorateReferenced: Ptr ~> λ[α => Decoration[R]],
     decorateUnreferenced: Ptr ~> λ[α => Decoration[R]],
@@ -105,21 +110,26 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     agg: Aggregator[B, R],
     E: HEqualK[Ptr]
   ): B =
-    show(deref, decorateReferenced, decorateUnreferenced, showReference).aggregateLeft(b)
+    eval(deref, decorateReferenced, decorateUnreferenced, showReference).aggregateLeft(b)
 
-  def toString(
-    deref: Ptr ~> Id,
-    decorateReferenced: Ptr ~> λ[α => Decoration[R]],
-    decorateUnreferenced: Ptr ~> λ[α => Decoration[R]],
-    showReference: Ptr ~> λ[α => R]
+  def showAutoLabeled(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
+    decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
+    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
+    decorateReference: String => String = ref => s"<ref $ref/>"
   )(implicit
-    agg: Aggregator[StringBuilder, R],
-    E: HEqualK[Ptr]
+    E: HEqualK[Ptr],
+    ev: R === String
   ): String =
-    appendTo(new StringBuilder, deref, decorateReferenced, decorateUnreferenced, showReference).result()
+    ev.subst[FreeObjectOutput[?, Ptr, A]](this).appendTo(
+      new StringBuilder,
+      deref,
+      decorateReferenced,
+      decorateUnreferenced,
+      λ[Ptr ~> λ[α => String]](p => decorateReference(showRef(p)))
+    ).result()
 
   /** Serialize, cutting off cycles. Pointers that would cause cycles will be handled by `showReference`. */
-  def show(
+  def eval(
     deref: Ptr ~> Id,
     decorateContent: Ptr ~> λ[α => Decoration[R]],
     showReference: Ptr ~> λ[α => R]
@@ -146,9 +156,9 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     agg: Aggregator[B, R],
     E: HEqualK[Ptr]
   ): B =
-    show(deref, decorateContent, showReference).aggregateLeft(b)
+    eval(deref, decorateContent, showReference).aggregateLeft(b)
 
-  def toString(
+  def showLabeled(
     deref: Ptr ~> Id,
     decorateContent: Ptr ~> λ[α => Decoration[R]],
     showReference: Ptr ~> λ[α => R]
@@ -237,4 +247,12 @@ object FreeObjectOutput {
           case \/-(b) => point(b)
         })
     }
+
+  implicit def monoidInstance[R, Ptr[_]]: Monoid[FreeObjectOutput[R, Ptr, Unit]] = new Monoid[FreeObjectOutput[R, Ptr, Unit]] {
+    def append(f1: FreeObjectOutput[R, Ptr, Unit], f2: => FreeObjectOutput[R, Ptr, Unit]): FreeObjectOutput[R, Ptr, Unit] = f1 ++ f2
+    def zero: FreeObjectOutput[R, Ptr, Unit] = empty[R, Ptr]
+  }
+
+  implicit def aggregatorInstance[R, Ptr[_]]: Aggregator[FreeObjectOutput[R, Ptr, Unit], R] =
+    Aggregator(_ :+ _)
 }

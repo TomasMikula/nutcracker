@@ -19,11 +19,11 @@ class DeepShowTest extends FunSuite {
       def show(is: List[Int]): Desc[Id] = is match {
         case Nil => Desc.done("")
         case i :: Nil => Desc.done(i.toString)
-        case i :: is => Desc.done(i.toString) ++ Desc.done(", ") ++ Desc.ref[Id, List[Int]](is)(this)
+        case i :: is => Desc.done[Id](i.toString) ++ Desc.done(", ") ++ Desc.ref[Id, List[Int]](is)(this)
       }
     }
 
-    val res = ds.show(l).eval(NaturalTransformation.refl[Id], idShowK)()
+    val res = ds.show(l).showAutoLabeled(NaturalTransformation.refl[Id], idShowK)()
     val expected = l.mkString(", ")
 
     assertResult(expected)(res)
@@ -39,7 +39,7 @@ class DeepShowTest extends FunSuite {
         Desc.done(is.i.toString + ", ") ++ Desc.ref[Id, Lst](is.tail)(this)
     }
 
-    val s = ds.show(l).eval(NaturalTransformation.refl[Id], idShowK)(
+    val s = ds.show(l).showAutoLabeled(NaturalTransformation.refl[Id], idShowK)(
       decorateReferenced = λ[Id ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
       decorateReference = ref => "@"
     )

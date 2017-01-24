@@ -20,11 +20,11 @@ trait DeepShow[A, Ptr[_]] extends ObjectSerializer[A, String, Ptr] {
     decorateReference: String => String = ref => s"<ref $ref/>"
   )(implicit E: HEqualK[Ptr]): Show[A] = new Show[A] {
     override def shows(a: A): String =
-      DeepShow.this.show(a).eval(deref, showRef)(decorateReferenced, decorateUnreferenced, decorateReference)
+      DeepShow.this.show(a).showAutoLabeled(deref, showRef)(decorateReferenced, decorateUnreferenced, decorateReference)
   }
 
   def shallow(implicit S: ShowK[Ptr]): Show[A] = new Show[A] {
-    override def shows(a: A): String = DeepShow.this.show(a).shallowEval
+    override def shows(a: A): String = DeepShow.this.show(a).showShallow(S)
   }
 }
 
@@ -39,11 +39,11 @@ object DeepShow {
   }
 
   trait FromWrite[A, Ptr[_]] extends DeepShow[A, Ptr] with ObjectSerializer.FromWrite[A, String, Ptr] {
-    def show(a: A): Desc[Ptr] = Desc.wrap(write(Desc.empty[Ptr].unwrap, a))
+    def show(a: A): Desc[Ptr] = write(Desc.empty[Ptr], a)
   }
 
   trait FromSerialize[A, Ptr[_]] extends DeepShow[A, Ptr] with ObjectSerializer.FromSerialize[A, String, Ptr] {
-    def show(a: A): Desc[Ptr] = Desc.wrap(serialize[FreeObjectOutput[String, Ptr, ?]](a))
+    def show(a: A): Desc[Ptr] = serialize[FreeObjectOutput[String, Ptr, ?]](a)
   }
 
   def toShow[Ptr[_], A](deref: Ptr ~> Id)(implicit ev: DeepShow[A, Ptr], S: ShowK[Ptr], E: HEqualK[Ptr]): Show[A] =
