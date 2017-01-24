@@ -1,11 +1,10 @@
 package nutcracker
 
 import scala.language.higherKinds
-
 import nutcracker.Promise.Empty
-import nutcracker.util.{DeepEqual, IsEqual}
+import nutcracker.util.{DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
 
-import scalaz.Equal
+import scalaz.{BindRec, Equal}
 import scalaz.syntax.equal._
 
 /** For any type `A`, `Promise[A]` is a bounded lattice on the set `A ⊔ {0, 1}`
@@ -99,6 +98,15 @@ object Promise {
         case (Empty, Empty) => IsEqual(true)
         case (Conflict, Conflict) => IsEqual(true)
         case _ => IsEqual(false)
+      }
+    }
+
+  implicit def deepShowInstance[A, Ptr[_]](implicit ev: DeepShow[A, Ptr]): DeepShow[Promise[A], Ptr] =
+    new DeepShow.FromSerialize[Promise[A], Ptr] {
+      def serialize[M[_]](a: Promise[A])(implicit M: MonadObjectOutput[M, String, Ptr], M1: BindRec[M]): M[Unit] = a match {
+        case Empty => M.write("?")
+        case Conflict => M.write("⊥")
+        case Completed(a) => ev.serialize(a)
       }
     }
 }
