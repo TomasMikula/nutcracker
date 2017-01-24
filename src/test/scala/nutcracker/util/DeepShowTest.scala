@@ -15,7 +15,7 @@ class DeepShowTest extends FunSuite {
   test("stack safety") {
     val l = (1 to 10000).toList
 
-    implicit val ds: DeepShow[List[Int], Id] = new DeepShow[List[Int], Id] {
+    implicit val ds: DeepShow[List[Int], Id] = new DeepShow.FromShow[List[Int], Id] {
       def show(is: List[Int]): Desc[Id] = is match {
         case Nil => Desc.done("")
         case i :: Nil => Desc.done(i.toString)
@@ -34,7 +34,7 @@ class DeepShowTest extends FunSuite {
     val l = new Lst(1)
     l.tail = l
 
-    implicit val ds: DeepShow[Lst, Id] = new DeepShow[Lst, Id] {
+    implicit val ds: DeepShow[Lst, Id] = new DeepShow.FromShow[Lst, Id] {
       def show(is: Lst): Desc[Id] =
         Desc.done(is.i.toString + ", ") ++ Desc.ref[Id, Lst](is.tail)(this)
     }

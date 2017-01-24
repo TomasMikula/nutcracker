@@ -4,7 +4,7 @@ import nutcracker.util.free.Free
 import nutcracker.util.ops.toFoldableOps
 
 import scalaz.Id.Id
-import scalaz.{-\/, Monoid, Writer, \/, \/-, ~>}
+import scalaz.{-\/, BindRec, Monoid, Writer, \/, \/-, ~>}
 import scalaz.syntax.monad._
 
 final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private val unwrap: Free[FreeObjectOutput.OutputInst[R, Ptr, ?], A]) /* extends AnyVal // can't have nested AnyVals :( */ {
@@ -165,6 +165,12 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
         case WriteObject(pa, ser) => (O.writeObject(out, pa)(ser), ())
       }
     })._1
+
+  def serialize[M[_]](implicit M: MonadObjectOutput[M, R, Ptr], M1: BindRec[M]): M[A] =
+    unwrap.foldMap[M](λ[OutputInst[R, Ptr, ?] ~> M](_ match {
+      case Write(r) => M.write(r)
+      case WriteObject(pa, ser) => M.writeObject(pa)(ser)
+    }))
 }
 
 object FreeObjectOutput {
@@ -210,8 +216,8 @@ object FreeObjectOutput {
         wrap(out.unwrap >> FreeObjectOutput.writeObject(pa, ser).unwrap)
     }
 
-  implicit def monadObjectOutputInstance[R, Ptr[_]]: MonadObjectOutput[FreeObjectOutput[R, Ptr, ?], R, Ptr] =
-    new MonadObjectOutput[FreeObjectOutput[R, Ptr, ?], R, Ptr] {
+  implicit def monadObjectOutputInstance[R, Ptr[_]]: MonadObjectOutput[FreeObjectOutput[R, Ptr, ?], R, Ptr] with BindRec[FreeObjectOutput[R, Ptr, ?]] =
+    new MonadObjectOutput[FreeObjectOutput[R, Ptr, ?], R, Ptr] with BindRec[FreeObjectOutput[R, Ptr, ?]] {
 
       def writeObject[A](pa: Ptr[A])(implicit ser: ObjectSerializer[A, R, Ptr]): FreeObjectOutput[R, Ptr, Unit] =
         FreeObjectOutput.writeObject(pa, ser)
@@ -224,5 +230,11 @@ object FreeObjectOutput {
 
       def point[A](a: => A): FreeObjectOutput[R, Ptr, A] =
         FreeObjectOutput.point(a)
+
+      def tailrecM[A, B](a: A)(f: A => FreeObjectOutput[R, Ptr, A \/ B]): FreeObjectOutput[R, Ptr, B] =
+        bind(f(a))(_ match {
+          case -\/(a) => tailrecM(a)(f)
+          case \/-(b) => point(b)
+        })
     }
 }

@@ -2,7 +2,7 @@ package nutcracker.util
 
 import nutcracker.util.FreeObjectOutput.Decoration
 
-import scalaz.{Semigroup, Show, ~>}
+import scalaz.{BindRec, Semigroup, Show, ~>}
 import scalaz.Id._
 import scalaz.syntax.monad._
 
@@ -14,8 +14,6 @@ import scalaz.syntax.monad._
   */
 trait DeepShow[A, Ptr[_]] extends ObjectSerializer[A, String, Ptr] {
   def show(a: A): Desc[Ptr]
-  def write[O](out: O, a: A)(implicit ev: ObjectOutput[O, String, Ptr]): O =
-    show(a).writeTo(out)
 
   def toShow(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
     decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
@@ -33,6 +31,22 @@ trait DeepShow[A, Ptr[_]] extends ObjectSerializer[A, String, Ptr] {
 
 object DeepShow {
 
+  trait FromShow[A, Ptr[_]] extends DeepShow[A, Ptr] {
+    def write[O](out: O, a: A)(implicit ev: ObjectOutput[O, String, Ptr]): O =
+      show(a).writeTo(out)
+
+    def serialize[M[_]](a: A)(implicit ev: MonadObjectOutput[M, String, Ptr], M1: BindRec[M]): M[Unit] =
+      show(a).serialize[M]
+  }
+
+  trait FromWrite[A, Ptr[_]] extends DeepShow[A, Ptr] with ObjectSerializer.FromWrite[A, String, Ptr] {
+    def show(a: A): Desc[Ptr] = Desc.wrap(write(Desc.empty[Ptr].unwrap, a))
+  }
+
+  trait FromSerialize[A, Ptr[_]] extends DeepShow[A, Ptr] with ObjectSerializer.FromSerialize[A, String, Ptr] {
+    def show(a: A): Desc[Ptr] = Desc.wrap(serialize[FreeObjectOutput[String, Ptr, ?]](a))
+  }
+
   def toShow[Ptr[_], A](deref: Ptr ~> Id)(implicit ev: DeepShow[A, Ptr], S: ShowK[Ptr], E: HEqualK[Ptr]): Show[A] =
     ev.toShow(deref, S)()
 
@@ -43,12 +57,12 @@ object DeepShow {
 trait DeepShowK[A[_[_]]] {
   def show[Ptr[_]](a: A[Ptr]): Desc[Ptr]
 
-  def specialize[Ptr[_]]: DeepShow[A[Ptr], Ptr] = new DeepShow[A[Ptr], Ptr] {
+  def specialize[Ptr[_]]: DeepShow[A[Ptr], Ptr] = new DeepShow.FromShow[A[Ptr], Ptr] {
     def show(a: A[Ptr]): Desc[Ptr] = DeepShowK.this.show(a)
   }
 }
 
-final class Desc[Ptr[_]] private(private val unwrap: FreeObjectOutput[String, Ptr, Unit]) extends AnyVal {
+final class Desc[Ptr[_]] private(private[util] val unwrap: FreeObjectOutput[String, Ptr, Unit]) extends AnyVal {
   import Desc._
 
   def ++(that: Desc[Ptr]): Desc[Ptr] = wrap(this.unwrap >> that.unwrap)
@@ -57,6 +71,9 @@ final class Desc[Ptr[_]] private(private val unwrap: FreeObjectOutput[String, Pt
 
   def writeTo[O](out: O)(implicit O: ObjectOutput[O, String, Ptr]): O =
     unwrap.writeTo(out)
+
+  def serialize[M[_]](implicit M: MonadObjectOutput[M, String, Ptr], M1: BindRec[M]): M[Unit] =
+    unwrap.serialize[M]
 
   def eval(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
     decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
@@ -75,7 +92,7 @@ final class Desc[Ptr[_]] private(private val unwrap: FreeObjectOutput[String, Pt
 }
 
 object Desc {
-  private[Desc] def wrap[Ptr[_]](f: FreeObjectOutput[String, Ptr, Unit]): Desc[Ptr] = new Desc(f)
+  private[util] def wrap[Ptr[_]](f: FreeObjectOutput[String, Ptr, Unit]): Desc[Ptr] = new Desc(f)
 
   def apply[Ptr[_], A](a: A)(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
     ev.show(a)
@@ -85,6 +102,9 @@ object Desc {
 
   def done[Ptr[_]](s: String): Desc[Ptr] =
     wrap(FreeObjectOutput.write(s))
+
+  def empty[Ptr[_]]: Desc[Ptr] =
+    wrap(FreeObjectOutput.empty[String, Ptr])
 
   def setDesc[Ptr[_], A](sa: Set[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
     Desc.done("{") ++ mkString(sa)(", ") ++ Desc.done("}")
