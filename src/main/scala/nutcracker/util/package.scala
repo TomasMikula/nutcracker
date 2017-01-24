@@ -125,6 +125,8 @@ package object util {
 
   type Desc[Ptr[_]] = FreeObjectOutput[String, Ptr, Unit]
 
+  type DeepShow[A, Ptr[_]] = ObjectSerializer[A, String, Ptr]
+
   implicit def idToM[M[_]](implicit M: Monad[M]): M |>=| Id = new (M |>=| Id) {
     override val MF = implicitly[Monad[Id]]
     override val MG = M

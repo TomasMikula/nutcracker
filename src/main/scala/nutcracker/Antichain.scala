@@ -77,8 +77,8 @@ trait AntichainInstances extends AntichainInstances1 {
     }
 
   implicit def deepShowInstance[Ptr[_], A](implicit ev: DeepShow[A, Ptr]): DeepShow[Antichain[A], Ptr] =
-    new DeepShow.FromShow[Antichain[A], Ptr] {
-      def show(a: Antichain[A]): Desc[Ptr] = ev.show(a.value)
+    new DeepShow.FromFree[Antichain[A], Ptr] {
+      def free(a: Antichain[A]): Desc[Ptr] = ev.free(a.value)
     }
 
 }

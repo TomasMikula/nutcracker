@@ -15,15 +15,15 @@ class DeepShowTest extends FunSuite {
   test("stack safety") {
     val l = (1 to 10000).toList
 
-    implicit val ds: DeepShow[List[Int], Id] = new DeepShow.FromShow[List[Int], Id] {
-      def show(is: List[Int]): Desc[Id] = is match {
+    implicit val ds: DeepShow[List[Int], Id] = new DeepShow.FromFree[List[Int], Id] {
+      def free(is: List[Int]): Desc[Id] = is match {
         case Nil => Desc.done("")
         case i :: Nil => Desc.done(i.toString)
         case i :: is => Desc.done[Id](i.toString) ++ Desc.done(", ") ++ Desc.ref[Id, List[Int]](is)(this)
       }
     }
 
-    val res = ds.show(l).showAutoLabeled(NaturalTransformation.refl[Id], idShowK)()
+    val res = ds.free(l).showAutoLabeled(NaturalTransformation.refl[Id], idShowK)()
     val expected = l.mkString(", ")
 
     assertResult(expected)(res)
@@ -34,12 +34,12 @@ class DeepShowTest extends FunSuite {
     val l = new Lst(1)
     l.tail = l
 
-    implicit val ds: DeepShow[Lst, Id] = new DeepShow.FromShow[Lst, Id] {
-      def show(is: Lst): Desc[Id] =
+    implicit val ds: DeepShow[Lst, Id] = new DeepShow.FromFree[Lst, Id] {
+      def free(is: Lst): Desc[Id] =
         Desc.done(is.i.toString + ", ") ++ Desc.ref[Id, Lst](is.tail)(this)
     }
 
-    val s = ds.show(l).showAutoLabeled(NaturalTransformation.refl[Id], idShowK)(
+    val s = ds.free(l).showAutoLabeled(NaturalTransformation.refl[Id], idShowK)(
       decorateReferenced = λ[Id ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
       decorateReference = ref => "@"
     )

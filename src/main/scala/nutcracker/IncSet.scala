@@ -55,8 +55,8 @@ object IncSet {
     }
 
   implicit def deepShow[Ptr[_], A](implicit ev: DeepShow[A, Ptr]): DeepShow[IncSet[A], Ptr] =
-    new DeepShow.FromShow[IncSet[A], Ptr] {
-      def show(a: IncSet[A]): Desc[Ptr] = Desc.setDesc(a.value)
+    new DeepShow.FromFree[IncSet[A], Ptr] {
+      def free(a: IncSet[A]): Desc[Ptr] = Desc.setDesc(a.value)
     }
 }
 

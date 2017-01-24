@@ -2,7 +2,7 @@ package nutcracker.util
 
 object Desc {
   def apply[Ptr[_], A](a: A)(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
-    ev.show(a)
+    ev.free(a)
 
   def ref[Ptr[_], A](pa: Ptr[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
     FreeObjectOutput.writeObject(pa, ev)
@@ -17,7 +17,7 @@ object Desc {
     Desc.done("{") ++ mkString(sa)(", ") ++ Desc.done("}")
 
   def mkString[Ptr[_], A](sa: Iterable[A])(sep: String)(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] = {
-    val it = sa.iterator.map(ev.show)
+    val it = sa.iterator.map(ev.free)
     join(it)(sep)
   }
 

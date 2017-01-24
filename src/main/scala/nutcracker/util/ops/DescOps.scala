@@ -5,7 +5,7 @@ import scala.language.implicitConversions
 import nutcracker.util.{DeepShow, Desc}
 
 final case class DescOps[A](a: A) extends AnyVal {
-  def desc[Ptr[_]](implicit ev: DeepShow[A, Ptr]): Desc[Ptr] = ev.show(a)
+  def desc[Ptr[_]](implicit ev: DeepShow[A, Ptr]): Desc[Ptr] = ev.free(a)
 }
 
 trait ToDescOps {
