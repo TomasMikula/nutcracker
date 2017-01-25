@@ -195,22 +195,29 @@ object FreeObjectOutput {
   def write[R, Ptr[_]](r: R): FreeObjectOutput[R, Ptr, Unit] = wrap(Free.liftF[OutputInst[R, Ptr, ?], Unit](Write(r)))
   def writeObject[R, Ptr[_], A](pa: Ptr[A], ser: ObjectSerializer[A, R, Ptr]): FreeObjectOutput[R, Ptr, Unit] = wrap(Free.liftF[OutputInst[R, Ptr, ?], Unit](WriteObject(pa, ser)))
 
-  sealed abstract class Decoration[+R] {
-    def beforeOption: Option[R]
-    def afterOption: Option[R]
-    def decorate[S](s: S)(prepend: (R, S) => S, append: (S, R) => S): S = this match {
+  sealed abstract class IndexedDecoration[+R1, +R2] {
+    def beforeOption: Option[R1]
+    def afterOption: Option[R2]
+    def decorate[S](s: S)(prepend: (R1, S) => S, append: (S, R2) => S): S = this match {
       case Naked => s
       case BeforeAfter(r1, r2) => append(prepend(r1, s), r2)
       case Before(r1) => prepend(r1, s)
       case After(r2) => append(s, r2)
     }
   }
-  case object Naked extends Decoration[Nothing] { def beforeOption = None; def afterOption = None }
-  case class Before[R](r: R) extends Decoration[R] { def beforeOption = Some(r); def afterOption = None }
-  case class After[R](r: R) extends Decoration[R] { def beforeOption = None; def afterOption = Some(r) }
-  case class BeforeAfter[R](before: R, after: R) extends Decoration[R] { def beforeOption = Some(before); def afterOption = Some(after) }
+  case object Naked extends IndexedDecoration[Nothing, Nothing] { def beforeOption = None; def afterOption = None }
+  case class Before[R1](r1: R1) extends IndexedDecoration[R1, Nothing] { def beforeOption = Some(r1); def afterOption = None }
+  case class After[R2](r2: R2) extends IndexedDecoration[Nothing, R2] { def beforeOption = None; def afterOption = Some(r2) }
+  case class BeforeAfter[R1, R2](before: R1, after: R2) extends IndexedDecoration[R1, R2] { def beforeOption = Some(before); def afterOption = Some(after) }
+  object IndexedDecoration {
+    def naked: IndexedDecoration[Nothing, Nothing] = Naked
+    def apply[R1, R2](l: R1, r: R2): IndexedDecoration[R1, R2] = BeforeAfter(l, r)
+    def before[R1](before: R1): IndexedDecoration[R1, Nothing] = Before(before)
+    def after[R2](after: R2): IndexedDecoration[Nothing, R2] = After(after)
+  }
+  type Decoration[+R] = IndexedDecoration[R, R]
   object Decoration {
-    def naked[R]: Decoration[R] = Naked
+    def naked: Decoration[Nothing] = Naked
     def apply[R](l: R, r: R): Decoration[R] = BeforeAfter(l, r)
     def before[R](before: R): Decoration[R] = Before(before)
     def after[R](after: R): Decoration[R] = After(after)
