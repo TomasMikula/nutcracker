@@ -14,7 +14,8 @@ import scalaz.syntax.equal._
   * the elements of `A` represent a completed promise, and `1` represents a
   * conflict (a promise completed multiple times with different values).
   *
-  * @see [[Antichain]]
+  * @see [[Revocable]]
+  * @see [[Discrete]]
   */
 sealed trait Promise[+A] {
   def isEmpty: Boolean = this == Empty
