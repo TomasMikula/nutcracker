@@ -3,8 +3,7 @@ package nutcracker.util
 import nutcracker.util.free.Free
 import nutcracker.util.ops.toFoldableOps
 
-import scalaz.Id.Id
-import scalaz.{-\/, BindRec, Monoid, Writer, \/, \/-, ~>}
+import scalaz.{-\/, Applicative, BindRec, Monoid, Writer, \/, \/-, ~>}
 import scalaz.Leibniz.===
 import scalaz.syntax.monad._
 
@@ -39,31 +38,31 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     * @tparam S1 state to be passed downwards
     * @tparam S2 state to be passed upwards
     */
-  private def foldBiState[S1, S2](s1: S1)(step: S1 => Ptr ~> λ[α => (S1, S2 => (S2, Decoration[R])) \/ (S2, R)])(deref: Ptr ~> Id)(implicit S2: Monoid[S2]): Lst[R] = {
+  private def foldBiState[S1, S2, M[_]](s1: S1)(step: S1 => Ptr ~> λ[α => (S1, S2 => (S2, Decoration[R])) \/ (S2, R)])(deref: Ptr ~> M)(implicit S2: Monoid[S2], M0: BindRec[M], M1: Applicative[M]): M[Lst[R]] = {
     type S2_ = (S2, Lst[R]); import scalaz.std.tuple.tuple2Monoid
-    unwrap.foldRunRecParM[Id, S1, S2_](s1, λ[λ[α => (S1, OutputInst[R, Ptr, α])] ~> λ[α => (S1, Free[OutputInst[R, Ptr, ?], α], S2_ => S2_) \/ (S2_, α)]] {
+    M0.map(unwrap.foldRunRecParM[M, S1, S2_](s1, λ[λ[α => (S1, OutputInst[R, Ptr, α])] ~> λ[α => M[(S1, Free[OutputInst[R, Ptr, ?], α], S2_ => S2_) \/ (S2_, α)]]] {
       case (s1, inst) => inst match {
-        case Write(r) => \/-(((S2.zero, Lst.singleton(r)), ()))
+        case Write(r) => M1.point(\/-(((S2.zero, Lst.singleton(r)), ())))
         case WriteObject(pa, ser) => step(s1)(pa) match {
-          case -\/((s11, tr)) => -\/((s11, ser.write(FreeObjectOutput.empty[R, Ptr], deref(pa)).unwrap, { case (s2, r) => tr(s2) match { case (s2, decor) => (s2, decor.decorate(r)(_ +: _, _ :+ _)) }}))
-          case \/-((s2, r)) => \/-(((s2, Lst.singleton(r)), ()))
+          case -\/((s11, tr)) => M0.map(deref(pa))(a => -\/((s11, ser.write(FreeObjectOutput.empty[R, Ptr], a).unwrap, { case (s2, r) => tr(s2) match { case (s2, decor) => (s2, decor.decorate(r)(_ +: _, _ :+ _)) }})))
+          case \/-((s2, r)) => M1.point(\/-(((s2, Lst.singleton(r)), ())))
         }
       }
-    })._1._2
+    }))(_._1._2)
   }
 
   /** Specialized [[foldBiState]] for `S2 = Unit`. */
-  private def foldState[S](s: S)(step: S => Ptr ~> λ[α => (S, Decoration[R]) \/ R])(deref: Ptr ~> Id): Lst[R] = {
+  private def foldState[S, M[_]](s: S)(step: S => Ptr ~> λ[α => (S, Decoration[R]) \/ R])(deref: Ptr ~> M)(implicit M0: BindRec[M], M1: Applicative[M]): M[Lst[R]] = {
     type S2 = Lst[R]
-    unwrap.foldRunRecParM[Id, S, S2](s, λ[λ[α => (S, OutputInst[R, Ptr, α])] ~> λ[α => (S, Free[OutputInst[R, Ptr, ?], α], S2 => S2) \/ (S2, α)]] {
+    M0.map(unwrap.foldRunRecParM[M, S, S2](s, λ[λ[α => (S, OutputInst[R, Ptr, α])] ~> λ[α => M[(S, Free[OutputInst[R, Ptr, ?], α], S2 => S2) \/ (S2, α)]]] {
       case (s, inst) => inst match {
-        case Write(r) => \/-((Lst.singleton(r), ()))
+        case Write(r) => M1.point(\/-((Lst.singleton(r), ())))
         case WriteObject(pa, ser) => step(s)(pa) match {
-          case -\/((s1, decor)) => -\/((s1, ser.write(FreeObjectOutput.empty[R, Ptr], deref(pa)).unwrap, r => decor.decorate(r)(_ +: _, _ :+ _)))
-          case \/-(r) => \/-((Lst.singleton(r), ()))
+          case -\/((s1, decor)) => M0.map(deref(pa))(a => -\/((s1, ser.write(FreeObjectOutput.empty[R, Ptr], a).unwrap, r => decor.decorate(r)(_ +: _, _ :+ _))))
+          case \/-(r) => M1.point(\/-((Lst.singleton(r), ())))
         }
       }
-    })._1
+    }))(_._1)
   }
 
   def eval(showReference: Ptr ~> λ[α => R]): Lst[R] =
@@ -76,14 +75,16 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     appendTo(new StringBuilder, showReference).result()
 
   /** Serialize, cutting off cycles. Pointers that would cause cycles will be handled by `showReference`. */
-  def eval(
-    deref: Ptr ~> Id,
+  def eval[M[_]](
+    deref: Ptr ~> M,
     decorateReferenced: Ptr ~> λ[α => Decoration[R]],
     decorateUnreferenced: Ptr ~> λ[α => Decoration[R]],
     showReference: Ptr ~> λ[α => R]
   )(implicit
-    E: HEqualK[Ptr]
-  ): Lst[R] = {
+    E: HEqualK[Ptr],
+    M0: BindRec[M],
+    M1: Applicative[M]
+  ): M[Lst[R]] = {
     type S1 = List[Ptr[_]] // context, i.e. all parents
     type S2 = Lst[Ptr[_]]  // referenced within the subgraph
 
@@ -97,45 +98,51 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
         }))
       })
 
-    foldBiState[S1, S2](Nil)(step)(deref)
+    foldBiState[S1, S2, M](Nil)(step)(deref)
   }
 
-  def appendTo[B](
+  def appendTo[B, M[_]](
     b: B,
-    deref: Ptr ~> Id,
+    deref: Ptr ~> M,
     decorateReferenced: Ptr ~> λ[α => Decoration[R]],
     decorateUnreferenced: Ptr ~> λ[α => Decoration[R]],
     showReference: Ptr ~> λ[α => R]
   )(implicit
     agg: Aggregator[B, R],
-    E: HEqualK[Ptr]
-  ): B =
-    eval(deref, decorateReferenced, decorateUnreferenced, showReference).aggregateLeft(b)
+    E: HEqualK[Ptr],
+    M0: BindRec[M],
+    M1: Applicative[M]
+  ): M[B] =
+    M0.map(eval(deref, decorateReferenced, decorateUnreferenced, showReference))(_.aggregateLeft(b))
 
-  def showAutoLabeled(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
+  def showAutoLabeled[M[_]](deref: Ptr ~> M, showRef: Ptr ~> λ[α => String])(
     decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
     decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
     decorateReference: String => String = ref => s"<ref $ref/>"
   )(implicit
     E: HEqualK[Ptr],
+    M0: BindRec[M],
+    M1: Applicative[M],
     ev: R === String
-  ): String =
-    ev.subst[FreeObjectOutput[?, Ptr, A]](this).appendTo(
+  ): M[String] =
+    M0.map(ev.subst[FreeObjectOutput[?, Ptr, A]](this).appendTo(
       new StringBuilder,
       deref,
       decorateReferenced,
       decorateUnreferenced,
       λ[Ptr ~> λ[α => String]](p => decorateReference(showRef(p)))
-    ).result()
+    ))(_.result())
 
   /** Serialize, cutting off cycles. Pointers that would cause cycles will be handled by `showReference`. */
-  def eval(
-    deref: Ptr ~> Id,
+  def eval[M[_]](
+    deref: Ptr ~> M,
     decorateContent: Ptr ~> λ[α => Decoration[R]],
     showReference: Ptr ~> λ[α => R]
   )(implicit
-    E: HEqualK[Ptr]
-  ): Lst[R] = {
+    E: HEqualK[Ptr],
+    M0: BindRec[M],
+    M1: Applicative[M]
+  ): M[Lst[R]] = {
     type S = List[Ptr[_]] // context, i.e. all parents
 
     val step = (s: S) =>
@@ -144,29 +151,33 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
         else -\/((pa :: s, decorateContent(pa)))
       })
 
-    foldState[S](Nil)(step)(deref)
+    foldState[S, M](Nil)(step)(deref)
   }
 
-  def appendTo[B](
+  def appendTo[B, M[_]](
     b: B,
-    deref: Ptr ~> Id,
+    deref: Ptr ~> M,
     decorateContent: Ptr ~> λ[α => Decoration[R]],
     showReference: Ptr ~> λ[α => R]
   )(implicit
     agg: Aggregator[B, R],
-    E: HEqualK[Ptr]
-  ): B =
-    eval(deref, decorateContent, showReference).aggregateLeft(b)
+    E: HEqualK[Ptr],
+    M0: BindRec[M],
+    M1: Applicative[M]
+  ): M[B] =
+    M0.map(eval(deref, decorateContent, showReference))(_.aggregateLeft(b))
 
-  def showLabeled(
-    deref: Ptr ~> Id,
+  def showLabeled[M[_]](
+    deref: Ptr ~> M,
     decorateContent: Ptr ~> λ[α => Decoration[R]],
     showReference: Ptr ~> λ[α => R]
   )(implicit
     agg: Aggregator[StringBuilder, R],
-    E: HEqualK[Ptr]
-  ): String =
-    appendTo(new StringBuilder, deref, decorateContent, showReference).result()
+    E: HEqualK[Ptr],
+    M0: BindRec[M],
+    M1: Applicative[M]
+  ): M[String] =
+    M0.map(appendTo(new StringBuilder, deref, decorateContent, showReference))(_.result())
 
   def writeTo[O](out: O)(implicit O: ObjectOutput[O, R, Ptr]): O =
     unwrap.foldRun[O](out, λ[λ[α => (O, OutputInst[R, Ptr, α])] ~> (O, ?)] {
