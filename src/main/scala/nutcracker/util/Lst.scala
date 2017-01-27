@@ -2,7 +2,7 @@ package nutcracker.util
 
 import scala.annotation.tailrec
 import scala.collection.mutable.Buffer
-import scalaz.{Foldable, Monoid}
+import scalaz.{Foldable, Monoid, PlusEmpty}
 
 /** Linked list with O(1) cons, snoc and concatenation
   * and amortized O(1) uncons.
@@ -59,6 +59,8 @@ sealed abstract class Lst[+A] {
     }
   }
 
+  final def :::[B >: A](that: Lst[B]): Lst[B] = that ++ this
+
   final def toRevList: List[A] = {
     @tailrec def go(as: Lst[A], acc: List[A]): List[A] = as.toRightAssoc match {
       case Nil => acc
@@ -85,6 +87,9 @@ sealed abstract class Lst[+A] {
   final def map[B](f: A => B): Lst[B] =
     toBuffer.foldRight(Lst.empty[B])((a, bs) => f(a) :: bs)
 
+  final def flatMap[B](f: A => Lst[B]): Lst[B] =
+    toBuffer.foldRight(Lst.empty[B])((a, bs) => f(a) ++ bs)
+
   final def filter(p: A => Boolean): Lst[A] =
     foldLeft(Buffer[A]())((buf, a) => if (p(a)) (buf += a) else buf).foldRight(Lst.empty[A])((a, l) => a :: l)
 
@@ -106,6 +111,16 @@ sealed abstract class Lst[+A] {
 
   final def foldRight[B](b: B)(f: (A, B) => B): B =
     toBuffer[A].foldRight(b)(f)
+
+  override def toString: String = {
+    val buf = new StringBuilder("Lst(")
+    uncons match {
+      case Some((a, as)) => as.foldLeft(buf ++= a.toString)((b, a) => buf ++= ", " ++= a.toString)
+      case None =>
+    }
+    buf ++= ")"
+    buf.result()
+  }
 
   @tailrec
   private final def toRightAssoc: Lst[A] = this match {
@@ -166,6 +181,16 @@ object Lst {
   implicit def monoid[A]: Monoid[Lst[A]] = new Monoid[Lst[A]] {
     def zero: Lst[A] = Nil
     def append(f1: Lst[A], f2: => Lst[A]): Lst[A] = f1 ++ f2
+  }
+
+  implicit val plusEmpty: PlusEmpty[Lst] = new PlusEmpty[Lst] {
+    def empty[A]: Lst[A] = Nil
+    def plus[A](a: Lst[A], b: => Lst[A]): Lst[A] = a ++ b
+  }
+
+  implicit def plusEmptyT[F[_]]: PlusEmpty[λ[α => Lst[F[α]]]] = new PlusEmpty[λ[α => Lst[F[α]]]] {
+    def empty[A]: Lst[F[A]] = Nil
+    def plus[A](a: Lst[F[A]], b: => Lst[F[A]]): Lst[F[A]] = a ++ b
   }
 
   implicit val foldable: Foldable[Lst] = new Foldable[Lst] {
