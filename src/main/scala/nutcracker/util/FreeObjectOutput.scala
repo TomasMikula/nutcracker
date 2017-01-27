@@ -3,7 +3,8 @@ package nutcracker.util
 import nutcracker.util.free.Free
 import nutcracker.util.ops.toFoldableOps
 
-import scalaz.{-\/, Applicative, BindRec, Monoid, Writer, \/, \/-, ~>}
+import scala.annotation.tailrec
+import scalaz.{-\/, Applicative, BindRec, Foldable, Monoid, Writer, \/, \/-, ~>}
 import scalaz.Leibniz.===
 import scalaz.syntax.monad._
 
@@ -38,14 +39,19 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     * @tparam S1 state to be passed downwards
     * @tparam S2 state to be passed upwards
     */
-  private def foldBiState[S1, S2, M[_]](s1: S1)(step: S1 => Ptr ~> λ[α => (S1, S2 => (S2, Decoration[R])) \/ (S2, R)])(deref: Ptr ~> M)(implicit S2: Monoid[S2], M0: BindRec[M], M1: Applicative[M]): M[Lst[R]] = {
-    type S2_ = (S2, Lst[R]); import scalaz.std.tuple.tuple2Monoid
+  private def foldBiState[S1, S2, M[_]](s1: S1)(step: S1 => Ptr ~> λ[α => (S1, S2 => (S2, Decoration[R])) \/ (S2, R)])(deref: Ptr ~> M)(implicit S2: Monoid[S2], M0: BindRec[M], M1: Applicative[M]): M[Tree[R]] = {
+    import Tree._
+    type S2_ = (S2, Tree[R]); import scalaz.std.tuple.tuple2Monoid
     M0.map(unwrap.foldRunRecParM[M, S1, S2_](s1, λ[λ[α => (S1, OutputInst[R, Ptr, α])] ~> λ[α => M[(S1, Free[OutputInst[R, Ptr, ?], α], S2_ => S2_) \/ (S2_, α)]]] {
       case (s1, inst) => inst match {
-        case Write(r) => M1.point(\/-(((S2.zero, Lst.singleton(r)), ())))
+        case Write(r) => M1.point(\/-(((S2.zero, singleton(r)), ())))
         case WriteObject(pa, ser) => step(s1)(pa) match {
-          case -\/((s11, tr)) => M0.map(deref(pa))(a => -\/((s11, ser.write(FreeObjectOutput.empty[R, Ptr], a).unwrap, { case (s2, r) => tr(s2) match { case (s2, decor) => (s2, decor.decorate(r)(_ +: _, _ :+ _)) }})))
-          case \/-((s2, r)) => M1.point(\/-(((s2, Lst.singleton(r)), ())))
+          case -\/((s11, tr)) => M0.map(deref(pa)) { a =>
+            -\/((s11, ser.write(FreeObjectOutput.empty[R, Ptr], a).unwrap, {
+              case (s2, tree) => tr(s2) match { case (s2, decor) => (s2, nest(decor.decorate(tree)(_ +: _, _ :+ _))) }
+            }))
+          }
+          case \/-((s2, r)) => M1.point(\/-(((s2, singleton(r)), ())))
         }
       }
     }))(_._1._2)
@@ -84,7 +90,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     E: HEqualK[Ptr],
     M0: BindRec[M],
     M1: Applicative[M]
-  ): M[Lst[R]] = {
+  ): M[Tree[R]] = {
     type S1 = List[Ptr[_]] // context, i.e. all parents
     type S2 = Lst[Ptr[_]]  // referenced within the subgraph
 
@@ -117,7 +123,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
 
   def showAutoLabeled[M[_]](deref: Ptr ~> M, showRef: Ptr ~> λ[α => String])(
     decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
-    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
+    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration.naked),
     decorateReference: String => String = ref => s"<ref $ref/>"
   )(implicit
     E: HEqualK[Ptr],
@@ -132,6 +138,23 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
       decorateUnreferenced,
       λ[Ptr ~> λ[α => String]](p => decorateReference(showRef(p)))
     ))(_.result())
+
+  def printTree[M[_]](deref: Ptr ~> M, showRef: Ptr ~> λ[α => String], lineLimit: Int = 60, tab: String = "  ", newLine: String = "\n")(
+    decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
+    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration.naked),
+    decorateReference: String => String = ref => s"<ref $ref/>"
+  )(implicit
+    E: HEqualK[Ptr],
+    M0: BindRec[M],
+    M1: Applicative[M],
+    ev: R === String
+  ): M[String] =
+    M0.map(ev.subst[FreeObjectOutput[?, Ptr, A]](this).eval(
+      deref,
+      decorateReferenced,
+      decorateUnreferenced,
+      λ[Ptr ~> λ[α => String]](p => decorateReference(showRef(p)))
+    ))(_.print(lineLimit, tab, newLine)(_.length).aggregateLeft(new StringBuilder).result())
 
   /** Serialize, cutting off cycles. Pointers that would cause cycles will be handled by `showReference`. */
   def eval[M[_]](
@@ -232,6 +255,74 @@ object FreeObjectOutput {
     def apply[R](l: R, r: R): Decoration[R] = BeforeAfter(l, r)
     def before[R](before: R): Decoration[R] = Before(before)
     def after[R](after: R): Decoration[R] = After(after)
+  }
+
+  final case class Tree[R](lst: Lst[R \/ Tree[R]]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-9600
+    def ++(that: Tree[R]): Tree[R] = Tree(this.lst ++ that.lst)
+    def :+(r: R): Tree[R] = Tree(lst :+ -\/(r))
+    def +:(r: R): Tree[R] = Tree(-\/(r) +: lst)
+
+    def foldLeft[B](z: B)(f: (B, R) => B): B = {
+      @tailrec def go(z: B, lst: Lst[R \/ Tree[R]]): B = lst.uncons match {
+        case Some((rt, lst)) => rt match {
+          case -\/(r) => go(f(z, r), lst)
+          case \/-(t) => go(z, t.lst ++ lst)
+        }
+        case None => z
+      }
+
+      go(z, lst)
+    }
+
+    def print(lineLimit: Int, tab: R, newLine: R)(implicit measure: R => Int): Lst[R] =
+      print(0, lineLimit).uncons match {
+        case None => Lst.empty
+        case Some((l, ls)) => printLine(l, tab) ::: ls.foldRight(Lst.empty[R])((ln, rs) => newLine :: printLine(ln, tab) ::: rs)
+      }
+
+    type Line = (/* indent: */ Int, /* tokens: */ Lst[R])
+
+    private def print(indent: Int, lineLimit: Int)(implicit measure: R => Int): Lst[Line] = {
+      if(fitsOnALine(lineLimit)) Lst.singleton((indent, flatten))
+      else lst.flatMap(_ match {
+        case -\/(r) => Lst.singleton((indent, Lst.singleton(r)))
+        case \/-(tree) => tree.print(indent + 1, lineLimit)
+      })
+    }
+
+    private def printLine(line: Line, tab: R): Lst[R] = {
+      @tailrec def go(tabs: Int, tail: Lst[R]): Lst[R] =
+        if(tabs == 0) tail
+        else go(tabs - 1, tab :: tail)
+
+      go(line._1, line._2)
+    }
+
+    private def fitsOnALine(lineLimit: Int)(implicit measure: R => Int): Boolean =
+      foldLeft(0)((n, r) => n + measure(r)) <= lineLimit
+
+    private def flatten: Lst[R] = lst.foldRight(Lst.empty[R])((rt, rs) => rt match {
+      case -\/(r) => r :: rs
+      case \/-(t) => t.flatten ::: rs
+    })
+  }
+  object Tree {
+    def singleton[R](r: R): Tree[R] = Tree(Lst.singleton(-\/(r)))
+    def empty[R]: Tree[R] = Tree(Lst.empty)
+    def nest[R](tree: Tree[R]): Tree[R] = Tree(Lst.singleton(\/-(tree)))
+
+    implicit def monoid[R]: Monoid[Tree[R]] = new Monoid[Tree[R]] {
+      def zero: Tree[R] = empty
+      def append(t1: Tree[R], t2: => Tree[R]): Tree[R] = t1 ++ t2
+    }
+
+    implicit val foldable: Foldable[Tree] = new Foldable[Tree] {
+      def foldMap[A, B](fa: Tree[A])(f: (A) => B)(implicit F: Monoid[B]): B = ???
+
+      def foldRight[A, B](fa: Tree[A], z: => B)(f: (A, => B) => B): B = ???
+
+      override def foldLeft[A, B](fa: Tree[A], z: B)(f: (B, A) => B): B = fa.foldLeft(z)(f)
+    }
   }
 
   implicit def objectOutputInstance[R, Ptr[_]]: ObjectOutput[FreeObjectOutput[R, Ptr, Unit], R, Ptr] =
