@@ -20,6 +20,14 @@ final case class Free[F[_], A] private(unwrap: FreeBind[(Id :++: F)#Out, A]) ext
       case Right(fx) => f(fx)
     }))
 
+  def foldMapRec[M[_]](f: F ~> λ[α => M[Free[F, α] \/ α]])(implicit M0: BindRec[M], M1: Applicative[M]): M[A] = {
+    type F1[X] = this.F1[X] // otherwise getting scalac error: "private type F1 escapes its defining scope as part of type M[scalaz.\/[nutcracker.util.free.FreeBind[Free.this.F1,α],α]]"
+    unwrap.foldMapRec(λ[F1 ~> λ[α => M[FreeBind[F1, α] \/ α]]](_ match {
+      case Left(x) => M1.point(\/-(x))
+      case Right(fx) => M1.map(f(fx))(_.leftMap(_.unwrap))
+    }))
+  }
+
   def foldRun[S](s: S, f: λ[α => (S, F[α])] ~> (S, ?)): (S, A) =
     unwrap.foldRun(s, λ[λ[α => (S, F1[α])] ~> (S, ?)]{
       case (s, f1x) => f1x match {
@@ -27,6 +35,19 @@ final case class Free[F[_], A] private(unwrap: FreeBind[(Id :++: F)#Out, A]) ext
         case Right(fx) => f((s, fx))
       }
     })
+
+  def foldRunRec[S](s: S, f: λ[α => (S, F[α])] ~> λ[α => (S, Free[F, α], S => S) \/ (S, α)]): (S, A) = {
+    type F1[X] = this.F1[X] // otherwise scalac error: "private type F1 escapes its defining scope ..."
+    unwrap.foldRunRecM[Id, S](s, λ[λ[α => (S, F1[α])] ~> λ[α => (S, FreeBind[F1, α], S => S) \/ (S, α)]] {
+      case (s, f1x) => f1x match {
+        case Left(x) => \/-((s, x))
+        case Right(fx) => f((s, fx)) match {
+          case \/-(sa) => \/-(sa)
+          case -\/((s, fx, tr)) => -\/((s, fx.unwrap, tr))
+        }
+      }
+    })
+  }
 
   def foldRunRecParM[M[_], S1, S2](s1: S1, f: λ[α => (S1, F[α])] ~> λ[α => M[(S1, Free[F, α], S2 => S2) \/ (S2, α)]])(implicit M0: BindRec[M], M1: Applicative[M], S2: Monoid[S2]): M[(S2, A)] = {
     type F1[X] = this.F1[X] // otherwise scalac error: "private type F1 escapes its defining scope ..."
