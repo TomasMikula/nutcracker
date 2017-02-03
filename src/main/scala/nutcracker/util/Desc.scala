@@ -13,6 +13,9 @@ object Desc {
   def empty[Ptr[_]]: Desc[Ptr] =
     FreeObjectOutput.empty[String, Ptr]
 
+  def nest[Ptr[_]](that: Desc[Ptr]): Desc[Ptr] =
+    FreeObjectOutput.nest(that)
+
   def setDesc[Ptr[_], A](sa: Set[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
     Desc.done("{") ++ mkString(sa)(", ") ++ Desc.done("}")
 

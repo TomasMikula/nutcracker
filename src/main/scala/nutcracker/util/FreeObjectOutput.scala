@@ -15,8 +15,10 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     wrap(unwrap flatMap (a => f(a).unwrap))
 
   def ++[B](that: FreeObjectOutput[R, Ptr, B])(implicit ev: A =:= Unit): FreeObjectOutput[R, Ptr, B] = this >> that
+  def :::(that: FreeObjectOutput[R, Ptr, Unit]): FreeObjectOutput[R, Ptr, A] = that ++ this
   def :+(r: R)(implicit ev: A =:= Unit): FreeObjectOutput[R, Ptr, Unit] = this ++ write(r)
-  def +:(r: R): FreeObjectOutput[R, Ptr, A] = FreeObjectOutput.write(r) ++ this
+  def +:(r: R): FreeObjectOutput[R, Ptr, A] = write(r) ++ this
+  def ::(r: R): FreeObjectOutput[R, Ptr, A] = r +: this
 
   private def foldMap(showRef: Ptr ~> λ[α => R]): Lst[R] =
     unwrap.foldMapRec[Writer[Lst[R], ?]](λ[OutputInst[R, Ptr, ?] ~> λ[α => Writer[Lst[R], Free[OutputInst[R, Ptr, ?], α] \/ α]]](_ match {
