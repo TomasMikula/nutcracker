@@ -105,9 +105,9 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
   def collectAll[A](cps: Iterable[ContU[F, A]])(implicit M: Monad[F]): F[Ref[IncSet[A]]] =
     collect(ContU.sequence(cps))
 
-  /** Relative monadic bind. `Ref[IncSet[A]]` is a monad relative to `FreeK[F, ?]`,
-    * i.e. we can implement `bind` if additional effects of type `FreeK[F, ?]` are allowed.
-    * This is equivalent to having a monad instance for `λ[A => FreeK[F, IncSetRef[A]]]`.
+  /** Relative monadic bind. `Ref[IncSet[A]]` is a monad relative to `F`,
+    * i.e. we can implement `bind` if additional effects of type `F` are allowed.
+    * This is equivalent to having a monad instance for `λ[A => F[Ref[IncSet[A]]]]`.
     */
   def relBind[A, B](sref: Ref[IncSet[A]])(f: A => F[Ref[IncSet[B]]])(implicit M: Monad[F]): F[Ref[IncSet[B]]] = {
     import scalaz.syntax.traverse._

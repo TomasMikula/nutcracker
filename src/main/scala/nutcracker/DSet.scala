@@ -19,6 +19,7 @@ import scalaz.syntax.monad._
   * Unrefined -> Refined -> Failed, since a refined state can go to unrefined
   * when all the refined members become failed.
   */
+@deprecated("Use IncRefSet instead", since = "0.2")
 case class DSet[Ref[_], D] private(unrefined: Set[Ref[D]], refined: Set[Ref[D]])
 
 object DSet {
