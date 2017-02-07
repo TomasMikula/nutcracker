@@ -28,7 +28,7 @@ object DeepShow {
     join(it)(sep)
   }
 
-  private def join[M[_]](descs: Iterable[M[Unit]])(sep: String)(implicit M: MonadTell[M, String]): M[Unit] = {
+  def join[M[_]](descs: Iterable[M[Unit]])(sep: String)(implicit M: MonadTell[M, String]): M[Unit] = {
     join(descs.iterator)(sep)
   }
 

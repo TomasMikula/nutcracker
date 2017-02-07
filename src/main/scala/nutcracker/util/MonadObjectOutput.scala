@@ -17,6 +17,9 @@ trait MonadObjectOutput[F[_], R, Ptr[_]] extends MonadTell[F, R] with BindRec[F]
   def writeSubObject[A, B](pa: Ptr[A])(f: A => B)(implicit ev: ObjectSerializer[B, R, Ptr]): F[Unit] =
     writeRec(pa)(a => ev.serialize[F](f(a))(self))
 
+  def apply[A](a: A)(implicit ev: ObjectSerializer[A, R, Ptr]): F[Unit] =
+    ev.serialize(a)(self)
+
   def empty: F[Unit] = point(())
 
   /** A hint for displaying tree structure.
