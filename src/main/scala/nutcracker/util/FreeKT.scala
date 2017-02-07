@@ -1,9 +1,10 @@
 package nutcracker.util
 
+import nutcracker.util.free.FreeT
 import scala.language.{higherKinds, implicitConversions}
 import scalaz.{Applicative, BindRec, Functor, Monad, MonadPartialOrder, ~>}
 
-final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M, A]) extends AnyVal {
+final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M, A]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-7685
 
   def map[B](f: A => B)(implicit M: Applicative[M]): FreeKT[F, M, B] =
     FreeKT(run.map(f))

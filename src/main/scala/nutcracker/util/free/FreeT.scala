@@ -11,6 +11,9 @@ final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A
   def flatMap[B](f: A => FreeT[F, M, B]): FreeT[F, M, B] =
     FreeT(unwrap.flatMap(a => f(a).unwrap))
 
+  def map[B](f: A => B)(implicit M: Applicative[M]): FreeT[F, M, B] =
+    flatMap(a => FreeT.point(f(a)))
+
   def flatten[A0](implicit ev: A =:= FreeT[F, M, A0]): FreeT[F, M, A0] =
     flatMap[A0](ev)
 
