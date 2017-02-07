@@ -23,7 +23,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
   private def foldMap(showRef: Ptr ~> λ[α => R]): Lst[R] =
     unwrap.foldMapRec[Writer[Lst[R], ?]](λ[OutputInst[R, Ptr, ?] ~> λ[α => Writer[Lst[R], Free[OutputInst[R, Ptr, ?], α] \/ α]]](_ match {
       case Write(r) => Writer(Lst.singleton(r), \/-(()))
-      case WriteObject(pa, _) => Writer(Lst.singleton(showRef(pa)), \/-(()))
+      case WriteRec(pa, _) => Writer(Lst.singleton(showRef(pa)), \/-(()))
       case Nest(fa) => Writer(Lst.empty[R], -\/(fa.unwrap))
     })).run._1
 
@@ -48,9 +48,9 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     M0.map(unwrap.foldRunRecParM[M, S1, S2_](s1, λ[λ[α => (S1, OutputInst[R, Ptr, α])] ~> λ[α => M[(S1, Free[OutputInst[R, Ptr, ?], α], S2_ => S2_) \/ (S2_, α)]]] {
       case (s1, inst) => inst match {
         case Write(r) => M1.point(\/-(((S2.zero, singleton(r)), ())))
-        case WriteObject(pa, ser) => step(s1)(pa) match {
+        case WriteRec(pa, f) => step(s1)(pa) match {
           case -\/((s11, tr)) => M0.map(deref(pa)) { a =>
-            -\/((s11, ser.serialize[FreeObjectOutput[R, Ptr, ?]](a).unwrap, {
+            -\/((s11, f(a).unwrap, {
               case (s2, tree) => tr(s2) match { case (s2, decor) => (s2, nest(decor.decorate(tree)(_ +: _, _ :+ _))) }
             }))
           }
@@ -67,8 +67,8 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     M0.map(unwrap.foldRunRecParM[M, S, S2](s, λ[λ[α => (S, OutputInst[R, Ptr, α])] ~> λ[α => M[(S, Free[OutputInst[R, Ptr, ?], α], S2 => S2) \/ (S2, α)]]] {
       case (s, inst) => inst match {
         case Write(r) => M1.point(\/-((Tree.singleton(r), ())))
-        case WriteObject(pa, ser) => step(s)(pa) match {
-          case -\/((s1, decor)) => M0.map(deref(pa))(a => -\/((s1, ser.serialize[FreeObjectOutput[R, Ptr, ?]](a).unwrap, t => decor.decorate(t)(_ +: _, _ :+ _))))
+        case WriteRec(pa, f) => step(s)(pa) match {
+          case -\/((s1, decor)) => M0.map(deref(pa))(a => -\/((s1, f(a).unwrap, t => decor.decorate(t)(_ +: _, _ :+ _))))
           case \/-(r) => M1.point(\/-((Tree.singleton(r), ())))
         }
         case Nest(fx) => M1.point(-\/((s, fx.unwrap, tree => Tree.nest(tree))))
@@ -211,7 +211,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     unwrap.foldRunRec[O](out, λ[λ[α => (O, OutputInst[R, Ptr, α])] ~> λ[α => (O, Free[OutputInst[R, Ptr, ?], α], O => O) \/ (O, α)]] {
       case (out, i) => i match {
         case Write(r) => \/-((O.write(out, r), ()))
-        case WriteObject(pa, ser) => \/-((O.writeObject(out, pa)(ser), ()))
+        case WriteRec(pa, f) => \/-((O.writeSubObject(out, pa)(f), ()))
         case Nest(fx) => -\/((out, fx.unwrap, o => o)) // Note: if ObjectOutput supported nesting, here we would
                                                        // "open a parenthesis" and close it in the continuation
       }
@@ -220,7 +220,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
   def serialize[M[_]](implicit M: MonadObjectOutput[M, R, Ptr], M1: BindRec[M]): M[A] =
     unwrap.foldMap[M](λ[OutputInst[R, Ptr, ?] ~> M](_ match {
       case Write(r) => M.write(r)
-      case WriteObject(pa, ser) => M.writeObject(pa)(ser)
+      case WriteRec(pa, f) => M.writeRec(pa)(f(_).serialize[M])
       case Nest(fx) => M.nest(fx.serialize[M])
     }))
 }
@@ -228,7 +228,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
 object FreeObjectOutput {
   private[util] sealed trait OutputInst[R, Ptr[_], A]
   private[FreeObjectOutput] case class Write[R, Ptr[_]](r: R) extends OutputInst[R, Ptr, Unit]
-  private[FreeObjectOutput] case class WriteObject[R, Ptr[_], A](pa: Ptr[A], ser: ObjectSerializer[A, R, Ptr]) extends OutputInst[R, Ptr, Unit]
+  private[FreeObjectOutput] case class WriteRec[R, Ptr[_], A](pa: Ptr[A], f: A => FreeObjectOutput[R, Ptr, Unit]) extends OutputInst[R, Ptr, Unit]
   private[FreeObjectOutput] case class Nest[R, Ptr[_], A](fa: FreeObjectOutput[R, Ptr, A]) extends OutputInst[R, Ptr, A]
 
   private def wrap[R, Ptr[_], A](fa: Free[FreeObjectOutput.OutputInst[R, Ptr, ?], A]): FreeObjectOutput[R, Ptr, A] = new FreeObjectOutput(fa)
@@ -236,7 +236,10 @@ object FreeObjectOutput {
   def point[R, Ptr[_], A](a: A): FreeObjectOutput[R, Ptr, A] = wrap(Free.point[OutputInst[R, Ptr, ?], A](a))
   def empty[R, Ptr[_]]: FreeObjectOutput[R, Ptr, Unit] = point(())
   def write[R, Ptr[_]](r: R): FreeObjectOutput[R, Ptr, Unit] = wrap(Free.liftF[OutputInst[R, Ptr, ?], Unit](Write(r)))
-  def writeObject[R, Ptr[_], A](pa: Ptr[A], ser: ObjectSerializer[A, R, Ptr]): FreeObjectOutput[R, Ptr, Unit] = wrap(Free.liftF[OutputInst[R, Ptr, ?], Unit](WriteObject(pa, ser)))
+  def writeRec[R, Ptr[_], A](pa: Ptr[A], f: A => FreeObjectOutput[R, Ptr, Unit]): FreeObjectOutput[R, Ptr, Unit] =
+    wrap(Free.liftF[OutputInst[R, Ptr, ?], Unit](WriteRec(pa, f)))
+  def writeObject[R, Ptr[_], A](pa: Ptr[A], ser: ObjectSerializer[A, R, Ptr]): FreeObjectOutput[R, Ptr, Unit] =
+    writeRec(pa, (a: A) => ser.free(a))
   def nest[R, Ptr[_], A](fa: FreeObjectOutput[R, Ptr, A]): FreeObjectOutput[R, Ptr, A] = wrap(Free.liftF[OutputInst[R, Ptr, ?], A](Nest(fa)))
 
   sealed abstract class IndexedDecoration[+R1, +R2] {
@@ -341,18 +344,21 @@ object FreeObjectOutput {
       def write(out: FreeObjectOutput[R, Ptr, Unit], r: R): FreeObjectOutput[R, Ptr, Unit] =
         wrap(out.unwrap >> FreeObjectOutput.write(r).unwrap)
 
-      def writeObject[A](out: FreeObjectOutput[R, Ptr, Unit], pa: Ptr[A])(implicit ser: ObjectSerializer[A, R, Ptr]): FreeObjectOutput[R, Ptr, Unit] =
-        wrap(out.unwrap >> FreeObjectOutput.writeObject(pa, ser).unwrap)
+      def writeSubObject[A, B](out: FreeObjectOutput[R, Ptr, Unit], pa: Ptr[A])(f: A => B)(implicit ser: ObjectSerializer[B, R, Ptr]): FreeObjectOutput[R, Ptr, Unit] =
+        wrap(out.unwrap >> FreeObjectOutput.writeRec(pa, (a: A) => ser.free(f(a))).unwrap)
     }
 
   implicit def monadObjectOutputInstance[R, Ptr[_]]: MonadObjectOutput[FreeObjectOutput[R, Ptr, ?], R, Ptr] with BindRec[FreeObjectOutput[R, Ptr, ?]] =
     new MonadObjectOutput[FreeObjectOutput[R, Ptr, ?], R, Ptr] with BindRec[FreeObjectOutput[R, Ptr, ?]] {
 
-      def writeObject[A](pa: Ptr[A])(implicit ser: ObjectSerializer[A, R, Ptr]): FreeObjectOutput[R, Ptr, Unit] =
-        FreeObjectOutput.writeObject(pa, ser)
+      def writeRec[A](pa: Ptr[A])(f: A => FreeObjectOutput[R, Ptr, Unit]): FreeObjectOutput[R, Ptr, Unit] =
+        FreeObjectOutput.writeRec(pa, f)
 
       def writer[A](w: R, v: A): FreeObjectOutput[R, Ptr, A] =
         wrap(FreeObjectOutput.write[R, Ptr](w).unwrap >> FreeObjectOutput.point(v).unwrap)
+
+      def write(r: R): FreeObjectOutput[R, Ptr, Unit] =
+        FreeObjectOutput.write(r)
 
       def nest[A](fa: FreeObjectOutput[R, Ptr, A]): FreeObjectOutput[R, Ptr, A] =
         FreeObjectOutput.nest(fa)
@@ -368,6 +374,12 @@ object FreeObjectOutput {
           case -\/(a) => tailrecM(a)(f)
           case \/-(b) => point(b)
         })
+    }
+
+  implicit def objectSerializerInstance[R, Ptr[_]]: ObjectSerializer[FreeObjectOutput[R, Ptr, Unit], R, Ptr] =
+    new ObjectSerializer.FromSerialize[FreeObjectOutput[R, Ptr, Unit], R, Ptr] {
+      def serialize[M[_]](a: FreeObjectOutput[R, Ptr, Unit])(implicit ev: MonadObjectOutput[M, R, Ptr], M1: BindRec[M]): M[Unit] =
+        a.serialize[M]
     }
 
   implicit def monoidInstance[R, Ptr[_]]: Monoid[FreeObjectOutput[R, Ptr, Unit]] = new Monoid[FreeObjectOutput[R, Ptr, Unit]] {

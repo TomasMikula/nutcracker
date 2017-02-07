@@ -1,7 +1,6 @@
 package nutcracker.util.ops
 
 import scala.language.implicitConversions
-
 import nutcracker.util.{DeepShow, Desc}
 
 final case class DescOps[A](a: A) extends AnyVal {

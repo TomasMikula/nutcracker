@@ -1,13 +1,23 @@
 package nutcracker.util
 
-import scalaz.MonadTell
+import scalaz.{BindRec, MonadTell}
 
 trait MonadObjectOutput[F[_], R, Ptr[_]] extends MonadTell[F, R] { self =>
 
   /** Alias for [[tell]]. */
-  def write(r: R): F[Unit] = tell(r)
+  def write(r: R): F[Unit]
 
-  def writeObject[A](pa: Ptr[A])(implicit ser: ObjectSerializer[A, R, Ptr]): F[Unit]
+  override def tell(r: R): F[Unit] = write(r)
+
+  def writeRec[A](pa: Ptr[A])(f: A => F[Unit]): F[Unit]
+
+  def writeObject[A](pa: Ptr[A])(implicit ev: ObjectSerializer[A, R, Ptr], F: BindRec[F]): F[Unit] =
+    writeRec(pa)(ev.serialize[F](_)(self, F))
+
+  def writeSubObject[A, B](pa: Ptr[A])(f: A => B)(implicit ev: ObjectSerializer[B, R, Ptr], F: BindRec[F]): F[Unit] =
+    writeRec(pa)(a => ev.serialize[F](f(a))(self, F))
+
+  def empty: F[Unit] = point(())
 
   /** A hint for displaying tree structure.
     * The implementation is identity, which means ignoring the hint, i.e. no support for displaying tree structure.
@@ -15,10 +25,10 @@ trait MonadObjectOutput[F[_], R, Ptr[_]] extends MonadTell[F, R] { self =>
   def nest[A](fa: F[A]): F[A]
   // TODO: can we do an analog of nest for ObjectOutput?
 
-  def objectOutput: ObjectOutput[F[Unit], R, Ptr] = new ObjectOutput[F[Unit], R, Ptr] {
+  def objectOutput(implicit F: BindRec[F]): ObjectOutput[F[Unit], R, Ptr] = new ObjectOutput[F[Unit], R, Ptr] {
     def write(out: F[Unit], r: R): F[Unit] = self.bind(out)((_: Unit) => self.write(r))
 
-    def writeObject[A](out: F[Unit], pa: Ptr[A])(implicit ser: ObjectSerializer[A, R, Ptr]): F[Unit] =
-      self.bind(out)((_: Unit) => self.writeObject(pa))
+    def writeSubObject[A, B](out: F[Unit], pa: Ptr[A])(f: A => B)(implicit ser: ObjectSerializer[B, R, Ptr]): F[Unit] =
+      self.bind(out)((_: Unit) => self.writeRec(pa)(a => ser.serialize[F](f(a))(self, implicitly)))
   }
 }

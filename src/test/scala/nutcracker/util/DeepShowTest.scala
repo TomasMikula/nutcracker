@@ -1,9 +1,10 @@
 package nutcracker.util
 
 import nutcracker.util.FreeObjectOutput.Decoration
+import nutcracker.util.ops._
 import org.scalatest.FunSuite
 
-import scalaz.{NaturalTransformation, ~>}
+import scalaz.{BindRec, NaturalTransformation, ~>}
 import scalaz.Id.Id
 
 class DeepShowTest extends FunSuite {
@@ -12,12 +13,13 @@ class DeepShowTest extends FunSuite {
     def shows[A](fa: Id[A]): String = System.identityHashCode(fa).formatted("%x")
   }
 
-  val listShow: DeepShow[List[Int], Id] = new DeepShow.FromFree[List[Int], Id] {
-    def free(is: List[Int]): Desc[Id] = is match {
-      case Nil => Desc.done("")
-      case i :: Nil => Desc.done(i.toString)
-      case i :: is => Desc.done[Id](i.toString) ++ Desc.done(",") ++ Desc.ref[Id, List[Int]](is)(this)
-    }
+  val listShow: DeepShow[List[Int], Id] = new DeepShow.FromSerialize[List[Int], Id] {
+    def serialize[M[_]](is: List[Int])(implicit ev: MonadObjectOutput[M, String, Id], M1: BindRec[M]): M[Unit] =
+      is match {
+        case Nil => ev.empty
+        case i :: Nil => ev.write(i.toString)
+        case i :: is => ev.write(i.toString) ++ ev.write(",") ++ ev.writeObject(is)(this, M1)
+      }
   }
 
   test("stack safety") {
@@ -34,9 +36,9 @@ class DeepShowTest extends FunSuite {
     val l = new Lst(1)
     l.tail = l
 
-    implicit val ds: DeepShow[Lst, Id] = new DeepShow.FromFree[Lst, Id] {
-      def free(is: Lst): Desc[Id] =
-        Desc.done(is.i.toString + ",") ++ Desc.ref[Id, Lst](is.tail)(this)
+    implicit val ds: DeepShow[Lst, Id] = new DeepShow.FromSerialize[Lst, Id] {
+      def serialize[M[_]](is: Lst)(implicit ev: MonadObjectOutput[M, String, Id], M1: BindRec[M]): M[Unit] =
+        ev.write(is.i.toString + ",") ++ ev.writeObject(is.tail)(this, M1)
     }
 
     val s = ds.free(l).showAutoLabeled(NaturalTransformation.refl[Id], idShowK)(

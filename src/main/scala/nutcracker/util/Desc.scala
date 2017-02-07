@@ -7,6 +7,9 @@ object Desc {
   def ref[Ptr[_], A](pa: Ptr[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
     FreeObjectOutput.writeObject(pa, ev)
 
+  def ref[Ptr[_], A, B](pa: Ptr[A], f: A => B)(implicit ev: DeepShow[B, Ptr]): Desc[Ptr] =
+    FreeObjectOutput.writeRec(pa, (a: A) => ev.free(f(a)))
+
   def done[Ptr[_]](s: String): Desc[Ptr] =
     FreeObjectOutput.write(s)
 
@@ -15,24 +18,4 @@ object Desc {
 
   def nest[Ptr[_]](that: Desc[Ptr]): Desc[Ptr] =
     FreeObjectOutput.nest(that)
-
-  def setDesc[Ptr[_], A](sa: Set[A])(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] =
-    Desc.done("{") ++ mkString(sa)(", ") ++ Desc.done("}")
-
-  def mkString[Ptr[_], A](sa: Iterable[A])(sep: String)(implicit ev: DeepShow[A, Ptr]): Desc[Ptr] = {
-    val it = sa.iterator.map(ev.free)
-    join(it)(sep)
-  }
-
-  def join[Ptr[_]](descs: Iterable[Desc[Ptr]])(sep: String): Desc[Ptr] = {
-    join(descs.iterator)(sep)
-  }
-
-  private def join[Ptr[_]](it: Iterator[Desc[Ptr]])(sep: String): Desc[Ptr] = {
-    if (it.hasNext) {
-      val h = it.next()
-      it.foldLeft(h)((acc, d) => acc ++ Desc.done(sep) ++ d)
-    } else
-      Desc.done("")
-  }
 }

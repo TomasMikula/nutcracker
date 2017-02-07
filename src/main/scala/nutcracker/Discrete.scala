@@ -2,10 +2,10 @@ package nutcracker
 
 import nutcracker.Dom.{Refined, Status}
 import nutcracker.ops._
-import nutcracker.util.{ContU, DeepEqual, DeepShow, Desc, IsEqual, Uninhabited}
+import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput, Uninhabited}
 
 import scala.language.higherKinds
-import scalaz.{Bind, ContT, Monad, Show}
+import scalaz.{Bind, BindRec, ContT, Monad, Show}
 import scalaz.Id.Id
 
 /** Marker wrapper meaning that any two distinct values of type `Discrete[A]`
@@ -78,8 +78,9 @@ trait DiscreteInstances extends DiscreteInstances1 {
     }
 
   implicit def deepShowInstance[Ptr[_], A](implicit ev: DeepShow[A, Ptr]): DeepShow[Discrete[A], Ptr] =
-    new DeepShow.FromFree[Discrete[A], Ptr] {
-      def free(a: Discrete[A]): Desc[Ptr] = ev.free(a.value)
+    new DeepShow.FromSerialize[Discrete[A], Ptr] {
+      def serialize[M[_]](a: Discrete[A])(implicit M: MonadObjectOutput[M, String, Ptr], M1: BindRec[M]): M[Unit] =
+        ev.serialize(a.value)
     }
 
 }

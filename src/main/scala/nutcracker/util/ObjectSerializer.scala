@@ -22,9 +22,9 @@ trait ObjectSerializer[A, S, Ptr[_]] { self =>
 
   def serialize[M[_]](a: A)(implicit ev: MonadObjectOutput[M, S, Ptr], M1: BindRec[M]): M[Unit]
 
-  def free(a: A): FreeObjectOutput[S, Ptr, Unit]
-
   def pointer: ObjectSerializer[Ptr[A], S, Ptr]
+
+  final def free(a: A): FreeObjectOutput[S, Ptr, Unit] = serialize[FreeObjectOutput[S, Ptr, ?]](a)
 
   def show(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
     decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
@@ -46,9 +46,6 @@ object ObjectSerializer {
     def serialize[M[_]](a: A)(implicit ev: MonadObjectOutput[M, S, Ptr], M1: BindRec[M]): M[Unit] =
       write(ev.point(()), a)(ev.objectOutput)
 
-    def free(a: A): FreeObjectOutput[S, Ptr, Unit] =
-      serialize[FreeObjectOutput[S, Ptr, ?]](a)
-
     def pointer: ObjectSerializer[Ptr[A], S, Ptr] = new FromWrite[Ptr[A], S, Ptr] {
       def write[O](out: O, pa: Ptr[A])(implicit ev: ObjectOutput[O, S, Ptr]): O =
         ev.writeObject(out, pa)(FromWrite.this)
@@ -59,25 +56,9 @@ object ObjectSerializer {
     def write[O](out: O, a: A)(implicit ev: ObjectOutput[O, S, Ptr]): O =
       free(a).writeTo(out)
 
-    def free(a: A): FreeObjectOutput[S, Ptr, Unit] =
-      serialize[FreeObjectOutput[S, Ptr, ?]](a)
-
     def pointer: ObjectSerializer[Ptr[A], S, Ptr] = new FromSerialize[Ptr[A], S, Ptr] {
       def serialize[M[_]](pa: Ptr[A])(implicit ev: MonadObjectOutput[M, S, Ptr], M1: BindRec[M]): M[Unit] =
-        ev.writeObject(pa)(FromSerialize.this)
-    }
-  }
-
-  trait FromFree[A, S, Ptr[_]] extends ObjectSerializer[A, S, Ptr] {
-    def write[O](out: O, a: A)(implicit ev: ObjectOutput[O, S, Ptr]): O =
-      free(a).writeTo(out)
-
-    def serialize[M[_]](a: A)(implicit ev: MonadObjectOutput[M, S, Ptr], M1: BindRec[M]): M[Unit] =
-      free(a).serialize[M]
-
-    def pointer: ObjectSerializer[Ptr[A], S, Ptr] = new FromFree[Ptr[A], S, Ptr] {
-      def free(pa: Ptr[A]): FreeObjectOutput[S, Ptr, Unit] =
-        FreeObjectOutput.writeObject(pa, FromFree.this)
+        ev.writeRec(pa)(a => FromSerialize.this.serialize(a))
     }
   }
 

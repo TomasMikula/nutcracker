@@ -1,3 +1,3 @@
 package nutcracker.util
 
-package object ops extends ToLensOps with ToDescOps with ToFoldableOps
+package object ops extends ToLensOps with ToDescOps with ToFoldableOps with ToMonadObjectOutputOps
