@@ -85,6 +85,10 @@ object DeepEqual {
   implicit def specialize[Ptr1[_], Ptr2[_], A1[_[_]], A2[_[_]]](implicit ev: DeepEqualK[A1, A2]): DeepEqual[A1[Ptr1], A2[Ptr2], Ptr1, Ptr2] =
     ev.specialize
 
+  implicit def intInstance[Ptr1[_], Ptr2[_]]: DeepEqual[Int, Int, Ptr1, Ptr2] = new DeepEqual[Int, Int, Ptr1, Ptr2] {
+    def equal(a1: Int, a2: Int): IsEqual[Ptr1, Ptr2] = IsEqual(a1 == a2)
+  }
+
   implicit def optionInstance[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[Option[A1], Option[A2], Ptr1, Ptr2] =
     new DeepEqual[Option[A1], Option[A2], Ptr1, Ptr2] {
       def equal(a1: Option[A1], a2: Option[A2]): IsEqual[Ptr1, Ptr2] = IsEqual.optionEqual(a1, a2)
