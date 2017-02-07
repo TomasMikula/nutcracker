@@ -1,9 +1,9 @@
 package nutcracker.util
 
-import scala.annotation.tailrec
+import nutcracker.util.free.Free
 import scala.language.higherKinds
 import scalaz.Id._
-import scalaz.{ICons, IList, INil, ~>}
+import scalaz.{-\/, IList, INil, \/, \/-, ~>}
 
 /** Comparing of (potentially cyclic) object graphs for equality.
   * Features:
@@ -22,7 +22,7 @@ trait DeepEqual[A1, A2, Ptr1[_], Ptr2[_]] {
   def equal(a1: A1, a2: A2): IsEqual[Ptr1, Ptr2]
 
   final def deepEqual(a1: A1, a2: A2)(deref1: Ptr1 ~> Id, deref2: Ptr2 ~> Id)(implicit eq2: HEqualK[Ptr2]): Boolean =
-    DeepEqual.deepEqual(equal(a1, a2))(deref1, deref2)
+    equal(a1, a2).eval(deref1, deref2)
 
   final def lift: DeepEqual[Ptr1[A1], Ptr2[A2], Ptr1, Ptr2] =
     new DeepEqual[Ptr1[A1], Ptr2[A2], Ptr1, Ptr2] {
@@ -31,53 +31,6 @@ trait DeepEqual[A1, A2, Ptr1[_], Ptr2[_]] {
 }
 
 object DeepEqual {
-  private[DeepEqual] type Γ[Ptr1[_], Ptr2[_]] = KMap[Ptr1, λ[α => IList[Exists[Ptr2]]]]
-  private[DeepEqual] object Γ {
-    def apply[Ptr1[_], Ptr2[_]](): Γ[Ptr1, Ptr2] = KMap[Ptr1, λ[α => IList[Exists[Ptr2]]]]()
-  }
-
-  private[DeepEqual] type StackFrame[Ptr1[_], Ptr2[_]] =
-    Boolean => (IsEqual[Ptr1, Ptr2], Γ[Ptr1, Ptr2])
-
-  private[DeepEqual] def deepEqual[Ptr1[_], Ptr2[_]](
-    e: IsEqual[Ptr1, Ptr2])(
-    deref1: Ptr1 ~> Id,
-    deref2: Ptr2 ~> Id
-  )(implicit
-    eq2: HEqualK[Ptr2]
-  ): Boolean =
-    deepEqual(e, Γ[Ptr1, Ptr2](), INil[StackFrame[Ptr1, Ptr2]]())(deref1, deref2)
-
-  @tailrec
-  private[DeepEqual] def deepEqual[Ptr1[_], Ptr2[_]](
-    e: IsEqual[Ptr1, Ptr2],
-    γ: Γ[Ptr1, Ptr2],
-    stack: IList[StackFrame[Ptr1, Ptr2]])(
-    deref1: Ptr1 ~> Id,
-    deref2: Ptr2 ~> Id
-  )(implicit
-    eq2: HEqualK[Ptr2]
-  ): Boolean = {
-    import IsEqual._
-
-    e match {
-      case Const(v) =>
-        stack match {
-          case ICons(f, fs) => val (e1, γ1) = f(v); deepEqual(e1, γ1, fs)(deref1, deref2)
-          case INil() => v
-        }
-      case Indirect(p1, p2, ev) =>
-        val p1_eq = γ.getOrElse(p1)(INil())
-        if(p1_eq.find(ep2 => eq2.hEqual(ep2.value, p2)).isDefined) deepEqual(Const(true), γ, stack)(deref1, deref2)
-        else deepEqual(ev.equal(deref1(p1), deref2(p2)), γ.put(p1)(Exists(p2) :: p1_eq), stack)(deref1, deref2)
-      case And(e1, e2) =>
-        val cont: StackFrame[Ptr1, Ptr2] = if(_) (e2(), γ) else (Const(false), γ)
-        deepEqual(e1, γ, cont :: stack)(deref1, deref2)
-      case Or(e1, e2) =>
-        val cont: StackFrame[Ptr1, Ptr2] = if(_) (Const(true), γ) else (e2(), γ)
-        deepEqual(e1, γ, cont :: stack)(deref1, deref2)
-    }
-  }
 
   implicit def lift[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[Ptr1[A1], Ptr2[A2], Ptr1, Ptr2] =
     ev.lift
@@ -174,23 +127,42 @@ trait DeepEqualK[F1[_[_]], F2[_[_]]] {
     }
 }
 
-sealed trait IsEqual[Ptr1[_], Ptr2[_]] {
+final case class IsEqual[Ptr1[_], Ptr2[_]] private (private val unwrap: Free[IsEqual.IsEqF[Ptr1, Ptr2, ?], Boolean]) { // extends AnyVal // https://issues.scala-lang.org/browse/SI-7685
   import IsEqual._
 
-  def &&(that: => IsEqual[Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = And(this, () => that)
-  def ||(that: => IsEqual[Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = Or(this, () => that)
+  def &&(that: => IsEqual[Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = IsEqual(unwrap.flatMap(if(_) that.unwrap else IsEqual(false).unwrap))
+  def ||(that: => IsEqual[Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = IsEqual(unwrap.flatMap(if(_) IsEqual(true).unwrap else that.unwrap))
+
+  def eval(deref1: Ptr1 ~> Id, deref2: Ptr2 ~> Id)(implicit eq2: HEqualK[Ptr2]): Boolean = {
+    type Γ = KMap[Ptr1, λ[α => IList[Exists[Ptr2]]]]
+    def Γ(): Γ = KMap[Ptr1, λ[α => IList[Exists[Ptr2]]]]()
+    import scalaz.std.anyVal._ // need Monoid[Unit]
+
+    type F[X] = IsEqF[Ptr1, Ptr2, X]
+
+    unwrap.foldRunRecParM[Id, Γ, Unit](Γ(), λ[λ[α => (Γ, F[α])] ~> λ[α => (Γ, Free[F, α], Unit => Unit) \/ (Unit, α)]] {
+      case (γ, fx) => fx match {
+        case Pair(p1, p2, f) =>
+          val p1_eq = γ.getOrElse(p1)(INil())
+          if(p1_eq.find(ep2 => eq2.hEqual(ep2.value, p2)).isDefined) \/-(((), true))
+          else -\/((γ.put(p1)(Exists(p2) :: p1_eq), f(deref1(p1), deref2(p2)).unwrap, identity))
+      }
+    })._2
+  }
 }
 
 object IsEqual {
-  private[util] case class Const[Ptr1[_], Ptr2[_]](value: Boolean) extends IsEqual[Ptr1, Ptr2]
-  private[util] case class Indirect[Ptr1[_], Ptr2[_], X, Y](p1: Ptr1[X], p2: Ptr2[Y], ev: DeepEqual[X, Y, Ptr1, Ptr2]) extends IsEqual[Ptr1, Ptr2]
-  private[util] case class And[Ptr1[_], Ptr2[_]](e1: IsEqual[Ptr1, Ptr2], e2: () => IsEqual[Ptr1, Ptr2]) extends IsEqual[Ptr1, Ptr2]
-  private[util] case class Or[Ptr1[_], Ptr2[_]](e1: IsEqual[Ptr1, Ptr2], e2: () => IsEqual[Ptr1, Ptr2]) extends IsEqual[Ptr1, Ptr2]
+  private[util] sealed abstract class IsEqF[Ptr1[_], Ptr2[_], A]
+  private[util] case class Pair[Ptr1[_], Ptr2[_], X, Y](p1: Ptr1[X], p2: Ptr2[Y], f: (X, Y) => IsEqual[Ptr1, Ptr2]) extends IsEqF[Ptr1, Ptr2, Boolean]
 
-  def apply[Ptr1[_], Ptr2[_]](value: Boolean): IsEqual[Ptr1, Ptr2] = Const(value)
-  def apply[Ptr1[_], Ptr2[_], A1, A2](a1: A1, a2: A2)(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = ev.equal(a1, a2)
+  def apply[Ptr1[_], Ptr2[_]](value: Boolean): IsEqual[Ptr1, Ptr2] =
+    IsEqual(Free.point[IsEqF[Ptr1, Ptr2, ?], Boolean](value))
 
-  def refs[Ptr1[_], Ptr2[_], X, Y](p1: Ptr1[X], p2: Ptr2[Y])(implicit ev: DeepEqual[X, Y, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = Indirect(p1, p2, ev)
+  def apply[Ptr1[_], Ptr2[_], A1, A2](a1: A1, a2: A2)(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
+    ev.equal(a1, a2)
+
+  def refs[Ptr1[_], Ptr2[_], X, Y](p1: Ptr1[X], p2: Ptr2[Y])(implicit ev: DeepEqual[X, Y, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
+    IsEqual(Free.liftF[IsEqF[Ptr1, Ptr2, ?], Boolean](Pair(p1, p2, ev.equal)))
 
   def apply[Ptr1[_], Ptr2[_]]: PApplied[Ptr1, Ptr2] = new PApplied[Ptr1, Ptr2]
   final class PApplied[Ptr1[_], Ptr2[_]] private[IsEqual] {
@@ -200,33 +172,33 @@ object IsEqual {
   def optionEqual[Ptr1[_], Ptr2[_], A1, A2](o1: Option[A1], o2: Option[A2])(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
     (o1, o2) match {
       case (Some(a1), Some(a2)) => ev.equal(a1, a2)
-      case (None, None) => Const(true)
-      case _ => Const(false)
+      case (None, None) => IsEqual(true)
+      case _ => IsEqual(false)
     }
 
   def eitherEqual[Ptr1[_], Ptr2[_], A1, B1, A2, B2](e1: Either[A1, B1], e2: Either[A2, B2])(implicit eva: DeepEqual[A1, A2, Ptr1, Ptr2], evb: DeepEqual[B1, B2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
     (e1, e2) match {
       case (Left(a1), Left(a2)) => eva.equal(a1, a2)
       case (Right(b1), Right(b2)) => evb.equal(b1, b2)
-      case _ => Const(false)
+      case _ => IsEqual(false)
     }
 
   def listEqual[Ptr1[_], Ptr2[_], A1, A2](l1: List[A1], l2: List[A2])(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
-    if(l1.size != l2.size) Const(false)
+    if(l1.size != l2.size) IsEqual(false)
     else {
       def go(l1: List[A1], l2: List[A2]): IsEqual[Ptr1, Ptr2] = (l1, l2) match {
         case (a :: as, b :: bs) => ev.equal(a, b) && go(as, bs)
-        case _ => Const(true)
+        case _ => IsEqual(true)
       }
       go(l1, l2)
     }
 
   def vectorEqual[Ptr1[_], Ptr2[_], A1, A2](v1: Vector[A1], v2: Vector[A2])(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
-    if(v1.size != v2.size) Const(false)
+    if(v1.size != v2.size) IsEqual(false)
     else {
       def go(i: Int): IsEqual[Ptr1, Ptr2] =
         if(i >= 0) ev.equal(v1(i), v2(i)) && go(i-1)
-        else Const(true)
+        else IsEqual(true)
 
       go(v1.size - 1)
     }
