@@ -41,14 +41,3 @@ object DeepShow {
   }
 }
 
-trait DeepShowK[A[_[_]]] {
-  def show[Ptr[_]](a: A[Ptr]): Desc[Ptr]
-
-  def specialize[Ptr[_]]: DeepShow[A[Ptr], Ptr] = new DeepShow.FromSerialize[A[Ptr], Ptr] {
-    def serialize[M[_]](a: A[Ptr])(implicit ev: MonadObjectOutput[M, String, Ptr]): M[Unit] =
-      DeepShowK.this.show(a).serialize[M]
-  }
-}
-
-
-
