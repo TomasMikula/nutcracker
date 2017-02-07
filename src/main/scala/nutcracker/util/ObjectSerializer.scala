@@ -4,7 +4,7 @@ import nutcracker.util.FreeObjectOutput.Decoration
 
 import scalaz.Id.Id
 import scalaz.Leibniz.===
-import scalaz.{BindRec, Show, ~>}
+import scalaz.{Show, ~>}
 
 /** Serialization of (potentially cyclic) object graphs.
   * Features:
@@ -20,7 +20,7 @@ trait ObjectSerializer[A, S, Ptr[_]] { self =>
 
   def write[O](out: O, a: A)(implicit ev: ObjectOutput[O, S, Ptr]): O
 
-  def serialize[M[_]](a: A)(implicit ev: MonadObjectOutput[M, S, Ptr], M1: BindRec[M]): M[Unit]
+  def serialize[M[_]](a: A)(implicit ev: MonadObjectOutput[M, S, Ptr]): M[Unit]
 
   def pointer: ObjectSerializer[Ptr[A], S, Ptr]
 
@@ -43,7 +43,7 @@ trait ObjectSerializer[A, S, Ptr[_]] { self =>
 object ObjectSerializer {
 
   trait FromWrite[A, S, Ptr[_]] extends ObjectSerializer[A, S, Ptr] {
-    def serialize[M[_]](a: A)(implicit ev: MonadObjectOutput[M, S, Ptr], M1: BindRec[M]): M[Unit] =
+    def serialize[M[_]](a: A)(implicit ev: MonadObjectOutput[M, S, Ptr]): M[Unit] =
       write(ev.point(()), a)(ev.objectOutput)
 
     def pointer: ObjectSerializer[Ptr[A], S, Ptr] = new FromWrite[Ptr[A], S, Ptr] {
@@ -57,7 +57,7 @@ object ObjectSerializer {
       free(a).writeTo(out)
 
     def pointer: ObjectSerializer[Ptr[A], S, Ptr] = new FromSerialize[Ptr[A], S, Ptr] {
-      def serialize[M[_]](pa: Ptr[A])(implicit ev: MonadObjectOutput[M, S, Ptr], M1: BindRec[M]): M[Unit] =
+      def serialize[M[_]](pa: Ptr[A])(implicit ev: MonadObjectOutput[M, S, Ptr]): M[Unit] =
         ev.writeRec(pa)(a => FromSerialize.this.serialize(a))
     }
   }

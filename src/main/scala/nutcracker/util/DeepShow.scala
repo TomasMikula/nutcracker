@@ -1,6 +1,6 @@
 package nutcracker.util
 
-import scalaz.{BindRec, MonadTell, Show, ~>}
+import scalaz.{MonadTell, Show, ~>}
 import scalaz.Id._
 import scalaz.std.list._
 import scalaz.syntax.foldable._
@@ -16,14 +16,14 @@ object DeepShow {
     ev.show(deref, S)()
 
   def set[Ptr[_], A](implicit ev: DeepShow[A, Ptr]): DeepShow[Set[A], Ptr] = new DeepShow.FromSerialize[Set[A], Ptr] {
-    def serialize[M[_]](a: Set[A])(implicit M: MonadObjectOutput[M, String, Ptr], M1: BindRec[M]): M[Unit] =
+    def serialize[M[_]](a: Set[A])(implicit M: MonadObjectOutput[M, String, Ptr]): M[Unit] =
       showSet(a)
   }
 
-  private def showSet[M[_], Ptr[_], A](sa: Set[A])(implicit ev: DeepShow[A, Ptr], M: MonadObjectOutput[M, String, Ptr], M1: BindRec[M]): M[Unit] =
+  private def showSet[M[_], Ptr[_], A](sa: Set[A])(implicit ev: DeepShow[A, Ptr], M: MonadObjectOutput[M, String, Ptr]): M[Unit] =
     List(M.write("{"), mkString(sa)(", "), M.write("}")).sequence_
 
-  private def mkString[M[_], Ptr[_], A](sa: Iterable[A])(sep: String)(implicit ev: DeepShow[A, Ptr], M: MonadObjectOutput[M, String, Ptr], M1: BindRec[M]): M[Unit] = {
+  private def mkString[M[_], Ptr[_], A](sa: Iterable[A])(sep: String)(implicit ev: DeepShow[A, Ptr], M: MonadObjectOutput[M, String, Ptr]): M[Unit] = {
     val it = sa.iterator.map(ev.serialize[M])
     join(it)(sep)
   }
@@ -45,7 +45,7 @@ trait DeepShowK[A[_[_]]] {
   def show[Ptr[_]](a: A[Ptr]): Desc[Ptr]
 
   def specialize[Ptr[_]]: DeepShow[A[Ptr], Ptr] = new DeepShow.FromSerialize[A[Ptr], Ptr] {
-    def serialize[M[_]](a: A[Ptr])(implicit ev: MonadObjectOutput[M, String, Ptr], M1: BindRec[M]): M[Unit] =
+    def serialize[M[_]](a: A[Ptr])(implicit ev: MonadObjectOutput[M, String, Ptr]): M[Unit] =
       DeepShowK.this.show(a).serialize[M]
   }
 }

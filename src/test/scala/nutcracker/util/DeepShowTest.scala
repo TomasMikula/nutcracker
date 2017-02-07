@@ -1,11 +1,11 @@
 package nutcracker.util
 
 import nutcracker.util.FreeObjectOutput.Decoration
-import nutcracker.util.ops._
 import org.scalatest.FunSuite
 
-import scalaz.{BindRec, NaturalTransformation, ~>}
+import scalaz.{NaturalTransformation, ~>}
 import scalaz.Id.Id
+import scalaz.syntax.monad._
 
 class DeepShowTest extends FunSuite {
 
@@ -14,11 +14,11 @@ class DeepShowTest extends FunSuite {
   }
 
   val listShow: DeepShow[List[Int], Id] = new DeepShow.FromSerialize[List[Int], Id] {
-    def serialize[M[_]](is: List[Int])(implicit ev: MonadObjectOutput[M, String, Id], M1: BindRec[M]): M[Unit] =
+    def serialize[M[_]](is: List[Int])(implicit ev: MonadObjectOutput[M, String, Id]): M[Unit] =
       is match {
         case Nil => ev.empty
         case i :: Nil => ev.write(i.toString)
-        case i :: is => ev.write(i.toString) ++ ev.write(",") ++ ev.writeObject(is)(this, M1)
+        case i :: is => ev.write(i.toString) >> ev.write(",") >> ev.writeObject(is)(this)
       }
   }
 
@@ -37,8 +37,8 @@ class DeepShowTest extends FunSuite {
     l.tail = l
 
     implicit val ds: DeepShow[Lst, Id] = new DeepShow.FromSerialize[Lst, Id] {
-      def serialize[M[_]](is: Lst)(implicit ev: MonadObjectOutput[M, String, Id], M1: BindRec[M]): M[Unit] =
-        ev.write(is.i.toString + ",") ++ ev.writeObject(is.tail)(this, M1)
+      def serialize[M[_]](is: Lst)(implicit ev: MonadObjectOutput[M, String, Id]): M[Unit] =
+        ev.write(is.i.toString + ",") >> ev.writeObject(is.tail)(this)
     }
 
     val s = ds.free(l).showAutoLabeled(NaturalTransformation.refl[Id], idShowK)(

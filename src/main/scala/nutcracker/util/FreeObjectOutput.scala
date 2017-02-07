@@ -378,7 +378,7 @@ object FreeObjectOutput {
 
   implicit def objectSerializerInstance[R, Ptr[_]]: ObjectSerializer[FreeObjectOutput[R, Ptr, Unit], R, Ptr] =
     new ObjectSerializer.FromSerialize[FreeObjectOutput[R, Ptr, Unit], R, Ptr] {
-      def serialize[M[_]](a: FreeObjectOutput[R, Ptr, Unit])(implicit ev: MonadObjectOutput[M, R, Ptr], M1: BindRec[M]): M[Unit] =
+      def serialize[M[_]](a: FreeObjectOutput[R, Ptr, Unit])(implicit ev: MonadObjectOutput[M, R, Ptr]): M[Unit] =
         a.serialize[M]
     }
 

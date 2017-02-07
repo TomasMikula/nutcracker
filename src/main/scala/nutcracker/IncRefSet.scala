@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
 
-import scalaz.{Applicative, Bind, BindRec, Monad}
+import scalaz.{Applicative, Bind, Monad}
 import scalaz.std.list._
 import scalaz.syntax.bind._
 
@@ -55,7 +55,7 @@ object IncRefSet {
 
   implicit def deepShow[Ptr[_], A](implicit ev: DeepShow[A, Ptr]): DeepShow[IncRefSet[Ptr, A], Ptr] =
     new DeepShow.FromSerialize[IncRefSet[Ptr, A], Ptr] {
-      def serialize[M[_]](a: IncRefSet[Ptr, A])(implicit M: MonadObjectOutput[M, String, Ptr], M1: BindRec[M]): M[Unit] =
+      def serialize[M[_]](a: IncRefSet[Ptr, A])(implicit M: MonadObjectOutput[M, String, Ptr]): M[Unit] =
         DeepShow.set(ev.pointer).serialize(a.value)
     }
 }

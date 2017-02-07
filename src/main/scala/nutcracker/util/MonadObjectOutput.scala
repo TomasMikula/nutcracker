@@ -2,7 +2,7 @@ package nutcracker.util
 
 import scalaz.{BindRec, MonadTell}
 
-trait MonadObjectOutput[F[_], R, Ptr[_]] extends MonadTell[F, R] { self =>
+trait MonadObjectOutput[F[_], R, Ptr[_]] extends MonadTell[F, R] with BindRec[F] { self =>
 
   /** Alias for [[tell]]. */
   def write(r: R): F[Unit]
@@ -11,11 +11,11 @@ trait MonadObjectOutput[F[_], R, Ptr[_]] extends MonadTell[F, R] { self =>
 
   def writeRec[A](pa: Ptr[A])(f: A => F[Unit]): F[Unit]
 
-  def writeObject[A](pa: Ptr[A])(implicit ev: ObjectSerializer[A, R, Ptr], F: BindRec[F]): F[Unit] =
-    writeRec(pa)(ev.serialize[F](_)(self, F))
+  def writeObject[A](pa: Ptr[A])(implicit ev: ObjectSerializer[A, R, Ptr]): F[Unit] =
+    writeRec(pa)(ev.serialize[F](_)(self))
 
-  def writeSubObject[A, B](pa: Ptr[A])(f: A => B)(implicit ev: ObjectSerializer[B, R, Ptr], F: BindRec[F]): F[Unit] =
-    writeRec(pa)(a => ev.serialize[F](f(a))(self, F))
+  def writeSubObject[A, B](pa: Ptr[A])(f: A => B)(implicit ev: ObjectSerializer[B, R, Ptr]): F[Unit] =
+    writeRec(pa)(a => ev.serialize[F](f(a))(self))
 
   def empty: F[Unit] = point(())
 
@@ -25,10 +25,10 @@ trait MonadObjectOutput[F[_], R, Ptr[_]] extends MonadTell[F, R] { self =>
   def nest[A](fa: F[A]): F[A]
   // TODO: can we do an analog of nest for ObjectOutput?
 
-  def objectOutput(implicit F: BindRec[F]): ObjectOutput[F[Unit], R, Ptr] = new ObjectOutput[F[Unit], R, Ptr] {
+  def objectOutput: ObjectOutput[F[Unit], R, Ptr] = new ObjectOutput[F[Unit], R, Ptr] {
     def write(out: F[Unit], r: R): F[Unit] = self.bind(out)((_: Unit) => self.write(r))
 
     def writeSubObject[A, B](out: F[Unit], pa: Ptr[A])(f: A => B)(implicit ser: ObjectSerializer[B, R, Ptr]): F[Unit] =
-      self.bind(out)((_: Unit) => self.writeRec(pa)(a => ser.serialize[F](f(a))(self, implicitly)))
+      self.bind(out)((_: Unit) => self.writeRec(pa)(a => ser.serialize[F](f(a))(self)))
   }
 }
