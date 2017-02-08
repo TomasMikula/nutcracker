@@ -2,8 +2,8 @@ package nutcracker.util
 
 import nutcracker.util.free.Free
 
-import scalaz.Id.Id
-import scalaz.{-\/, IList, INil, \/, \/-, ~>}
+import scalaz.{Applicative, BindRec, IList, INil, -\/, \/, \/-, ~>}
+import scalaz.syntax.monad._
 
 final case class IsEqual[Ptr1[_], Ptr2[_]] private (private val unwrap: Free[IsEqual.IsEqF[Ptr1, Ptr2, ?], Boolean]) { // extends AnyVal // https://issues.scala-lang.org/browse/SI-7685
   import IsEqual._
@@ -12,21 +12,21 @@ final case class IsEqual[Ptr1[_], Ptr2[_]] private (private val unwrap: Free[IsE
   def ||(that: => IsEqual[Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = IsEqual(unwrap.flatMap(if(_) IsEqual(true).unwrap else that.unwrap))
 
   // XXX: Relies on meaningful hashCode and equals for Ptr1
-  def eval(deref1: Ptr1 ~> Id, deref2: Ptr2 ~> Id)(implicit eq2: HEqualK[Ptr2]): Boolean = {
+  def eval[M[_]](deref1: Ptr1 ~> M, deref2: Ptr2 ~> M)(implicit eq2: HEqualK[Ptr2], M0: BindRec[M], M1: Applicative[M]): M[Boolean] = {
     type Γ = KMap[Ptr1, λ[α => IList[Exists[Ptr2]]]]
     def Γ(): Γ = KMap[Ptr1, λ[α => IList[Exists[Ptr2]]]]()
     import scalaz.std.anyVal._ // need Monoid[Unit]
 
     type F[X] = IsEqF[Ptr1, Ptr2, X]
 
-    unwrap.foldRunRecParM[Id, Γ, Unit](Γ(), λ[λ[α => (Γ, F[α])] ~> λ[α => (Γ, Free[F, α], Unit => Unit) \/ (Unit, α)]] {
+    M0.map(unwrap.foldRunRecParM[M, Γ, Unit](Γ(), λ[λ[α => (Γ, F[α])] ~> λ[α => M[(Γ, Free[F, α], Unit => Unit) \/ (Unit, α)]]] {
       case (γ, fx) => fx match {
         case Pair(p1, p2, f) =>
           val p1_eq = γ.getOrElse(p1)(INil())
-          if(p1_eq.find(ep2 => eq2.hEqual(ep2.value, p2)).isDefined) \/-(((), true))
-          else -\/((γ.put(p1)(Exists(p2) :: p1_eq), f(deref1(p1), deref2(p2)).unwrap, identity))
+          if(p1_eq.find(ep2 => eq2.hEqual(ep2.value, p2)).isDefined) M1.point(\/-(((), true)))
+          else deref1(p1) >>= (x => M1.map(deref2(p2))(y => -\/((γ.put(p1)(Exists(p2) :: p1_eq), f(x, y).unwrap, identity))))
       }
-    })._2
+    }))(_._2)
   }
 }
 

@@ -1,8 +1,7 @@
 package nutcracker.util
 
 import scala.language.higherKinds
-import scalaz.Id._
-import scalaz.~>
+import scalaz.{Applicative, BindRec, ~>}
 
 /** Comparing of (potentially cyclic) object graphs for equality.
   * Features:
@@ -20,7 +19,7 @@ trait DeepEqual[A1, A2, Ptr1[_], Ptr2[_]] {
 
   def equal(a1: A1, a2: A2): IsEqual[Ptr1, Ptr2]
 
-  final def deepEqual(a1: A1, a2: A2)(deref1: Ptr1 ~> Id, deref2: Ptr2 ~> Id)(implicit eq2: HEqualK[Ptr2]): Boolean =
+  final def deepEqual[M[_]](a1: A1, a2: A2)(deref1: Ptr1 ~> M, deref2: Ptr2 ~> M)(implicit eq2: HEqualK[Ptr2], M0: BindRec[M], M1: Applicative[M]): M[Boolean] =
     equal(a1, a2).eval(deref1, deref2)
 
   final def lift: DeepEqual[Ptr1[A1], Ptr2[A2], Ptr1, Ptr2] =
