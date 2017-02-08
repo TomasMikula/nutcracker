@@ -55,7 +55,7 @@ object PropagationLang {
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[PropagationLang, F]): Propagation[FreeK[F, ?], DRef] =
     new FreePropagation[F]
 
-  implicit def interpreter: StateInterpreter[PropagationLang, PropagationStore] = PropagationStore.interpreter
+  implicit def interpreter: StateInterpreter[PropagationLang, PropagationStore[DRef, ?]] = PropagationStore.interpreter
 }
 
 

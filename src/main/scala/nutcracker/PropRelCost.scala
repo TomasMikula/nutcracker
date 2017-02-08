@@ -16,10 +16,10 @@ final class PropRelCost[C: NonDecreasingMonoid] {
   type CostS[K] = Const[C, K]
 
   type Vocabulary[K[_], A] = (PropagationLang  :+: RelLang :++: CostL)#Out[K, A]
-  type State[K]            = (PropagationStore :*: RelDB   :**: CostS)#Out[K]
+  type State[K]            = (PropagationStore[DRef, ?] :*: RelDB   :**: CostS)#Out[K]
 
   val interpreter = (PropagationStore.interpreter :&: RelDB.interpreter :&&: CostLang.interpreter[C]).freeInstance
-  def propStore[K]: Lens[State[K], PropagationStore[K]] = implicitly[Lens[State[K], PropagationStore[K]]]
+  def propStore[K]: Lens[State[K], PropagationStore[DRef, K]] = implicitly[Lens[State[K], PropagationStore[DRef, K]]]
   def cost[K]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
   private[PropRelCost] type Q[A] = FreeK[Vocabulary, A]

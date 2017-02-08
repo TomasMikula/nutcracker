@@ -13,12 +13,12 @@ import scalaz.~>
 object PropRel {
 
   type Vocabulary[K[_], A] = (PropagationLang  :++: RelLang)#Out[K, A]
-  type State[K]            = (PropagationStore :**: RelDB  )#Out[K]
+  type State[K]            = (PropagationStore[DRef, ?] :**: RelDB  )#Out[K]
 
   val interpreter = (PropagationStore.interpreter :&&: RelDB.interpreter).freeInstance
 
   private[PropRel] type Q[A] = FreeK[Vocabulary, A]
-  def propStore: Lens[State[Q[Unit]], PropagationStore[Q[Unit]]] = implicitly[Lens[State[Q[Unit]], PropagationStore[Q[Unit]]]]
+  def propStore: Lens[State[Q[Unit]], PropagationStore[DRef, Q[Unit]]] = implicitly[Lens[State[Q[Unit]], PropagationStore[DRef, Q[Unit]]]]
   private def naiveAssess: State[Q[Unit]] => Assessment[List[Q[Unit]]] =
     PropagationStore.naiveAssess(propStore)(FreeKT.injectionOrder[PropagationLang, Vocabulary, Id])
   private def fetch: λ[A => DRef[Promise[A]]] ~> (State[Q[Unit]] => ?) =
