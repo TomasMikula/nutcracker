@@ -27,7 +27,7 @@ case class PropagationStore[K] private(
     def apply[D](cell: DRef[D]): D = fetch(cell)
   }
 
-  def addVariable[D, U, Δ](d: D, dom: Dom[D]): (PropagationStore[K], DRef.Aux[D, dom.Update, dom.Delta]) = {
+  def addVariable[D, U, Δ](d: D, dom: Dom[D]): (PropagationStore[K], DRef[D]) = {
     val ref = DRef[D](nextId)(dom)
     val domains1 = domains.put(ref)((d, dom: Dom.Aux[D, dom.Update, dom.Delta]))
     val (unresolvedVars1, failedVars1) = dom.assess(d) match {
@@ -38,7 +38,7 @@ case class PropagationStore[K] private(
     (copy(nextId = nextId + 1, domains = domains1, unresolvedVars = unresolvedVars1, failedVars = failedVars1), ref)
   }
 
-  def fetch[D](ref: DRef[D]): D = domains(ref: DRef.Aux[D, ref.Update, ref.Delta])._1
+  def fetch[D](ref: DRef[D]): D = domains(ref)._1
 
   def fetchResult[D](ref: DRef[D])(implicit fin: Final[D]): Option[fin.Out] = fin.extract(fetch(ref))
 
@@ -213,7 +213,7 @@ object PropagationStore {
     else if(s.unresolvedVars.isEmpty) Done
     else {
       def splitDomain[D](ref: DRef[D]): Option[List[K[Unit]]] = {
-        val (d, domain) = s.domains(ref: DRef.Aux[D, ref.Update, ref.Delta])
+        val (d, domain) = s.domains(ref)
         domain.assess(d) match {
           case Dom.Unrefined(choices) => choices() map { _ map { ui => ord(update(ref)(domain).by(ui)) } }
           case _ => sys.error("splitDomain should be called on unresolved variables only.")
