@@ -13,18 +13,20 @@ import scalaz.std.anyVal._
 import scalaz.std.vector._
 
 class Sat extends FunSpec {
-  val V = FinalVars[FreeK[PropagationLang, ?], DRef]
-  val B = BoolOps[FreeK[PropagationLang, ?], DRef]
-  val P = PromiseOps[FreeK[PropagationLang, ?], DRef]
+  import PropagationStore.module._
+
+  val V = FinalVars[FreeK[PropagationLang[Ref, ?[_], ?], ?], Ref]
+  val B = BoolOps[FreeK[PropagationLang[Ref, ?[_], ?], ?], Ref]
+  val P = PromiseOps[FreeK[PropagationLang[Ref, ?[_], ?], ?], Ref]
 
   import V._
   import B._
   import P._
 
-  implicit val freeKMonad: Monad[FreeKT[PropagationLang, Id, ?]] = FreeKT.freeKTMonad[PropagationLang, Id]
+  implicit val freeKMonad: Monad[FreeKT[PropagationLang[Ref, ?[_], ?], Id, ?]] = FreeKT.freeKTMonad[PropagationLang[Ref, ?[_], ?], Id]
 
 
-  val solver = PropagationStore.dfsSolver
+  val solver = dfsSolver
 
   describe("A simple 3-SAT problem") {
 

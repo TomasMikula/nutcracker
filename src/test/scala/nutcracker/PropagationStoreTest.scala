@@ -6,23 +6,25 @@ import nutcracker.Trigger._
 import nutcracker.util.FreeK
 
 class PropagationStoreTest extends FunSuite {
-  type Prg[A] = FreeK[PropagationLang, A]
+  import PropagationStore.module._
 
-  val P = Propagation[Prg, DRef]
-  val V = FinalVars[Prg, DRef]
+  type Prg[A] = FreeK[PropagationLang[Ref, ?[_], ?], A]
+
+  val P = Propagation[Prg, Ref]
+  val V = FinalVars[Prg, Ref]
   import P._
   import V._
 
   test("diff accumulation") {
     val prg = for {
       ref <- variable[Int].oneOf(1, 2, 3, 4, 5)
-      log <- newLog[Prg, DRef, Diff[Set[Int]]]
+      log <- newLog[Prg, Ref, Diff[Set[Int]]]
       _   <- observe(ref).by(s => (None, Some((s: DecSet[Int], d: Diff[Set[Int]]) => fireReload(log.write[Prg](d)))))
       _   <- remove(ref, DecSet(1, 2))
       _   <- remove(ref, DecSet(4, 5))
     } yield log
 
-    val (store, logRef) = PropagationStore.interpreter.freeInstance.apply(prg)(PropagationStore.emptyF[PropagationLang])
+    val (store, logRef) = interpreter.freeInstance.apply(prg)(emptyF[PropagationLang[Ref, ?[_], ?]])
     val log = store.fetch(logRef)
     assertResult(List(Diff(Set(1, 2, 4, 5))))(log)
   }
@@ -30,19 +32,19 @@ class PropagationStoreTest extends FunSuite {
   test("delta is cleared after being handled") {
     val prg1 = for {
       ref <- variable[Int].oneOf(1, 2, 3, 4, 5)
-      log <- newLog[Prg, DRef, Diff[Set[Int]]]
+      log <- newLog[Prg, Ref, Diff[Set[Int]]]
       _   <- observe(ref).by(s => (None, Some((s: DecSet[Int], d: Diff[Set[Int]]) => fireReload(log.write[Prg](d)))))
       _   <- remove(ref, DecSet(1, 2))
     } yield (ref, log)
 
-    val interpreter = PropagationStore.interpreter.freeInstance
+    val interp = interpreter.freeInstance
 
-    val (store1, (ref, logRef)) = interpreter.apply(prg1)(PropagationStore.emptyF[PropagationLang])
+    val (store1, (ref, logRef)) = interp.apply(prg1)(emptyF[PropagationLang[Ref, ?[_], ?]])
     val log1 = store1.fetch(logRef)
     assertResult(List(Diff(Set(1, 2))))(log1)
 
     val prg2 = remove(ref, DecSet(4, 5))
-    val store2 = interpreter(prg2)(store1)._1
+    val store2 = interp(prg2)(store1)._1
     val log2 = store2.fetch(logRef)
     assertResult(List(Diff(Set(4, 5)), Diff(Set(1, 2))))(log2)
   }
@@ -51,12 +53,12 @@ class PropagationStoreTest extends FunSuite {
     val prg = for {
       ref <- variable[Int].oneOf(1, 2, 3, 4, 5)
       _   <- remove(ref, DecSet(4, 5, 6, 7)) // should not be logged
-      log <- newLog[Prg, DRef, Diff[Set[Int]]]
+      log <- newLog[Prg, Ref, Diff[Set[Int]]]
       _   <- observe(ref).by(s => (None, Some((s: DecSet[Int], d: Diff[Set[Int]]) => fireReload(log.write[Prg](d)))))
       _   <- remove(ref, DecSet(2, 3, 4, 5)) // only removal of {2, 3} should be logged
     } yield log
 
-    val (store, logRef) = PropagationStore.interpreter.freeInstance.apply(prg)(PropagationStore.emptyF[PropagationLang])
+    val (store, logRef) = interpreter.freeInstance.apply(prg)(emptyF[PropagationLang[Ref, ?[_], ?]])
     val log = store.fetch(logRef)
     assertResult(List(Diff(Set(2, 3))))(log)
   }

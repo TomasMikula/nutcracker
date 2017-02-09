@@ -11,20 +11,21 @@ import scalaz.Id._
 import scalaz.~>
 
 object PropRel {
+  type Ref[a] = PropagationStore.module.Ref[a]
 
-  type Vocabulary[K[_], A] = (PropagationLang  :++: RelLang)#Out[K, A]
-  type State[K]            = (PropagationStore[DRef, ?] :**: RelDB  )#Out[K]
+  type Vocabulary[K[_], A] = (PropagationLang[Ref, ?[_], ?] :++: RelLang)#Out[K, A]
+  type State[K]            = (PropagationStore[Ref, ?]      :**: RelDB  )#Out[K]
 
-  val interpreter = (PropagationStore.interpreter :&&: RelDB.interpreter).freeInstance
+  val interpreter = (PropagationStore.interpreter[Ref] :&&: RelDB.interpreter).freeInstance
+  def propStore: Lens[State[Q[Unit]], PropagationStore[Ref, Q[Unit]]] = implicitly[Lens[State[Q[Unit]], PropagationStore[Ref, Q[Unit]]]]
+  def emptyState: State[Q[Unit]] = PropagationStore.module.emptyF[Vocabulary] :**: RelDB.empty[Q[Unit]]
+
+  def dfsSolver: DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]] =
+    new DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]](interpreter, emptyState, naiveAssess, fetch)
 
   private[PropRel] type Q[A] = FreeK[Vocabulary, A]
-  def propStore: Lens[State[Q[Unit]], PropagationStore[DRef, Q[Unit]]] = implicitly[Lens[State[Q[Unit]], PropagationStore[DRef, Q[Unit]]]]
   private def naiveAssess: State[Q[Unit]] => Assessment[List[Q[Unit]]] =
-    PropagationStore.naiveAssess(propStore)(FreeKT.injectionOrder[PropagationLang, Vocabulary, Id])
-  private def fetch: λ[A => DRef[Promise[A]]] ~> (State[Q[Unit]] => ?) =
-    λ[λ[A => DRef[Promise[A]]] ~> (State[Q[Unit]] => ?)](pa => s => propStore.get(s).fetchResult(pa).get)
-  def emptyState: State[Q[Unit]] = PropagationStore.empty[Q[Unit]] :**: RelDB.empty[Q[Unit]]
-
-  def dfsSolver: DFSSolver[Vocabulary, State, Id, λ[A => DRef[Promise[A]]]] =
-    new DFSSolver[Vocabulary, State, Id, λ[A => DRef[Promise[A]]]](interpreter, emptyState, naiveAssess, fetch)
+    PropagationStore.naiveAssess(propStore)(FreeKT.injectionOrder[PropagationLang[Ref, ?[_], ?], Vocabulary, Id])
+  private def fetch: λ[A => Ref[Promise[A]]] ~> (State[Q[Unit]] => ?) =
+    λ[λ[A => Ref[Promise[A]]] ~> (State[Q[Unit]] => ?)](pa => s => propStore.get(s).fetchResult(pa).get)
 }

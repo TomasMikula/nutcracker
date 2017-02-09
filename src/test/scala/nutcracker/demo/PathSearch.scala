@@ -22,14 +22,15 @@ class PathSearch extends FunSuite {
   val lang = new PropCost[Int]
   val solver = lang.bfsSolver
 
+  type Ref[A] = lang.Ref[A]
   type Lang[K[_], A] = lang.Vocabulary[K, A]
 
   // not sure why scalac is not able to find these itself
-  implicit val injP = implicitly[InjectK[PropagationLang, Lang]]
+  implicit val injP = implicitly[InjectK[PropagationLang[Ref, ?[_], ?], Lang]]
   implicit val injC = implicitly[InjectK[solver.lang.CostL, Lang]]
 
-  val P = PromiseOps[FreeK[Lang, ?], DRef]
-  val B = Branching[FreeK[Lang, ?], DRef]
+  val P = PromiseOps[FreeK[Lang, ?], Ref]
+  val B = Branching[FreeK[Lang, ?], Ref]
   val C = CostOps[FreeK[Lang, ?]]
 
   implicit val freeKMonad: Monad[FreeKT[Lang, Id, ?]] = FreeKT.freeKTMonad[Lang, Id]
@@ -92,24 +93,24 @@ class PathSearch extends FunSuite {
 
   def successors(v: Vertex): List[(Int, Vertex)] = edges filter { _._1 == v } map { _._2 }
 
-  def findPath(u: Vertex, v: Vertex): FreeK[Lang, DRef[Promise[Path]]] = for {
+  def findPath(u: Vertex, v: Vertex): FreeK[Lang, Ref[Promise[Path]]] = for {
     pr <- promise[Path].inject[Lang]
     _ <- findPath(Nil, u, v, pr)
   } yield pr
 
-  def findPath(visited: List[Vertex], u: Vertex, v: Vertex, pr: DRef[Promise[Path]]): FreeK[Lang, Unit] = {
+  def findPath(visited: List[Vertex], u: Vertex, v: Vertex, pr: Ref[Promise[Path]]): FreeK[Lang, Unit] = {
     branchAndExec(
       zeroLengthPaths(visited, u, v, pr),
       nonZeroLengthPaths(visited, u, v, pr)
     )
   }
 
-  def zeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: DRef[Promise[Path]]): FreeK[Lang, Unit] = {
+  def zeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Ref[Promise[Path]]): FreeK[Lang, Unit] = {
     if(u == v) complete(pr, revPath(u::visited)).inject[Lang]
     else branchAndExec()
   }
 
-  def nonZeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: DRef[Promise[Path]]): FreeK[Lang, Unit] = {
+  def nonZeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Ref[Promise[Path]]): FreeK[Lang, Unit] = {
     val branches = successors(u) filter {
       case (c, w) => w != u && !visited.contains(w)
     } map {
