@@ -23,7 +23,7 @@ object log {
 
   implicit def logOps[Ref[_], A](l: Ref[Log[A]]): LogOps[Ref, A] = LogOps(l)
 
-  def newLog[F[_], Ref[_], A](implicit P: Propagation[F, Ref]): F[Ref[Log[A]]] = P.cell(List[A]())
+  def newLog[F[_], Ref[_], A](implicit P: Propagation[F, Ref]): F[Ref[Log[A]]] = P.newCell(List[A]())
   def log[F[_], Ref[_], A](ref: Ref[Log[A]], a: A)(implicit P: Propagation[F, Ref]): F[Unit] = P.update(ref).by(a)
 
   implicit def logDom[A]: Dom.Aux[Log[A], A, Log[A]] = new Dom[Log[A]] {

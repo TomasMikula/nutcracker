@@ -39,13 +39,13 @@ object Discrete extends DiscreteInstances {
     ref <- refC
     a   <- ref.asCont[M]
     res <- f(a) match {
-      case Some(b) => ContU.liftM(P.cell(Discrete(b)))
+      case Some(b) => ContU.liftM(P.newCell(Discrete(b)))
       case None    => ContU.noop[M, Ref[Discrete[B]]]
     }
   } yield res
 
   def cellC[M[_], Ref[_], A](a: A)(implicit M: Propagation[M, Ref], MB: Bind[M]): ContT[M, Unit, Ref[Discrete[A]]] =
-    ContT.liftM[Id, M, Unit, Ref[Discrete[A]]](M.cell(Discrete(a)))
+    ContT.liftM[Id, M, Unit, Ref[Discrete[A]]](M.newCell(Discrete(a)))
 
   implicit def domInstance[A]: Dom.Aux[Discrete[A], Update[A], Delta[A]] = new Dom[Discrete[A]] {
     type Update = Discrete.Update[A]

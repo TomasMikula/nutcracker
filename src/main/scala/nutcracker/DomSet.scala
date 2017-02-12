@@ -29,7 +29,7 @@ object DomSet {
   def empty[Ref[_], A]: DomSet[Ref, A] = DomSet(Set.empty)
 
   def init[F[_], Ref[_], A](implicit P: Propagation[F, Ref]): F[Ref[DomSet[Ref, A]]] =
-    P.cell(empty[Ref, A])
+    P.newCell(empty[Ref, A])
 
   def includeC[F[_], Ref[_], A](cps: ContU[F, _ <: Ref[A]], ref: Ref[DomSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A]): F[Unit] =
     cps(dref => insert(dref, ref))

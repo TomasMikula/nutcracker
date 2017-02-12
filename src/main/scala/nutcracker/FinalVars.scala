@@ -99,9 +99,9 @@ object FinalVars {
     def any[D]()(implicit
       ex: Final.Aux[D, A],
       dom: DomWithBottom[D]
-    ): M[Ref[D]] = M.cell(dom.bottom)
+    ): M[Ref[D]] = M.newCell(dom.bottom)
 
-    def oneOf(as: Set[A]): M[Ref[DecSet[A]]] = M.cell(DecSet.wrap(as))
+    def oneOf(as: Set[A]): M[Ref[DecSet[A]]] = M.newCell(DecSet.wrap(as))
     def oneOf(as: A*): M[Ref[DecSet[A]]] = oneOf(as.toSet)
 
     def count(n: Int): VarsBuilder[M, Ref, A] = new VarsBuilder(n)

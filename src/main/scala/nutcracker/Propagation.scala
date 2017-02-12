@@ -10,7 +10,7 @@ trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
 
   // basic instructions
 
-  def cell[D](d: D)(implicit dom: Dom[D]): M[Ref[D]]
+  def newCell[D](d: D)(implicit dom: Dom[D]): M[Ref[D]]
 
   def updateImpl[D, U, Δ](ref: Ref[D])(u: U)(implicit dom: Dom.Aux[D, U, Δ]): M[Unit]
 
@@ -28,7 +28,7 @@ trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
   // derived methods
 
   def cells[D](d: D, n: Int)(implicit dom: Dom[D], M: Applicative[M]): M[Vector[Ref[D]]] =
-    Traverse[Vector].sequence(Vector.fill(n)(cell(d)))
+    Traverse[Vector].sequence(Vector.fill(n)(newCell(d)))
 
   def valTrigger[D](ref: Ref[D])(f: D => Trigger[M[Unit]])(implicit dom: Dom[D]): M[Unit] =
     observe(ref).by(d => f(d) match {

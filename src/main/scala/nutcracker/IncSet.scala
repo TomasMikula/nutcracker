@@ -65,7 +65,7 @@ object IncSet {
 class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
 
   def init[A]: F[Ref[IncSet[A]]] =
-    P.cell(IncSet.empty[A])
+    P.newCell(IncSet.empty[A])
 
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
@@ -124,7 +124,7 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
 
   implicit def monad(implicit M: Monad[F]): Monad[λ[A => F[Ref[IncSet[A]]]]] =
     new Monad[λ[A => F[Ref[IncSet[A]]]]] {
-      def point[A](a: => A): F[Ref[IncSet[A]]] = P.cell(IncSet.singleton(a))
+      def point[A](a: => A): F[Ref[IncSet[A]]] = P.newCell(IncSet.singleton(a))
 
       def bind[A, B](fa: F[Ref[IncSet[A]]])(f: A => F[Ref[IncSet[B]]]): F[Ref[IncSet[B]]] =
         fa.flatMap(sa => relBind(sa)(f))

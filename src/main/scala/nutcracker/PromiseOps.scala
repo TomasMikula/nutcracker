@@ -12,7 +12,7 @@ import scalaz.syntax.bind._
   */
 final class PromiseOps[M[_], Ref[_]](implicit M: Propagation[M, Ref]) {
 
-  def promise[A: Equal]: M[Ref[Promise[A]]] = M.cell(Promise.empty[A])
+  def promise[A: Equal]: M[Ref[Promise[A]]] = M.newCell(Promise.empty[A])
 
   def complete[A: Equal](p: Ref[Promise[A]], a: A): M[Unit] = M.update(p).by(Promise.Complete(a))
 

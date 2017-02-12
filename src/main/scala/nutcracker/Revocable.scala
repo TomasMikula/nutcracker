@@ -19,7 +19,7 @@ object Revocable {
   def apply[A](a: A): Revocable[A] = Valid(a)
 
   def init[F[_], Ref[_], A](a: A)(implicit P: Propagation[F, Ref]): F[Ref[Revocable[A]]] =
-    P.cell(Revocable(a))
+    P.newCell(Revocable(a))
 
   def revoke[F[_], Ref[_], A](ref: Ref[Revocable[A]])(implicit P: Propagation[F, Ref]): F[Unit] =
     P.update(ref).by(())

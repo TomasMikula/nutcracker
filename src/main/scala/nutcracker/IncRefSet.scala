@@ -64,7 +64,7 @@ object IncRefSet {
 class IncRefSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
 
   def init[A]: F[Ref[IncRefSet[Ref, A]]] =
-    P.cell(IncRefSet.empty[Ref, A])
+    P.newCell(IncRefSet.empty[Ref, A])
 
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.

@@ -15,8 +15,8 @@ object PropagationLang {
   private type FP[Ref[_], A] = FreeK[PropagationLang[Ref, ?[_], ?], A]
 
   // constructors (the instruction set of a free program)
-  case class Cell[Ref[_], K[_], D, U, Δ](d: D, dom: Dom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Ref[D]] {
-    protected def transform[L[_]](tr: K ~> L): PropagationLang[Ref, L, Ref[D]] = Cell(d, dom)
+  case class NewCell[Ref[_], K[_], D, U, Δ](d: D, dom: Dom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Ref[D]] {
+    protected def transform[L[_]](tr: K ~> L): PropagationLang[Ref, L, Ref[D]] = NewCell(d, dom)
   }
   case class Update[Ref[_], K[_], D, U, Δ](ref: Ref[D], u: U, dom: Dom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Unit] {
     protected def transform[L[_]](tr: K ~> L): PropagationLang[Ref, L, Unit] = Update(ref, u, dom)
@@ -38,8 +38,8 @@ object PropagationLang {
   }
 
   // constructors returning less specific types, and curried to help with type inference
-  def cell[Ref[_], K[_], D](d: D)(implicit dom: Dom[D]): PropagationLang[Ref, K, Ref[D]] =
-    Cell[Ref, K, D, dom.Update, dom.Delta](d, dom)
+  def newCell[Ref[_], K[_], D](d: D)(implicit dom: Dom[D]): PropagationLang[Ref, K, Ref[D]] =
+    NewCell[Ref, K, D, dom.Update, dom.Delta](d, dom)
   def update[Ref[_], K[_], D, U, Δ](ref: Ref[D])(u: U)(implicit dom: Dom.Aux[D, U, Δ]): PropagationLang[Ref, K, Unit] =
     Update[Ref, K, D, U, Δ](ref, u, dom)
   def observe[Ref[_], K[_], D, U, Δ](ref: Ref[D])(f: D => (Option[K[Unit]], Option[(D, Δ) => Trigger[K[Unit]]]))(implicit dom: Dom.Aux[D, U, Δ]): PropagationLang[Ref, K, Unit] =
@@ -62,8 +62,8 @@ object PropagationLang {
 
 private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]) extends Propagation[FreeK[F, ?], Ref] {
 
-  def cell[D](d: D)(implicit dom: Dom[D]): FreeK[F, Ref[D]] =
-    FreeK.injLiftF(PropagationLang.cell[Ref, FreeK[F, ?], D](d))
+  def newCell[D](d: D)(implicit dom: Dom[D]): FreeK[F, Ref[D]] =
+    FreeK.injLiftF(PropagationLang.newCell[Ref, FreeK[F, ?], D](d))
 
   def updateImpl[D, U, Δ](ref: Ref[D])(u: U)(implicit dom: Dom.Aux[D, U, Δ]): FreeK[F, Unit] =
     FreeK.injLiftF(PropagationLang.update[Ref, FreeK[F, ?], D, U, Δ](ref)(u))
