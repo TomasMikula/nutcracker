@@ -45,8 +45,8 @@ sealed abstract class AList1[F[_, _], A, B] {
   }
 
   def :::[Z](that: AList[F, Z, A]): AList1[F, Z, B] =
-    that match {
-      case ANil(ev) => Leibniz.symm[Nothing, Any, Z, A](ev).subst[AList1[F, ?, B]](this)
+    that.uncons match {
+      case ANone(ev) => Leibniz.symm[Nothing, Any, Z, A](ev).subst[AList1[F, ?, B]](this)
       case ASome(list) => list ::: this
     }
 
@@ -125,7 +125,7 @@ sealed abstract class AList1[F[_, _], A, B] {
       case AJust(f) => f
     }
 
-  def toList: AList[F, A, B] = ASome(this)
+  def toList: AList[F, A, B] = AList(this)
 }
 
 final case class AJust[F[_, _], A, B](value: F[A, B]) extends AList1[F, A, B] {

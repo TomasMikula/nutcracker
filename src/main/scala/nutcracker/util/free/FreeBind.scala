@@ -2,7 +2,7 @@ package nutcracker.util.free
 
 import scala.annotation.tailrec
 import scala.language.higherKinds
-import nutcracker.util.typealigned.{AList, ANil, APair, ASome}
+import nutcracker.util.typealigned.{AList, ANone, APair, ASome}
 
 import scalaz.Leibniz.===
 import scalaz.{-\/, Applicative, BindRec, Foldable, Monad, MonadTrans, Monoid, NaturalTransformation, Traverse, \/, \/-, ~>}
@@ -107,8 +107,8 @@ sealed abstract class FreeBind[F[_], A] {
       x._1.resume match {
         case \/-(fa) => f((s, fa)) map {
           case -\/((s, fa, pop)) => -\/((s, APair[FreeBind[F, ?], AList[Tr, ?, A], x.A](fa, stateTr[x.A](pop) +: x._2)))
-          case \/-((s, a)) => x._2 match {
-            case ANil(ev) => \/-((s, ev(a)))
+          case \/-((s, a)) => x._2.uncons match {
+            case ANone(ev) => \/-((s, ev(a)))
             case ASome(l) => applyTransitions(s, a, l.toList)
           }
         }
