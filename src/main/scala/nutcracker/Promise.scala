@@ -80,7 +80,7 @@ object Promise {
       case (_, Conflict) => Some((Conflict, ()))
     }
 
-    override def combineDeltas(d1: Unit, d2: Unit): Unit = ()
+    override def appendDeltas(d1: Unit, d2: Unit): Unit = ()
   }
 
   implicit def equalInstance[A: Equal]: Equal[Promise[A]] = new Equal[Promise[A]] {

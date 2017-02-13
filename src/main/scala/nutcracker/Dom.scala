@@ -12,14 +12,14 @@ trait Dom[D] {
     * and a description of the diff. If the update doesn't have any
     * effect on `d`, returns `None`. In addition to being monotonic,
     * updates also have to be _commutative_ and _idempotent_ (when
-    * the deltas are combined using [[combineDeltas()]]).
+    * the deltas are combined using [[appendDeltas()]]).
     */
   def update(d: D, u: Update): Option[(D, Delta)]
 
   /** Associative, idempotent and monotonic (non-decreasing) operation
     * to combine diffs.
     */
-  def combineDeltas(d1: Delta, d2: Delta): Delta
+  def appendDeltas(d1: Delta, d2: Delta): Delta
 
   def assess(d: D): Dom.Status[Update]
 
@@ -36,7 +36,7 @@ trait Dom[D] {
   }
 
   def deltaSemigroup: Semigroup[Delta] = new Semigroup[Delta] {
-    def append(d1: Delta, d2: => Delta): Delta = combineDeltas(d1, d2)
+    def append(d1: Delta, d2: => Delta): Delta = appendDeltas(d1, d2)
   }
 }
 
@@ -64,8 +64,8 @@ object Dom {
       def update(a: A, u: Update): Option[(A, Delta)] =
         domB.update(iso.to(a), u) map { case (b, u) => (iso.from(b), u) }
 
-      def combineDeltas(d1: Delta, d2: Delta): Delta =
-        domB.combineDeltas(d1, d2)
+      def appendDeltas(d1: Delta, d2: Delta): Delta =
+        domB.appendDeltas(d1, d2)
 
       def assess(a: A): Status[Update] =
         domB.assess(iso.to(a))
@@ -93,7 +93,7 @@ object Dom {
         }
       }
 
-      def combineDeltas(δ1: Delta, δ2: Delta): Delta = deltaSemigroup.append(δ1, δ2)
+      def appendDeltas(δ1: Delta, δ2: Delta): Delta = deltaSemigroup.append(δ1, δ2)
 
       def assess(d: (D1, D2)): Status[Update] = (dom1.assess(d._1), dom2.assess(d._2)) match {
         case (Failed, _) => Failed

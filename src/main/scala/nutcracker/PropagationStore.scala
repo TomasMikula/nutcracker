@@ -267,7 +267,7 @@ object PropagationStore {
         case None => None
         case Some((d, δ)) =>
           val delta = this.delta match {
-            case Some(δ0) => dom.combineDeltas(δ0, δ)
+            case Some(δ0) => dom.appendDeltas(δ0, δ)
             case None => δ
           }
           Some(copy(value = d, delta = Some(delta)))

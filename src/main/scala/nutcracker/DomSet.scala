@@ -61,7 +61,7 @@ object DomSet {
         else None
     }
 
-    def combineDeltas(d1: Delta, d2: Delta): Delta = Inserted(d1.refs ++ d2.refs)
+    def appendDeltas(d1: Delta, d2: Delta): Delta = Inserted(d1.refs ++ d2.refs)
 
     def assess(d: DomSet[Ref, A]): Status[Update] = Refined
   }

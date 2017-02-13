@@ -48,7 +48,7 @@ object DecSet {
     def ljoin(d1: DecSet[A], d2: DecSet[A]): Option[(DecSet[A], Delta)] =
       update(d1, -\/(Join(d2)))
 
-    override def combineDeltas(d1: Delta, d2: Delta): Delta =
+    override def appendDeltas(d1: Delta, d2: Delta): Delta =
       Diff(d1.value union d2.value)
 
     @inline

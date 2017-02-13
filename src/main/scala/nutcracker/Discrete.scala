@@ -52,7 +52,7 @@ object Discrete extends DiscreteInstances {
     type Delta = Discrete.Delta[A]
 
     def update(d: Discrete[A], u: Update): Option[(Discrete[A], Delta)] = None
-    def combineDeltas(d1: Delta, d2: Delta): Delta = sys.error("unreachable code")
+    def appendDeltas(d1: Delta, d2: Delta): Delta = sys.error("unreachable code")
     def assess(d: Discrete[A]): Status[Update] = Refined
   }
 

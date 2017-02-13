@@ -28,7 +28,7 @@ object JoinDom {
 
     override def ljoin(d1: D, d2: D): Option[(D, Delta)] = ljoin0(d1, d2).map((_, ()))
     override def update(d: D, u: Update): Option[(D, Delta)] = ljoin(d, u)
-    override def combineDeltas(d1: Unit, d2: Unit): Unit = ()
+    override def appendDeltas(d1: Unit, d2: Unit): Unit = ()
   }
 
 }

@@ -33,7 +33,7 @@ object Revocable {
       case Revoked  => None
     }
 
-    def combineDeltas(d1: Delta, d2: Delta): Delta = ()
+    def appendDeltas(d1: Delta, d2: Delta): Delta = ()
 
     def assess(d: Revocable[A]): Status[Update] = d match {
       case Valid(a) => Refined

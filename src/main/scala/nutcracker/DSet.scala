@@ -78,7 +78,7 @@ object DSet {
           None
       }
 
-      def combineDeltas(d1: Delta, d2: Delta): Delta = d1 + d2
+      def appendDeltas(d1: Delta, d2: Delta): Delta = d1 + d2
 
       /** DSet is considered refined if at least one of the contained
         * domains is refined.

@@ -44,7 +44,7 @@ object IncRefSet {
       else None
     }
 
-    override def combineDeltas(d1: Diff[Set[Ref[A]]], d2: Diff[Set[Ref[A]]]): Diff[Set[Ref[A]]] =
+    override def appendDeltas(d1: Diff[Set[Ref[A]]], d2: Diff[Set[Ref[A]]]): Diff[Set[Ref[A]]] =
       Diff(d1.value union d2.value)
   }
 

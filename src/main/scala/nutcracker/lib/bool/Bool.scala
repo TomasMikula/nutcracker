@@ -52,7 +52,7 @@ object Bool {
         if(res == d) None else Some((res, ()))
       }
       override def ljoin(d1: Bool, d2: Bool): Option[(Bool, Delta)] = update(d1, -\/(Join(d2)))
-      override def combineDeltas(d1: Delta, d2: Delta): Delta = ()
+      override def appendDeltas(d1: Delta, d2: Delta): Delta = ()
       override def bottom: Bool = Anything
     }
 }

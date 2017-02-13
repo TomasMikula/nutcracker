@@ -33,7 +33,7 @@ object log {
     override def update(d: Log[A], u: A): Option[(Log[A], Log[A])] =
       Some((u :: d, List(u)))
 
-    override def combineDeltas(d1: Log[A], d2: Log[A]): Log[A] = d2 ::: d1
+    override def appendDeltas(d1: Log[A], d2: Log[A]): Log[A] = d2 ::: d1
 
     override def assess(d: Log[A]): Status[A] = Dom.Refined
   }
