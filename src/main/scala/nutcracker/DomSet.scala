@@ -40,11 +40,13 @@ object DomSet {
       _ <- includeC(cps, res)
     } yield res
 
-  def insert[F[_], Ref[_], A](ref: Ref[A], into: Ref[DomSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A]): F[Unit] =
+  def insert[F[_], Ref[_], A](ref: Ref[A], into: Ref[DomSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A]): F[Unit] = {
+    import Trigger._
     P.valTrigger(ref)(d => dom.assess(d) match {
       case Dom.Failed => Fire(P.update(into).by(Failed(ref)))
       case _ => FireReload(P.update(into).by(Insert(ref)))
     })
+  }
 
   implicit def domInstance[Ref[_], A]: Dom.Aux[DomSet[Ref, A], Update[Ref, A], Delta[Ref, A]] = new Dom[DomSet[Ref, A]] {
     type Update = DomSet.Update[Ref, A]

@@ -5,6 +5,7 @@ import scalaz.{Applicative, Bind, Traverse}
 import scalaz.std.vector._
 import scalaz.syntax.bind._
 import shapeless.{::, HList, HNil}
+import Trigger._
 
 trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
 

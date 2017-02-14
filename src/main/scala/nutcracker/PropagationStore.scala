@@ -3,21 +3,27 @@ package nutcracker
 import scala.language.higherKinds
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, FreeKT, FunctorKA, HEqualK, Index, InjectK, K3Map, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{* -> *}`}
+import nutcracker.PropagationStore.Token
+import nutcracker.util.typealigned.APair
+import nutcracker.util.{FreeK, FreeKT, FunctorKA, HEqualK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{* -> *}`}
 
 import scalaz.Id._
-import scalaz.{Equal, Monad, Show, StateT, |>=|, ~>}
+import scalaz.{Equal, Leibniz, Monad, Show, StateT, |>=|, ~>}
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
+
+import scala.annotation.tailrec
+import scalaz.Leibniz.===
 
 sealed abstract class PropagationStore[Ref[_], K] {
   def fetch[D](ref: Ref[D]): D
   def fetchResult[D](ref: Ref[D])(implicit fin: Final[D]): Option[fin.Out]
 
-  protected def addVariable[D](d: D, dom: Dom[D]): (PropagationStore[Ref, K], Ref[D])
-  protected def addDomainObserver[D, U, Δ](ref: Ref[D], f: D => (Option[K], Option[(D, Δ) => Trigger[K]]))(implicit dom: Dom.Aux[D, U, Δ]): (PropagationStore[Ref, K], Lst[K])
+  protected def addVariable[D](d: D, dom: IDom[D]): (PropagationStore[Ref, K], Ref[D])
+  protected def addDomainObserver[D, U, Δ[_, _]](ref: Ref[D], f: SeqPreHandler[Token, K, D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[Ref, K], Option[K])
+  protected def resume[D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], handler: SeqHandler[Token, K, D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[Ref, K]
   protected def addSelTrigger[L <: HList](sel: Sel[Ref, L], t: L => Trigger[K]): (PropagationStore[Ref, K], Option[K])
-  protected def update[D, U, Δ](ref: Ref[D], u: U)(implicit dom: Dom.Aux[D, U, Δ]): PropagationStore[Ref, K]
+  protected def update[D, U, Δ[_, _]](ref: Ref[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[Ref, K]
   protected def uncons: Option[(PropagationStore[Ref, K], Lst[K])]
 }
 
@@ -52,19 +58,19 @@ object PropagationStore {
 
   private object ModuleImpl extends Module {
     type Ref[A] = DRef[A]
-    type Lang[K[_], A] = PropagationLang[Ref, K, A]
+    type Lang[K[_], A] = PropagationLang[Ref, Token, K, A]
     type State[K] = PropagationStore[Ref, K]
 
     implicit val refEquality: HEqualK[Ref] = DRef.equalKInstance
     implicit def refShow: ShowK[Ref] = DRef.showKInstance
-    implicit def functorKAPropLang: FunctorKA[Lang] = PropagationLang.functorKInstance[Ref]
+    implicit def functorKAPropLang: FunctorKA[Lang] = PropagationLang.functorKInstance[Ref, Token]
     implicit def propagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref] =
-      PropagationLang.freePropagation[Ref, F]
+      PropagationLang.freePropagation[Ref, Token, F]
 
     def empty[K]: PropagationStore[Ref, K] =
       PropagationStoreImpl[K](
         nextId = 0L,
-        domains = K3Map[DRef.Aux, Cell[K, ?, ?, ?]](),
+        domains = KMap[DRef, Cell[K, ?]](),
         selTriggers = KMapB[λ[`L <: HList` => Sel[DRef, L]], λ[L => List[L => Trigger[K]]], HList](),
         cellsToSels = Index.empty(sel => sel.cells),
         unresolvedVars = Set(),
@@ -79,12 +85,12 @@ object PropagationStore {
     def interpreter: StateInterpreter[Lang, State] =
       PropagationStore.interpreter[Ref]
 
-    def dfsSolver: DFSSolver[PropagationLang[Ref, ?[_], ?], PropagationStore[Ref, ?], Id, λ[A => Ref[Promise[A]]]] = {
-      implicit val mfp: Monad[FreeKT[PropagationLang[Ref, ?[_], ?], Id, ?]] = FreeKT.freeKTMonad[PropagationLang[Ref, ?[_], ?], Id]
-      new DFSSolver[PropagationLang[Ref, ?[_], ?], PropagationStore[Ref, ?], Id, λ[A => Ref[Promise[A]]]](
+    def dfsSolver: DFSSolver[PropagationLang[Ref, Token, ?[_], ?], PropagationStore[Ref, ?], Id, λ[A => Ref[Promise[A]]]] = {
+      implicit val mfp: Monad[FreeKT[PropagationLang[Ref, Token, ?[_], ?], Id, ?]] = FreeKT.freeKTMonad[PropagationLang[Ref, Token, ?[_], ?], Id]
+      new DFSSolver[PropagationLang[Ref, Token, ?[_], ?], PropagationStore[Ref, ?], Id, λ[A => Ref[Promise[A]]]](
         interpreter.freeInstance,
-        emptyF[PropagationLang[Ref, ?[_], ?]],
-        PropagationStore.naiveAssess[Ref, FreeK[PropagationLang[Ref, ?[_], ?], ?]],
+        emptyF[PropagationLang[Ref, Token, ?[_], ?]],
+        PropagationStore.naiveAssess[Ref, FreeK[PropagationLang[Ref, Token, ?[_], ?], ?]],
         fetch
       )
     }
@@ -101,36 +107,38 @@ object PropagationStore {
     def fetchResult[K, D](s: State[K])(ref: Ref[D])(implicit fin: Final[D]): Option[fin.Out] =
       s.fetchResult(ref)
 
-    private val fetch: λ[A => Ref[Promise[A]]] ~> (PropagationStore[Ref, FreeK[PropagationLang[Ref, ?[_], ?], Unit]] => ?) =
-      λ[λ[A => Ref[Promise[A]]] ~> (PropagationStore[Ref, FreeK[PropagationLang[Ref, ?[_], ?], Unit]] => ?)](
+    private val fetch: λ[A => Ref[Promise[A]]] ~> (PropagationStore[Ref, FreeK[PropagationLang[Ref, Token, ?[_], ?], Unit]] => ?) =
+      λ[λ[A => Ref[Promise[A]]] ~> (PropagationStore[Ref, FreeK[PropagationLang[Ref, Token, ?[_], ?], Unit]] => ?)](
         pa => s => s.fetchResult(pa).get
       )
   }
 
-  def naiveAssess[Ref[_], K[_]](implicit ord: K |>=| FreeK[PropagationLang[Ref, ?[_], ?], ?]): PropagationStore[Ref, K[Unit]] => Assessment[List[K[Unit]]] =
+  def naiveAssess[Ref[_], K[_]](implicit ord: K |>=| FreeK[PropagationLang[Ref, Token, ?[_], ?], ?]): PropagationStore[Ref, K[Unit]] => Assessment[List[K[Unit]]] =
     s => s match {
       case ps @ PropagationStoreImpl(_, _, _, _, _, _, _, _) => ps.naiveAssess(ord[Unit](_))
     }
 
 
-  def interpreter[Ref[_]]: StateInterpreter[PropagationLang[Ref, ?[_], ?], PropagationStore[Ref, ?]] =
-    new StateInterpreter[PropagationLang[Ref, ?[_], ?], PropagationStore[Ref, ?]] {
+  def interpreter[Ref[_]]: StateInterpreter[PropagationLang[Ref, Token, ?[_], ?], PropagationStore[Ref, ?]] =
+    new StateInterpreter[PropagationLang[Ref, Token, ?[_], ?], PropagationStore[Ref, ?]] {
 
-      def step: Step[PropagationLang[Ref, ?[_], ?], PropagationStore[Ref, ?]] =
-        new Step[PropagationLang[Ref, ?[_], ?], PropagationStore[Ref, ?]] {
+      def step: Step[PropagationLang[Ref, Token, ?[_], ?], PropagationStore[Ref, ?]] =
+        new Step[PropagationLang[Ref, Token, ?[_], ?], PropagationStore[Ref, ?]] {
           import PropagationLang._
-          override def apply[K[_], A](p: PropagationLang[Ref, K, A]): WriterState[Lst[K[Unit]], PropagationStore[Ref, K[Unit]], A] = WriterState(s =>
+          override def apply[K[_], A](p: PropagationLang[Ref, Token, K, A]): WriterState[Lst[K[Unit]], PropagationStore[Ref, K[Unit]], A] = WriterState(s =>
             p match {
               case NewCell(d, dom) => s.addVariable(d, dom) match {
                 case (s1, ref) => (Lst.empty, s1, ref)
               }
-              case Observe(ref, f, dom) => s.addDomainObserver(ref, f)(dom) match {
-                case (s1, ks) => (ks, s1, ())
+              case Observe(ref, f, dom) => s.addDomainObserver[dom.Domain, dom.Update, dom.IDelta](ref, f)(dom) match {
+                case (s1, ko) => (Lst.maybe(ko), s1, ())
               }
+              case Resume(ref, token, handler, dom) =>
+                (Lst.empty, s.resume[dom.Domain, dom.Update, dom.IDelta, token.Arg](ref, token, handler)(dom), ())
               case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
                 case (s1, ok) => (Lst.maybe(ok), s1, ())
               }
-              case Update(ref, u, dom) => (Lst.empty, s.update(ref, u)(dom), ())
+              case Update(ref, u, dom) => (Lst.empty, s.update[dom.Domain, dom.Update, dom.IDelta](ref, u)(dom), ())
             }
           )
         }
@@ -144,7 +152,7 @@ object PropagationStore {
 
   private case class PropagationStoreImpl[K] private(
     nextId: Long,
-    domains: K3Map[DRef.Aux, Cell[K, ?, ?, ?]],
+    domains: KMap[DRef, Cell[K, ?]],
     selTriggers: KMapB[λ[`L <: HList` => Sel[DRef, L]], λ[L => List[L => Trigger[K]]], HList],
     cellsToSels: Index[DRef[_], Sel[DRef, _ <: HList]],
     unresolvedVars: Set[DRef[D] forSome { type D }],
@@ -158,12 +166,9 @@ object PropagationStore {
       def apply[D](cell: DRef[D]): D = fetch(cell)
     }
 
-    private def getDomain[D](ref: DRef[D]): Cell[K, D, ref.Update, ref.Delta] =
-      domains(ref)
-
-    def addVariable[D](d: D, dom: Dom[D]): (PropagationStoreImpl[K], DRef[D]) = {
+    def addVariable[D](d: D, dom: IDom[D]): (PropagationStoreImpl[K], DRef[D]) = {
       val ref = DRef[D](nextId)(dom)
-      val domains1 = domains.put(ref)(Cell(d, dom, None, Nil))
+      val domains1 = domains.put(ref)(Cell.init(d, dom))
       val (unresolvedVars1, failedVars1) = dom.assess(d) match {
         case Dom.Failed => (unresolvedVars, failedVars + nextId)
         case Dom.Refined => (unresolvedVars, failedVars)
@@ -172,15 +177,15 @@ object PropagationStore {
       (copy(nextId = nextId + 1, domains = domains1, unresolvedVars = unresolvedVars1, failedVars = failedVars1), ref)
     }
 
-    def fetch[D](ref: DRef[D]): D = domains(ref: DRef.Aux[D, ref.Update, ref.Delta]).value
+    def fetch[D](ref: DRef[D]): D = domains(ref).value
 
     def fetchResult[D](ref: DRef[D])(implicit fin: Final[D]): Option[fin.Out] = fin.extract(fetch(ref))
 
     def fetchVector[D, N <: Nat](refs: Sized[Vector[DRef[D]], N]): Sized[Vector[D], N] =
       refs.map(ref => fetch(ref))
 
-    protected def update[D, U, Δ](ref: DRef[D], u: U)(implicit dom: Dom.Aux[D, U, Δ]): PropagationStoreImpl[K] =
-      domains(ref.infer).update(u) match {
+    protected def update[D, U, Δ[_, _]](ref: DRef[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): PropagationStoreImpl[K] =
+      domains(ref).infer.update(u) match {
         case None => this
         case Some(cell) =>
           val (unresolvedVars1, failedVars1) = cell.assess match {
@@ -189,32 +194,31 @@ object PropagationStore {
             case Dom.Unrefined(_) => (unresolvedVars, failedVars)
           }
           val domains1 = domains.put(ref.infer)(cell)
-          val dirtyDomains1 = dirtyDomains + ref
+          val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
           copy(domains = domains1, unresolvedVars = unresolvedVars1, failedVars = failedVars1, dirtyDomains = dirtyDomains1)
       }
 
-    def addDomainObserver[D, U, Δ](ref: DRef[D], f: D => (Option[K], Option[(D, Δ) => Trigger[K]]))(implicit dom: Dom.Aux[D, U, Δ]): (PropagationStoreImpl[K], Lst[K]) = {
-      val (now, onChange) = f(fetch(ref))
-      onChange match {
-        case Some(action) =>
-          val (s1, ks) = addDomainObserver0(ref.infer, action)
-          (s1, now ?+: ks)
-        case None => (this, Lst.maybe(now))
-      }
+    def addDomainObserver[D, U, Δ[_, _]](ref: DRef[D], f: SeqPreHandler[Token, K, D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStoreImpl[K], Option[K]) = {
+      val (cell, ko) = domains(ref).infer.observe(f)
+      val s1 = copy(domains = domains.put(ref)(cell))
+      (s1, ko)
     }
 
+    def resume[D, U, Δ[_, _], D0 <: D](ref: DRef[D], token: Token[D0], handler: SeqHandler[Token, K, D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationStoreImpl[K] = {
+      val cell = domains(ref).infer.resume(token, handler)
+      val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
+      copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains1)
+    }
+
+
     def addSelTrigger[L <: HList](sel: Sel[DRef, L], t: L => Trigger[K]): (PropagationStoreImpl[K], Option[K]) = {
+      import Trigger._
       t(sel.fetch(cellFetcher)) match {
         case Discard() => (this, None)
         case Sleep() => (addSelTrigger0(sel, t), None)
         case Fire(cont) => (this, Some(cont))
         case FireReload(cont) => (addSelTrigger0(sel, t), Some(cont))
       }
-    }
-
-    private def addDomainObserver0[D, U, Δ](ref: DRef.Aux[D, U, Δ], f: (D, Δ) => Trigger[K]): (PropagationStoreImpl[K], Lst[K]) = {
-      val (cell, fired) = domains(ref).addObserver(f)
-      (copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains - ref), fired)
     }
 
     private def addSelTrigger0[L <: HList](sel: Sel[DRef, L], t: L => Trigger[K]): PropagationStoreImpl[K] = {
@@ -238,6 +242,7 @@ object PropagationStore {
       triggers match {
         case Nil => (Nil, Lst.empty)
         case t :: ts =>
+          import Trigger._
           val (ts1, conts) = collectSelTriggers(l, ts)
           t(l) match {
             case Discard() => (ts1, conts)
@@ -252,7 +257,7 @@ object PropagationStore {
         val ref0 = dirtyDomains.head
         val ref: DRef.Aux[ref0.Domain, ref0.Update, ref0.Delta] = ref0.aux
         val dirtySels = dirtySelections union getSelsForCell(ref)
-        val (cell, ks) = getDomain(ref).trigger
+        val (cell, ks) = domains(ref).trigger
         Some((copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains.tail, dirtySelections = dirtySels), ks))
       } else if(dirtySelections.nonEmpty) {
         val sel = dirtySelections.head
@@ -261,14 +266,14 @@ object PropagationStore {
       }
       else None
 
-    private[nutcracker] def naiveAssess(inj: FreeK[PropagationLang[DRef, ?[_], ?], Unit] => K): Assessment[List[K]] =
+    private[nutcracker] def naiveAssess(inj: FreeK[PropagationLang[DRef, Token, ?[_], ?], Unit] => K): Assessment[List[K]] =
       if(failedVars.nonEmpty) Failed
       else if(unresolvedVars.isEmpty) Done
       else {
         def splitDomain[D](ref: DRef[D]): Option[List[K]] = {
-          val cell = getDomain(ref)
+          val cell = domains(ref)
           cell.assess match {
-            case Dom.Unrefined(choices) => choices() map { _ map { ui => inj(Propagation[FreeK[PropagationLang[DRef, ?[_], ?], ?], DRef].update(ref)(cell.dom).by(ui)) } }
+            case Dom.Unrefined(choices) => choices() map { _ map { ui => inj(PropagationLang.updateF[PropagationLang[DRef, Token, ?[_], ?], DRef, Token, cell.dom.Domain, cell.Update, cell.Delta](ref)(ui)(cell.dom, implicitly)) } }
             case _ => sys.error("splitDomain should be called on unresolved variables only.")
           }
         }
@@ -279,77 +284,150 @@ object PropagationStore {
       }
   }
 
-  private[PropagationStore] final case class Cell[K, D, U, Δ](
-    value: D,
-    dom: Dom.Aux[D, U, Δ],
-    delta: Option[Δ],
-    observers: List[(D, Δ) => Trigger[K]]
-  ) {
+  private[PropagationStore] sealed abstract class Cell[K, D] {
+    type Update
+    type Delta[_, _]
+    type Value <: D
 
-    def update(u: U): Option[Cell[K, D, U, Δ]] =
-      dom.update(value, u) match {
-        case None => None
-        case Some((d, δ)) =>
-          val delta = this.delta match {
-            case Some(δ0) => dom.appendDeltas(δ0, δ)
-            case None => δ
-          }
-          Some(copy(value = d, delta = Some(delta)))
-      }
+    type Handler[D1] = SeqHandler[Token, K, D, Delta, D1]
 
-    def addObserver(f: (D, Δ) => Trigger[K]): (Cell[K, D, U, Δ], Lst[K]) = {
-      val (remaining, fired) = delta match {
-        case Some(δ) => collectFired(value, δ, observers)
-        case None => (observers, Lst.empty)
+    val value: Value
+    val dom: IDom.Aux[D, Update, Delta]
+    val idleObservers: List[Handler[Value]]
+    val pendingObservers: List[APair[Delta[?, Value], Handler]]
+    val blockedIdleObservers: KMap[Token, Value === ?]
+    val blockedPendingObservers: KMap[Token, Delta[?, Value]]
+    val nextTokenId: Long
+
+    def infer(implicit dom: IDom[D]): Cell.Aux[K, D, dom.Update, dom.IDelta] =
+      this.asInstanceOf[Cell.Aux[K, D, dom.Update, dom.IDelta]]
+
+    def hasPendingObservers: Boolean = pendingObservers.nonEmpty
+
+    def update(u: Update): Option[Cell.Aux[K, D, Update, Delta]] =
+      dom.iUpdate(value, u).flatMap(p => {
+        val newVal = p._1
+        val delta = p._2
+
+        val pending0 = pendingObservers.map(dh => APair[Delta[?, p.A], Handler, dh.A](dom.composeDeltas(delta, dh._1), dh._2))
+        val pending1 = idleObservers.map(h => APair[Delta[?, p.A], Handler, Value](delta, h))
+        val pending = pending1 ::: pending0
+
+        val blocked0 = blockedPendingObservers.mapValues[Delta[?, p.A]](
+          λ[Delta[?, Value] ~> Delta[?, p.A]](d => dom.composeDeltas(delta, d))
+        )
+        val blocked1 = blockedIdleObservers.mapValues[Delta[?, p.A]](
+          λ[(Value === ?) ~> Delta[?, p.A]](ev => ev.subst[Delta[?, p.A]](delta))
+        )
+        val blocked = blocked0 ++ blocked1
+
+        Some(Cell[K, D, p.A](newVal, dom)(Nil, pending, KMap[Token, p.A === ?](), blocked, nextTokenId))
+      })
+
+    def observe(f: SeqPreHandler[Token, K, D, Delta]): (Cell[K, D], Option[K]) = {
+      val (now, onChange) = f.handle(value)
+      onChange match {
+        case Some(handler) => (addObserver(handler), now)
+        case None => (this, now)
       }
-      (copy(delta = None, observers = f :: remaining), fired)
     }
 
-    def trigger: (Cell[K, D, U, Δ], Lst[K]) = delta match {
-      case Some(δ) =>
-        val (forLater, fired) = collectFired(value, δ, observers)
-        (copy(delta = None, observers = forLater), fired)
-      case None =>
-        (this, Lst.empty)
+    private def addObserver(f: Handler[Value]): Cell.Aux[K, D, Update, Delta] =
+      Cell(value, dom)(f :: idleObservers, pendingObservers, blockedIdleObservers, blockedPendingObservers, nextTokenId)
+
+    def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell.Aux[K, D, Update, Delta] =
+      blockedIdleObservers.get(token) match {
+        case Some(ev) =>
+          assert(blockedPendingObservers.get(token).isEmpty)
+          val h: Handler[Value] = Leibniz.symm[Nothing, Any, Value, D0](ev).subst[Handler](handler)
+          Cell(value, dom)(h :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, nextTokenId)
+        case None => blockedPendingObservers.get(token) match {
+          case Some(δ) =>
+            val po = APair.of[Delta[?, Value], Handler](δ, handler)
+            Cell(value, dom)(idleObservers, po :: pendingObservers, blockedIdleObservers, blockedPendingObservers - token, nextTokenId)
+          case None =>
+            sys.error(s"unrecognized token $token")
+        }
+      }
+
+    def trigger: (Cell[K, D], Lst[K]) = {
+      @tailrec def go(
+        pending: List[APair[Delta[?, Value], Handler]],
+        idleAcc: List[Handler[Value]],
+        blockedIdleAcc: KMap[Token, Value === ?],
+        firedAcc: Lst[K],
+        nextTokenId: Long
+      ): (Cell.Aux[K, D, Update, Delta], Lst[K]) =
+      pending match {
+        case Nil => (Cell[K, D, Value](value, dom)(idleAcc, Nil, blockedIdleAcc, blockedPendingObservers, nextTokenId), firedAcc)
+        case dh :: tail =>
+          import SeqTrigger._
+          val (δ, h) = (dh._1, dh._2)
+          (h.handle(value, δ): SeqTrigger[Token, K, D, Delta, Value]) match {
+            case Discard() => go(tail, idleAcc, blockedIdleAcc, firedAcc, nextTokenId)
+            case Fire(k) => go(tail, idleAcc, blockedIdleAcc, k :: firedAcc, nextTokenId)
+            case Sleep(h) => go(tail, h :: idleAcc, blockedIdleAcc, firedAcc, nextTokenId)
+            case FireReload(f) =>
+              val token = new Token[Value](nextTokenId)
+              val k = f(token)
+              go(tail, idleAcc, blockedIdleAcc.put(token)(Leibniz.refl[Value]), k :: firedAcc, nextTokenId + 1)
+          }
+      }
+
+      go(pendingObservers, idleObservers, blockedIdleObservers, Lst.empty, nextTokenId)
     }
 
     def assess = dom.assess(value)
+  }
 
-    private def collectFired(d: D, δ: Δ, triggers: List[(D, Δ) => Trigger[K]]): (List[(D, Δ) => Trigger[K]], Lst[K]) =
-      triggers match {
-        case Nil => (Nil, Lst.empty)
-        case t :: ts =>
-          val (ts1, conts) = collectFired(d, δ, ts)
-          t(d, δ) match {
-            case Discard() => (ts1, conts)
-            case Sleep() => (t :: ts1, conts)
-            case Fire(cont) => (ts1, cont :: conts)
-            case FireReload(cont) => (t :: ts1, cont :: conts)
-          }
-      }
+  private[PropagationStore] object Cell {
+    type Aux[K, D, U, Δ[_, _]] = Cell[K, D] { type Update = U; type Delta[D1, D2] = Δ[D1, D2] }
+
+    def init[K, D](d: D, dom: IDom[D]): Cell.Aux[K, D, dom.Update, dom.IDelta] =
+      Cell[K, D, D](d, dom)(Nil, Nil, KMap[Token, D === ?](), KMap[Token, dom.IDelta[?, D]](), 0L)
+
+    def apply[K, D, Val <: D](d: Val, idom: IDom[D])(
+      idleObservers0: List[SeqHandler[Token, K, D, idom.IDelta, Val]],
+      pendingObservers0: List[APair[idom.IDelta[?, Val], SeqHandler[Token, K, D, idom.IDelta, ?]]],
+      blockedIdleObservers0: KMap[Token, Val === ?],
+      blockedPendingObservers0: KMap[Token, idom.IDelta[?, Val]],
+      nextToken: Long
+    ): Cell.Aux[K, D, idom.Update, idom.IDelta] = new Cell[K, D] {
+      type Update = idom.Update
+      type Delta[D1, D2] = idom.IDelta[D1, D2]
+      type Value = Val
+
+      val value = d
+      val dom = idom
+      val idleObservers = idleObservers0
+      val pendingObservers = pendingObservers0
+      val blockedIdleObservers = blockedIdleObservers0
+      val blockedPendingObservers = blockedPendingObservers0
+      val nextTokenId = nextToken
+    }
   }
 
   private[PropagationStore] sealed abstract class DRef[D](private[nutcracker] val domainId: Long) {
     type Domain = D
     type Update
-    type Delta
+    type Delta[_, _]
 
     /** Infer `Update` and `Delta` types. Relies on global uniqueness
       * of `Dom[D]` instances.
       */
-    def infer(implicit dom: Dom[D]): DRef.Aux[D, dom.Update, dom.Delta] =
-      this.asInstanceOf[DRef.Aux[D, dom.Update, dom.Delta]]
+    def infer(implicit dom: IDom[D]): DRef.Aux[D, dom.Update, dom.IDelta] =
+      this.asInstanceOf[DRef.Aux[D, dom.Update, dom.IDelta]]
 
     def aux: DRef.Aux[Domain, Update, Delta] = this
   }
 
   private object DRef {
-    type Aux[D, U, Δ] = DRef[D] { type Update = U; type Delta = Δ }
+    type Aux[D, U, Δ[_, _]] = DRef[D] { type Update = U; type Delta[D1, D2] = Δ[D1, D2] }
 
-    private[nutcracker] def apply[D](domainId: Long)(implicit dom: Dom[D]): DRef.Aux[D, dom.Update, dom.Delta] =
+    def apply[D](domainId: Long)(implicit dom: IDom[D]): DRef.Aux[D, dom.Update, dom.IDelta] =
       new DRef[D](domainId) {
         type Update = dom.Update
-        type Delta = dom.Delta
+        type Delta[D1, D2] = dom.IDelta[D1, D2]
       }
 
     implicit def equalInstance[D]: Equal[DRef[D]] = new Equal[DRef[D]] {
@@ -367,5 +445,9 @@ object PropagationStore {
     implicit def showKInstance: ShowK[DRef] = new ShowK[DRef] {
       def shows[A](ref: DRef[A]): String = s"ref${ref.domainId}"
     }
+  }
+
+  private[PropagationStore] final case class Token[A](val id: Long) extends AnyVal {
+    type Arg = A
   }
 }

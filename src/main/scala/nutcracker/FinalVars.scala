@@ -124,6 +124,8 @@ object FinalVars {
   }
 
   final case class WhenFinal[M[_], Ref[_], D, A] private[nutcracker](ref: Ref[D], fin: Final.Aux[D, A])(implicit dom: Dom[D], M: Propagation[M, Ref]) {
+    import Trigger._
+
     def exec(f: A => M[Unit]): M[Unit] =
       M.valTrigger[D](ref)(d => fin.extract(d) match {
         case Some(a) => Fire[M[Unit]](f(a))

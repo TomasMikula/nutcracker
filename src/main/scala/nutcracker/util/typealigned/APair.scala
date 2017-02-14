@@ -2,36 +2,35 @@ package nutcracker.util.typealigned
 
 import scala.language.higherKinds
 
-/**
- * Type-aligned pair. Isomorphic to
- *
- * {{{
- * (F[A], G[A]) forSome { type A }
- * }}}
- *
- * The "pivot" type `A` is intentionally "hidden" as a type member
- * (as opposed to being a type parameter), so that pairs that differ
- * only in the pivot are considered to be of the same type and thus
- * can be used as arguments to tail-optimized recursive calls.
- */
-sealed abstract class APair[F[_], G[_]] {
-  type A
-  val _1: F[A]
-  val _2: G[A]
-}
-
 object APair {
-  def apply[F[_], G[_], A0](fa: F[A0], ga: G[A0]): APair[F, G] =
-    new APair[F, G] { type A = A0; val _1 = fa; val _2 = ga }
+  def apply[F[_], G[_], A](fa: F[A], ga: G[A]): APair[F, G] =
+    BoundedAPair[Any, F, G, A](fa, ga)
 
   def unapply[F[_], G[_]](p: APair[F, G]): Option[(F[p.A], G[p.A])] =
     Some((p._1, p._2))
 
   /** Defer specifying `A`, so that it could possibly be inferred. */
-  def of[F[_], G[_]]: Builder[F, G] = new Builder[F, G]
+  def of[F[_], G[_]] = BoundedAPair.of[Any, F, G]
+}
 
-  class Builder[F[_], G[_]] {
-    def apply[A](fa: F[A], ga: G[A]): APair[F, G] =
-      APair[F, G, A](fa, ga)
+sealed abstract class BoundedAPair[U, F[_ <: U], G[_ <: U]] {
+  type A <: U
+  val _1: F[A]
+  val _2: G[A]
+}
+
+object BoundedAPair {
+  def apply[U, F[_ <: U], G[_ <: U], A0 <: U](fa: F[A0], ga: G[A0]): BoundedAPair[U, F, G] =
+    new BoundedAPair[U, F, G] { type A = A0; val _1 = fa; val _2 = ga }
+
+  def unapply[U, F[_ <: U], G[_ <: U]](p: BoundedAPair[U, F, G]): Option[(F[p.A], G[p.A])] =
+    Some((p._1, p._2))
+
+  /** Defer specifying `A`, so that it could possibly be inferred. */
+  def of[U, F[_ <: U], G[_ <: U]]: Builder[U, F, G] = new Builder[U, F, G]
+
+  class Builder[U, F[_ <: U], G[_ <: U]] {
+    def apply[A <: U](fa: F[A], ga: G[A]): BoundedAPair[U, F, G] =
+      BoundedAPair[U, F, G, A](fa, ga)
   }
 }

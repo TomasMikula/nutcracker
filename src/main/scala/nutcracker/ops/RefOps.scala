@@ -1,8 +1,8 @@
 package nutcracker.ops
 
 import scala.language.{higherKinds, implicitConversions}
-
-import nutcracker.{Dom, Final, FinalVars, FireReload, Join, Propagation}
+import nutcracker.{Dom, Final, FinalVars, Join, Propagation}
+import nutcracker.Trigger.FireReload
 import nutcracker.util.{ContU, Inject}
 
 import scalaz.Bind

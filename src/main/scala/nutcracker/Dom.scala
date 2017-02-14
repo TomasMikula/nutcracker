@@ -1,12 +1,39 @@
 package nutcracker
 
+import nutcracker.util.typealigned.BoundedAPair
+
 import scalaz.{Leibniz, Semigroup, \&/}
 import scalaz.Isomorphism.<=>
 import scalaz.Leibniz.===
 
-trait Dom[D] {
+trait IDom[D] {
+  type Domain = D
+  type Update
+  type IDelta[_, _]
+
+  def iUpdate[D0 <: D](d: D0, u: Update): Option[BoundedAPair[D, λ[`D1 <: D` => D1], λ[`D1 <: D` => IDelta[D0, D1]]]]
+
+  def composeDeltas[D1, D2, D3](δ1: IDelta[D2, D3], δ2: IDelta[D1, D2]): IDelta[D1, D3]
+
+  def assess(d: D): Dom.Status[Update]
+
+  final def isFailed(d: D): Boolean = assess(d) match {
+    case Dom.Failed => true
+    case _ => false
+  }
+
+  final def aux: IDom.Aux[D, Update, IDelta] = this
+}
+
+object IDom {
+  type Aux[D, U, Δ[_, _]] = IDom[D] { type Update = U; type IDelta[D1, D2] = Δ[D1, D2] }
+}
+
+trait Dom[D] extends IDom[D] {
   type Update
   type Delta
+
+  type IDelta[D1, D2] = Delta
 
   /** Applies the monotonic update `u` to `d`, obtaining `d1 ≥ d`
     * and a description of the diff. If the update doesn't have any
@@ -21,18 +48,20 @@ trait Dom[D] {
     */
   def appendDeltas(d1: Delta, d2: Delta): Delta
 
-  def assess(d: D): Dom.Status[Update]
+  final override def iUpdate[D0 <: D](d: D0, u: Update): Option[BoundedAPair[D, λ[`D1 <: D` => D1], λ[`D1 <: D` => Delta]]] =
+    update(d, u) match {
+      case Some((d, δ)) => Some(BoundedAPair[D, λ[`D1 <: D` => D1], λ[`D1 <: D` => Delta], D](d, δ))
+      case None => None
+    }
+
+  final override def composeDeltas[D1, D2, D3](δ1: IDelta[D2, D3], δ2: IDelta[D1, D2]): IDelta[D1, D3] =
+    appendDeltas(δ2, δ1)
 
   /** A variation on [[update]] that always returns the updated value,
     * whether changed or unchaged. */
   def update_(d: D, u: Update): D = update(d, u) match {
-    case Some((d1, _)) => d1
+    case Some(p) => p._1
     case None => d
-  }
-
-  final def isFailed(d: D): Boolean = assess(d) match {
-    case Dom.Failed => true
-    case _ => false
   }
 
   def deltaSemigroup: Semigroup[Delta] = new Semigroup[Delta] {

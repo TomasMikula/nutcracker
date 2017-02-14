@@ -76,13 +76,15 @@ trait Source[A, M[_]] {
     def by(f: A => (Option[M[Unit]], Option[(A, Δ) => Trigger[M[Unit]]])): M[Unit] = observeImpl(f)
   }
 
-  def observeValues(f: A => Trigger[M[Unit]])(implicit dom: Dom[A]): M[Unit] =
+  def observeValues(f: A => Trigger[M[Unit]])(implicit dom: Dom[A]): M[Unit] = {
+    import Trigger._
     observe.by(a => f(a) match {
       case FireReload(k) => (Some(k), Some((d, δ) => f(d)))
       case Fire(k) => (Some(k), None)
       case Sleep() => (None, Some((d, δ) => f(d)))
       case Discard() => (None, None)
     })
+  }
 
   def map[B](f: A => B)(implicit da: Dom[A], db: Dom[B]): MapSyntaxHelper[B, da.Update, da.Delta, db.Update, db.Delta] =
     new MapSyntaxHelper(f)(da, db)
@@ -104,6 +106,8 @@ trait Source[A, M[_]] {
     new WhenFinalSyntaxHelper(fin)
 
   final class WhenFinalSyntaxHelper[A0] private[nutcracker](fin: Final.Aux[A, A0])(implicit dom: Dom[A]) {
+    import Trigger._
+
     def exec(f: A0 => M[Unit]): M[Unit] =
       observeValues(a => fin.extract(a) match {
         case Some(a0) => Fire[M[Unit]](f(a0))

@@ -87,7 +87,7 @@ class IncRefSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
   def include[A](sub: Ref[IncRefSet[Ref, A]], sup: Ref[IncRefSet[Ref, A]]): F[Unit] =
     P.observe(sub).by((sa: IncRefSet[Ref, A]) => {
       val now = Some(insertAll(sa.value, sup))
-      val onChange = Some((sa: IncRefSet[Ref, A], delta: Diff[Set[Ref[A]]]) => FireReload(insertAll(delta.value, sup)))
+      val onChange = Some((sa: IncRefSet[Ref, A], delta: Diff[Set[Ref[A]]]) => Trigger.fireReload(insertAll(delta.value, sup)))
       (now, onChange)
     })
 
@@ -111,7 +111,7 @@ class IncRefSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
       res <- init[B]
       _ <- P.observe[IncRefSet[Ref, A]](sref).by((sa: IncRefSet[Ref, A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
-        val onChange = Some((sa: IncRefSet[Ref, A], delta: Diff[Set[Ref[A]]]) => FireReload(delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res)))))
+        val onChange = Some((sa: IncRefSet[Ref, A], delta: Diff[Set[Ref[A]]]) => Trigger.fireReload(delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res)))))
         (Some(now), onChange)
       })
     } yield res

@@ -2,6 +2,7 @@ package nutcracker.util
 
 import scala.language.existentials
 import scala.language.higherKinds
+import scalaz.~>
 
 final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
@@ -18,6 +19,10 @@ final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
       case Some(v0) => put(k)(combineIfPresent(v0, v))
     }
   def -(k: K[_]): KMap[K, V] = KMap[K, V](map - k)
+  def mapValues[W[_]](f: V ~> W): KMap[K, W] =
+    KMap[K, W](map.mapValues[W[_]](v => f(v)))
+  def ++(that: KMap[K, V]): KMap[K, V] =
+    KMap[K, V](this.map ++ that.map)
 }
 
 object KMap {
@@ -67,7 +72,7 @@ object HHKMap {
 }
 
 /** KMap with an upper bound on the type parameter accepted by K[_], V[_]. */
-final case class KMapB[K[_ <: UB], V[_ <: UB], UB](map: Map[K[_], V[_]]) extends AnyVal {
+final case class KMapB[K[_ <: UB], V[_ <: UB], UB](map: Map[K[_ <: UB], V[_ <: UB]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
   def head: (K[A], V[A]) forSome { type A <: UB } = map.head.asInstanceOf[(K[A], V[A]) forSome { type A <: UB }]
@@ -81,11 +86,11 @@ final case class KMapB[K[_ <: UB], V[_ <: UB], UB](map: Map[K[_], V[_]]) extends
       case None => put(k)(v)
       case Some(v0) => put(k)(combineIfPresent(v0, v))
     }
-  def -(k: K[_]): KMapB[K, V, UB] = KMapB[K, V, UB](map - k)
+  def -(k: K[_ <: UB]): KMapB[K, V, UB] = KMapB[K, V, UB](map - k)
 }
 
 object KMapB {
-  def apply[K[_], V[_], UB](): KMapB[K, V, UB] = KMapB[K, V, UB](Map[K[_], V[_]]())
+  def apply[K[_ <: UB], V[_ <: UB], UB](): KMapB[K, V, UB] = KMapB[K, V, UB](Map[K[_ <: UB], V[_ <: UB]]())
 }
 
 
