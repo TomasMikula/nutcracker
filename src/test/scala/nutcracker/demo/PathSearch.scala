@@ -22,11 +22,13 @@ class PathSearch extends FunSuite {
   val lang = new PropCost[Int]
   val solver = lang.bfsSolver
 
-  type Ref[A] = lang.Ref[A]
+  import lang._
+  import lang.Prop.{Ref => _, _}
+
   type Lang[K[_], A] = lang.Vocabulary[K, A]
 
   // not sure why scalac is not able to find these itself
-  implicit val injP = implicitly[InjectK[PropagationLang[Ref, ?[_], ?], Lang]]
+  implicit val injP = implicitly[InjectK[Prop.Lang, Lang]]
   implicit val injC = implicitly[InjectK[solver.lang.CostL, Lang]]
 
   val P = PromiseOps[FreeK[Lang, ?], Ref]

@@ -13,17 +13,18 @@ import scalaz.Monad
 import scalaz.std.anyVal._
 
 class Sudoku extends FunSuite {
-  import PropagationStore.module._
+  val Prop = PropagationStore.module
+  import Prop._
 
-  val P1 = Propagation[FreeK[PropagationLang[Ref, ?[_], ?], ?], Ref]
-  val P2 = PromiseOps[FreeK[PropagationLang[Ref, ?[_], ?], ?], Ref]
-  val V = FinalVars[FreeK[PropagationLang[Ref, ?[_], ?], ?], Ref]
+  val P1 = Propagation[FreeK[Prop.Lang, ?], Ref]
+  val P2 = PromiseOps[FreeK[Prop.Lang, ?], Ref]
+  val V = FinalVars[FreeK[Prop.Lang, ?], Ref]
 
   import P1._
   import P2._
   import V._
 
-  implicit val freeKMonad: Monad[FreeKT[PropagationLang[Ref, ?[_], ?], Id, ?]] = FreeKT.freeKTMonad[PropagationLang[Ref, ?[_], ?], Id]
+  implicit val freeKMonad: Monad[FreeKT[Prop.Lang, Id, ?]] = FreeKT.freeKTMonad[Prop.Lang, Id]
 
 
   val solver = dfsSolver
@@ -34,7 +35,7 @@ class Sudoku extends FunSuite {
   /** A program that sets up an empty Sudoku, that is 81 integer variables
     * and definitional constraints.
     */
-  val sudoku0: FreeK[PropagationLang[Ref, ?[_], ?], Cells] = {
+  val sudoku0: FreeK[Prop.Lang, Cells] = {
     for {
       // create 81 integer variables, ranging from 1 to 9
       cells <- variable[Int].count(81).oneOf((1 to 9).toSet)
@@ -53,12 +54,12 @@ class Sudoku extends FunSuite {
   /** A more sophisticated Sudoku program that includes additional constraints
     * and thus reduces the amount of guessing and backtracking.
     */
-  val sudoku1: FreeK[PropagationLang[Ref, ?[_], ?], Cells] = {
+  val sudoku1: FreeK[Prop.Lang, Cells] = {
 
     // For the given segment (row/column/3x3 square) and number,
     // keep a set of possible positions of that number in that segment.
     // When only one possible position remains, enter the number to that cell.
-    def segNumConstraint(seg: Seq[Cell], x: Int): FreeK[PropagationLang[Ref, ?[_], ?], Unit] = {
+    def segNumConstraint(seg: Seq[Cell], x: Int): FreeK[Prop.Lang, Unit] = {
       for {
         xPos <- variable[Cell].oneOf(seg.toSet)
         _ <- sequence_(seg map { cell => valTrigger(cell) { ys =>
@@ -70,7 +71,7 @@ class Sudoku extends FunSuite {
       } yield ()
     }
 
-    def segConstraints(seg: Seq[Cell]): FreeK[PropagationLang[Ref, ?[_], ?], Unit] = {
+    def segConstraints(seg: Seq[Cell]): FreeK[Prop.Lang, Unit] = {
       sequence_((1 to 9) map { segNumConstraint(seg, _) })
     }
 
@@ -85,7 +86,7 @@ class Sudoku extends FunSuite {
   /** Returns function that, given Sudoku cells, returns a program
     * to enter the given number to the specified cell.
     */
-  def set(i: Int, j: Int, value: Int): Cells => FreeK[PropagationLang[Ref, ?[_], ?], Unit] =
+  def set(i: Int, j: Int, value: Int): Cells => FreeK[Prop.Lang, Unit] =
     cells => V.set(cells(i*9 + j), value)
 
 

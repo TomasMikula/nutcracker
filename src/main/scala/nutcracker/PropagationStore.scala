@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.util.{FreeK, FreeKT, HEqualK, Index, K3Map, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{* -> *}`}
+import nutcracker.util.{FreeK, FreeKT, FunctorKA, HEqualK, Index, InjectK, K3Map, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{* -> *}`}
 
 import scalaz.Id._
 import scalaz.{Equal, Monad, Show, StateT, |>=|, ~>}
@@ -25,16 +25,26 @@ object PropagationStore {
 
   trait Module {
     type Ref[_]
+    type Lang[K[_], A]
+    type State[K]
 
     implicit def refEquality: HEqualK[Ref]
     implicit def refShow: ShowK[Ref]
+    implicit def functorKAPropLang: FunctorKA[Lang]
+    implicit def propagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref]
 
-    def empty[K]: PropagationStore[Ref, K]
-    def emptyF[F[_[_], _]]: PropagationStore[Ref, FreeK[F, Unit]]
-    def dfsSolver: DFSSolver[PropagationLang[Ref, ?[_], ?], PropagationStore[Ref, ?], Id, λ[A => Ref[Promise[A]]]]
+    def empty[K]: State[K]
+    def emptyF[F[_[_], _]]: State[FreeK[F, Unit]]
+    def interpreter: StateInterpreter[Lang, State]
+    def dfsSolver: DFSSolver[Lang, State, Id, λ[A => Ref[Promise[A]]]]
 
-    def interpreter: StateInterpreter[PropagationLang[Ref, ?[_], ?], PropagationStore[Ref, ?]] =
-      PropagationStore.interpreter[Ref]
+    def naiveAssess[K[_], S[_]](
+      lens: Lens[S[K[Unit]], State[K[Unit]]])(implicit
+      ord: K |>=| FreeK[Lang, ?]
+    ): S[K[Unit]] => Assessment[List[K[Unit]]]
+
+    def fetch[K, D](s: State[K])(ref: Ref[D]): D
+    def fetchResult[K, D](s: State[K])(ref: Ref[D])(implicit fin: Final[D]): Option[fin.Out]
   }
 
   val module: Module = ModuleImpl
@@ -42,9 +52,14 @@ object PropagationStore {
 
   private object ModuleImpl extends Module {
     type Ref[A] = DRef[A]
+    type Lang[K[_], A] = PropagationLang[Ref, K, A]
+    type State[K] = PropagationStore[Ref, K]
 
     implicit val refEquality: HEqualK[Ref] = DRef.equalKInstance
     implicit def refShow: ShowK[Ref] = DRef.showKInstance
+    implicit def functorKAPropLang: FunctorKA[Lang] = PropagationLang.functorKInstance[Ref]
+    implicit def propagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref] =
+      PropagationLang.freePropagation[Ref, F]
 
     def empty[K]: PropagationStore[Ref, K] =
       PropagationStoreImpl[K](
@@ -61,15 +76,30 @@ object PropagationStore {
     def emptyF[F[_[_], _]]: PropagationStore[Ref, FreeK[F, Unit]] =
       empty[FreeK[F, Unit]]
 
+    def interpreter: StateInterpreter[Lang, State] =
+      PropagationStore.interpreter[Ref]
+
     def dfsSolver: DFSSolver[PropagationLang[Ref, ?[_], ?], PropagationStore[Ref, ?], Id, λ[A => Ref[Promise[A]]]] = {
       implicit val mfp: Monad[FreeKT[PropagationLang[Ref, ?[_], ?], Id, ?]] = FreeKT.freeKTMonad[PropagationLang[Ref, ?[_], ?], Id]
       new DFSSolver[PropagationLang[Ref, ?[_], ?], PropagationStore[Ref, ?], Id, λ[A => Ref[Promise[A]]]](
         interpreter.freeInstance,
         emptyF[PropagationLang[Ref, ?[_], ?]],
-        naiveAssess[Ref, FreeK[PropagationLang[Ref, ?[_], ?], ?]],
+        PropagationStore.naiveAssess[Ref, FreeK[PropagationLang[Ref, ?[_], ?], ?]],
         fetch
       )
     }
+
+    def naiveAssess[K[_], S[_]](
+      lens: Lens[S[K[Unit]], State[K[Unit]]])(implicit
+      ord: K |>=| FreeK[Lang, ?]
+    ): S[K[Unit]] => Assessment[List[K[Unit]]] =
+      s => (PropagationStore.naiveAssess[Ref, K](ord))(lens.get(s))
+
+    def fetch[K, D](s: State[K])(ref: Ref[D]): D =
+      s.fetch(ref)
+
+    def fetchResult[K, D](s: State[K])(ref: Ref[D])(implicit fin: Final[D]): Option[fin.Out] =
+      s.fetchResult(ref)
 
     private val fetch: λ[A => Ref[Promise[A]]] ~> (PropagationStore[Ref, FreeK[PropagationLang[Ref, ?[_], ?], Unit]] => ?) =
       λ[λ[A => Ref[Promise[A]]] ~> (PropagationStore[Ref, FreeK[PropagationLang[Ref, ?[_], ?], Unit]] => ?)](
@@ -81,12 +111,6 @@ object PropagationStore {
     s => s match {
       case ps @ PropagationStoreImpl(_, _, _, _, _, _, _, _) => ps.naiveAssess(ord[Unit](_))
     }
-
-  def naiveAssess[Ref[_], K[_], S[_]](
-    lens: Lens[S[K[Unit]], PropagationStore[Ref, K[Unit]]])(implicit
-    ord: K |>=| FreeK[PropagationLang[Ref, ?[_], ?], ?]
-  ): S[K[Unit]] => Assessment[List[K[Unit]]] =
-    s => (naiveAssess[Ref, K](ord))(lens.get(s))
 
 
   def interpreter[Ref[_]]: StateInterpreter[PropagationLang[Ref, ?[_], ?], PropagationStore[Ref, ?]] =

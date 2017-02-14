@@ -12,17 +12,20 @@ import scalaz.Id._
 import scalaz.{Const, ~>}
 
 final case class PropCost[C: NonDecreasingMonoid]() {
-  type Ref[a] = PropagationStore.module.Ref[a]
+  val Prop = PropagationStore.module
+  import Prop._
+
+  type Ref[a] = Prop.Ref[a]
 
   type CostL[K[_], A] = CostLang[C, K, A]
   type CostS[K] = Const[C, K]
 
-  type Vocabulary[K[_], A] = (PropagationLang[Ref, ?[_], ?] :++: CostL)#Out[K, A]
-  type State[K]            = (PropagationStore[Ref, ?]      :**: CostS)#Out[K]
+  type Vocabulary[K[_], A] = (Prop.Lang  :++: CostL)#Out[K, A]
+  type State[K]            = (Prop.State :**: CostS)#Out[K]
 
-  val interpreter = (PropagationStore.interpreter[Ref] :&&: CostLang.interpreter[C]).freeInstance
-  def propStore[K]: Lens[State[K], PropagationStore[Ref, K]] = implicitly[Lens[State[K], PropagationStore[Ref, K]]]
-  def cost[K]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
+  val interpreter = (Prop.interpreter :&&: CostLang.interpreter[C]).freeInstance
+  def propStore[K]: Lens[State[K], Prop.State[K]] = implicitly[Lens[State[K], Prop.State[K]]]
+  private def cost[K]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
   def dfsSolver: DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]] =
     new DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]](interpreter, emptyState, naiveAssess, fetch)
@@ -31,9 +34,9 @@ final case class PropCost[C: NonDecreasingMonoid]() {
 
   private[PropCost] type Q[A] = FreeK[Vocabulary, A]
   private def naiveAssess: State[Q[Unit]] => Assessment[List[Q[Unit]]] =
-    PropagationStore.naiveAssess(propStore[Q[Unit]])(FreeKT.injectionOrder[PropagationLang[Ref, ?[_], ?], Vocabulary, Id])
+    Prop.naiveAssess(propStore[Q[Unit]])(FreeKT.injectionOrder[Prop.Lang, Vocabulary, Id])
   private def fetch: λ[A => Ref[Promise[A]]] ~> (State[Q[Unit]] => ?) =
-    λ[λ[A => Ref[Promise[A]]] ~> (State[Q[Unit]] => ?)](pa => s => propStore[Q[Unit]].get(s).fetchResult(pa).get)
+    λ[λ[A => Ref[Promise[A]]] ~> (State[Q[Unit]] => ?)](pa => s => Prop.fetchResult(propStore[Q[Unit]].get(s))(pa).get)
   private def getCost: State[Q[Unit]] => C = s => cost[Q[Unit]].get(s).getConst
-  private def emptyState: State[Q[Unit]] = PropagationStore.module.emptyF[Vocabulary] :**: Const[C, Q[Unit]](NonDecreasingMonoid[C].zero)
+  private def emptyState: State[Q[Unit]] = Prop.emptyF[Vocabulary] :**: Const[C, Q[Unit]](NonDecreasingMonoid[C].zero)
 }

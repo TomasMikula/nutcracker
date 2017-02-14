@@ -1,6 +1,6 @@
 package nutcracker.demo
 
-import nutcracker.{FinalVars, PromiseOps, PropagationLang, PropagationStore}
+import nutcracker.{FinalVars, PromiseOps, PropagationStore}
 import nutcracker.lib.bool.Bool._
 import nutcracker.lib.bool._
 import nutcracker.util._
@@ -19,17 +19,18 @@ import scalaz.std.anyVal._
 // the inhabitants' type from their statements.
 
 class KnightsAndKnaves extends FreeSpec {
-  import PropagationStore.module._
+  val Prop = PropagationStore.module
+  import Prop._
 
-  val V = FinalVars[FreeK[PropagationLang[Ref, ?[_], ?], ?], Ref]
-  val B = BoolOps[FreeK[PropagationLang[Ref, ?[_], ?], ?], Ref]
-  val P = PromiseOps[FreeK[PropagationLang[Ref, ?[_], ?], ?], Ref]
+  val V = FinalVars[FreeK[Prop.Lang, ?], Ref]
+  val B = BoolOps[FreeK[Prop.Lang, ?], Ref]
+  val P = PromiseOps[FreeK[Prop.Lang, ?], Ref]
 
   import V._
   import B._
   import P._
 
-  implicit val freeKMonad: Monad[FreeKT[PropagationLang[Ref, ?[_], ?], Id, ?]] = FreeKT.freeKTMonad[PropagationLang[Ref, ?[_], ?], Id]
+  implicit val freeKMonad: Monad[FreeKT[Prop.Lang, Id, ?]] = FreeKT.freeKTMonad[Prop.Lang, Id]
 
   val solver = dfsSolver
 

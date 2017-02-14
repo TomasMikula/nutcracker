@@ -15,11 +15,11 @@ import shapeless.{::, HNil}
 import scala.language.higherKinds
 
 class SimpleForwardInference extends FunSpec with Matchers {
+  import PropRel.Prop.{Ref => _, _}
+  import PropRel._
 
   // our instruction sets will be propagation and relations
   type Lang[K[_], A] = PropRel.Vocabulary[K, A]
-
-  type Ref[A] = PropRel.Ref[A]
 
   val P = PromiseOps[FreeK[Lang, ?], Ref]
   val R = Relations[FreeK[Lang, ?]]
@@ -84,7 +84,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
 
     it("should follow that a < e") {
       val (s, promise) = PropRel.interpreter(problem)(PropRel.emptyState)
-      PropRel.propStore.get(s).fetchResult(promise) should be (Some(()))
+      Prop.fetchResult(PropRel.propStore.get(s))(promise) should be (Some(()))
     }
   }
 }
