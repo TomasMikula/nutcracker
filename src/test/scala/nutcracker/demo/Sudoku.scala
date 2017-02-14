@@ -13,7 +13,7 @@ import scalaz.Monad
 import scalaz.std.anyVal._
 
 class Sudoku extends FunSuite {
-  val Prop = PropagationStore.module
+  val Prop = Propagation.module
   import Prop._
 
   val P1 = Propagation[FreeK[Prop.Lang, ?], Ref]

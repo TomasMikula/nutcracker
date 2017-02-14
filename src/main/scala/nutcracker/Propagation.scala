@@ -1,11 +1,15 @@
 package nutcracker
 
 import scala.language.higherKinds
-import scalaz.{Applicative, Bind, Traverse}
+import scalaz.{Applicative, Bind, Traverse, |>=|}
 import scalaz.std.vector._
 import scalaz.syntax.bind._
 import shapeless.{::, HList, HNil}
 import Trigger._
+import monocle.Lens
+import nutcracker.util.{FreeK, FunctorKA, HEqualK, InjectK, ShowK, StateInterpreter}
+
+import scalaz.Id.Id
 
 trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
 
@@ -100,4 +104,30 @@ trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
 
 object Propagation {
   def apply[M[_], Ref[_]](implicit M: Propagation[M, Ref]): Propagation[M, Ref] = M
+
+  trait Module {
+    type Ref[_]
+    type Lang[K[_], A]
+    type State[K]
+
+    implicit def refEquality: HEqualK[Ref]
+    implicit def refShow: ShowK[Ref]
+    implicit def functorKAPropLang: FunctorKA[Lang]
+    implicit def propagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref]
+
+    def empty[K]: State[K]
+    def emptyF[F[_[_], _]]: State[FreeK[F, Unit]]
+    def interpreter: StateInterpreter[Lang, State]
+    def dfsSolver: DFSSolver[Lang, State, Id, λ[A => Ref[Promise[A]]]]
+
+    def naiveAssess[K[_], S[_]](
+      lens: Lens[S[K[Unit]], State[K[Unit]]])(implicit
+      ord: K |>=| FreeK[Lang, ?]
+    ): S[K[Unit]] => Assessment[List[K[Unit]]]
+
+    def fetch[K, D](s: State[K])(ref: Ref[D]): D
+    def fetchResult[K, D](s: State[K])(ref: Ref[D])(implicit fin: Final[D]): Option[fin.Out]
+  }
+
+  val module: Module = PropagationModuleImpl
 }

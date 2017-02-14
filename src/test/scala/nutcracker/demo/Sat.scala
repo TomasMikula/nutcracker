@@ -13,7 +13,7 @@ import scalaz.std.anyVal._
 import scalaz.std.vector._
 
 class Sat extends FunSpec {
-  val Prop = PropagationStore.module
+  val Prop = Propagation.module
   import Prop._
 
   val V = FinalVars[FreeK[Prop.Lang, ?], Ref]

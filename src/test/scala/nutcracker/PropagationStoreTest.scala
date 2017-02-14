@@ -6,7 +6,7 @@ import nutcracker.Trigger._
 import nutcracker.util.FreeK
 
 class PropagationStoreTest extends FunSuite {
-  val Prop = PropagationStore.module
+  val Prop = Propagation.module
   import Prop._
 
   type Prg[A] = FreeK[Prop.Lang, A]

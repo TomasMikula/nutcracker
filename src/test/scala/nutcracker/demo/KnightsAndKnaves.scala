@@ -1,6 +1,6 @@
 package nutcracker.demo
 
-import nutcracker.{FinalVars, PromiseOps, PropagationStore}
+import nutcracker.{FinalVars, PromiseOps, Propagation}
 import nutcracker.lib.bool.Bool._
 import nutcracker.lib.bool._
 import nutcracker.util._
@@ -19,7 +19,7 @@ import scalaz.std.anyVal._
 // the inhabitants' type from their statements.
 
 class KnightsAndKnaves extends FreeSpec {
-  val Prop = PropagationStore.module
+  val Prop = Propagation.module
   import Prop._
 
   val V = FinalVars[FreeK[Prop.Lang, ?], Ref]

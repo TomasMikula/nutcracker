@@ -11,7 +11,7 @@ import scalaz.Id._
 import scalaz.~>
 
 object PropRel {
-  val Prop = PropagationStore.module
+  val Prop = Propagation.module
   import Prop._
 
   type Ref[a] = Prop.Ref[a]

@@ -12,7 +12,7 @@ import scalaz.Id._
 import scalaz.{Const, ~>}
 
 final class PropRelCost[C: NonDecreasingMonoid] {
-  val Prop = PropagationStore.module
+  val Prop = Propagation.module
   import Prop._
 
   type Ref[a] = Prop.Ref[a]
