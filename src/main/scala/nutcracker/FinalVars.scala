@@ -81,8 +81,8 @@ class FinalVars[M[_], Ref[_]](implicit M: Propagation[M, Ref]) {
       _ <- whenFinal(res).exec(r => if (r) different(d1, d2) else d1 <=> d2)
       _ <- whenFinal(d1).exec0(r1 => whenFinal(d2).exec0(r2 => {
         val r = dom.update(r1, injm(Join(r2))) match {
-          case None => false
-          case Some((x, _)) => dom.assess(x) == Dom.Failed
+          case Unchanged() => false
+          case Updated(x, _) => dom.assess(x) == Dom.Failed
         }
         set(res, r)
       }))

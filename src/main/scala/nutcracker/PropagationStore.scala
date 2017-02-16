@@ -252,24 +252,24 @@ private[nutcracker] sealed abstract class Cell[K, D] {
   def hasPendingObservers: Boolean = pendingObservers.nonEmpty
 
   def update(u: Update): Option[Cell.Aux[K, D, Update, Delta]] =
-    dom.iUpdate(value, u).flatMap(p => {
-      val newVal = p._1
-      val delta = p._2
+    dom.update(value, u) match {
+      case up @ Updated(newVal, delta) =>
+        val pending0 = pendingObservers.map(dh => APair[Delta[?, up.NewValue], Handler, dh.A](dom.composeDeltas(delta, dh._1), dh._2))
+        val pending1 = idleObservers.map(h => APair[Delta[?, up.NewValue], Handler, Value](delta, h))
+        val pending = pending1 ::: pending0
 
-      val pending0 = pendingObservers.map(dh => APair[Delta[?, p.A], Handler, dh.A](dom.composeDeltas(delta, dh._1), dh._2))
-      val pending1 = idleObservers.map(h => APair[Delta[?, p.A], Handler, Value](delta, h))
-      val pending = pending1 ::: pending0
+        val blocked0 = blockedPendingObservers.mapValues[Delta[?, up.NewValue]](
+          λ[Delta[?, Value] ~> Delta[?, up.NewValue]](d => dom.composeDeltas(delta, d))
+        )
+        val blocked1 = blockedIdleObservers.mapValues[Delta[?, up.NewValue]](
+          λ[(Value === ?) ~> Delta[?, up.NewValue]](ev => ev.subst[Delta[?, up.NewValue]](delta))
+        )
+        val blocked = blocked0 ++ blocked1
 
-      val blocked0 = blockedPendingObservers.mapValues[Delta[?, p.A]](
-        λ[Delta[?, Value] ~> Delta[?, p.A]](d => dom.composeDeltas(delta, d))
-      )
-      val blocked1 = blockedIdleObservers.mapValues[Delta[?, p.A]](
-        λ[(Value === ?) ~> Delta[?, p.A]](ev => ev.subst[Delta[?, p.A]](delta))
-      )
-      val blocked = blocked0 ++ blocked1
+        Some(Cell[K, D, up.NewValue](newVal, dom)(Nil, pending, KMap[Token, up.NewValue === ?](), blocked, nextTokenId))
 
-      Some(Cell[K, D, p.A](newVal, dom)(Nil, pending, KMap[Token, p.A === ?](), blocked, nextTokenId))
-    })
+      case Unchanged() => None
+    }
 
   def observe(f: SeqPreHandler[Token, K, D, Delta]): (Cell[K, D], Option[K]) = {
     import SeqTrigger._

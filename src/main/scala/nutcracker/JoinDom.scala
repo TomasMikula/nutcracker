@@ -3,14 +3,17 @@ package nutcracker
 /** Typeclass for domains that are join-semilattices. */
 trait JoinDom[D] extends Dom[D] {
 
-  /** Asymmetric join operation: performs join and returns `Some` if
-    * the result is different from the left argument, `None` if the
+  /** Asymmetric join operation: performs join and returns `Updated` if
+    * the result is different from the left argument, `Unchanged` if the
     * result is the same as the left argument.
     */
-  def ljoin(d1: D, d2: D): Option[(D, Delta)]
+  def ljoin[D0 <: D](d1: D0, d2: D): UpdateResult[D, IDelta, D0]
 
   /** Join operation (as in join-semilattice). */
-  def join(d1: D, d2: D): D = ljoin(d1, d2).fold(d1)(_._1)
+  def join(d1: D, d2: D): D = ljoin(d1, d2) match {
+    case Updated(d, _) => d
+    case Unchanged()   => d1
+  }
 }
 
 object JoinDom {
@@ -26,8 +29,11 @@ object JoinDom {
 
     def ljoin0(d1: D, d2: D): Option[D]
 
-    override def ljoin(d1: D, d2: D): Option[(D, Delta)] = ljoin0(d1, d2).map((_, ()))
-    override def update(d: D, u: Update): Option[(D, Delta)] = ljoin(d, u)
+    override def ljoin[D0 <: D](d1: D0, d2: D): UpdateResult[D, IDelta, D0] = ljoin0(d1, d2) match {
+      case Some(d) => UpdateResult(d, ())
+      case None    => UpdateResult()
+    }
+    override def update[D0 <: D](d: D0, u: Update): UpdateResult[D, IDelta, D0] = ljoin(d, u)
     override def appendDeltas(d1: Unit, d2: Unit): Unit = ()
   }
 

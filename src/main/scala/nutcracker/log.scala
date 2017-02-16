@@ -30,8 +30,8 @@ object log {
     type Update = A
     type Delta = Log[A]
 
-    override def update(d: Log[A], u: A): Option[(Log[A], Log[A])] =
-      Some((u :: d, List(u)))
+    override def update[L <: Log[A]](d: L, u: A): UpdateResult[Log[A], IDelta, L] =
+      UpdateResult(u :: d, List(u))
 
     override def appendDeltas(d1: Log[A], d2: Log[A]): Log[A] = d2 ::: d1
 

@@ -38,10 +38,10 @@ object IncRefSet {
       case _ => Dom.Refined
     }
 
-    override def update(s: IncRefSet[Ref, A], u: Join[IncRefSet[Ref, A]]): Option[(IncRefSet[Ref, A], Diff[Set[Ref[A]]])] = {
+    override def update[S <: IncRefSet[Ref, A]](s: S, u: Join[IncRefSet[Ref, A]]): UpdateResult[IncRefSet[Ref, A], IDelta, S] = {
       val res = s union u.value
-      if(res.size > s.size) Some((res, Diff(u.value.value diff s.value)))
-      else None
+      if(res.size > s.size) UpdateResult(res, Diff(u.value.value diff s.value))
+      else UpdateResult()
     }
 
     override def appendDeltas(d1: Diff[Set[Ref[A]]], d2: Diff[Set[Ref[A]]]): Diff[Set[Ref[A]]] =

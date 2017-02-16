@@ -1,6 +1,6 @@
 package nutcracker.lib.bool
 
-import nutcracker.{Diff, Dom, DomWithBottom, Final, Join, JoinDom}
+import nutcracker.{Diff, Dom, DomWithBottom, Final, Join, JoinDom, UpdateResult}
 
 import scalaz.{-\/, \/, \/-}
 import scalaz.syntax.either._
@@ -44,14 +44,14 @@ object Bool {
         case Contradiction => Dom.Failed
         case _ => Dom.Refined
       }
-      override def update(d: Bool, u: Update): Option[(Bool, Delta)] = {
+      override def update[B <: Bool](d: B, u: Update): UpdateResult[Bool, IDelta, B] = {
         val res = u match {
           case -\/(Join(x)) => Bool(d.intValue &  x.intValue)
           case \/-(Diff(x)) => Bool(d.intValue & ~x.intValue)
         }
-        if(res == d) None else Some((res, ()))
+        if(res == d) UpdateResult() else UpdateResult(res, ())
       }
-      override def ljoin(d1: Bool, d2: Bool): Option[(Bool, Delta)] = update(d1, -\/(Join(d2)))
+      override def ljoin[B <: Bool](d1: B, d2: Bool): UpdateResult[Bool, IDelta, B] = update(d1, -\/(Join(d2)))
       override def appendDeltas(d1: Delta, d2: Delta): Delta = ()
       override def bottom: Bool = Anything
     }

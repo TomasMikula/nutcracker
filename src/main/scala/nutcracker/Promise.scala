@@ -65,19 +65,19 @@ object Promise {
       case Conflict => Dom.Failed
     }
 
-    override def update(p: Promise[A], v: Complete[A]): Option[(Promise[A], Unit)] = p match {
-      case Empty => Some((Completed(v.value), ()))
+    override def update[P <: Promise[A]](p: P, v: Complete[A]): UpdateResult[Promise[A], IDelta, P] = p match {
+      case Empty => UpdateResult(Completed(v.value), ())
       case Completed(a) =>
-        if(EqA.equal(a, v.value)) None
-        else Some((Conflict, ()))
-      case Conflict => None
+        if(EqA.equal(a, v.value)) UpdateResult()
+        else UpdateResult(Conflict, ())
+      case Conflict => UpdateResult()
     }
 
-    override def ljoin(d1: Promise[A], d2: Promise[A]): Option[(Promise[A], Unit)] = (d1, d2) match {
-      case (_, Empty) => None
+    override def ljoin[P <: Promise[A]](d1: P, d2: Promise[A]): UpdateResult[Promise[A], IDelta, P] = (d1, d2) match {
+      case (_, Empty) => UpdateResult()
       case (d1, Completed(a)) => update(d1, Complete(a))
-      case (Conflict, Conflict) => None
-      case (_, Conflict) => Some((Conflict, ()))
+      case (Conflict, Conflict) => UpdateResult()
+      case (_, Conflict) => UpdateResult(Conflict, ())
     }
 
     override def appendDeltas(d1: Unit, d2: Unit): Unit = ()

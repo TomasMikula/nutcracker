@@ -66,7 +66,7 @@ object DSet {
       type Update = DSet.Update[Ref, D]
       type Delta = DSet.Inserted[Ref, D]
 
-      def update(d: DSet[Ref, D], u: Update): Option[(DSet[Ref, D], Delta)] = {
+      def update[S <: DSet[Ref, D]](d: S, u: Update): UpdateResult[DSet[Ref, D], IDelta, S] = {
         val (unrefined, refined) = u match {
           case Unrefined(ref) => (d.unrefined + ref, d.refined - ref)
           case Refined(ref)   => (d.unrefined - ref, d.refined + ref)
@@ -74,9 +74,9 @@ object DSet {
         }
 
         if(unrefined.size + refined.size > d.unrefined.size + d.refined.size)
-          Some((DSet(unrefined, refined), Inserted(u.ref)))
+          UpdateResult(DSet(unrefined, refined), Inserted(u.ref))
         else
-          None
+          UpdateResult()
       }
 
       def appendDeltas(d1: Delta, d2: Delta): Delta = d1 + d2

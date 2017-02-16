@@ -40,29 +40,29 @@ object DecSet {
       case _ => Dom.Unrefined(() => Some(d.toList map (x => Join(singleton(x)).left))) // split into singleton sets
     }
 
-    override def update(s: DecSet[A], u: Update): Option[(DecSet[A], Delta)] = u match {
+    override def update[S <: DecSet[A]](s: S, u: Update): UpdateResult[DecSet[A], IDelta, S] = u match {
       case -\/(m) => intersect(s, m.value);
       case \/-(d) => diff(s, d.value);
     }
 
-    def ljoin(d1: DecSet[A], d2: DecSet[A]): Option[(DecSet[A], Delta)] =
+    def ljoin[D <: DecSet[A]](d1: D, d2: DecSet[A]): UpdateResult[DecSet[A], IDelta, D] =
       update(d1, -\/(Join(d2)))
 
     override def appendDeltas(d1: Delta, d2: Delta): Delta =
       Diff(d1.value union d2.value)
 
     @inline
-    private def intersect(a: DecSet[A], b: DecSet[A]): Option[(DecSet[A], Diff[Set[A]])] = {
+    private def intersect[D <: DecSet[A]](a: DecSet[A], b: DecSet[A]): UpdateResult[DecSet[A], IDelta, D] = {
       val res = a intersect b
-      if(res.size < a.size) Some((res, Diff(a.value diff b.value)))
-      else None
+      if(res.size < a.size) UpdateResult(res, Diff(a.value diff b.value))
+      else UpdateResult()
     }
 
     @inline
-    private def diff(a: DecSet[A], b: DecSet[A]): Option[(DecSet[A], Diff[Set[A]])] = {
+    private def diff[D <: DecSet[A]](a: DecSet[A], b: DecSet[A]): UpdateResult[DecSet[A], IDelta, D] = {
       val res = a diff b
-      if(res.size < a.size) Some((res, Diff(a.value intersect b.value)))
-      else None
+      if(res.size < a.size) UpdateResult(res, Diff(a.value intersect b.value))
+      else UpdateResult()
     }
   }
 

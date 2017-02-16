@@ -28,9 +28,9 @@ object Revocable {
     type Update = Revocable.Update
     type Delta = Revocable.Delta
 
-    def update(d: Revocable[A], u: Update): Option[(Revocable[A], Delta)] = d match {
-      case Valid(a) => Some((Revoked, ()))
-      case Revoked  => None
+    def update[R <: Revocable[A]](d: R, u: Update): UpdateResult[Revocable[A], IDelta, R] = d match {
+      case Valid(a) => UpdateResult(Revoked, ())
+      case Revoked  => UpdateResult()
     }
 
     def appendDeltas(d1: Delta, d2: Delta): Delta = ()

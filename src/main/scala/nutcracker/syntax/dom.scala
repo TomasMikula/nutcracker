@@ -1,7 +1,7 @@
 package nutcracker.syntax
 
 import scala.language.implicitConversions
-import nutcracker.Dom
+import nutcracker.{Dom, UpdateResult}
 
 object dom extends DomSyntax
 
@@ -11,8 +11,8 @@ trait DomSyntax {
 }
 
 object DomSyntax {
-  class Ops[D, U, Δ](d: D)(implicit dom: Dom.Aux[D, U, Δ]) {
-    def update(u: U): Option[(D, Δ)] = dom.update(d, u)
+  class Ops[D, U, Δ](d: D)(val dom: Dom.Aux[D, U, Δ]) {
+    def update(u: U): UpdateResult[D, dom.IDelta, D] = dom.update(d, u)
     def update_(u: U): D = dom.update_(d, u)
     def assess: Dom.Status[U] = dom.assess(d)
     def isFailed: Boolean = dom.isFailed(d)

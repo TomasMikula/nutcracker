@@ -51,15 +51,15 @@ object DomSet {
     type Update = DomSet.Update[Ref, A]
     type Delta  = DomSet.Delta[Ref, A]
 
-    def update(d: DomSet[Ref, A], u: Update): Option[(DomSet[Ref, A], Delta)] = u match {
+    def update[S <: DomSet[Ref, A]](d: S, u: Update): UpdateResult[DomSet[Ref, A], IDelta, S] = u match {
       case Insert(ref) =>
         val refs = d.value + ref
-        if(refs.size > d.value.size) Some((DomSet(refs), Inserted(Lst.singleton(ref))))
-        else None
+        if(refs.size > d.value.size) UpdateResult(DomSet(refs), Inserted(Lst.singleton(ref)))
+        else UpdateResult()
       case Failed(ref) =>
         val refs = d.value - ref
-        if(refs.size < d.value.size) Some((DomSet(refs), Inserted(Lst.empty))) // we don't publish auto-cleaned refs
-        else None
+        if(refs.size < d.value.size) UpdateResult(DomSet(refs), Inserted(Lst.empty)) // we don't publish auto-cleaned refs
+        else UpdateResult()
     }
 
     def appendDeltas(d1: Delta, d2: Delta): Delta = Inserted(d1.refs ++ d2.refs)
