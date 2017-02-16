@@ -29,7 +29,7 @@ private[nutcracker] object PropagationModuleImpl extends Propagation.Module {
     PropagationStore[K](
       nextId = 0L,
       domains = KMap[DRef, Cell[K, ?]](),
-      selTriggers = KMapB[λ[`L <: HList` => Sel[DRef, L]], λ[L => List[L => Trigger[K]]], HList](),
+      selTriggers = KMapB[λ[`L <: HList` => Sel[DRef, L]], λ[L => List[L => (Option[K], Boolean)]], HList](),
       cellsToSels = Index.empty(sel => sel.cells),
       unresolvedVars = Set(),
       failedVars = Set(),
@@ -108,7 +108,7 @@ private[nutcracker] object PropagationModuleImpl extends Propagation.Module {
 private[nutcracker] case class PropagationStore[K] private(
   nextId: Long,
   domains: KMap[DRef, Cell[K, ?]],
-  selTriggers: KMapB[λ[`L <: HList` => Sel[DRef, L]], λ[L => List[L => Trigger[K]]], HList],
+  selTriggers: KMapB[λ[`L <: HList` => Sel[DRef, L]], λ[L => List[L => (Option[K], Boolean)]], HList],
   cellsToSels: Index[DRef[_], Sel[DRef, _ <: HList]],
   unresolvedVars: Set[DRef[D] forSome { type D }],
   failedVars: Set[Long],
@@ -166,17 +166,13 @@ private[nutcracker] case class PropagationStore[K] private(
   }
 
 
-  def addSelTrigger[L <: HList](sel: Sel[DRef, L], t: L => Trigger[K]): (PropagationStore[K], Option[K]) = {
-    import Trigger._
-    t(sel.fetch(cellFetcher)) match {
-      case Discard() => (this, None)
-      case Sleep() => (addSelTrigger0(sel, t), None)
-      case Fire(cont) => (this, Some(cont))
-      case FireReload(cont) => (addSelTrigger0(sel, t), Some(cont))
-    }
+  def addSelTrigger[L <: HList](sel: Sel[DRef, L], t: L => (Option[K], Boolean)): (PropagationStore[K], Option[K]) = {
+    val (ko, keep) = t(sel.fetch(cellFetcher))
+    if(keep) (addSelTrigger0(sel, t), ko)
+    else     (this,                   ko)
   }
 
-  private def addSelTrigger0[L <: HList](sel: Sel[DRef, L], t: L => Trigger[K]): PropagationStore[K] = {
+  private def addSelTrigger0[L <: HList](sel: Sel[DRef, L], t: L => (Option[K], Boolean)): PropagationStore[K] = {
     copy(
       selTriggers = selTriggers.put(sel)(t :: selTriggers.getOrElse(sel)(Nil)),
       cellsToSels = cellsToSels.add(sel)
@@ -193,18 +189,14 @@ private[nutcracker] case class PropagationStore[K] private(
 
   private def getSelsForCell(ref: DRef[_]): Set[Sel[DRef, _ <: HList]] = cellsToSels.get(ref)
 
-  private def collectSelTriggers[L <: HList](l: L, triggers: List[L => Trigger[K]]): (List[L => Trigger[K]], Lst[K]) =
+  private def collectSelTriggers[L <: HList](l: L, triggers: List[L => (Option[K], Boolean)]): (List[L => (Option[K], Boolean)], Lst[K]) =
     triggers match {
       case Nil => (Nil, Lst.empty)
       case t :: ts =>
-        import Trigger._
-        val (ts1, conts) = collectSelTriggers(l, ts)
-        t(l) match {
-          case Discard() => (ts1, conts)
-          case Sleep() => (t :: ts1, conts)
-          case Fire(cont) => (ts1, cont :: conts)
-          case FireReload(cont) => (t :: ts1, cont :: conts)
-        }
+        val (ts1, ks) = collectSelTriggers(l, ts)
+        val (ko, keep) = t(l)
+        if(keep) (t :: ts1, ko ?+: ks)
+        else     (     ts1, ko ?+: ks)
     }
 
   def uncons: Option[(PropagationStore[K], Lst[K])] =
@@ -280,10 +272,15 @@ private[nutcracker] sealed abstract class Cell[K, D] {
     })
 
   def observe(f: SeqPreHandler[Token, K, D, Delta]): (Cell[K, D], Option[K]) = {
-    val (now, onChange) = f.handle(value)
-    onChange match {
-      case Some(handler) => (addObserver(handler), now)
-      case None => (this, now)
+    import SeqTrigger._
+    f.handle(value) match {
+      case Discard() => (this, None)
+      case Fire(k)   => (this, Some(k))
+      case Sleep(h)  => (addObserver(h), None)
+      case FireReload(cont) =>
+        val token = new Token[Value](nextTokenId)
+        val k = cont(token)
+        (Cell(value, dom)(idleObservers, pendingObservers, blockedIdleObservers.put(token)(Leibniz.refl[Value]), blockedPendingObservers, nextTokenId + 1), Some(k))
     }
   }
 
@@ -298,7 +295,7 @@ private[nutcracker] sealed abstract class Cell[K, D] {
         Cell(value, dom)(h :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, nextTokenId)
       case None => blockedPendingObservers.get(token) match {
         case Some(δ) =>
-          val po = APair.of[Delta[?, Value], Handler](δ, handler)
+          val po = APair.of[Delta[?, Value], Handler](δ, handler) // linter:ignore UndesirableTypeInference // otherwise complains about inferred type Any
           Cell(value, dom)(idleObservers, po :: pendingObservers, blockedIdleObservers, blockedPendingObservers - token, nextTokenId)
         case None =>
           sys.error(s"unrecognized token $token")

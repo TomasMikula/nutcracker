@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
 
-import scalaz.{Applicative, Bind, Monad}
+import scalaz.{Applicative, Bind, Functor, Monad}
 import scalaz.std.list._
 import scalaz.syntax.bind._
 
@@ -74,8 +74,8 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
     import scalaz.syntax.traverse._
     ContU(f => P.observe(ref).by(as => {
       val now = as.toList.traverse_(f)
-      val onChange = (as: IncSet[A], delta: Diff[Set[A]]) => Trigger.fireReload(delta.value.toList.traverse_(f))
-      (Some(now), Some(onChange))
+      val onChange = Trigger.continually((as: IncSet[A], delta: Diff[Set[A]]) => delta.value.toList.traverse_(f))
+      Trigger.fireReload(now map (_ => onChange))
     }))
   }
 
@@ -85,11 +85,11 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
   def insertAll[A](add: Set[A], into: Ref[IncSet[A]]): F[Unit] =
     P.update(into).by(Join(IncSet.wrap(add)))
 
-  def include[A](sub: Ref[IncSet[A]], sup: Ref[IncSet[A]]): F[Unit] =
+  def include[A](sub: Ref[IncSet[A]], sup: Ref[IncSet[A]])(implicit F: Functor[F]): F[Unit] =
     P.observe(sub).by((sa: IncSet[A]) => {
-      val now = Some(insertAll(sa.value, sup))
-      val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => Trigger.fireReload(insertAll(delta.value, sup)))
-      (now, onChange)
+      val now = insertAll(sa.value, sup)
+      val onChange = Trigger.continually((sa: IncSet[A], delta: Diff[Set[A]]) => insertAll(delta.value, sup))
+      Trigger.fireReload(now map (_ => onChange))
     })
 
   def includeC[A](cps: ContU[F, A], ref: Ref[IncSet[A]]): F[Unit] =
@@ -116,8 +116,8 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
       res <- init[B]
       _ <- P.observe[IncSet[A]](sref).by((sa: IncSet[A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
-        val onChange = Some((sa: IncSet[A], delta: Diff[Set[A]]) => Trigger.fireReload(delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res)))))
-        (Some(now), onChange)
+        val onChange = Trigger.continually((sa: IncSet[A], delta: Diff[Set[A]]) => delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res))))
+        Trigger.fireReload(now map (_ => onChange))
       })
     } yield res
   }

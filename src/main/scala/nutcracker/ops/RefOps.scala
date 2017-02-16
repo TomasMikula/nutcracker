@@ -2,18 +2,18 @@ package nutcracker.ops
 
 import scala.language.{higherKinds, implicitConversions}
 import nutcracker.{Dom, Final, FinalVars, Join, Propagation}
-import nutcracker.Trigger.FireReload
+import nutcracker.Trigger.continually
 import nutcracker.util.{ContU, Inject}
 
-import scalaz.Bind
+import scalaz.{Bind, Functor}
 import scalaz.syntax.bind._
 
 final case class RefOps[Ref[_], D, U, Δ](ref: Ref[D])(implicit dom: Dom.Aux[D, U, Δ]) {
 
-  def ==>[M[_]](target: Ref[D])(implicit inj: Inject[Join[D], U], P: Propagation[M, Ref]): M[Unit] =
-    P.valTrigger(ref){ d => FireReload(FinalVars[M, Ref].join(target)(d)) }
+  def ==>[M[_]](target: Ref[D])(implicit inj: Inject[Join[D], U], P: Propagation[M, Ref], M: Functor[M]): M[Unit] =
+    P.observe(ref).by(continually[M, D, Δ]((d: D) => FinalVars[M, Ref].join(target)(d)))
 
-  def <==[M[_]](source: Ref[D])(implicit inj: Inject[Join[D], U], P: Propagation[M, Ref]): M[Unit] =
+  def <==[M[_]](source: Ref[D])(implicit inj: Inject[Join[D], U], P: Propagation[M, Ref], M: Functor[M]): M[Unit] =
     RefOps(source) ==> ref
 
   def <=>[M[_]: Bind](target: Ref[D])(implicit inj: Inject[Join[D], U], P: Propagation[M, Ref]): M[Unit] =

@@ -3,7 +3,6 @@ package nutcracker.lib.bool
 import scala.language.higherKinds
 
 import nutcracker.{FinalVars, Propagation}
-import nutcracker.Trigger._
 import nutcracker.lib.bool.Bool._
 import nutcracker.ops._
 
@@ -48,19 +47,19 @@ class BoolOps[M[_], Ref[_]](implicit P: Propagation[M, Ref]) {
           // the result is equal to the remaining one
           x(j) <=> res
         } else {
-          selTrigger2(x(i), x(j))((di, dj) => {
+          selThreshold2(x(i), x(j))((di, dj) => {
             if (di == MustBeTrue || dj == MustBeTrue) {
               // found a variable set to true,
               // thus the result must be true
-              fire(set(res, true))
+              Some(set(res, true))
             } else if (di == MustBeFalse) {
               // pick next variable to watch instead of x(i)
-              fire(watch(i-1, j))
+              Some(watch(i-1, j))
             } else if (dj == MustBeFalse) {
               // pick next variable to watch instead of x(j)
-              fire(watch(i-1, i))
+              Some(watch(i-1, i))
             } else {
-              sleep
+              None
             }
           })
         }

@@ -6,7 +6,8 @@ import nutcracker.lib.bool.Bool._
 import nutcracker.ops._
 import nutcracker.util.Inject
 
-import scalaz.{Applicative, Bind, Monad, Traverse}
+import scalaz.Id.Id
+import scalaz.{Applicative, Bind, Monad, Traverse, ~>}
 import scalaz.syntax.bind._
 
 /**
@@ -124,18 +125,18 @@ object FinalVars {
   }
 
   final case class WhenFinal[M[_], Ref[_], D, A] private[nutcracker](ref: Ref[D], fin: Final.Aux[D, A])(implicit dom: Dom[D], M: Propagation[M, Ref]) {
-    import Trigger._
+    import TriggerF._
 
     def exec(f: A => M[Unit]): M[Unit] =
-      M.valTrigger[D](ref)(d => fin.extract(d) match {
-        case Some(a) => Fire[M[Unit]](f(a))
-        case None => Sleep[M[Unit]]()
-      })
+      M.observe(ref).by(λ[Id ~> λ[α => (D => TriggerF[M, α])]](α => d => fin.extract(d) match {
+        case Some(a) => Fire(f(a))
+        case None => Sleep(α)
+      }))
 
     def exec0(f: D => M[Unit]): M[Unit] =
-      M.valTrigger[D](ref)(d =>
-        if(fin.isFinal(d)) Fire[M[Unit]](f(d))
-        else Sleep[M[Unit]]()
-      )
+      M.observe(ref).by(λ[Id ~> λ[α => (D => TriggerF[M, α])]](α => d =>
+        if(fin.isFinal(d)) Fire(f(d))
+        else Sleep(α)
+      ))
   }
 }

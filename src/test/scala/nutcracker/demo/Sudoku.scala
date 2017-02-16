@@ -1,8 +1,5 @@
 package nutcracker.demo
 
-import nutcracker.DecSet
-import nutcracker.PropagationLang._
-import nutcracker.Trigger._
 import nutcracker._
 import nutcracker.util.{FreeK, FreeKT}
 import nutcracker.util.FreeK._
@@ -62,11 +59,11 @@ class Sudoku extends FunSuite {
     def segNumConstraint(seg: Seq[Cell], x: Int): FreeK[Prop.Lang, Unit] = {
       for {
         xPos <- variable[Cell].oneOf(seg.toSet)
-        _ <- sequence_(seg map { cell => valTrigger(cell) { ys =>
-          if(!ys.contains(x)) fire(exclude(xPos, cell))
-          else if(ys.size == 1) fire(V.set(xPos, cell))
-          else sleep
-        } })
+        _ <- sequence_(seg map { cell => observe(cell).threshold(ys =>
+          if(!ys.contains(x)) Some(exclude(xPos, cell))
+          else if(ys.size == 1) Some(V.set(xPos, cell))
+          else None
+        )})
         _ <- whenFinal(xPos).exec(cell => V.set(cell, x))
       } yield ()
     }

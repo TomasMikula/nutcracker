@@ -169,7 +169,7 @@ sealed abstract class FreeBind[F[_], A] {
       fa match {
         case LiftF(f) => f(s)
         case FlatMap(fz, h) => fz match {
-          case LiftF(f) => val (s1, z) = f(s); go(s1, h(z))
+          case LiftF(f) => f(s) match { case (s1, z) => go(s1, h(z)) }
           case FlatMap(fy, g) => go(s, fy flatMap (y => g(y) flatMap h))
         }
       }

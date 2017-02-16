@@ -47,8 +47,8 @@ final class BalancedComposer[F[_, _], A, B, D <: Direction] private(count: Int, 
 
 object BalancedComposer {
   sealed trait Direction
-  sealed trait Pre extends Direction
-  sealed trait Post extends Direction
+  sealed trait Pre extends Direction  // linter:ignore UnextendedSealedTrait
+  sealed trait Post extends Direction // linter:ignore UnextendedSealedTrait
 
   def apply[F[_, _], A, B, D <: Direction](f: F[A, B]): BalancedComposer[F, A, B, D] =
     new BalancedComposer(1, AList1(f))

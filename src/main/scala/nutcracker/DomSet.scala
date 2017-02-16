@@ -4,7 +4,7 @@ import scala.language.higherKinds
 import nutcracker.Dom.{Refined, Status}
 import nutcracker.util.{ContU, Lst}
 
-import scalaz.Bind
+import scalaz.{Bind, Functor}
 import scalaz.syntax.bind._
 
 /** A set of domain references, with auto-cleaning failed domains.
@@ -31,7 +31,7 @@ object DomSet {
   def init[F[_], Ref[_], A](implicit P: Propagation[F, Ref]): F[Ref[DomSet[Ref, A]]] =
     P.newCell(empty[Ref, A])
 
-  def includeC[F[_], Ref[_], A](cps: ContU[F, _ <: Ref[A]], ref: Ref[DomSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A]): F[Unit] =
+  def includeC[F[_], Ref[_], A](cps: ContU[F, _ <: Ref[A]], ref: Ref[DomSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Functor[F]): F[Unit] =
     cps(dref => insert(dref, ref))
 
   def collect[F[_]: Bind, Ref[_], A](cps: ContU[F, _ <: Ref[A]])(implicit P: Propagation[F, Ref], dom: Dom[A]): F[Ref[DomSet[Ref, A]]] =
@@ -40,11 +40,10 @@ object DomSet {
       _ <- includeC(cps, res)
     } yield res
 
-  def insert[F[_], Ref[_], A](ref: Ref[A], into: Ref[DomSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A]): F[Unit] = {
-    import Trigger._
-    P.valTrigger(ref)(d => dom.assess(d) match {
-      case Dom.Failed => Fire(P.update(into).by(Failed(ref)))
-      case _ => FireReload(P.update(into).by(Insert(ref)))
+  def insert[F[_], Ref[_], A](ref: Ref[A], into: Ref[DomSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Functor[F]): F[Unit] = {
+    P.observe(ref).untilRight(d => dom.assess(d) match {
+      case Dom.Failed => Right(P.update(into).by(Failed(ref)))
+      case _ => Left(P.update(into).by(Insert(ref)))
     })
   }
 
