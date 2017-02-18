@@ -75,9 +75,9 @@ package object util {
       WriterStateT[Id, W, S, A](run)
   }
 
-  type StateInterpreter[F[_[_], _], S[_]]  = StateInterpreterT[Id, F, S]
+  type StateInterpreter[F[_[_], _], S[_[_]]]  = StateInterpreterT[Id, F, S]
 
-  type Step[F[_[_], _], S[_]] = StepT[Id, F, S]
+  type Step[F[_[_], _], S[_[_]]] = StepT[Id, F, S]
 
   /** Free monad for type constructors of kind `F[_[_], _]`,
     * where `F`'s first type parameter is recursively set to FreeK[F, ?].

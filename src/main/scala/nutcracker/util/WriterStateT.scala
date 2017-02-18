@@ -16,7 +16,7 @@ final case class WriterStateT[F[_], W, S, A](run: S => F[(W, S, A)]) extends Any
       }
     })
 
-  def zoomOut[T](l: Lens[T, S])(implicit F: Functor[F]): WriterStateT[F, W, T, A] =
+  def zoomOut[T](implicit l: Lens[T, S], F: Functor[F]): WriterStateT[F, W, T, A] =
     WriterStateT(t => F.map(run(l.get(t))) { case (w, s, a) => (w, l.set(t, s), a) })
 }
 

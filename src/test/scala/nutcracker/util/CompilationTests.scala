@@ -8,18 +8,18 @@ object CompilationTests {
 
   def f(): Unit = {
     import CoproductK._
-    import KList._
+    import KPair._
 
     trait FooL[K[_], A]
     trait BarL[K[_], A]
     trait BazL[K[_], A]
 
-    trait FooS[K]
-    trait BarS[K]
-    trait BazS[K]
+    trait FooS[K[_]]
+    trait BarS[K[_]]
+    trait BazS[K[_]]
 
     type FooBarBazL[K[_], A] = (FooL :+: BarL :++: BazL)#Out[K, A]
-    type FooBarBazS[K]       = (FooS :*: BarS :**: BazS)#Out[K]
+    type FooBarBazS[K[_]]    = (FooS :*: BarS :**: BazS)#Out[K]
 
     val fooStep: Step[FooL, FooS] = ???
     val barStep: Step[BarL, BarS] = ???
@@ -39,13 +39,13 @@ object CompilationTests {
     fooIntr :&: barIntr :&&: bazIntr
 
     trait QuuxL[X, K[_], A]
-    trait QuuxS[X, K]
+    trait QuuxS[X, K[_]]
 
     type QuxL[K[_], A] = QuuxL[Int, K, A]
-    type QuxS[K] = QuuxS[Int, K]
+    type QuxS[K[_]]    = QuuxS[Int, K]
 
     type FooBarQuxL[K[_], A] = (FooL :+: BarL :++: QuxL)#Out[K, A]
-    type FooBarQuxS[K]       = (FooS :*: BarS :**: QuxS)#Out[K]
+    type FooBarQuxS[K[_]]    = (FooS :*: BarS :**: QuxS)#Out[K]
 
     val quxStep: Step[QuxL, QuxS] = ???
     val quxIntr: StateInterpreter[QuxL, QuxS] = ???
@@ -63,17 +63,17 @@ object CompilationTests {
     implicitly[InjectK[BarL, FooBarQuxL]]
     implicitly[InjectK[QuxL, FooBarQuxL]]
 
-    implicitly[Lens[FooBarQuxS[Int], FooS[Int]]]
-    implicitly[Lens[FooBarQuxS[Int], BarS[Int]]]
-    implicitly[Lens[FooBarQuxS[Int], QuxS[Int]]]
+    implicitly[Lens[FooBarQuxS[List], FooS[List]]]
+    implicitly[Lens[FooBarQuxS[List], BarS[List]]]
+    implicitly[Lens[FooBarQuxS[List], QuxS[List]]]
 
-    implicitly[Lenz[FooBarQuxS[Int], FooS[Int]]]
-    implicitly[Lenz[FooBarQuxS[Int], BarS[Int]]]
-    implicitly[Lenz[FooBarQuxS[Int], QuxS[Int]]]
+    implicitly[Lenz[FooBarQuxS[List], FooS[List]]]
+    implicitly[Lenz[FooBarQuxS[List], BarS[List]]]
+    implicitly[Lenz[FooBarQuxS[List], QuxS[List]]]
 
-    implicitly[`Forall{* -> *}`[λ[K => Lenz[FooBarQuxS[K], FooS[K]]]]]
-    implicitly[`Forall{* -> *}`[λ[K => Lenz[FooBarQuxS[K], BarS[K]]]]]
-    implicitly[`Forall{* -> *}`[λ[K => Lenz[FooBarQuxS[K], QuxS[K]]]]]
+    implicitly[`Forall{(* -> *) -> *}`[λ[K[_] => Lenz[FooBarQuxS[K], FooS[K]]]]]
+    implicitly[`Forall{(* -> *) -> *}`[λ[K[_] => Lenz[FooBarQuxS[K], BarS[K]]]]]
+    implicitly[`Forall{(* -> *) -> *}`[λ[K[_] => Lenz[FooBarQuxS[K], QuxS[K]]]]]
 
     ()
   }

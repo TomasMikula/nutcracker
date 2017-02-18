@@ -109,25 +109,25 @@ object Propagation {
   trait Module {
     type Ref[_]
     type Lang[K[_], A]
-    type State[K]
+    type State[K[_]]
 
     implicit def refEquality: HEqualK[Ref]
     implicit def refShow: ShowK[Ref]
     implicit def functorKAPropLang: FunctorKA[Lang]
     implicit def propagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref]
 
-    def empty[K]: State[K]
-    def emptyF[F[_[_], _]]: State[FreeK[F, Unit]]
+    def empty[K[_]]: State[K]
+    def emptyF[F[_[_], _]]: State[FreeK[F, ?]]
     def interpreter: StateInterpreter[Lang, State]
     def dfsSolver: DFSSolver[Lang, State, Id, λ[A => Ref[Promise[A]]]]
 
-    def naiveAssess[K[_], S[_]](
-      lens: Lens[S[K[Unit]], State[K[Unit]]])(implicit
+    def naiveAssess[K[_], S[_[_]]](
+      lens: Lens[S[K], State[K]])(implicit
       ord: K |>=| FreeK[Lang, ?]
-    ): S[K[Unit]] => Assessment[List[K[Unit]]]
+    ): S[K] => Assessment[List[K[Unit]]]
 
-    def fetch[K, D](s: State[K])(ref: Ref[D]): D
-    def fetchResult[K, D](s: State[K])(ref: Ref[D])(implicit fin: Final[D]): Option[fin.Out]
+    def fetch[K[_], D](s: State[K])(ref: Ref[D]): D
+    def fetchResult[K[_], D](s: State[K])(ref: Ref[D])(implicit fin: Final[D]): Option[fin.Out]
   }
 
   val module: Module = PropagationModuleImpl

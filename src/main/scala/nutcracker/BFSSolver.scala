@@ -11,17 +11,17 @@ import scalaz.std.list._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 
-class BFSSolver[F[_[_], _], St[_], M[_], P[_], C: NonDecreasingMonoid](
-  interpreter: FreeK[F, ?] ~> scalaz.StateT[M, St[FreeK[F, Unit]], ?],
-  initialState: St[FreeK[F, Unit]],
-  assess: St[FreeK[F, Unit]] => Assessment[List[FreeK[F, Unit]]],
-  fetch: P ~> (St[FreeK[F, Unit]] => ?),
-  getCost: St[FreeK[F, Unit]] => C
+class BFSSolver[F[_[_], _], St[_[_]], M[_], P[_], C: NonDecreasingMonoid](
+  interpreter: FreeK[F, ?] ~> scalaz.StateT[M, St[FreeK[F, ?]], ?],
+  initialState: St[FreeK[F, ?]],
+  assess: St[FreeK[F, ?]] => Assessment[List[FreeK[F, Unit]]],
+  fetch: P ~> (St[FreeK[F, ?]] => ?),
+  getCost: St[FreeK[F, ?]] => C
 )(implicit M: Monad[M]) {
   val lang: PropRelCost[C] = new PropRelCost[C]
 
   type K[A] = FreeK[F, A]
-  type S = St[K[Unit]]
+  type S = St[K]
 
   implicit val orderByCost: Order[S] = Order.orderBy(getCost)
 

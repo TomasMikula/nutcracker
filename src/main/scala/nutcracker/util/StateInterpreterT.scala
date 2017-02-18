@@ -1,42 +1,42 @@
 package nutcracker.util
 
 import scala.language.higherKinds
-import scalaz.{BindRec, Functor, Lens, Monad, StateT, \/, ~>}
+import scalaz.{BindRec, Functor, Monad, StateT, \/, ~>}
 import scalaz.Id._
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
-import nutcracker.util.KList._
+import nutcracker.util.KPair._
 
-trait StateInterpreterT[M[_], F[_[_], _], S[_]] { self =>
+trait StateInterpreterT[M[_], F[_[_], _], S[_[_]]] { self =>
   def step: StepT[M, F, S]
   def uncons: Uncons[S]
 
-  final def :&&:[G[_[_], _], T[_]](that: StateInterpreterT[M, G, T])(implicit M: Functor[M]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], Cons[T, Just[S, ?], ?]] = {
+  final def :&&:[G[_[_], _], T[_[_]]](that: StateInterpreterT[M, G, T])(implicit M: Functor[M]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], (T :**: S)#Out] = {
     type H[K[_], A] = CoproductK[G, F, K, A]
-    type U[K] = Cons[T, Just[S, ?], K]
+    type U[K[_]] = (T :**: S)#Out[K]
 
     new StateInterpreterT[M, H, U] {
       def step: StepT[M, H, U] = that.step :&&: self.step
 
       def uncons: Uncons[U] = {
-        val uncons1 = that.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], T[K]]]]])
-        val uncons2 = self.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], S[K]]]]])
+        val uncons1 = that.uncons.zoomOut[U]
+        val uncons2 = self.uncons.zoomOut[U]
         uncons1 orElse uncons2
       }
     }
   }
 
-  final def :&&:[G[_[_], _], T[_]](
+  final def :&&:[G[_[_], _], T[_[_]]](
     i2: StepT[M, G, T]
   )(implicit
     M: Functor[M]
-  ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], Cons[T, Just[S, ?], ?]] = {
+  ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], (T :**: S)#Out] = {
     type H[K[_], A] = CoproductK[G, F, K, A]
-    type U[K] = Cons[T, Just[S, ?], K]
+    type U[K[_]] = (T :**: S)#Out[K]
     new StateInterpreterT[M, H, U] {
       def step: StepT[M, H, U] = i2 :&&: self.step
-      def uncons: Uncons[U] = self.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], S[K]]]]])
+      def uncons: Uncons[U] = self.uncons.zoomOut[U]
     }
   }
 
@@ -67,40 +67,40 @@ trait StateInterpreterT[M[_], F[_[_], _], S[_]] { self =>
   def hoistId[N[_]](implicit N: Monad[N], ev: this.type <:< StateInterpreterT[Id, F, S]): StateInterpreterT[N, F, S] =
     ev(this).hoist(idToM[N])
 
-  def freeInstance(implicit M0: Monad[M], M1: BindRec[M]): FreeK[F, ?] ~> StateT[M, S[FreeK[F, Unit]], ?] =
+  def freeInstance(implicit M0: Monad[M], M1: BindRec[M]): FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?] =
     StateInterpreterT.freeInstance(step, uncons)
 }
 
 object StateInterpreterT {
   import scala.language.implicitConversions  
 
-  def freeInstance[M[_], F[_[_], _], S[_]](
+  def freeInstance[M[_], F[_[_], _], S[_[_]]](
     step: StepT[M, F, S],
     uncons: Uncons[S]
   )(implicit
     M0: Monad[M],
     M1: BindRec[M]
-  ): FreeK[F, ?] ~> StateT[M, S[FreeK[F, Unit]], ?] = {
+  ): FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?] = {
     val step1 = step.papply[FreeK[F, ?]]
-    val uncons1 = uncons[FreeK[F, Unit]]
+    val uncons1 = uncons[FreeK[F, ?]]
 
-    def runUntilClean[A](p: FreeK[F, A])(s: S[FreeK[F, Unit]]): M[(S[FreeK[F, Unit]], A)] = {
+    def runUntilClean[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] = {
       M0.bind(runToCompletion(p)(s)){ case (s1, a) => M0.map(runUntilClean1(s1)) {(_, a)} }
     }
 
-    def runUntilClean1(s: S[FreeK[F, Unit]]): M[S[FreeK[F, Unit]]] =
+    def runUntilClean1(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] =
       M1.tailrecM(s)(s => uncons1(s) match {
         case None => s.right.point[M]
         case Some((s1, ku)) => M0.map(runToCompletionU(ku)(s1)){ _.left }
       })
 
-    def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, Unit]]): M[(S[FreeK[F, Unit]], A)] =
+    def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] =
       M0.bind(p.foldMapN(step1).apply(s)) {
         case (ku, s1, a) => M0.map(runToCompletionU(ku)(s1)) { (_, a) }
       }
 
-    def runToCompletionU(ps: Lst[FreeK[F, Unit]])(s: S[FreeK[F, Unit]]): M[S[FreeK[F, Unit]]] = {
-      def go(a: (Lst[FreeK[F, Unit]], S[FreeK[F, Unit]])): M[(Lst[FreeK[F, Unit]], S[FreeK[F, Unit]]) \/ S[FreeK[F, Unit]]] = {
+    def runToCompletionU(ps: Lst[FreeK[F, Unit]])(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = {
+      def go(a: (Lst[FreeK[F, Unit]], S[FreeK[F, ?]])): M[(Lst[FreeK[F, Unit]], S[FreeK[F, ?]]) \/ S[FreeK[F, ?]]] = {
         val (l, s) = a
         l.uncons match {
           case None => s.right.point[M]
@@ -110,44 +110,44 @@ object StateInterpreterT {
       M1.tailrecM((ps, s))(go)
     }
 
-    new (FreeK[F, ?] ~> StateT[M, S[FreeK[F, Unit]], ?]) {
-      def apply[A](fa: FreeK[F, A]): StateT[M, S[FreeK[F, Unit]], A] = StateT(runUntilClean(fa))
+    new (FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?]) {
+      def apply[A](fa: FreeK[F, A]): StateT[M, S[FreeK[F, ?]], A] = StateT(runUntilClean(fa))
     }
   }
 
-  final case class Ops[M[_], F[_[_], _], S[_] <: KList[_]](self: StateInterpreterT[M, F, S]) extends AnyVal {
+  final case class Ops[M[_], F[_[_], _], S[_[_]]](self: StateInterpreterT[M, F, S]) extends AnyVal {
 
-    def :&:[G[_[_], _], T[_]](
+    def :&:[G[_[_], _], T[_[_]]](
       that: StepT[M, G, T]
     )(implicit
       M: Functor[M]
-    ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], Cons[T, S, ?]] = {
+    ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], (T :**: S)#Out] = {
       type H[K[_], A] = CoproductK[G, F, K, A]
-      type U[K] = Cons[T, S, K]
+      type U[K[_]] = KPair[T, S, K]
 
       new StateInterpreterT[M, H, U] {
         def step: StepT[M, H, U] = that :&: self.step
         def uncons: Uncons[U] =
-          self.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], S[K]]]]])
+          self.uncons.zoomOut[U]
       }
     }
 
-    def :&:[G[_[_], _], T[_]](that: StateInterpreterT[M, G, T])(implicit M: Functor[M]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], Cons[T, S, ?]] = {
+    def :&:[G[_[_], _], T[_[_]]](that: StateInterpreterT[M, G, T])(implicit M: Functor[M]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], (T :**: S)#Out] = {
       type H[K[_], A] = CoproductK[G, F, K, A]
-      type U[K] = Cons[T, S, K]
+      type U[K[_]] = KPair[T, S, K]
 
       new StateInterpreterT[M, H, U] {
         def step: StepT[M, H, U] = that.step :&: self.step
 
         def uncons: Uncons[U] = {
-          val uncons1 = that.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], T[K]]]]])
-          val uncons2 = self.uncons.zoomOut[U](implicitly[`Forall{* -> *}`[λ[K => Lens[U[K], S[K]]]]])
+          val uncons1 = that.uncons.zoomOut[U]
+          val uncons2 = self.uncons.zoomOut[U]
           uncons1 orElse uncons2
         }
       }
     }
   }
 
-  implicit def toOps[M[_], F[_[_], _], S[_] <: KList[_]](i: StateInterpreterT[M, F, S]): Ops[M, F, S] =
+  implicit def toOps[M[_], F[_[_], _], S[_[_]]](i: StateInterpreterT[M, F, S]): Ops[M, F, S] =
     Ops(i)
 }

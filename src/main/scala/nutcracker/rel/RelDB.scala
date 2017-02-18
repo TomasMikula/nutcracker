@@ -8,15 +8,15 @@ import algebra.Order
 import shapeless.HList
 import RelDB._
 
-case class RelDB[K] private (
+case class RelDB[K[_]] private (
   private val tables: KMapB[Rel, RelTable, HList],
-  private val patternTriggers: Map[PartiallyAssignedPattern[_], List[_ => K]],
+  private val patternTriggers: Map[PartiallyAssignedPattern[_], List[_ => K[Unit]]],
   private val relToPatterns: TransformedIndex[Rel[_ <: HList], PartiallyAssignedPattern[_ <: HList], PartiallyAssignedOrientedPattern[_ <: HList, _ <: HList]]
 ) {
 
   case class Inserter[L <: HList, OS <: HList] private[RelDB] (rel: Rel[L])(implicit m: Mapped.Aux[L, Order, OS]) {
 
-    def insert(row: L)(implicit orders: OS): (RelDB[K], Lst[K]) =  {
+    def insert(row: L)(implicit orders: OS): (RelDB[K], Lst[K[Unit]]) =  {
 
       // insert the row to the corresponding table
       table(rel).insert(row) match {
@@ -27,7 +27,7 @@ case class RelDB[K] private (
         case Some(tbl1) => // successfully inserted
 
           // search for pattern matches before including the new relation
-          val ks: Lst[K] = collectTriggers(rel, row)
+          val ks: Lst[K[Unit]] = collectTriggers(rel, row)
 
           (replaceTable(rel)(tbl1), ks)
       }
@@ -36,20 +36,20 @@ case class RelDB[K] private (
 
   def into[L <: HList](rel: Rel[L])(implicit m: Mapped[L, Order]): Inserter[L, m.Out] = Inserter(rel)(m)
 
-  def addOnPatternMatch[V <: HList](p: Pattern[V], ass: Assignment[V])(h: V => K): (RelDB[K], Lst[K]) = {
+  def addOnPatternMatch[V <: HList](p: Pattern[V], ass: Assignment[V])(h: V => K[Unit]): (RelDB[K], Lst[K[Unit]]) = {
     require(p.isCovered, "The domain of the pattern is not fully covered by its relations. These positions are not covered: " + ((0 until p.vertexCount).toSet -- p.vertexSet))
 
     val matches: List[V] = search(p, ass)
 
-    val ks = matches.foldLeft(Lst.empty[K])((l, v) => h(v) :: l)
+    val ks = matches.foldLeft(Lst.empty[K[Unit]])((l, v) => h(v) :: l)
 
     (addTrigger(PartiallyAssignedPattern(p, ass), h), ks)
   }
 
-  private def collectTriggers[L <: HList](rel: Rel[L], row: L): Lst[K] =
-    watchedPatterns(rel).foldLeft(Lst.empty[K])((l, p) => collectTriggers(p, row) rev_::: l)
+  private def collectTriggers[L <: HList](rel: Rel[L], row: L): Lst[K[Unit]] =
+    watchedPatterns(rel).foldLeft(Lst.empty[K[Unit]])((l, p) => collectTriggers(p, row) rev_::: l)
 
-  private def collectTriggers[V <: HList, L <: HList](paop: PartiallyAssignedOrientedPattern[V, L], row: L): List[K] = for {
+  private def collectTriggers[V <: HList, L <: HList](paop: PartiallyAssignedOrientedPattern[V, L], row: L): List[K[Unit]] = for {
     hit <- search(paop, row)
     trig <- triggers(paop.unorient)
   } yield trig(hit)
@@ -113,13 +113,13 @@ case class RelDB[K] private (
     case None => Nil
   }
 
-  private def triggers[V <: HList](p: PartiallyAssignedPattern[V]): List[V => K] =
-    patternTriggers.getOrElse(p, Nil).asInstanceOf[List[V => K]]
+  private def triggers[V <: HList](p: PartiallyAssignedPattern[V]): List[V => K[Unit]] =
+    patternTriggers.getOrElse(p, Nil).asInstanceOf[List[V => K[Unit]]]
 
   private def replaceTable[L <: HList](rel: Rel[L])(tbl: RelTable[L]): RelDB[K] =
     copy(tables = tables.put(rel)(tbl))
 
-  private def addTrigger[V <: HList](p: PartiallyAssignedPattern[V], h: V => K): RelDB[K] =
+  private def addTrigger[V <: HList](p: PartiallyAssignedPattern[V], h: V => K[Unit]): RelDB[K] =
     copy(
       patternTriggers = patternTriggers + ((p, h :: triggers(p))),
       relToPatterns = relToPatterns.add(p)
@@ -136,14 +136,14 @@ object RelDB {
     def unorient: PartiallyAssignedPattern[V] = PartiallyAssignedPattern(pattern.pattern, assignment)
   }
 
-  def empty[K]: RelDB[K] = RelDB(
+  def empty[K[_]]: RelDB[K] = RelDB(
     KMapB[Rel, RelTable, HList](),
     Map.empty,
     TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel))
   )
 
   def interpreter: Step[RelLang, RelDB] = new Step[RelLang, RelDB] {
-    override def apply[K[_], A](f: RelLang[K, A]): WriterState[Lst[K[Unit]], RelDB[K[Unit]], A] = f match {
+    override def apply[K[_], A](f: RelLang[K, A]): WriterState[Lst[K[Unit]], RelDB[K], A] = f match {
       case r @ Relate(rel, values) => WriterState(db => db.into(rel)(r.ordersWitness).insert(values)(r.orders) match { case (db1, ks) => (ks, db1, ()) })
       case OnPatternMatch(p, a, h) => WriterState(db => db.addOnPatternMatch(p, a)(h) match { case (db1, ks) => (ks, db1, ()) })
     }
