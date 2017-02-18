@@ -1,13 +1,12 @@
 package nutcracker
 
 import scala.language.higherKinds
-import monocle.Lens
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
 import nutcracker.util.typealigned.APair
 import nutcracker.util.{FreeK, FreeKT, FunctorKA, HEqualK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
 
 import scalaz.Id._
-import scalaz.{Equal, Leibniz, Monad, Show, StateT, |>=|, ~>}
+import scalaz.{Equal, Leibniz, Lens, Monad, Show, StateT, |>=|, ~>}
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
 

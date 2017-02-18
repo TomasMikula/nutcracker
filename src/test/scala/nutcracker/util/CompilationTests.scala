@@ -1,8 +1,7 @@
 package nutcracker.util
 
 import scala.language.higherKinds
-import monocle.Lens
-import scalaz.{Lens => Lenz}
+import scalaz.Lens
 
 object CompilationTests {
 
@@ -67,13 +66,9 @@ object CompilationTests {
     implicitly[Lens[FooBarQuxS[List], BarS[List]]]
     implicitly[Lens[FooBarQuxS[List], QuxS[List]]]
 
-    implicitly[Lenz[FooBarQuxS[List], FooS[List]]]
-    implicitly[Lenz[FooBarQuxS[List], BarS[List]]]
-    implicitly[Lenz[FooBarQuxS[List], QuxS[List]]]
-
-    implicitly[`Forall{(* -> *) -> *}`[λ[K[_] => Lenz[FooBarQuxS[K], FooS[K]]]]]
-    implicitly[`Forall{(* -> *) -> *}`[λ[K[_] => Lenz[FooBarQuxS[K], BarS[K]]]]]
-    implicitly[`Forall{(* -> *) -> *}`[λ[K[_] => Lenz[FooBarQuxS[K], QuxS[K]]]]]
+    implicitly[`Forall{(* -> *) -> *}`[λ[K[_] => Lens[FooBarQuxS[K], FooS[K]]]]]
+    implicitly[`Forall{(* -> *) -> *}`[λ[K[_] => Lens[FooBarQuxS[K], BarS[K]]]]]
+    implicitly[`Forall{(* -> *) -> *}`[λ[K[_] => Lens[FooBarQuxS[K], QuxS[K]]]]]
 
     ()
   }

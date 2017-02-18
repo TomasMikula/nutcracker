@@ -45,7 +45,6 @@ libraryDependencies ++= Seq(
   "org.typelevel" %% "algebra" % "0.6.0",
   "org.scalaz" %% "scalaz-core" % "7.3.0-M8",
   "com.chuusai" %% "shapeless" % "2.3.2",
-  "com.github.julien-truffaut"  %%  "monocle-core" % "1.4.0",
   "com.github.scalaprops" %% "scalaprops" % "0.3.5",
 
   "org.scalatest" %% "scalatest" % "3.0.0" % "test",

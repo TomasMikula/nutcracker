@@ -1,12 +1,11 @@
 package nutcracker
 
 import scala.language.higherKinds
-import monocle.Lens
 import nutcracker.rel.{RelDB, RelLang}
 import nutcracker.util.{FreeK, FreeKT}
 import nutcracker.util.CoproductK._
 import nutcracker.util.KPair._
-
+import scalaz.Lens
 import scalaz.Id._
 import scalaz.~>
 

@@ -1,7 +1,6 @@
 package nutcracker.util
 
 import scala.language.higherKinds
-import monocle.Lens
 import scalaz.{Lens => Lenz, Store}
 
 final case class KPair[F[_[_]], G[_[_]], A[_]](_1: F[A], _2: G[A])
@@ -19,18 +18,6 @@ object KPair {
   type :*:[F[_[_]], B <: Builder] = Builder {
     type Out[A[_]] = KPair[F, B#Out, A]
   }
-
-  implicit def fstLens[F[_[_]], G[_[_]], A[_]]: Lens[KPair[F, G, A], F[A]] =
-    Lens[KPair[F, G, A], F[A]](_._1)(fa => fga => KPair(fa, fga._2))
-
-  implicit def sndLens[F[_[_]], G[_[_]], A[_]]: Lens[KPair[F, G, A], G[A]] =
-    Lens[KPair[F, G, A], G[A]](_._2)(ga => fga => KPair(fga._1, ga))
-
-  implicit def fstRecLens[F[_[_]], G[_[_]], A[_], B](implicit fab: Lens[F[A], B]): Lens[KPair[F, G, A], B] =
-    fstLens[F, G, A].composeLens(fab)
-
-  implicit def sndRecLens[F[_[_]], G[_[_]], A[_], B](implicit gab: Lens[G[A], B]): Lens[KPair[F, G, A], B] =
-    sndLens[F, G, A].composeLens(gab)
 
   implicit def fstLenz[F[_[_]], G[_[_]], A[_]]: Lenz[KPair[F, G, A], F[A]] =
     Lenz[KPair[F, G, A], F[A]](fga => Store(fa => KPair(fa, fga._2), fga._1))

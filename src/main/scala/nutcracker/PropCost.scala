@@ -2,12 +2,12 @@ package nutcracker
 
 import scala.language.higherKinds
 
-import monocle.Lens
 import nutcracker.algebraic.NonDecreasingMonoid
 import nutcracker.util.{FreeK, FreeKT}
 import nutcracker.util.CoproductK._
 import nutcracker.util.KPair._
 
+import scalaz.Lens
 import scalaz.Id._
 import scalaz.~>
 
@@ -26,8 +26,8 @@ final case class PropCost[C: NonDecreasingMonoid]() {
   type State[K[_]]         = (Prop.State :**: CostS)#Out[K]
 
   val interpreter = (Prop.interpreter :&&: CostLang.interpreter[C]).freeInstance
-  def propStore[K[_]]: Lens[State[K], Prop.State[K]] = /*fstLens[Prop.State, CostS, K]*/ implicitly[Lens[State[K], Prop.State[K]]]
-  private def cost[K[_]]: Lens[State[K], CostS[K]]   = sndLens[Prop.State, CostS, K] // implicitly[Lens[State[K], CostS[K]]]
+  def propStore[K[_]]: Lens[State[K], Prop.State[K]] = implicitly[Lens[State[K], Prop.State[K]]]
+  private def cost[K[_]]: Lens[State[K], CostS[K]]   = implicitly[Lens[State[K], CostS[K]]]
 
   def dfsSolver: DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]] =
     new DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]](interpreter, emptyState, naiveAssess, fetch)

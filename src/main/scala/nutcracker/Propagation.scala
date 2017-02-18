@@ -1,12 +1,11 @@
 package nutcracker
 
 import scala.language.higherKinds
-import scalaz.{Applicative, Bind, Traverse, |>=|, ~>}
+import scalaz.{Applicative, Bind, Lens, Traverse, |>=|, ~>}
 import scalaz.std.vector._
 import scalaz.syntax.bind._
 import shapeless.{::, HList, HNil}
 import Trigger._
-import monocle.Lens
 import nutcracker.util.{FreeK, FunctorKA, HEqualK, InjectK, ShowK, StateInterpreter}
 
 import scalaz.Id.Id
