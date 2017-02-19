@@ -6,7 +6,7 @@ import scalaz.std.vector._
 import scalaz.syntax.bind._
 import shapeless.{::, HList, HNil}
 import Trigger._
-import nutcracker.util.{FreeK, FunctorKA, HEqualK, InjectK, ShowK, StateInterpreter}
+import nutcracker.util.{FreeK, HEqualK, InjectK, ShowK, StateInterpreter}
 
 import scalaz.Id.Id
 
@@ -112,7 +112,6 @@ object Propagation {
 
     implicit def refEquality: HEqualK[Ref]
     implicit def refShow: ShowK[Ref]
-    implicit def functorKAPropLang: FunctorKA[Lang]
     implicit def propagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref]
 
     def empty[K[_]]: State[K]

@@ -1,8 +1,8 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.util.{FreeK, FunctorKA, InjectK, Lst, Step, WriterState}
-import scalaz.{Monoid, ~>}
+import nutcracker.util.{FreeK, InjectK, Lst, Step, WriterState}
+import scalaz.Monoid
 
 sealed trait CostLang[C, K[_], A]
 
@@ -14,14 +14,6 @@ object CostLang {
 
   def cost[C, K[_]](c: C): CostLang[C, K, Unit] = Cost(c)
   def getCost[C, K[_]](): CostLang[C, K, C] = GetCost()
-
-  implicit def functorKInstance[C]: FunctorKA[CostLang[C, ?[_], ?]] = new FunctorKA[CostLang[C, ?[_], ?]] {
-
-    def transform[K[_], L[_], A](ck: CostLang[C, K, A])(tr: K ~> L): CostLang[C, L, A] = ck match {
-      case Cost(c) => cost(c)
-      case GetCost() => getCost[C, L]().asInstanceOf[CostLang[C, L, A]] // XXX is there a way to convince scalac that C =:= A?
-    }
-  }
 
   def interpreter[C: Monoid]: Step[CostLang[C, ?[_], ?], CostS[C, ?[_]]] =
     new Step[CostLang[C, ?[_], ?], CostS[C, ?[_]]] {

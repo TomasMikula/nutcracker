@@ -1,38 +1,23 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.util.{FreeK, FunctorKA, InjectK}
+import nutcracker.util.{FreeK, InjectK}
 import scalaz.~>
 import scalaz.Id._
 import shapeless.HList
 
-sealed trait PropagationLang[Ref[_], Tok[_], K[_], A] {
-  protected def transform[L[_]](tr: K ~> L): PropagationLang[Ref, Tok, L, A]
-}
+sealed trait PropagationLang[Ref[_], Tok[_], K[_], A]
 
 object PropagationLang {
 
   private type FP[Ref[_], Tok[_], A] = FreeK[PropagationLang[Ref, Tok, ?[_], ?], A]
 
   // constructors (the instruction set of a free program)
-  case class NewCell[Ref[_], Tok[_], K[_], D, U, Δ](d: D, dom: Dom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, K, Ref[D]] {
-    protected def transform[L[_]](tr: K ~> L): PropagationLang[Ref, Tok, L, Ref[D]] = NewCell(d, dom)
-  }
-  case class Update[Ref[_], Tok[_], K[_], D, U, Δ[_, _]](ref: Ref[D], u: U, dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, K, Unit] {
-    protected def transform[L[_]](tr: K ~> L): PropagationLang[Ref, Tok, L, Unit] = Update[Ref, Tok, L, D, U, Δ](ref, u, dom)
-  }
-  case class Observe[Ref[_], Tok[_], K[_], D, U, Δ[_, _]](ref: Ref[D], f: SeqPreHandler[Tok, K[Unit], D, Δ], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, K, Unit] {
-    protected def transform[L[_]](tr: K ~> L): PropagationLang[Ref, Tok, L, Unit] = Observe[Ref, Tok, L, D, U, Δ](ref, f.map(tr(_)), dom)
-  }
-  case class Resume[Ref[_], Tok[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Tok[D0], handler: SeqHandler[Tok, K[Unit], D, Δ, D0], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, K, Unit] {
-    protected def transform[L[_]](tr: K ~> L): PropagationLang[Ref, Tok, L, Unit] = Resume[Ref, Tok, L, D, U, Δ, D0](ref, token, handler.map(tr(_)), dom)
-  }
-  case class SelTrigger[Ref[_], Tok[_], K[_], L <: HList](sel: Sel[Ref, L], f: L => (Option[K[Unit]], Boolean)) extends PropagationLang[Ref, Tok, K, Unit] {
-    protected def transform[K2[_]](tr: K ~> K2): PropagationLang[Ref, Tok, K2, Unit] = selTrigger(sel){ l => {
-      val (ko, b) = f(l)
-      (ko.map(tr(_)), b)
-    }}
-  }
+  case class NewCell[Ref[_], Tok[_], K[_], D, U, Δ](d: D, dom: Dom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, K, Ref[D]]
+  case class Update[Ref[_], Tok[_], K[_], D, U, Δ[_, _]](ref: Ref[D], u: U, dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, K, Unit]
+  case class Observe[Ref[_], Tok[_], K[_], D, U, Δ[_, _]](ref: Ref[D], f: SeqPreHandler[Tok, K[Unit], D, Δ], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, K, Unit]
+  case class Resume[Ref[_], Tok[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Tok[D0], handler: SeqHandler[Tok, K[Unit], D, Δ, D0], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, K, Unit]
+  case class SelTrigger[Ref[_], Tok[_], K[_], L <: HList](sel: Sel[Ref, L], f: L => (Option[K[Unit]], Boolean)) extends PropagationLang[Ref, Tok, K, Unit]
 
   // constructors returning less specific types, and curried to help with type inference
   def newCell[Ref[_], Tok[_], K[_], D](d: D)(implicit dom: Dom[D]): PropagationLang[Ref, Tok, K, Ref[D]] =
@@ -51,10 +36,6 @@ object PropagationLang {
   def resumeF[F[_[_], _], Ref[_], Tok[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Tok[D0], handler: SeqHandler[Tok, FreeK[F, Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ], inj: InjectK[PropagationLang[Ref, Tok, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(resume[Ref, Tok, FreeK[F, ?], D, U, Δ, D0](ref, token, handler))
 
-
-  implicit def functorKInstance[Ref[_], Tok[_]]: FunctorKA[PropagationLang[Ref, Tok, ?[_], ?]] = new FunctorKA[PropagationLang[Ref, Tok, ?[_], ?]] {
-    def transform[K[_], L[_], A](pk: PropagationLang[Ref, Tok, K, A])(tr: K ~> L): PropagationLang[Ref, Tok, L, A] = pk.transform(tr)
-  }
 
   implicit def freePropagation[Ref[_], Tok[_], F[_[_], _]](implicit inj: InjectK[PropagationLang[Ref, Tok, ?[_], ?], F]): Propagation[FreeK[F, ?], Ref] =
     new FreePropagation[Ref, Tok, F]

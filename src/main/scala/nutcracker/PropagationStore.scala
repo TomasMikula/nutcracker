@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
 import nutcracker.util.typealigned.APair
-import nutcracker.util.{FreeK, FreeKT, FunctorKA, HEqualK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
+import nutcracker.util.{FreeK, FreeKT, HEqualK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
 
 import scalaz.Id._
 import scalaz.{Equal, Leibniz, Lens, Monad, Show, StateT, ~>}
@@ -20,7 +20,6 @@ private[nutcracker] object PropagationModuleImpl extends Propagation.Module {
 
   implicit val refEquality: HEqualK[Ref] = DRef.equalKInstance
   implicit def refShow: ShowK[Ref] = DRef.showKInstance
-  implicit def functorKAPropLang: FunctorKA[Lang] = PropagationLang.functorKInstance[Ref, Token]
   implicit def propagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref] =
     PropagationLang.freePropagation[Ref, Token, F]
 
