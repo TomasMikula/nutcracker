@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 import nutcracker.algebraic.NonDecreasingMonoid
 import nutcracker.rel.{RelDB, RelLang}
-import nutcracker.util.{FreeK, FreeKT}
+import nutcracker.util.FreeK
 import nutcracker.util.CoproductK._
 import nutcracker.util.KPair._
 
@@ -31,7 +31,7 @@ final class PropRelCost[C: NonDecreasingMonoid] {
 
   private[PropRelCost] type Q[A] = FreeK[Vocabulary, A]
   private def naiveAssess: State[Q] => Assessment[List[Q[Unit]]] =
-    Prop.naiveAssess(propStore[Q])(FreeKT.injectionOrder[Prop.Lang, Vocabulary, Id])
+    Prop.naiveAssess(propStore[Q])
   private def fetch: λ[A => Ref[Promise[A]]] ~> (State[Q] => ?) =
     λ[λ[A => Ref[Promise[A]]] ~> (State[Q] => ?)](pa => s => Prop.fetchResult(propStore[Q].get(s))(pa).get)
   private def getCost: State[Q] => C = s => cost[Q].get(s).value

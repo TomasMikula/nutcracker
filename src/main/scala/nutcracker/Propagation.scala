@@ -1,7 +1,7 @@
 package nutcracker
 
 import scala.language.higherKinds
-import scalaz.{Applicative, Bind, Lens, Traverse, |>=|, ~>}
+import scalaz.{Applicative, Bind, Lens, Traverse, ~>}
 import scalaz.std.vector._
 import scalaz.syntax.bind._
 import shapeless.{::, HList, HNil}
@@ -16,7 +16,7 @@ trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
 
   def newCell[D](d: D)(implicit dom: Dom[D]): M[Ref[D]]
 
-  def updateImpl[D, U, Δ](ref: Ref[D])(u: U)(implicit dom: Dom.Aux[D, U, Δ]): M[Unit]
+  def updateImpl[D, U, Δ[_, _]](ref: Ref[D])(u: U)(implicit dom: IDom.Aux[D, U, Δ]): M[Unit]
 
   def selTrigger[L <: HList](sel: Sel[Ref, L])(f: Id ~> λ[α => L => TriggerF[M, α]]): M[Unit]
 
@@ -25,7 +25,7 @@ trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
     new UpdateSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
 
   final class UpdateSyntaxHelper[D, U, Δ](ref: Ref[D])(implicit dom: Dom.Aux[D, U, Δ]) {
-    def by(u: U): M[Unit] = updateImpl(ref)(u)
+    def by(u: U): M[Unit] = updateImpl[D, U, λ[(α, β) => Δ]](ref)(u)
   }
 
 
@@ -122,7 +122,7 @@ object Propagation {
 
     def naiveAssess[K[_], S[_[_]]](
       lens: Lens[S[K], State[K]])(implicit
-      ord: K |>=| FreeK[Lang, ?]
+      K: Propagation[K, Ref]
     ): S[K] => Assessment[List[K[Unit]]]
 
     def fetch[K[_], D](s: State[K])(ref: Ref[D]): D

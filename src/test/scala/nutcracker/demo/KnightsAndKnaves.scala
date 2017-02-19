@@ -78,7 +78,7 @@ class KnightsAndKnaves extends FreeSpec {
       // a says (knave(a) ∨ knave(b))
       _ <- presume(a =??= (neg(a) || neg(b)))
 
-    } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b) }
+    } yield (a, b)) >>= { case (a, b) => promiseResults(a, b) }
 
     val solutions = solver.solutions(problem).toStream.toList
 
@@ -103,7 +103,7 @@ class KnightsAndKnaves extends FreeSpec {
       // a says (knave(a) ∧ knave(b))
       _ <- presume(a =??= (neg(a) && neg(b)))
 
-    } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b) }
+    } yield (a, b)) >>= { case (a, b) => promiseResults(a, b) }
 
     val solutions = solver.solutions(problem).toStream.toList
 
@@ -133,7 +133,7 @@ class KnightsAndKnaves extends FreeSpec {
       // b says (kind(a) ≠ kind(b)
       _ <- presume(b =??= negM(a =?= b))
 
-    } yield (a, b)) >>>= { case (a, b) => promiseResults(a, b) }
+    } yield (a, b)) >>= { case (a, b) => promiseResults(a, b) }
 
     val solutions = solver.solutions(problem).toStream.toList
 

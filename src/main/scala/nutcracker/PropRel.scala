@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.rel.{RelDB, RelLang}
-import nutcracker.util.{FreeK, FreeKT}
+import nutcracker.util.FreeK
 import nutcracker.util.CoproductK._
 import nutcracker.util.KPair._
 import scalaz.Lens
@@ -27,7 +27,7 @@ object PropRel {
 
   private[PropRel] type Q[A] = FreeK[Vocabulary, A]
   private def naiveAssess: State[Q] => Assessment[List[Q[Unit]]] =
-    Prop.naiveAssess(propStore)(FreeKT.injectionOrder[Prop.Lang, Vocabulary, Id])
+    Prop.naiveAssess(propStore)
   private def fetch: λ[A => Ref[Promise[A]]] ~> (State[Q] => ?) =
     λ[λ[A => Ref[Promise[A]]] ~> (State[Q] => ?)](pa => s => Prop.fetchResult(propStore.get(s))(pa).get)
 }

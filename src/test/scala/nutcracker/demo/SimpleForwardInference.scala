@@ -40,7 +40,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
   implicit val symbolOrdering: Order[Symbol] = Order[String].on[Symbol](_.name)
 
   // a program to add some inference rules for LT and LTE
-  val LtLteRules: FreeK[Lang, Unit] = (for {
+  val LtLteRules: FreeK[Lang, Unit] = for {
     // LT(a, b) => LTE(a, b)
     _ <- onPatternMatch(
            Pattern[Pair].build({ case (a :: b :: HNil) => NonEmptyList(LT(a, b)) }))(
@@ -61,7 +61,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
            Pattern[Triple].build({ case (a :: b :: c :: HNil) => NonEmptyList(LTE(a, b), LTE(b, c)) }))(
            { case (a :: b :: c :: HNil) => relate(LTE).values(a :: c :: HNil) })
 
-  } yield ()).inject[Lang]
+  } yield ()
 
 
   describe("From a ≤ b ≤ c < d ≤ e") {
@@ -71,15 +71,15 @@ class SimpleForwardInference extends FunSpec with Matchers {
       relate(LTE).values('a :: 'b :: HNil) >>
       relate(LTE).values('b :: 'c :: HNil) >>
       relate(LT ).values('c :: 'd :: HNil) >>
-      relate(LTE).values('d :: 'e :: HNil) >>>
+      relate(LTE).values('d :: 'e :: HNil) >>
       // add inference rules to the mix
       LtLteRules >>
       // observe when a < e is inferred
       (for {
-        pr <- promise[Unit].inject[Lang]
+        pr <- promise[Unit]
         _ <- onPatternMatch(
           Pattern[Pair].where({ case (x :: y :: HNil) => (x -> 'a) :: (y -> 'e) :: HNil }).build({ case (x :: y :: HNil) => NonEmptyList(LT(x, y)) }))(
-          { _ => complete(pr, ()).inject[Lang] })
+          { _ => complete(pr, ()) })
       } yield pr)
 
     it("should follow that a < e") {

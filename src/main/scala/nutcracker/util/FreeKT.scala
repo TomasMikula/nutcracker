@@ -1,7 +1,7 @@
 package nutcracker.util
 
 import nutcracker.util.free.FreeT
-import scala.language.{higherKinds, implicitConversions}
+import scala.language.higherKinds
 import scalaz.{Applicative, BindRec, Functor, Monad, MonadPartialOrder, ~>}
 
 final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M, A]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-7685
@@ -115,10 +115,4 @@ object FreeKT {
       def apply[A](fa: FreeKT[F, M, A]): FreeKT[F, N, A] =
         FreeKT(fa.run.hoist(mn).interpret(tr))
     }
-
-  implicit def autoInject[F[_[_], _], G[_[_], _], M[_], A](f: FreeKT[F, M, A])(implicit
-    inj: InjectK[F, G],
-    FK: FunctorKA[F],
-    M: Applicative[M]
-  ): FreeKT[G, M, A] = f.inject[G]
 }

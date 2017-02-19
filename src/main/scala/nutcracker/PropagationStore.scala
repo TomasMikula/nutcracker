@@ -6,7 +6,7 @@ import nutcracker.util.typealigned.APair
 import nutcracker.util.{FreeK, FreeKT, FunctorKA, HEqualK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
 
 import scalaz.Id._
-import scalaz.{Equal, Leibniz, Lens, Monad, Show, StateT, |>=|, ~>}
+import scalaz.{Equal, Leibniz, Lens, Monad, Show, StateT, ~>}
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
 
@@ -82,9 +82,9 @@ private[nutcracker] object PropagationModuleImpl extends Propagation.Module {
 
   def naiveAssess[K[_], S[_[_]]](
     lens: Lens[S[K], State[K]])(implicit
-    ord: K |>=| FreeK[Lang, ?]
+    K: Propagation[K, Ref]
   ): S[K] => Assessment[List[K[Unit]]] =
-    s => (naiveAssess[K](ord))(lens.get(s))
+    s => naiveAssess[K].apply(lens.get(s))
 
   def fetch[K[_], D](s: State[K])(ref: Ref[D]): D =
     s.fetch(ref)
@@ -97,9 +97,9 @@ private[nutcracker] object PropagationModuleImpl extends Propagation.Module {
       pa => s => s.fetchResult(pa).get
     )
 
-  private def naiveAssess[K[_]](implicit ord: K |>=| FreeK[PropagationLang[Ref, Token, ?[_], ?], ?]): PropagationStore[K] => Assessment[List[K[Unit]]] =
+  private def naiveAssess[K[_]](implicit K: Propagation[K, Ref]): PropagationStore[K] => Assessment[List[K[Unit]]] =
     s => s match {
-      case ps @ PropagationStore(_, _, _, _, _, _, _, _) => ps.naiveAssess(ord[Unit](_))
+      case ps @ PropagationStore(_, _, _, _, _, _, _, _) => ps.naiveAssess
     }
 }
 
@@ -212,14 +212,14 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     }
     else None
 
-  private[nutcracker] def naiveAssess(inj: FreeK[PropagationLang[DRef, Token, ?[_], ?], Unit] => K[Unit]): Assessment[List[K[Unit]]] =
+  private[nutcracker] def naiveAssess(implicit K: Propagation[K, DRef]): Assessment[List[K[Unit]]] =
     if(failedVars.nonEmpty) Failed
     else if(unresolvedVars.isEmpty) Done
     else {
       def splitDomain[D](ref: DRef[D]): Option[List[K[Unit]]] = {
         val cell = domains(ref)
         cell.assess match {
-          case Dom.Unrefined(choices) => choices() map { _ map { ui => inj(PropagationLang.updateF[PropagationLang[DRef, Token, ?[_], ?], DRef, Token, cell.dom.Domain, cell.Update, cell.Delta](ref)(ui)(cell.dom, implicitly)) } }
+          case Dom.Unrefined(choices) => choices() map { _ map { ui => K.updateImpl[D, cell.Update, cell.Delta](ref)(ui)(cell.dom) } }
           case _ => sys.error("splitDomain should be called on unresolved variables only.")
         }
       }

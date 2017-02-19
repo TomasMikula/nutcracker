@@ -66,8 +66,8 @@ private[nutcracker] class FreePropagation[Ref[_], Tok[_], F[_[_], _]](implicit i
   def newCell[D](d: D)(implicit dom: Dom[D]): FreeK[F, Ref[D]] =
     FreeK.injLiftF(PropagationLang.newCell[Ref, Tok, FreeK[F, ?], D](d))
 
-  def updateImpl[D, U, Δ](ref: Ref[D])(u: U)(implicit dom: Dom.Aux[D, U, Δ]): FreeK[F, Unit] =
-    PropagationLang.updateF[F, Ref, Tok, D, U, dom.IDelta](ref)(u)
+  def updateImpl[D, U, Δ[_, _]](ref: Ref[D])(u: U)(implicit dom: IDom.Aux[D, U, Δ]): FreeK[F, Unit] =
+    PropagationLang.updateF[F, Ref, Tok, D, U, Δ](ref)(u)
 
   def observeImpl[D, U, Δ](ref: Ref[D])(f: D => Trigger[FreeK[F, ?], D, Δ])(implicit dom: Dom.Aux[D, U, Δ]): FreeK[F, Unit] = {
     import SeqTrigger._
