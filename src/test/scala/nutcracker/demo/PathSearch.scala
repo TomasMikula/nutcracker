@@ -18,19 +18,18 @@ class PathSearch extends FunSuite {
 
   val propBranchCost = new PropBranchCost[Int]
   import propBranchCost._
+  import Promises._
 
   val solver = bfsSolver
 
   // not sure why scalac is not able to find this itself
   implicit val injC = implicitly[InjectK[solver.lang.CostL, Vocabulary]]
 
-  val P = PromiseOps[Prg, Ref]
   val B = Branching[Prg, Ref]
   val C = CostOps[Prg]
 
   implicit val freeKMonad: Monad[Prg] = FreeKT.freeKTMonad[Vocabulary, Id]
 
-  import P._
   import B._
   import C._
 
@@ -89,7 +88,7 @@ class PathSearch extends FunSuite {
   def successors(v: Vertex): List[(Int, Vertex)] = edges filter { _._1 == v } map { _._2 }
 
   def findPath(u: Vertex, v: Vertex): Prg[Ref[Promise[Path]]] = for {
-    pr <- promise[Path]
+    pr <- promise[Path]()
     _ <- findPath(Nil, u, v, pr)
   } yield pr
 

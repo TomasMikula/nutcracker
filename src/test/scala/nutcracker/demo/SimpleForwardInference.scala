@@ -17,13 +17,12 @@ import scala.language.higherKinds
 class SimpleForwardInference extends FunSpec with Matchers {
   import PropRel.Prop.{Ref => _, _}
   import PropRel._
+  import Promises._
 
   // our instruction sets will be propagation and relations
   type Lang[K[_], A] = PropRel.Vocabulary[K, A]
 
-  val P = PromiseOps[FreeK[Lang, ?], Ref]
   val R = Relations[FreeK[Lang, ?]]
-  import P._
   import R._
 
 
@@ -76,7 +75,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
       LtLteRules >>
       // observe when a < e is inferred
       (for {
-        pr <- promise[Unit]
+        pr <- promise[Unit]()
         _ <- onPatternMatch(
           Pattern[Pair].where({ case (x :: y :: HNil) => (x -> 'a) :: (y -> 'e) :: HNil }).build({ case (x :: y :: HNil) => NonEmptyList(LT(x, y)) }))(
           { _ => complete(pr, ()) })

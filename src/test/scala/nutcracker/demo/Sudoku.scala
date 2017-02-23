@@ -11,12 +11,11 @@ import scalaz.std.anyVal._
 
 class Sudoku extends FunSuite {
   import PropBranch._
+  import Promises._
 
   val P1 = Propagation[Prg, Ref]
-  val P2 = PromiseOps[Prg, Ref]
 
   import P1._
-  import P2._
 
 
   val solver = dfsSolver

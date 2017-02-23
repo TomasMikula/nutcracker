@@ -7,7 +7,7 @@ import scalaz.syntax.bind._
 
 /** API for branching as a special kind of lattice. */
 class Branching[M[_], Ref[_]](implicit M: BranchingPropagation[M, Ref]) {
-  implicit val prop = M.propagation
+  private implicit val prop = M.propagation
 
   /** Convenience method to add an exclusive choice of multiple possibilities.
     * This is a shorthand for adding a cell whose semi-lattice is the lattice

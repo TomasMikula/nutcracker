@@ -16,12 +16,11 @@ import scalaz.syntax.traverse._
 class Sat extends FunSpec {
   import PropBranch._
   import PropBranch.branchingPropagation.{propagation => _, _}
+  import Promises._
 
   val B = BoolOps[Prg, Ref]
-  val P = PromiseOps[Prg, Ref]
 
   import B._
-  import P._
 
   implicit val freeKMonad: Monad[FreeKT[Prop.Lang, Id, ?]] = FreeKT.freeKTMonad[Prop.Lang, Id]
 
