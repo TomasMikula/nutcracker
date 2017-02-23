@@ -18,7 +18,7 @@ trait Final[D] {
     */
   def extract(d: D): Option[Out]
 
-  /** The reverse of [[extract()]].
+  /** The reverse of [[extract]].
     */
   def embed(a: Out): D
 

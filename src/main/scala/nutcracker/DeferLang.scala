@@ -1,8 +1,7 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.util.{FreeK, FunctorKA, InjectK}
-import scalaz.~>
+import nutcracker.util.{FreeK, InjectK}
 
 sealed trait DeferLang[D, K[_], A]
 
@@ -11,12 +10,6 @@ object DeferLang {
 
   def defer[D, K[_]](delay: D, k: K[Unit]): DeferLang[D, K, Unit] =
     Delay(delay, k)
-
-  implicit def functorKAInstance[D]: FunctorKA[DeferLang[D, ?[_], ?]] = new FunctorKA[DeferLang[D, ?[_], ?]] {
-    def transform[K[_], L[_], A](d: DeferLang[D, K, A])(f: K ~> L): DeferLang[D, L, A] = d match {
-      case Delay(d, k) => defer(d, f(k))
-    }
-  }
 
   implicit def deferInstance[F[_[_], _], D](implicit inj: InjectK[DeferLang[D, ?[_], ?], F]): Defer[FreeK[F, ?], D] =
     new Defer[FreeK[F, ?], D] {

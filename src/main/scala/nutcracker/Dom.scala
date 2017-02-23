@@ -13,7 +13,7 @@ trait IDom[D] {
     * and a description of the diff. If the update doesn't have any
     * effect on `d`, returns `Unchanged`. In addition to being monotonic,
     * updates also have to be _commutative_ and _idempotent_ (when
-    * the deltas are combined using [[composeDeltas()]]).
+    * the deltas are combined using [[composeDeltas]]).
     */
   def update[D0 <: D](d: D0, u: Update): UpdateResult[D, IDelta, D0]
 

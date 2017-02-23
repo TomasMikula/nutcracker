@@ -8,7 +8,7 @@ import scala.language.implicitConversions
   * A diff is a list of appended elements.
   *
   * **Note:** updates to log are neither idempotent nor commutative,
-  * as is required by [[Dom.update()]], so don't base any business
+  * as is required by [[Dom.update]], so don't base any business
   * logic on it.
   */
 object log {

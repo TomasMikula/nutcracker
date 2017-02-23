@@ -7,7 +7,7 @@ package nutcracker
 sealed trait Assessment[+U] {
   import Assessment._
 
-  /** When this assessment is [[Done]] or [[Stuck]], use `that`. */
+  /** When this assessment is [[Assessment.Done]] or [[Assessment.Stuck]], use `that`. */
   def orElse[V >: U](that: => Assessment[V]): Assessment[V] = this match {
     case Done => that
     case Stuck => that

@@ -27,11 +27,11 @@ class Branching[M[_], Ref[_]](implicit M: BranchingPropagation[M, Ref]) {
 
   /** Convenience method to add an exclusive choice of multiple possibilities,
     * presented as a continuation of the chosen element. Note that a "branching
-    * cell" (see [[branch(Set[A])]]) is added for each callback that is registered
+    * cell" (see [[branch[A](as:Set[A])*]]) is added for each callback that is registered
     * on the returned continuation. Thus, if two callback are registered on the
     * returned continuation, it will have the effect of making a choice from the
     * cartesian product `as × as`. If this is not what you want, use
-    * [[branch(Set[A])]] directly.
+    * [[branch[A](as:Set[A])*]] directly.
     */
   def branchC[A](as: Set[A])(implicit B: Bind[M]): Cont[M[Unit], A] =
     Cont(f => branch(as) >>= { _.asCont.apply(f) })
