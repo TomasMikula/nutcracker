@@ -1,9 +1,6 @@
 package nutcracker.lib.bool
 
-import nutcracker.{Diff, Final, Join, RelativelyComplementedDom, SplittableDomWithBottom, UpdateResult}
-
-import scalaz.{-\/, \/, \/-}
-import scalaz.syntax.either._
+import nutcracker.{Final, RelativelyComplementedDom, SplittableDomWithBottom, UpdateResult}
 
 /** A domain for boolean values. It is a boolean algebra, with interpretation
   * of operations that is dual to the standard interpretation in a boolean
@@ -13,7 +10,11 @@ import scalaz.syntax.either._
 final case class Bool private(intValue: Int) extends AnyVal
 
 object Bool {
-  type BoolDom = RelativelyComplementedDom[Bool] with SplittableDomWithBottom.Aux[Bool, Join[Bool] \/ Diff[Bool], Unit]
+  sealed abstract class Update
+  final case class Join(value: Bool) extends Update
+  final case class Diff(value: Bool) extends Update
+
+  type BoolDom = RelativelyComplementedDom[Bool] with SplittableDomWithBottom.Aux[Bool, Update, Unit]
 
   val Contradiction = Bool(0)
   val MustBeTrue = Bool(1)
@@ -36,25 +37,25 @@ object Bool {
 
   implicit val boolDomain: BoolDom =
     new RelativelyComplementedDom[Bool] with SplittableDomWithBottom[Bool] {
-      type Update = Join[Bool] \/ Diff[Bool]
+      type Update = Bool.Update
       type Delta = Unit
 
       import nutcracker.Splittable._
       override def assess(d: Bool): Status[Update] = d match {
-        case Anything => Unrefined(() => Some(List(Join(MustBeTrue).left, Join(MustBeFalse).left)))
+        case Anything => Unrefined(() => Some(List(Join(MustBeTrue), Join(MustBeFalse))))
         case Contradiction => Failed
         case _ => Refined
       }
       override def update[B <: Bool](d: B, u: Update): UpdateResult[Bool, IDelta, B] = {
         val res = u match {
-          case -\/(Join(x)) => Bool(d.intValue &  x.intValue)
-          case \/-(Diff(x)) => Bool(d.intValue & ~x.intValue)
+          case Join(x) => Bool(d.intValue &  x.intValue)
+          case Diff(x) => Bool(d.intValue & ~x.intValue)
         }
         if(res == d) UpdateResult() else UpdateResult(res, ())
       }
-      override def toJoinUpdate(d: Bool): Update = -\/(Join(d))
-      override def toComplementUpdate(d: Bool): Update = \/-(Diff(d))
-      override def ljoin[B <: Bool](d1: B, d2: Bool): UpdateResult[Bool, IDelta, B] = update(d1, -\/(Join(d2)))
+      override def toJoinUpdate(d: Bool): Update = Join(d)
+      override def toComplementUpdate(d: Bool): Update = Diff(d)
+      override def ljoin[B <: Bool](d1: B, d2: Bool): UpdateResult[Bool, IDelta, B] = update(d1, Join(d2))
       override def appendDeltas(d1: Delta, d2: Delta): Delta = ()
       override def bottom: Bool = Anything
     }

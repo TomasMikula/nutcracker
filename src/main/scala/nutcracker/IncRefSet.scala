@@ -24,10 +24,13 @@ object IncRefSet {
   def singleton[Ref[_], A](ref: Ref[A]): IncRefSet[Ref, A] = new IncRefSet(Set(ref))
   def wrap[Ref[_], A](refs: Set[Ref[A]]): IncRefSet[Ref, A] = new IncRefSet(refs)
 
-  type Update[Ref[_], A] = Join[IncRefSet[Ref, A]]
-  type Delta[Ref[_], A] = Diff[Set[Ref[A]]]
+  final case class Join[Ref[_], A](value: IncRefSet[Ref, A]) // extends AnyVal // value class may not wrap another user-defined value class
+  final case class Added[Ref[_], A](value: Set[Ref[A]]) extends AnyVal
 
-  type IncRefSetDom[Ref[_], A] = Dom.Aux[IncRefSet[Ref, A], Join[IncRefSet[Ref, A]], Diff[Set[Ref[A]]]]
+  type Update[Ref[_], A] = Join[Ref, A]
+  type Delta[Ref[_], A] = Added[Ref, A]
+
+  type IncRefSetDom[Ref[_], A] = Dom.Aux[IncRefSet[Ref, A], Join[Ref, A], Added[Ref, A]]
 
   implicit def domInstance[Ref[_], A]: IncRefSetDom[Ref, A] = new Dom[IncRefSet[Ref, A]] {
     type Update = IncRefSet.Update[Ref, A]
@@ -35,14 +38,14 @@ object IncRefSet {
 
     override def isFailed(d: IncRefSet[Ref, A]): Boolean = false
 
-    override def update[S <: IncRefSet[Ref, A]](s: S, u: Join[IncRefSet[Ref, A]]): UpdateResult[IncRefSet[Ref, A], IDelta, S] = {
+    override def update[S <: IncRefSet[Ref, A]](s: S, u: Update): UpdateResult[IncRefSet[Ref, A], IDelta, S] = {
       val res = s union u.value
-      if(res.size > s.size) UpdateResult(res, Diff(u.value.value diff s.value))
+      if(res.size > s.size) UpdateResult(res, Added(u.value.value diff s.value))
       else UpdateResult()
     }
 
-    override def appendDeltas(d1: Diff[Set[Ref[A]]], d2: Diff[Set[Ref[A]]]): Diff[Set[Ref[A]]] =
-      Diff(d1.value union d2.value)
+    override def appendDeltas(d1: Delta, d2: Delta): Delta =
+      Added(d1.value union d2.value)
   }
 
   implicit def deepEqual[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[IncRefSet[Ptr1, A1], IncRefSet[Ptr2, A2], Ptr1, Ptr2] =
@@ -59,6 +62,7 @@ object IncRefSet {
 
 
 class IncRefSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
+  import IncRefSet._
 
   def init[A]: F[Ref[IncRefSet[Ref, A]]] =
     P.newCell(IncRefSet.empty[Ref, A])
@@ -70,7 +74,7 @@ class IncRefSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
     import scalaz.syntax.traverse._
     ContU(f => P.observe(ref).by(as => {
       val now = as.toList.traverse_(f)
-      val onChange = Trigger.continually((as: IncRefSet[Ref, A], delta: Diff[Set[Ref[A]]]) => delta.value.toList.traverse_(f))
+      val onChange = Trigger.continually((as: IncRefSet[Ref, A], delta: Added[Ref, A]) => delta.value.toList.traverse_(f))
       Trigger.fireReload(now map (_ => onChange))
     }))
   }
@@ -84,7 +88,7 @@ class IncRefSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
   def include[A](sub: Ref[IncRefSet[Ref, A]], sup: Ref[IncRefSet[Ref, A]])(implicit F: Functor[F]): F[Unit] =
     P.observe(sub).by((sa: IncRefSet[Ref, A]) => {
       val now = insertAll(sa.value, sup)
-      val onChange = Trigger.continually((sa: IncRefSet[Ref, A], delta: Diff[Set[Ref[A]]]) => insertAll(delta.value, sup))
+      val onChange = Trigger.continually((sa: IncRefSet[Ref, A], delta: Added[Ref, A]) => insertAll(delta.value, sup))
       Trigger.fireReload(now map (_ => onChange))
     })
 
@@ -108,7 +112,7 @@ class IncRefSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
       res <- init[B]
       _ <- P.observe[IncRefSet[Ref, A]](sref).by((sa: IncRefSet[Ref, A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
-        val onChange = Trigger.continually((sa: IncRefSet[Ref, A], delta: Diff[Set[Ref[A]]]) => delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res))))
+        val onChange = Trigger.continually((sa: IncRefSet[Ref, A], delta: Added[Ref, A]) => delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res))))
         Trigger.fireReload(now map (_ => onChange))
       })
     } yield res

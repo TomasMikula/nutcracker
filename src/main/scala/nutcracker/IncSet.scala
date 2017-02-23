@@ -25,10 +25,13 @@ object IncSet {
   def singleton[A](a: A): IncSet[A] = new IncSet(Set(a))
   def wrap[A](as: Set[A]): IncSet[A] = new IncSet(as)
 
-  type Update[A] = Join[IncSet[A]]
-  type Delta[A] = Diff[Set[A]]
+  final case class Join[A](value: IncSet[A]) // extends AnyVal // value class may not wrap another user-defined value class
+  final case class Added[A](value: Set[A]) extends AnyVal
 
-  type IncSetDom[A] = Dom.Aux[IncSet[A], Join[IncSet[A]], Diff[Set[A]]]
+  type Update[A] = Join[A]
+  type Delta[A] = Added[A]
+
+  type IncSetDom[A] = Dom.Aux[IncSet[A], Update[A], Delta[A]]
 
   implicit def domInstance[A]: IncSetDom[A] = new Dom[IncSet[A]] {
     type Update = IncSet.Update[A]
@@ -36,14 +39,14 @@ object IncSet {
 
     override def isFailed(d: IncSet[A]): Boolean = false
 
-    override def update[S <: IncSet[A]](s: S, u: Join[IncSet[A]]): UpdateResult[IncSet[A], IDelta, S] = {
+    override def update[S <: IncSet[A]](s: S, u: Update): UpdateResult[IncSet[A], IDelta, S] = {
       val res = s union u.value
-      if(res.size > s.size) UpdateResult(res, Diff(u.value.value diff s.value))
+      if(res.size > s.size) UpdateResult(res, Added(u.value.value diff s.value))
       else UpdateResult()
     }
 
-    override def appendDeltas(d1: Diff[Set[A]], d2: Diff[Set[A]]): Diff[Set[A]] =
-      Diff(d1.value union d2.value)
+    override def appendDeltas(d1: Delta, d2: Delta): Delta =
+      Added(d1.value union d2.value)
   }
 
   implicit def deepEqual[Ptr1[_], Ptr2[_], A1, A2](implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): DeepEqual[IncSet[A1], IncSet[A2], Ptr1, Ptr2] =
@@ -60,6 +63,7 @@ object IncSet {
 
 
 class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
+  import IncSet._
 
   def init[A]: F[Ref[IncSet[A]]] =
     P.newCell(IncSet.empty[A])
@@ -71,7 +75,7 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
     import scalaz.syntax.traverse._
     ContU(f => P.observe(ref).by(as => {
       val now = as.toList.traverse_(f)
-      val onChange = Trigger.continually((as: IncSet[A], delta: Diff[Set[A]]) => delta.value.toList.traverse_(f))
+      val onChange = Trigger.continually((as: IncSet[A], delta: Delta[A]) => delta.value.toList.traverse_(f))
       Trigger.fireReload(now map (_ => onChange))
     }))
   }
@@ -85,7 +89,7 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
   def include[A](sub: Ref[IncSet[A]], sup: Ref[IncSet[A]])(implicit F: Functor[F]): F[Unit] =
     P.observe(sub).by((sa: IncSet[A]) => {
       val now = insertAll(sa.value, sup)
-      val onChange = Trigger.continually((sa: IncSet[A], delta: Diff[Set[A]]) => insertAll(delta.value, sup))
+      val onChange = Trigger.continually((sa: IncSet[A], delta: Delta[A]) => insertAll(delta.value, sup))
       Trigger.fireReload(now map (_ => onChange))
     })
 
@@ -113,7 +117,7 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
       res <- init[B]
       _ <- P.observe[IncSet[A]](sref).by((sa: IncSet[A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
-        val onChange = Trigger.continually((sa: IncSet[A], delta: Diff[Set[A]]) => delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res))))
+        val onChange = Trigger.continually((sa: IncSet[A], delta: Delta[A]) => delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res))))
         Trigger.fireReload(now map (_ => onChange))
       })
     } yield res

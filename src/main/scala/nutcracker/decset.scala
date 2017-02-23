@@ -1,8 +1,5 @@
 package nutcracker
 
-import scalaz.{-\/, \/, \/-}
-import scalaz.syntax.either._
-
 /** Decreasing set.
   * A wrapper for `Set` where a _monotonic_ update is one that removes
   * elements, e.g. by intersection or set difference. This is dual to
@@ -21,8 +18,13 @@ final class DecSet[A] private(private val value: Set[A]) extends AnyVal {
 }
 
 object DecSet {
-  type Update[A] = Join[DecSet[A]] \/ Diff[DecSet[A]]
-  type Delta[A] = Diff[Set[A]]
+  sealed abstract class Update[A]
+  final case class Join[A](value: DecSet[A]) extends Update[A]
+  final case class Diff[A](value: DecSet[A]) extends Update[A]
+
+  final case class Removed[A](value: Set[A]) extends AnyVal
+  final type Delta[A] = Removed[A]
+
   type Dom[A] = SplittableJoinDom.Aux[DecSet[A], Update[A], Delta[A]] with RelativelyComplementedDom[DecSet[A]]
 
   def apply[A](as: A*): DecSet[A] = new DecSet(Set(as: _*))
@@ -42,31 +44,31 @@ object DecSet {
     override def assess(d: DecSet[A]): Status[Update] = d.size match {
       case 0 => Failed
       case 1 => Refined
-      case _ => Unrefined(() => Some(d.toList map (x => Join(singleton(x)).left))) // split into singleton sets
+      case _ => Unrefined(() => Some(d.toList map (x => Join(singleton(x))))) // split into singleton sets
     }
 
     override def update[S <: DecSet[A]](s: S, u: Update): UpdateResult[DecSet[A], IDelta, S] = u match {
-      case -\/(m) => intersect(s, m.value);
-      case \/-(d) => diff(s, d.value);
+      case Join(m) => intersect(s, m)
+      case Diff(d) => diff(s, d)
     }
 
-    def toJoinUpdate(d: DecSet[A]) = -\/(Join(d))
-    def toComplementUpdate(d: DecSet[A]) = \/-(Diff(d))
+    def toJoinUpdate(d: DecSet[A]) = Join(d)
+    def toComplementUpdate(d: DecSet[A]) = Diff(d)
 
     override def appendDeltas(d1: Delta, d2: Delta): Delta =
-      Diff(d1.value union d2.value)
+      Removed(d1.value union d2.value)
 
     @inline
     private def intersect[D <: DecSet[A]](a: DecSet[A], b: DecSet[A]): UpdateResult[DecSet[A], IDelta, D] = {
       val res = a intersect b
-      if(res.size < a.size) UpdateResult(res, Diff(a.value diff b.value))
+      if(res.size < a.size) UpdateResult(res, Removed(a.value diff b.value))
       else UpdateResult()
     }
 
     @inline
     private def diff[D <: DecSet[A]](a: DecSet[A], b: DecSet[A]): UpdateResult[DecSet[A], IDelta, D] = {
       val res = a diff b
-      if(res.size < a.size) UpdateResult(res, Diff(a.value intersect b.value))
+      if(res.size < a.size) UpdateResult(res, Removed(a.value intersect b.value))
       else UpdateResult()
     }
   }
