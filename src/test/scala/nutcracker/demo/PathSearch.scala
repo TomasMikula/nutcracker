@@ -2,6 +2,7 @@ package nutcracker.demo
 
 import nutcracker._
 import nutcracker.algebraic.NonDecreasingMonoid
+import nutcracker.DecSet._
 import nutcracker.util.{FreeKT, InjectK}
 import org.scalatest.FunSuite
 import scala.annotation.tailrec
@@ -25,12 +26,10 @@ class PathSearch extends FunSuite {
   // not sure why scalac is not able to find this itself
   implicit val injC = implicitly[InjectK[solver.lang.CostL, Vocabulary]]
 
-  val B = Branching[Prg, Ref]
   val C = CostOps[Prg]
 
   implicit val freeKMonad: Monad[Prg] = FreeKT.freeKTMonad[Vocabulary, Id]
 
-  import B._
   import C._
 
 

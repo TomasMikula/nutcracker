@@ -38,6 +38,9 @@ object BranchingPropagation {
 
   def module(prop: Propagation.Module): Module[prop.type] =
     new BranchingPropagationModuleImpl(prop)
+
+  implicit def toPropagation[M[_], Ref[_]](implicit bp: BranchingPropagation[M, Ref]): Propagation[M, Ref] =
+    bp.propagation
 }
 
 private[nutcracker] class BranchingPropagationModuleImpl[P <: Propagation.Module](val Prop: P) extends BranchingPropagation.Module[P] {

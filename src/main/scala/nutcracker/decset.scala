@@ -1,5 +1,10 @@
 package nutcracker
 
+import nutcracker.BranchingPropagation._
+import nutcracker.ops._
+import scalaz.{Bind, Cont}
+import scalaz.syntax.bind._
+
 /** Decreasing set.
   * A wrapper for `Set` where a _monotonic_ update is one that removes
   * elements, e.g. by intersection or set difference. This is dual to
@@ -35,6 +40,27 @@ object DecSet {
     M.newVar(wrap(as))
   def oneOf[M[_], Ref[_], A](as: A*)(implicit M: BranchingPropagation[M, Ref]): M[Ref[DecSet[A]]] =
     oneOf(as.toSet)
+
+  /** Convenience method to add an exclusive choice of arbitrary free programs
+    * to continue. When the choice is made, the chosen program is executed.
+    */
+  def branchAndExec[M[_], Ref[_]](conts: Set[M[Unit]])(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): M[Unit] =
+    oneOf(conts) >>= { _.whenFinal(k => k) }
+  def branchAndExec[M[_], Ref[_]](conts: M[Unit]*)(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): M[Unit] =
+    branchAndExec(conts.toSet)
+
+  /** Convenience method to add an exclusive choice of multiple possibilities,
+    * presented as a continuation of the chosen element. Note that a "branching
+    * cell" (see [[oneOf[M,Ref,A](as:Set[A])*]]) is added for each callback that
+    * is registered on the returned continuation. Thus, if two callbacks are
+    * registered on the returned continuation, it will have the effect of making
+    * a choice from the cartesian product `as × as`. If this is not desired,
+    * use [[oneOf[M,Ref,A](as:Set[A])*]] directly.
+    */
+  def branchC[M[_], Ref[_], A](as: Set[A])(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): Cont[M[Unit], A] =
+    Cont(f => oneOf(as) >>= { _.asCont.apply(f) })
+  def branchC[M[_], Ref[_], A](as: A*)(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): Cont[M[Unit], A] =
+    branchC(as.toSet)
 
   implicit def domInstance[A]: DecSet.Dom[A] = new SplittableJoinDom[DecSet[A]] with RelativelyComplementedDom[DecSet[A]] {
     type Update = DecSet.Update[A]
