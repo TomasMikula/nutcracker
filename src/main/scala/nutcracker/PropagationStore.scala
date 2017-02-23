@@ -3,10 +3,10 @@ package nutcracker
 import scala.language.higherKinds
 import nutcracker.Assessment.{Done, Failed}
 import nutcracker.util.typealigned.APair
-import nutcracker.util.{FreeK, FreeKT, HEqualK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
+import nutcracker.util.{FreeK, HEqualK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
 
 import scalaz.Id._
-import scalaz.{Equal, Leibniz, Lens, Monad, Show, StateT, ~>}
+import scalaz.{Equal, Leibniz, Lens, Show, StateT, ~>}
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
 
@@ -65,15 +65,13 @@ private[nutcracker] object PropagationModuleImpl extends Propagation.Module {
         })
     }
 
-  def dfsSolver: DFSSolver[PropagationLang[Ref, Token, ?[_], ?], PropagationStore, Id, λ[A => Ref[Promise[A]]]] = {
-    implicit val mfp: Monad[FreeKT[PropagationLang[Ref, Token, ?[_], ?], Id, ?]] = FreeKT.freeKTMonad[PropagationLang[Ref, Token, ?[_], ?], Id]
-    new DFSSolver[PropagationLang[Ref, Token, ?[_], ?], PropagationStore, Id, λ[A => Ref[Promise[A]]]](
+  def dfsSolver: DFSSolver[Prg, PropagationStore, Id, λ[A => Ref[Promise[A]]]] =
+    new DFSSolver[Prg, PropagationStore, Id, λ[A => Ref[Promise[A]]]](
       interpreter.freeInstance,
-      empty[FreeK[PropagationLang[Ref, Token, ?[_], ?], ?]],
-      naiveAssess[FreeK[PropagationLang[Ref, Token, ?[_], ?], ?]],
+      empty[Prg],
+      naiveAssess[Prg],
       fetch
     )
-  }
 
   def naiveAssess[K[_], S[_[_]]](
     lens: Lens[S[K], State[K]])(implicit

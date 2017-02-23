@@ -27,8 +27,8 @@ object PropRel {
   def propStore: Lens[State[Prg], Prop.State[Prg]] = implicitly[Lens[State[Prg], Prop.State[Prg]]]
   def emptyState: State[Prg] = Prop.empty[Prg] :*: RelDB.empty[Prg]
 
-  def dfsSolver: DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]] =
-    new DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]](interpreter, emptyState, naiveAssess, fetch)
+  def dfsSolver: DFSSolver[Prg, State, Id, λ[A => Ref[Promise[A]]]] =
+    new DFSSolver[Prg, State, Id, λ[A => Ref[Promise[A]]]](interpreter, emptyState, naiveAssess, fetch)
 
   private def naiveAssess: State[Prg] => Assessment[List[Prg[Unit]]] =
     Prop.naiveAssess(propStore)

@@ -29,8 +29,8 @@ object PropBranch {
   def fetch[K[_], A](s: State[K])(ref: Ref[A]): A = Prop.fetch(propStore[K].get(s))(ref)
   def emptyState[K[_]]: State[K] = Prop.empty[K] :*: Branch.empty[K]
 
-  def dfsSolver: DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]] =
-    new DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]](interpreter, emptyState[Prg], naiveAssess, fetch)
+  def dfsSolver: DFSSolver[Prg, State, Id, λ[A => Ref[Promise[A]]]] =
+    new DFSSolver[Prg, State, Id, λ[A => Ref[Promise[A]]]](interpreter, emptyState[Prg], naiveAssess, fetch)
 
   private def naiveAssess: State[Prg] => Assessment[List[Prg[Unit]]] = s =>
     Prop.naiveAssess(propStore[Prg]).apply(s) orElse Branch.assess(branchStore[Prg].get(s))(λ[Ref ~> Id](ref => Prop.fetch(propStore[Prg].get(s))(ref)))

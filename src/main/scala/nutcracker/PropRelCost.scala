@@ -25,21 +25,22 @@ final class PropRelCost[C: NonDecreasingMonoid] {
   type Vocabulary[K[_], A] = (Prop.Lang  :+: RelLang :++: CostL)#Out[K, A]
   type State[K[_]]         = (Prop.State :*: RelDB   :**: CostS)#Out[K]
 
+  type Prg[A] = FreeK[Vocabulary, A]
+
   val interpreter = (Prop.interpreter :&: RelDB.interpreter :&&: CostLang.interpreter[C]).freeInstance
   def propStore[K[_]]: Lens[State[K], Prop.State[K]] = implicitly[Lens[State[K], Prop.State[K]]]
   def cost[K[_]]: Lens[State[K], CostS[K]] = implicitly[Lens[State[K], CostS[K]]]
 
-  private[PropRelCost] type Q[A] = FreeK[Vocabulary, A]
-  private def naiveAssess: State[Q] => Assessment[List[Q[Unit]]] =
-    Prop.naiveAssess(propStore[Q])
-  private def fetch: λ[A => Ref[Promise[A]]] ~> (State[Q] => ?) =
-    λ[λ[A => Ref[Promise[A]]] ~> (State[Q] => ?)](pa => s => Prop.fetchResult(propStore[Q].get(s))(pa).get)
-  private def getCost: State[Q] => C = s => cost[Q].get(s).value
-  private def emptyState: State[Q] =
-    Prop.empty[Q] :*: RelDB.empty[Q] :*: CostS(NonDecreasingMonoid[C].zero)
+  private def naiveAssess: State[Prg] => Assessment[List[Prg[Unit]]] =
+    Prop.naiveAssess(propStore[Prg])
+  private def fetch: λ[A => Ref[Promise[A]]] ~> (State[Prg] => ?) =
+    λ[λ[A => Ref[Promise[A]]] ~> (State[Prg] => ?)](pa => s => Prop.fetchResult(propStore[Prg].get(s))(pa).get)
+  private def getCost: State[Prg] => C = s => cost[Prg].get(s).value
+  private def emptyState: State[Prg] =
+    Prop.empty[Prg] :*: RelDB.empty[Prg] :*: CostS(NonDecreasingMonoid[C].zero)
 
-  def dfsSolver: DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]] =
-    new DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]](interpreter, emptyState, naiveAssess, fetch)
+  def dfsSolver: DFSSolver[Prg, State, Id, λ[A => Ref[Promise[A]]]] =
+    new DFSSolver[Prg, State, Id, λ[A => Ref[Promise[A]]]](interpreter, emptyState, naiveAssess, fetch)
   def bfsSolver: BFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]], C] =
     new BFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]], C](interpreter, emptyState, naiveAssess, fetch, getCost)
 }

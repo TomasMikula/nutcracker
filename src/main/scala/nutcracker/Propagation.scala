@@ -113,13 +113,15 @@ object Propagation {
     type Lang[K[_], A]
     type State[K[_]]
 
+    type Prg[A] = FreeK[Lang, A]
+
     implicit def refEquality: HEqualK[Ref]
     implicit def refShow: ShowK[Ref]
     implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref]
 
     def empty[K[_]]: State[K]
     def interpreter: StateInterpreter[Lang, State]
-    def dfsSolver: DFSSolver[Lang, State, Id, λ[A => Ref[Promise[A]]]]
+    def dfsSolver: DFSSolver[Prg, State, Id, λ[A => Ref[Promise[A]]]]
 
     def naiveAssess[K[_], S[_[_]]](
       lens: Lens[S[K], State[K]])(implicit
