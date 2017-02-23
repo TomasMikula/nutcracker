@@ -20,7 +20,7 @@ object PropRel {
 
   val interpreter = (Prop.interpreter :&&: RelDB.interpreter).freeInstance
   def propStore: Lens[State[Q], Prop.State[Q]] = implicitly[Lens[State[Q], Prop.State[Q]]]
-  def emptyState: State[Q] = Prop.emptyF[Vocabulary] :**: RelDB.empty[Q]
+  def emptyState: State[Q] = Prop.empty[Q] :*: RelDB.empty[Q]
 
   def dfsSolver: DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]] =
     new DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]](interpreter, emptyState, naiveAssess, fetch)

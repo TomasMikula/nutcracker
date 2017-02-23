@@ -36,7 +36,7 @@ final class PropRelCost[C: NonDecreasingMonoid] {
     λ[λ[A => Ref[Promise[A]]] ~> (State[Q] => ?)](pa => s => Prop.fetchResult(propStore[Q].get(s))(pa).get)
   private def getCost: State[Q] => C = s => cost[Q].get(s).value
   private def emptyState: State[Q] =
-    Prop.empty[Q] :*: RelDB.empty[Q] :**: CostS(NonDecreasingMonoid[C].zero)
+    Prop.empty[Q] :*: RelDB.empty[Q] :*: CostS(NonDecreasingMonoid[C].zero)
 
   def dfsSolver: DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]] =
     new DFSSolver[Vocabulary, State, Id, λ[A => Ref[Promise[A]]]](interpreter, emptyState, naiveAssess, fetch)

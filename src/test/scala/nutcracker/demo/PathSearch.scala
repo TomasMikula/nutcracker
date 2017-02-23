@@ -1,13 +1,10 @@
 package nutcracker.demo
 
 import nutcracker._
-import nutcracker.PropagationLang._
 import nutcracker.algebraic.NonDecreasingMonoid
-import nutcracker.util.{FreeK, FreeKT, InjectK}
+import nutcracker.util.{FreeKT, InjectK}
 import org.scalatest.FunSuite
-
 import scala.annotation.tailrec
-import scala.language.higherKinds
 import scalaz.Id._
 import scalaz.{Equal, Monad, Ordering, StreamT}
 
@@ -19,23 +16,19 @@ class PathSearch extends FunSuite {
     def order(x: Int, y: Int): Ordering = Ordering.fromInt(x - y)
   }
 
-  val lang = new PropCost[Int]
-  val solver = lang.bfsSolver
+  val propBranchCost = new PropBranchCost[Int]
+  import propBranchCost._
 
-  import lang._
-  import lang.Prop.{Ref => _, _}
+  val solver = bfsSolver
 
-  type Lang[K[_], A] = lang.Vocabulary[K, A]
+  // not sure why scalac is not able to find this itself
+  implicit val injC = implicitly[InjectK[solver.lang.CostL, Vocabulary]]
 
-  // not sure why scalac is not able to find these itself
-  implicit val injP = implicitly[InjectK[Prop.Lang, Lang]]
-  implicit val injC = implicitly[InjectK[solver.lang.CostL, Lang]]
+  val P = PromiseOps[Prg, Ref]
+  val B = Branching[Prg, Ref]
+  val C = CostOps[Prg]
 
-  val P = PromiseOps[FreeK[Lang, ?], Ref]
-  val B = Branching[FreeK[Lang, ?], Ref]
-  val C = CostOps[FreeK[Lang, ?]]
-
-  implicit val freeKMonad: Monad[FreeKT[Lang, Id, ?]] = FreeKT.freeKTMonad[Lang, Id]
+  implicit val freeKMonad: Monad[Prg] = FreeKT.freeKTMonad[Vocabulary, Id]
 
   import P._
   import B._
@@ -95,24 +88,24 @@ class PathSearch extends FunSuite {
 
   def successors(v: Vertex): List[(Int, Vertex)] = edges filter { _._1 == v } map { _._2 }
 
-  def findPath(u: Vertex, v: Vertex): FreeK[Lang, Ref[Promise[Path]]] = for {
+  def findPath(u: Vertex, v: Vertex): Prg[Ref[Promise[Path]]] = for {
     pr <- promise[Path]
     _ <- findPath(Nil, u, v, pr)
   } yield pr
 
-  def findPath(visited: List[Vertex], u: Vertex, v: Vertex, pr: Ref[Promise[Path]]): FreeK[Lang, Unit] = {
+  def findPath(visited: List[Vertex], u: Vertex, v: Vertex, pr: Ref[Promise[Path]]): Prg[Unit] = {
     branchAndExec(
       zeroLengthPaths(visited, u, v, pr),
       nonZeroLengthPaths(visited, u, v, pr)
     )
   }
 
-  def zeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Ref[Promise[Path]]): FreeK[Lang, Unit] = {
+  def zeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Ref[Promise[Path]]): Prg[Unit] = {
     if(u == v) complete(pr, revPath(u::visited))
     else branchAndExec()
   }
 
-  def nonZeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Ref[Promise[Path]]): FreeK[Lang, Unit] = {
+  def nonZeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Ref[Promise[Path]]): Prg[Unit] = {
     val branches = successors(u) filter {
       case (c, w) => w != u && !visited.contains(w)
     } map {

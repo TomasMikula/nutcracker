@@ -1,6 +1,6 @@
 package nutcracker.lib.bool
 
-import nutcracker.{Diff, Dom, DomWithBottom, Final, Join, JoinDom, UpdateResult}
+import nutcracker.{Diff, Final, Join, RelativelyComplementedDom, SplittableDomWithBottom, UpdateResult}
 
 import scalaz.{-\/, \/, \/-}
 import scalaz.syntax.either._
@@ -13,7 +13,7 @@ import scalaz.syntax.either._
 final case class Bool private(intValue: Int) extends AnyVal
 
 object Bool {
-  type BoolDom = DomWithBottom.Aux[Bool, Join[Bool] \/ Diff[Bool], Unit]
+  type BoolDom = RelativelyComplementedDom[Bool] with SplittableDomWithBottom.Aux[Bool, Join[Bool] \/ Diff[Bool], Unit]
 
   val Contradiction = Bool(0)
   val MustBeTrue = Bool(1)
@@ -35,14 +35,15 @@ object Bool {
   }
 
   implicit val boolDomain: BoolDom =
-    new JoinDom[Bool] with DomWithBottom[Bool] {
+    new RelativelyComplementedDom[Bool] with SplittableDomWithBottom[Bool] {
       type Update = Join[Bool] \/ Diff[Bool]
       type Delta = Unit
 
-      override def assess(d: Bool): Dom.Status[Update] = d match {
-        case Anything => Dom.Unrefined(() => Some(List(Join(MustBeTrue).left, Join(MustBeFalse).left)))
-        case Contradiction => Dom.Failed
-        case _ => Dom.Refined
+      import nutcracker.Splittable._
+      override def assess(d: Bool): Status[Update] = d match {
+        case Anything => Unrefined(() => Some(List(Join(MustBeTrue).left, Join(MustBeFalse).left)))
+        case Contradiction => Failed
+        case _ => Refined
       }
       override def update[B <: Bool](d: B, u: Update): UpdateResult[Bool, IDelta, B] = {
         val res = u match {
@@ -51,6 +52,8 @@ object Bool {
         }
         if(res == d) UpdateResult() else UpdateResult(res, ())
       }
+      override def toJoinUpdate(d: Bool): Update = -\/(Join(d))
+      override def toComplementUpdate(d: Bool): Update = \/-(Diff(d))
       override def ljoin[B <: Bool](d1: B, d2: Bool): UpdateResult[Bool, IDelta, B] = update(d1, -\/(Join(d2)))
       override def appendDeltas(d1: Delta, d2: Delta): Delta = ()
       override def bottom: Bool = Anything

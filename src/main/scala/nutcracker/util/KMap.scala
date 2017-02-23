@@ -1,5 +1,7 @@
 package nutcracker.util
 
+import nutcracker.util.typealigned.APair
+
 import scala.language.existentials
 import scala.language.higherKinds
 import scalaz.~>
@@ -23,6 +25,8 @@ final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
     KMap[K, W](map.mapValues[W[_]](v => f(v)))
   def ++(that: KMap[K, V]): KMap[K, V] =
     KMap[K, V](this.map ++ that.map)
+  def toStream: Stream[APair[K, V]] =
+    map.toStream.map(kv => APair(kv._1.asInstanceOf[K[Any]], kv._2.asInstanceOf[V[Any]]))
 }
 
 object KMap {

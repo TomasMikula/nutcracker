@@ -1,6 +1,6 @@
 package nutcracker.demo
 
-import nutcracker.{FinalVars, PromiseOps, Propagation}
+import nutcracker.{PromiseOps, PropBranch}
 import nutcracker.lib.bool.Bool._
 import nutcracker.lib.bool._
 import nutcracker.util._
@@ -19,18 +19,16 @@ import scalaz.std.anyVal._
 // the inhabitants' type from their statements.
 
 class KnightsAndKnaves extends FreeSpec {
-  val Prop = Propagation.module
-  import Prop._
+  import PropBranch._
+  import PropBranch.branchingPropagation.{propagation => _, _}
 
-  val V = FinalVars[FreeK[Prop.Lang, ?], Ref]
-  val B = BoolOps[FreeK[Prop.Lang, ?], Ref]
-  val P = PromiseOps[FreeK[Prop.Lang, ?], Ref]
+  val B = BoolOps[Prg, Ref]
+  val P = PromiseOps[Prg, Ref]
 
-  import V._
   import B._
   import P._
 
-  implicit val freeKMonad: Monad[FreeKT[Prop.Lang, Id, ?]] = FreeKT.freeKTMonad[Prop.Lang, Id]
+  implicit val freeKMonad: Monad[Prg] = FreeKT.freeKTMonad[Vocabulary, Id]
 
   val solver = dfsSolver
 
@@ -40,9 +38,9 @@ class KnightsAndKnaves extends FreeSpec {
     // B then says "A said that he is a knave" and
     // C says "Don't believe B; he is lying!"
     val problem = for {
-      a <- variable[Boolean]()
-      b <- variable[Boolean]()
-      c <- variable[Boolean]()
+      a <- newVar[Bool]
+      b <- newVar[Bool]
+      c <- newVar[Bool]
 
       // b says (a says knave(a))
       _ <- B.presume(b =??= (a =??= neg(a)))
@@ -72,8 +70,8 @@ class KnightsAndKnaves extends FreeSpec {
     // "Are there any knaves among you?"
     // A replies "Yes."
     val problem = (for {
-      a <- variable[Boolean]()
-      b <- variable[Boolean]()
+      a <- newVar[Bool]
+      b <- newVar[Bool]
 
       // a says (knave(a) ∨ knave(b))
       _ <- presume(a =??= (neg(a) || neg(b)))
@@ -97,8 +95,8 @@ class KnightsAndKnaves extends FreeSpec {
     // The visitor meets inhabitants A and B.
     // A says "We are both knaves."
     val problem = (for {
-      a <- variable[Boolean]()
-      b <- variable[Boolean]()
+      a <- newVar[Bool]
+      b <- newVar[Bool]
 
       // a says (knave(a) ∧ knave(b))
       _ <- presume(a =??= (neg(a) && neg(b)))
@@ -124,8 +122,8 @@ class KnightsAndKnaves extends FreeSpec {
     // A says "We are the same kind."
     // B says "We are of different kinds."
     val problem = (for {
-      a <- variable[Boolean]()
-      b <- variable[Boolean]()
+      a <- newVar[Bool]
+      b <- newVar[Bool]
 
       // a says (kind(a) = kind(b))
       _ <- presume(a =??= (a =?= b))

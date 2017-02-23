@@ -1,11 +1,6 @@
 package nutcracker {
 
   /** Used as a monotonic update on domain D:
-    * represents the operation of lattice meet with the given value.
-    */
-  final case class Meet[+D](value: D) extends AnyVal
-
-  /** Used as a monotonic update on domain D:
     * represents the operation of lattice join with the given value.
     */
   final case class Join[D](value: D) extends AnyVal

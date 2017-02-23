@@ -23,21 +23,26 @@ final class DecSet[A] private(private val value: Set[A]) extends AnyVal {
 object DecSet {
   type Update[A] = Join[DecSet[A]] \/ Diff[DecSet[A]]
   type Delta[A] = Diff[Set[A]]
+  type Dom[A] = SplittableJoinDom.Aux[DecSet[A], Update[A], Delta[A]] with RelativelyComplementedDom[DecSet[A]]
 
   def apply[A](as: A*): DecSet[A] = new DecSet(Set(as: _*))
   def singleton[A](a: A): DecSet[A] = new DecSet(Set(a))
   def wrap[A](as: Set[A]): DecSet[A] = new DecSet(as)
 
-  type Dom[A] = JoinDom.Aux[DecSet[A], Update[A], Delta[A]]
+  def oneOf[M[_], Ref[_], A](as: Set[A])(implicit M: BranchingPropagation[M, Ref]): M[Ref[DecSet[A]]] =
+    M.newVar(wrap(as))
+  def oneOf[M[_], Ref[_], A](as: A*)(implicit M: BranchingPropagation[M, Ref]): M[Ref[DecSet[A]]] =
+    oneOf(as.toSet)
 
-  implicit def domInstance[A]: DecSet.Dom[A] = new nutcracker.JoinDom[DecSet[A]] {
+  implicit def domInstance[A]: DecSet.Dom[A] = new SplittableJoinDom[DecSet[A]] with RelativelyComplementedDom[DecSet[A]] {
     type Update = DecSet.Update[A]
     type Delta = DecSet.Delta[A]
 
-    override def assess(d: DecSet[A]): Dom.Status[Update] = d.size match {
-      case 0 => Dom.Failed
-      case 1 => Dom.Refined
-      case _ => Dom.Unrefined(() => Some(d.toList map (x => Join(singleton(x)).left))) // split into singleton sets
+    import Splittable._
+    override def assess(d: DecSet[A]): Status[Update] = d.size match {
+      case 0 => Failed
+      case 1 => Refined
+      case _ => Unrefined(() => Some(d.toList map (x => Join(singleton(x)).left))) // split into singleton sets
     }
 
     override def update[S <: DecSet[A]](s: S, u: Update): UpdateResult[DecSet[A], IDelta, S] = u match {
@@ -45,8 +50,8 @@ object DecSet {
       case \/-(d) => diff(s, d.value);
     }
 
-    def ljoin[D <: DecSet[A]](d1: D, d2: DecSet[A]): UpdateResult[DecSet[A], IDelta, D] =
-      update(d1, -\/(Join(d2)))
+    def toJoinUpdate(d: DecSet[A]) = -\/(Join(d))
+    def toComplementUpdate(d: DecSet[A]) = \/-(Diff(d))
 
     override def appendDeltas(d1: Delta, d2: Delta): Delta =
       Diff(d1.value union d2.value)

@@ -1,12 +1,12 @@
 package nutcracker
 
 import scala.language.higherKinds
-import scalaz.{Applicative, Bind, Lens, Traverse, ~>}
-import scalaz.std.vector._
+import scalaz.{Applicative, Bind, Lens, ~>}
 import scalaz.syntax.bind._
 import shapeless.{::, HList, HNil}
 import Trigger._
 import nutcracker.util.{FreeK, HEqualK, InjectK, ShowK, StateInterpreter}
+import nutcracker.util.ops.applicative._
 
 import scalaz.Id.Id
 
@@ -21,6 +21,9 @@ trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
   def selTrigger[L <: HList](sel: Sel[Ref, L])(f: Id ~> λ[α => L => TriggerF[M, α]]): M[Unit]
 
 
+  def newCell[D](implicit dom: DomWithBottom[D]): M[Ref[D]] =
+    newCell(dom.bottom)
+
   def update[D](ref: Ref[D])(implicit dom: Dom[D]): UpdateSyntaxHelper[D, dom.Update, dom.Delta] =
     new UpdateSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
 
@@ -32,7 +35,7 @@ trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
   // derived methods
 
   def cells[D](d: D, n: Int)(implicit dom: Dom[D], M: Applicative[M]): M[Vector[Ref[D]]] =
-    Traverse[Vector].sequence(Vector.fill(n)(newCell(d)))
+    newCell(d).replicate(n)
 
   def selTrigger2[D1, D2](ref1: Ref[D1], ref2: Ref[D2])(f: Id ~> λ[α => (D1, D2) => TriggerF[M, α]]): M[Unit] =
     selTrigger[D1 :: D2 :: HNil](Sel(ref1, ref2))(λ[Id ~> λ[α => (D1 :: D2 :: HNil) => TriggerF[M, α]]](
@@ -112,10 +115,9 @@ object Propagation {
 
     implicit def refEquality: HEqualK[Ref]
     implicit def refShow: ShowK[Ref]
-    implicit def propagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref]
+    implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref]
 
     def empty[K[_]]: State[K]
-    def emptyF[F[_[_], _]]: State[FreeK[F, ?]]
     def interpreter: StateInterpreter[Lang, State]
     def dfsSolver: DFSSolver[Lang, State, Id, λ[A => Ref[Promise[A]]]]
 

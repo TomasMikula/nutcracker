@@ -56,10 +56,6 @@ object KPair {
     }
 
   implicit class AnyOps[G[_[_]], A[_]](val g: G[A]) extends AnyVal {
-    def :**:[F[_[_]]](f: F[A]): KPair[F, G, A] = KPair(f, g)
-  }
-
-  implicit class KPairOps[G[_[_]], H[_[_]], A[_]](val p: KPair[G, H, A]) extends AnyVal {
-    def :*:[F[_[_]]](f: F[A]): KPair[F, (G :**: H)#Out, A] = KPair(f, p)
+    def :*:[F[_[_]]](f: F[A]): KPair[F, G, A] = KPair(f, g)
   }
 }

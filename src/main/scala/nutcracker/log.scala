@@ -3,8 +3,6 @@ package nutcracker
 import scala.language.higherKinds
 import scala.language.implicitConversions
 
-import nutcracker.Dom.Status
-
 /** Convenience methods to work with a list as a prepend-only log.
   * Monotonic update is prepending an element to the list.
   * A diff is a list of appended elements.
@@ -35,6 +33,6 @@ object log {
 
     override def appendDeltas(d1: Log[A], d2: Log[A]): Log[A] = d2 ::: d1
 
-    override def assess(d: Log[A]): Status[A] = Dom.Refined
+    override def isFailed(d: Log[A]) = false
   }
 }

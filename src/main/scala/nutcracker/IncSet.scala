@@ -34,10 +34,7 @@ object IncSet {
     type Update = IncSet.Update[A]
     type Delta = IncSet.Delta[A]
 
-    override def assess(d: IncSet[A]): Dom.Status[Join[IncSet[A]]] = d.size match {
-      case 0 => Dom.Unrefined(() => None)
-      case _ => Dom.Refined
-    }
+    override def isFailed(d: IncSet[A]): Boolean = false
 
     override def update[S <: IncSet[A]](s: S, u: Join[IncSet[A]]): UpdateResult[IncSet[A], IDelta, S] = {
       val res = s union u.value

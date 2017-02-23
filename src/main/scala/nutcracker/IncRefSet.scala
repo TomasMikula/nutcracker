@@ -33,10 +33,7 @@ object IncRefSet {
     type Update = IncRefSet.Update[Ref, A]
     type Delta = IncRefSet.Delta[Ref, A]
 
-    override def assess(d: IncRefSet[Ref, A]): Dom.Status[Join[IncRefSet[Ref, A]]] = d.size match {
-      case 0 => Dom.Unrefined(() => None)
-      case _ => Dom.Refined
-    }
+    override def isFailed(d: IncRefSet[Ref, A]): Boolean = false
 
     override def update[S <: IncRefSet[Ref, A]](s: S, u: Join[IncRefSet[Ref, A]]): UpdateResult[IncRefSet[Ref, A], IDelta, S] = {
       val res = s union u.value

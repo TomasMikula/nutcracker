@@ -1,26 +1,25 @@
 package nutcracker.demo
 
-import nutcracker.PropagationLang._
 import nutcracker._
 import nutcracker.lib.bool.Bool._
 import nutcracker.lib.bool._
-import nutcracker.util.{FreeK, FreeKT}
+import nutcracker.util.FreeKT
+import nutcracker.util.ops.applicative._
 import org.scalatest.FunSpec
 
 import scalaz.Id._
 import scalaz.Monad
 import scalaz.std.anyVal._
 import scalaz.std.vector._
+import scalaz.syntax.traverse._
 
 class Sat extends FunSpec {
-  val Prop = Propagation.module
-  import Prop._
+  import PropBranch._
+  import PropBranch.branchingPropagation.{propagation => _, _}
 
-  val V = FinalVars[FreeK[Prop.Lang, ?], Ref]
-  val B = BoolOps[FreeK[Prop.Lang, ?], Ref]
-  val P = PromiseOps[FreeK[Prop.Lang, ?], Ref]
+  val B = BoolOps[Prg, Ref]
+  val P = PromiseOps[Prg, Ref]
 
-  import V._
   import B._
   import P._
 
@@ -32,8 +31,8 @@ class Sat extends FunSpec {
   describe("A simple 3-SAT problem") {
 
     val problem = for {
-      a <- variable[Boolean].count(4)()
-      ā <- FreeK.traverse(a){ neg(_) }
+      a <- newVar[Bool].replicate(4)
+      ā <- a.traverse(neg(_))
 
       _ <- atLeastOneTrue(a(0), a(1), a(2))
       _ <- atLeastOneTrue(ā(1), a(2), ā(3))

@@ -1,7 +1,6 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.Dom.{Refined, Status}
 import nutcracker.util.{ContU, Lst}
 
 import scalaz.{Bind, Functor}
@@ -10,8 +9,6 @@ import scalaz.syntax.bind._
 /** A set of domain references, with auto-cleaning failed domains.
   *
   * Monotonic updates are adding more references to the set.
-  *
-  * It is considered refined at all times.
   */
 final case class DomSet[Ref[_], A](value: Set[Ref[A]]) extends AnyVal
 
@@ -41,10 +38,10 @@ object DomSet {
     } yield res
 
   def insert[F[_], Ref[_], A](ref: Ref[A], into: Ref[DomSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Functor[F]): F[Unit] = {
-    P.observe(ref).untilRight(d => dom.assess(d) match {
-      case Dom.Failed => Right(P.update(into).by(Failed(ref)))
-      case _ => Left(P.update(into).by(Insert(ref)))
-    })
+    P.observe(ref).untilRight(d =>
+      if(dom.isFailed(d)) Right(P.update(into).by(Failed(ref)))
+      else Left(P.update(into).by(Insert(ref)))
+    )
   }
 
   implicit def domInstance[Ref[_], A]: Dom.Aux[DomSet[Ref, A], Update[Ref, A], Delta[Ref, A]] = new Dom[DomSet[Ref, A]] {
@@ -64,6 +61,6 @@ object DomSet {
 
     def appendDeltas(d1: Delta, d2: Delta): Delta = Inserted(d1.refs ++ d2.refs)
 
-    def assess(d: DomSet[Ref, A]): Status[Update] = Refined
+    def isFailed(d: DomSet[Ref, A]): Boolean = false
   }
 }

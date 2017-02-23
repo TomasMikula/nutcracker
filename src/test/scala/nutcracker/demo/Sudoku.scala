@@ -1,74 +1,68 @@
 package nutcracker.demo
 
 import nutcracker._
-import nutcracker.util.{FreeK, FreeKT}
+import nutcracker.DecSet._
+import nutcracker.ops._
+import nutcracker.util.ops._
 import nutcracker.util.FreeK._
 import org.scalatest.FunSuite
 
-import scalaz.Id._
-import scalaz.Monad
 import scalaz.std.anyVal._
 
 class Sudoku extends FunSuite {
-  val Prop = Propagation.module
-  import Prop._
+  import PropBranch._
 
-  val P1 = Propagation[FreeK[Prop.Lang, ?], Ref]
-  val P2 = PromiseOps[FreeK[Prop.Lang, ?], Ref]
-  val V = FinalVars[FreeK[Prop.Lang, ?], Ref]
+  val P1 = Propagation[Prg, Ref]
+  val P2 = PromiseOps[Prg, Ref]
 
   import P1._
   import P2._
-  import V._
-
-  implicit val freeKMonad: Monad[FreeKT[Prop.Lang, Id, ?]] = FreeKT.freeKTMonad[Prop.Lang, Id]
 
 
   val solver = dfsSolver
 
   type Cell = Ref[DecSet[Int]]
-  type Cells = Vector[Cell]
 
   /** A program that sets up an empty Sudoku, that is 81 integer variables
     * and definitional constraints.
     */
-  val sudoku0: FreeK[Prop.Lang, Cells] = {
+  val sudoku0: Prg[Vector[Cell]] = {
     for {
       // create 81 integer variables, ranging from 1 to 9
-      cells <- variable[Int].count(81).oneOf((1 to 9).toSet)
+      cells <- oneOf((1 to 9): _*).replicate(81)
 
       // numbers in each row are all different
-      _ <- sequence_(rows(cells) map { allDifferent(_:_*) })
+      _ <- sequence_(rows(cells) map { _.allDifferent })
 
       // numbers in each column are all different
-      _ <- sequence_(cols(cells) map { allDifferent(_:_*) })
+      _ <- sequence_(cols(cells) map { _.allDifferent })
 
       // numbers in each 3x3 square are all different
-      _ <- sequence_(sqrs(cells) map { allDifferent(_:_*) })
+      _ <- sequence_(sqrs(cells) map { _.allDifferent })
     } yield cells
   }
 
   /** A more sophisticated Sudoku program that includes additional constraints
     * and thus reduces the amount of guessing and backtracking.
     */
-  val sudoku1: FreeK[Prop.Lang, Cells] = {
+  val sudoku1: Prg[Vector[Cell]] = {
 
     // For the given segment (row/column/3x3 square) and number,
     // keep a set of possible positions of that number in that segment.
     // When only one possible position remains, enter the number to that cell.
-    def segNumConstraint(seg: Seq[Cell], x: Int): FreeK[Prop.Lang, Unit] = {
+    def segNumConstraint(seg: Seq[Cell], x: Int): Prg[Unit] = {
       for {
-        xPos <- variable[Cell].oneOf(seg.toSet)
+        xPos <- oneOf(seg: _*)
         _ <- sequence_(seg map { cell => observe(cell).threshold(ys =>
-          if(!ys.contains(x)) Some(exclude(xPos, cell))
-          else if(ys.size == 1) Some(V.set(xPos, cell))
+          if(!ys.contains(x)) Some(xPos.remove(cell))
+          else if(ys.size == 1) Some(xPos.set(cell))
           else None
         )})
-        _ <- whenFinal(xPos).exec(cell => V.set(cell, x))
+        _ <- xPos.whenFinal(cell => cell.set(x))
       } yield ()
     }
 
-    def segConstraints(seg: Seq[Cell]): FreeK[Prop.Lang, Unit] = {
+    def segConstraints(seg: Seq[Cell]): Prg[Unit] = {
       sequence_((1 to 9) map { segNumConstraint(seg, _) })
     }
 
@@ -83,15 +77,15 @@ class Sudoku extends FunSuite {
   /** Returns function that, given Sudoku cells, returns a program
     * to enter the given number to the specified cell.
     */
-  def set(i: Int, j: Int, value: Int): Cells => FreeK[Prop.Lang, Unit] =
-    cells => V.set(cells(i*9 + j), value)
+  def set(i: Int, j: Int, value: Int): Vector[Cell] => Prg[Unit] =
+    cells => cells(i*9 + j).set(value)
 
 
   // technicalities
 
-  private lazy val _rows: Seq[Seq[Int]] = (0 until 9) map { i => (0 until 9) map { j => i*9 + j } }
-  private lazy val _cols: Seq[Seq[Int]] = (0 until 9) map { j => (0 until 9) map { i => i*9 + j } }
-  private lazy val _sqrs: Seq[Seq[Int]] =
+  private lazy val _rows: IndexedSeq[IndexedSeq[Int]] = (0 until 9) map { i => (0 until 9) map { j => i*9 + j } }
+  private lazy val _cols: IndexedSeq[IndexedSeq[Int]] = (0 until 9) map { j => (0 until 9) map { i => i*9 + j } }
+  private lazy val _sqrs: IndexedSeq[IndexedSeq[Int]] =
     for {
       i <- 0 until 3
       j <- 0 until 3
@@ -100,15 +94,15 @@ class Sudoku extends FunSuite {
       l <- 0 until 3
     } yield (i*3 + k)*9 + j*3 + l
 
-  private def rows(cells: Cells): Seq[Seq[Cell]] = {
+  private def rows(cells: Vector[Cell]): IndexedSeq[IndexedSeq[Cell]] = {
     _rows map { _ map { cells(_) } }
   }
 
-  private def cols(cells: Cells): Seq[Seq[Cell]] = {
+  private def cols(cells: Vector[Cell]): IndexedSeq[IndexedSeq[Cell]] = {
     _cols map { _ map { cells(_) } }
   }
 
-  private def sqrs(cells: Cells): Seq[Seq[Cell]] = {
+  private def sqrs(cells: Vector[Cell]): IndexedSeq[IndexedSeq[Cell]] = {
     _sqrs map { _ map { cells(_) } }
   }
 

@@ -2,6 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 
+import nutcracker.ops._
 import scalaz.{Apply, Bind, Cont, Equal}
 import scalaz.std.tuple._
 import scalaz.std.vector._
@@ -14,7 +15,7 @@ final class PromiseOps[M[_], Ref[_]](implicit M: Propagation[M, Ref]) {
 
   def promise[A: Equal]: M[Ref[Promise[A]]] = M.newCell(Promise.empty[A])
 
-  def complete[A: Equal](p: Ref[Promise[A]], a: A): M[Unit] = M.update(p).by(Promise.Complete(a))
+  def complete[A: Equal](p: Ref[Promise[A]], a: A): M[Unit] = M.update(p).by(Promise.Completed(a))
 
   def promiseC[A: Equal](cont: Cont[M[Unit], A])(implicit MB: Bind[M]): M[Ref[Promise[A]]] =
     promise[A] >>= (pa => MB.map(cont(complete(pa, _)))((_: Unit) => pa))
@@ -29,7 +30,7 @@ final class PromiseOps[M[_], Ref[_]](implicit M: Propagation[M, Ref]) {
       if (i < 0) {
         complete(pr, tail.toVector)
       } else {
-        FinalVars[M, Ref].whenFinal(cells(i)).exec(a => go(pr, a :: tail, i - 1))
+        cells(i).whenFinal(a => go(pr, a :: tail, i - 1))
       }
     }
 

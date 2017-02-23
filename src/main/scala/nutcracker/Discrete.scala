@@ -1,6 +1,5 @@
 package nutcracker
 
-import nutcracker.Dom.{Refined, Status}
 import nutcracker.ops._
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput, Uninhabited}
 
@@ -53,7 +52,7 @@ object Discrete extends DiscreteInstances {
 
     def update[D <: Discrete[A]](d: D, u: Update): UpdateResult[Discrete[A], IDelta, D] = sys.error("unreachable code")
     def appendDeltas(d1: Delta, d2: Delta): Delta = sys.error("unreachable code")
-    def assess(d: Discrete[A]): Status[Update] = Refined
+    def isFailed(d: Discrete[A]): Boolean = false
   }
 
   implicit def finalInstance[A]: Final.Aux[Discrete[A], A] = new Final[Discrete[A]] {

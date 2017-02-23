@@ -28,9 +28,7 @@ object Promise {
   final case class Completed[A](value: A) extends Promise[A]
   final case object Conflict extends Promise[Nothing] // promise completed multiple times with different values
 
-  final case class Complete[A](value: A) extends AnyVal
-
-  type Update[A] = Complete[A]
+  type Update[A] = Promise[A]
   type Delta[A] = Unit
 
   def empty[A]: Promise[A] = Empty
@@ -55,33 +53,26 @@ object Promise {
     def embed(a: A): Promise[A] = Completed(a)
   }
 
-  implicit def promiseDomain[A](implicit EqA: Equal[A]): JoinDom.Aux[Promise[A], Complete[A], Unit] = new JoinDom[Promise[A]] {
-    type Update = Complete[A]
-    type Delta = Unit
+  implicit def promiseDomain[A](implicit EqA: Equal[A]): JoinDom.Template[Promise[A]] =
+    new JoinDom.Template[Promise[A]] {
 
-    override def assess(pa: Promise[A]): Dom.Status[Complete[A]] = pa match {
-      case Empty => Dom.Unrefined(() => None)
-      case Completed(a) => Dom.Refined
-      case Conflict => Dom.Failed
+      override def isFailed(pa: Promise[A]): Boolean = pa match {
+        case Conflict => true
+        case _ => false
+      }
+
+      override def ljoin0(d1: Promise[A], d2: Promise[A]): Option[Promise[A]] = (d1, d2) match {
+        case (_, Empty) => None
+        case (Empty, c2 @ Completed(_)) => Some(c2)
+        case (Completed(a1) , Completed(a2)) =>
+          if(EqA.equal(a1, a2)) None
+          else Some(Conflict)
+        case (Conflict, _) => None
+        case (_, Conflict) => Some(Conflict)
+      }
+
+      override def appendDeltas(d1: Unit, d2: Unit): Unit = ()
     }
-
-    override def update[P <: Promise[A]](p: P, v: Complete[A]): UpdateResult[Promise[A], IDelta, P] = p match {
-      case Empty => UpdateResult(Completed(v.value), ())
-      case Completed(a) =>
-        if(EqA.equal(a, v.value)) UpdateResult()
-        else UpdateResult(Conflict, ())
-      case Conflict => UpdateResult()
-    }
-
-    override def ljoin[P <: Promise[A]](d1: P, d2: Promise[A]): UpdateResult[Promise[A], IDelta, P] = (d1, d2) match {
-      case (_, Empty) => UpdateResult()
-      case (d1, Completed(a)) => update(d1, Complete(a))
-      case (Conflict, Conflict) => UpdateResult()
-      case (_, Conflict) => UpdateResult(Conflict, ())
-    }
-
-    override def appendDeltas(d1: Unit, d2: Unit): Unit = ()
-  }
 
   implicit def equalInstance[A: Equal]: Equal[Promise[A]] = new Equal[Promise[A]] {
     def equal(p1: Promise[A], p2: Promise[A]): Boolean = (p1, p2) match {

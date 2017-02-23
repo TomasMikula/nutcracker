@@ -2,8 +2,6 @@ package nutcracker
 
 import scala.language.higherKinds
 
-import nutcracker.Dom.{Failed, Refined, Status}
-
 sealed trait Revocable[+A]
 
 final case class Valid[A](value: A) extends Revocable[A]
@@ -35,9 +33,9 @@ object Revocable {
 
     def appendDeltas(d1: Delta, d2: Delta): Delta = ()
 
-    def assess(d: Revocable[A]): Status[Update] = d match {
-      case Valid(a) => Refined
-      case Revoked  => Failed
+    def isFailed(d: Revocable[A]): Boolean = d match {
+      case Valid(a) => false
+      case Revoked  => true
     }
   }
 }
