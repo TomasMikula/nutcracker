@@ -21,7 +21,7 @@ class PropagationStoreTest extends FunSuite {
       _   <- ref.exclude(DecSet(4, 5))
     } yield log
 
-    val (store, logRef) = interpreter(prg)(emptyState[Prg])
+    val (store, logRef) = interpreter(prg)(empty[Prg])
     val log = fetch(store)(logRef)
     assertResult(List(Removed(Set(1, 2, 4, 5))))(log)
   }
@@ -34,7 +34,7 @@ class PropagationStoreTest extends FunSuite {
       _   <- ref.exclude(DecSet(1, 2))
     } yield (ref, log)
 
-    val (store1, (ref, logRef)) = interpreter(prg1)(emptyState[Prg])
+    val (store1, (ref, logRef)) = interpreter(prg1)(empty[Prg])
     val log1 = fetch(store1)(logRef)
     assertResult(List(Removed(Set(1, 2))))(log1)
 
@@ -53,7 +53,7 @@ class PropagationStoreTest extends FunSuite {
       _   <- ref.exclude(DecSet(2, 3, 4, 5)) // only removal of {2, 3} should be logged
     } yield log
 
-    val (store, logRef) = interpreter(prg)(emptyState[Prg])
+    val (store, logRef) = interpreter(prg)(empty[Prg])
     val log = fetch(store)(logRef)
     assertResult(List(Removed(Set(2, 3))))(log)
   }

@@ -1,19 +1,17 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.Assessment.{Done, Failed}
 import nutcracker.util.typealigned.APair
 import nutcracker.util.{FreeK, HEqualK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
 
-import scalaz.Id._
-import scalaz.{Equal, Leibniz, Lens, Show, StateT, ~>}
+import scalaz.{Equal, Leibniz, Show, StateT, ~>}
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
 
 import scala.annotation.tailrec
 import scalaz.Leibniz.===
 
-private[nutcracker] object PropagationModuleImpl extends Propagation.Module {
+private[nutcracker] object PropagationImpl extends PropagationModule with PropagationBundle {
   type Ref[A] = DRef[A]
   type Lang[K[_], A] = PropagationLang[Ref, Token, K, A]
   type State[K[_]] = PropagationStore[K]
@@ -22,6 +20,9 @@ private[nutcracker] object PropagationModuleImpl extends Propagation.Module {
   implicit def refShow: ShowK[Ref] = DRef.showKInstance
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref] =
     PropagationLang.freePropagation[Ref, Token, F]
+
+  def propagationApi: Propagation[Prg, Ref] =
+    PropagationLang.freePropagation[Ref, Token, Lang]
 
   def empty[K[_]]: PropagationStore[K] =
     PropagationStore[K](
@@ -34,7 +35,10 @@ private[nutcracker] object PropagationModuleImpl extends Propagation.Module {
       dirtySelections = Set()
     )
 
-  def interpreter: StateInterpreter[Lang, State] =
+  def interpret[A](p: Prg[A], s: PropagationStore[Prg]): (PropagationStore[Prg], A) =
+    interpreter.freeInstance.apply(p).run(s)
+
+  val interpreter: StateInterpreter[Lang, State] =
     new StateInterpreter[PropagationLang[Ref, Token, ?[_], ?], PropagationStore] {
 
       def step: Step[PropagationLang[Ref, Token, ?[_], ?], PropagationStore] =
@@ -65,36 +69,12 @@ private[nutcracker] object PropagationModuleImpl extends Propagation.Module {
         })
     }
 
-  def dfsSolver: DFSSolver[Prg, PropagationStore, Id, λ[A => Ref[Promise[A]]]] =
-    new DFSSolver[Prg, PropagationStore, Id, λ[A => Ref[Promise[A]]]](
-      interpreter.freeInstance,
-      empty[Prg],
-      naiveAssess[Prg],
-      fetch
-    )
-
-  def naiveAssess[K[_], S[_[_]]](
-    lens: Lens[S[K], State[K]])(implicit
-    K: Propagation[K, Ref]
-  ): S[K] => Assessment[List[K[Unit]]] =
-    s => naiveAssess[K].apply(lens.get(s))
-
   def fetch[K[_], D](s: State[K])(ref: Ref[D]): D =
     s.fetch(ref)
 
-  def fetchResult[K[_], D](s: State[K])(ref: Ref[D])(implicit fin: Final[D]): Option[fin.Out] =
-    s.fetchResult(ref)
-
-  private val fetch: λ[A => Ref[Promise[A]]] ~> (PropagationStore[FreeK[PropagationLang[Ref, Token, ?[_], ?], ?]] => ?) =
-    λ[λ[A => Ref[Promise[A]]] ~> (PropagationStore[FreeK[PropagationLang[Ref, Token, ?[_], ?], ?]] => ?)](
-      pa => s => s.fetchResult(pa).get
-    )
-
-  private def naiveAssess[K[_]](implicit K: Propagation[K, Ref]): PropagationStore[K] => Assessment[List[K[Unit]]] =
-    _.naiveAssess
+  def isConsistent[K[_]](s: PropagationStore[K]): Boolean =
+    s.failedVars.isEmpty
 }
-
-
 
 
 private[nutcracker] case class PropagationStore[K[_]] private(
@@ -120,8 +100,6 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   }
 
   def fetch[D](ref: DRef[D]): D = domains(ref).value
-
-  def fetchResult[D](ref: DRef[D])(implicit fin: Final[D]): Option[fin.Out] = fin.extract(fetch(ref))
 
   def fetchVector[D, N <: Nat](refs: Sized[Vector[DRef[D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))
@@ -195,10 +173,6 @@ private[nutcracker] case class PropagationStore[K[_]] private(
       Some((s1.copy(dirtySelections = dirtySelections.tail), ks))
     }
     else None
-
-  private[nutcracker] def naiveAssess(implicit K: Propagation[K, DRef]): Assessment[List[K[Unit]]] =
-    if(failedVars.nonEmpty) Failed
-    else Done
 }
 
 private[nutcracker] sealed abstract class Cell[K[_], D] {

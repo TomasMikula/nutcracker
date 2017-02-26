@@ -20,7 +20,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
   import Promises._
 
   // our instruction sets will be propagation and relations
-  type Lang[K[_], A] = PropRel.Vocabulary[K, A]
+  type Lang[K[_], A] = PropRel.Lang[K, A]
 
   val R = Relations[FreeK[Lang, ?]]
   import R._
@@ -82,7 +82,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
       } yield pr)
 
     it("should follow that a < e") {
-      val (s, promise) = PropRel.interpreter(problem)(PropRel.emptyState)
+      val (s, promise) = PropRel.interpreter(problem)(PropRel.empty)
       Prop.fetchResult(PropRel.propStore.get(s))(promise) should be (Some(()))
     }
   }

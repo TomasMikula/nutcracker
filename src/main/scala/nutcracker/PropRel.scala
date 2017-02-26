@@ -2,36 +2,37 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.rel.{RelDB, RelLang}
-import nutcracker.util.FreeK
 import nutcracker.util.CoproductK._
 import nutcracker.util.KPair._
-
 import scalaz.Lens
-import scalaz.Id._
 import scalaz.~>
 
-object PropRel {
+object PropRel extends PropagationBundle {
   val Prop = Propagation.module
 
   type Ref[a] = Prop.Ref[a]
 
-  type Vocabulary[K[_], A] = (Prop.Lang  :++: RelLang)#Out[K, A]
-  type State[K[_]]         = (Prop.State :**: RelDB  )#Out[K]
+  type Lang[K[_], A] = (Prop.Lang  :++: RelLang)#Out[K, A]
+  type State[K[_]]   = (Prop.State :**: RelDB  )#Out[K]
 
-  type Prg[A] = FreeK[Vocabulary, A]
+  implicit def refEquality = Prop.refEquality
+  implicit def refShow = Prop.refShow
 
-  implicit val propagation: Propagation[Prg, Ref] =
-    Prop.freePropagation[Vocabulary]
+  implicit val propagationApi: Propagation[Prg, Ref] =
+    Prop.freePropagation[Lang]
+
+  def empty[K[_]]: State[K] =
+    Prop.empty[K] :*: RelDB.empty[K]
+
+  def fetch[K[_], A](s: State[K])(ref: Ref[A]) =
+    Prop.fetch(s._1)(ref)
+
+  def interpret[A](p: Prg[A], s: State[Prg]): (State[Prg], A) =
+    interpreter(p).run(s)
 
   val interpreter = (Prop.interpreter :&&: RelDB.interpreter).freeInstance
   def propStore: Lens[State[Prg], Prop.State[Prg]] = implicitly[Lens[State[Prg], Prop.State[Prg]]]
-  def emptyState: State[Prg] = Prop.empty[Prg] :*: RelDB.empty[Prg]
 
-  def dfsSolver: DFSSolver[Prg, State, Id, λ[A => Ref[Promise[A]]]] =
-    new DFSSolver[Prg, State, Id, λ[A => Ref[Promise[A]]]](interpreter, emptyState, naiveAssess, fetch)
-
-  private def naiveAssess: State[Prg] => Assessment[List[Prg[Unit]]] =
-    Prop.naiveAssess(propStore)
   private def fetch: λ[A => Ref[Promise[A]]] ~> (State[Prg] => ?) =
     λ[λ[A => Ref[Promise[A]]] ~> (State[Prg] => ?)](pa => s => Prop.fetchResult(propStore.get(s))(pa).get)
 }

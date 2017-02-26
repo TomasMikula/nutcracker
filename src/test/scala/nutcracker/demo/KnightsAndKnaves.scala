@@ -27,7 +27,7 @@ class KnightsAndKnaves extends FreeSpec {
 
   import B._
 
-  implicit val freeKMonad: Monad[Prg] = FreeKT.freeKTMonad[Vocabulary, Id]
+  implicit val freeKMonad: Monad[Prg] = FreeKT.freeKTMonad[Lang, Id]
 
   val solver = dfsSolver
 

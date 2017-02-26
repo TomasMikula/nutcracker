@@ -18,7 +18,6 @@ class BFSSolver[F[_[_], _], St[_[_]], M[_], P[_], C: NonDecreasingMonoid](
   fetch: P ~> (St[FreeK[F, ?]] => ?),
   getCost: St[FreeK[F, ?]] => C
 )(implicit M: Monad[M]) {
-  val lang: PropRelCost[C] = new PropRelCost[C]
 
   type K[A] = FreeK[F, A]
   type S = St[K]

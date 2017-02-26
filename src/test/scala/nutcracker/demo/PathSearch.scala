@@ -24,11 +24,11 @@ class PathSearch extends FunSuite {
   val solver = bfsSolver
 
   // not sure why scalac is not able to find this itself
-  implicit val injC = implicitly[InjectK[solver.lang.CostL, Vocabulary]]
+  implicit val injC = implicitly[InjectK[CostL, Lang]]
 
   val C = CostOps[Prg]
 
-  implicit val freeKMonad: Monad[Prg] = FreeKT.freeKTMonad[Vocabulary, Id]
+  implicit val freeKMonad: Monad[Prg] = FreeKT.freeKTMonad[Lang, Id]
 
   import C._
 
