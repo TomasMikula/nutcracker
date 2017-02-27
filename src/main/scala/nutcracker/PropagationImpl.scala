@@ -11,7 +11,7 @@ import shapeless.{HList, Nat, Sized}
 import scala.annotation.tailrec
 import scalaz.Leibniz.===
 
-private[nutcracker] object PropagationImpl extends PropagationModule with PropagationBundle {
+private[nutcracker] object PropagationImpl extends PersistentPropagationModule with PropagationBundle { self =>
   type Ref[A] = DRef[A]
   type Lang[K[_], A] = PropagationLang[Ref, Token, K, A]
   type State[K[_]] = PropagationStore[K]
@@ -74,6 +74,9 @@ private[nutcracker] object PropagationImpl extends PropagationModule with Propag
 
   def isConsistent[K[_]](s: PropagationStore[K]): Boolean =
     s.failedVars.isEmpty
+
+  def stashable: StashModule with PropagationModule { type Ref[A] = self.Ref[A]; type Lang[K[_], A] = self.Lang[K, A] } =
+    new PropagationListModule[self.Ref, self.Lang, self.State](this)
 }
 
 

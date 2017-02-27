@@ -1,7 +1,7 @@
 package nutcracker.util
 
 import scala.language.higherKinds
-import scalaz.{BindRec, Functor, Monad, StateT, \/, ~>}
+import scalaz.{BindRec, Functor, Lens, Monad, NonEmptyList => Nel, StateT, Store, \/, ~>}
 import scalaz.Id._
 import scalaz.std.option._
 import scalaz.syntax.applicative._
@@ -69,6 +69,14 @@ trait StateInterpreterT[M[_], F[_[_], _], S[_[_]]] { self =>
 
   def freeInstance(implicit M0: Monad[M], M1: BindRec[M]): FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?] =
     StateInterpreterT.freeInstance(step, uncons)
+
+  def inHead(implicit M: Functor[M]): StateInterpreterT[M, F, λ[K[_] => Nel[S[K]]]] = new StateInterpreterT[M, F, λ[K[_] => Nel[S[K]]]] {
+    val step = self.step.inHead
+
+    val uncons = self.uncons.zoomOut[λ[K[_] => Nel[S[K]]]](new `Forall{(* -> *) -> *}`[λ[K[_] => Lens[Nel[S[K]], S[K]]]] {
+      def compute[K[_]] = Lens[Nel[S[K]], S[K]](l => Store(s => Nel.nel(s, l.tail), l.head))
+    })
+  }
 }
 
 object StateInterpreterT {

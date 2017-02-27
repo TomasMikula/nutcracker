@@ -1,7 +1,8 @@
 package nutcracker.util
 
 import scala.language.higherKinds
-import scalaz.{Functor, Monad, -\/, \/-, ~>}
+import scalaz.{-\/, Functor, Monad, NonEmptyList => Nel, \/-, ~>}
+import scalaz.syntax.functor._
 import nutcracker.util.KPair._
 
 abstract class StepT[M[_], F[_[_], _], S[_[_]]] { self =>
@@ -60,6 +61,11 @@ abstract class StepT[M[_], F[_[_], _], S[_[_]]] { self =>
   def :>>:[G[_[_], _]](ig: G ≈>> M)(implicit M: Monad[M]): StepT[M, CoproductK[G, F, ?[_], ?], S] =
     StepT.lift[M, G, S](ig) :: self
 
+
+  def inHead(implicit M: Functor[M]): StepT[M, F, λ[K[_] => Nel[S[K]]]] = new StepT[M, F, λ[K[_] => Nel[S[K]]]] {
+    def apply[K[_], A](f: F[K, A]) =
+      WriterStateT((s: Nel[S[K]]) => self(f).apply(s.head) map { case (ks, h, a) => (ks, Nel.nel(h, s.tail), a) })
+  }
 }
 
 object StepT {

@@ -20,7 +20,7 @@ import scalaz.std.anyVal._
 
 class KnightsAndKnaves extends FreeSpec {
   import PropBranch._
-  import PropBranch.branchingPropagation.{propagation => _, _}
+  import PropBranch.branchingApi.{propagation => _, _}
   import Promises._
 
   val B = BoolOps[Prg, Ref]

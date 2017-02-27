@@ -107,7 +107,7 @@ trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
 object Propagation {
   def apply[M[_], Ref[_]](implicit M: Propagation[M, Ref]): Propagation[M, Ref] = M
 
-  val module: PropagationModule = PropagationImpl
+  val module: PersistentPropagationModule = PropagationImpl
   val bundle: PropagationBundle = PropagationImpl
 }
 

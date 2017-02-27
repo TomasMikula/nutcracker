@@ -15,7 +15,7 @@ import scalaz.syntax.traverse._
 
 class Sat extends FunSpec {
   import PropBranch._
-  import PropBranch.branchingPropagation.{propagation => _, _}
+  import PropBranch.branchingApi.{propagation => _, _}
   import Promises._
 
   val B = BoolOps[Prg, Ref]

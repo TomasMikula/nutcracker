@@ -20,3 +20,7 @@ trait RefBundle extends Bundle {
 
   def fetch[K[_], A](s: State[K])(ref: Ref[A]): A
 }
+
+trait StashBundle extends Bundle {
+  implicit def stashRestore[K[_]]: StashRestore[State[K]]
+}
