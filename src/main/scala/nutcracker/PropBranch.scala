@@ -4,7 +4,7 @@ import nutcracker.util.CoproductK.:++:
 import nutcracker.util.KPair._
 import scala.language.existentials
 import scalaz.Id.Id
-import scalaz.{Lens, ~>}
+import scalaz.~>
 
 object PropBranch extends PropagationBundle with BranchingBundle {
   val Prop = Propagation.module.stashable
@@ -13,7 +13,7 @@ object PropBranch extends PropagationBundle with BranchingBundle {
   type Ref[a] = Prop.Ref[a]
 
   type Lang[K[_], A] = (Prop.Lang  :++: Branch.Lang )#Out[K, A]
-  type State[K[_]]  = (Prop.State :**: Branch.State)#Out[K]
+  type State[K[_]]   = (Prop.State :**: Branch.State)#Out[K]
 
   implicit def refEquality = Prop.refEquality
   implicit def refShow = Prop.refShow
@@ -30,20 +30,12 @@ object PropBranch extends PropagationBundle with BranchingBundle {
 
   val interpreter = (Prop.interpreter :&&: Branch.interpreter).freeInstance
   def interpret[A](p: Prg[A], s: State[Prg]): (State[Prg], A) = interpreter(p).run(s)
-  def propStore[K[_]]: Lens[State[K], Prop.State[K]] = implicitly[Lens[State[K], Prop.State[K]]]
-  def branchStore[K[_]]: Lens[State[K], Branch.State[K]] = implicitly[Lens[State[K], Branch.State[K]]]
-  def fetch[K[_], A](s: State[K])(ref: Ref[A]): A = Prop.fetch(propStore[K].get(s))(ref)
+  def fetch[K[_], A](s: State[K])(ref: Ref[A]): A = Prop.fetch(s._1)(ref)
   def empty[K[_]]: State[K] = Prop.empty[K] :*: Branch.empty[K]
 
-  def dfsSolver: DFSSolver[Prg, State, Id, λ[A => Ref[Promise[A]]]] =
-    new DFSSolver[Prg, State, Id, λ[A => Ref[Promise[A]]]](interpreter, empty[Prg], assess, fetch)
-
   def assess(s: State[Prg]): Assessment[List[Prg[Unit]]] =
-    if(Prop.isConsistent(propStore[Prg].get(s)))
-      Branch.assess(branchStore[Prg].get(s))(λ[Ref ~> Id](ref => Prop.fetch(propStore[Prg].get(s))(ref)))
+    if(Prop.isConsistent(s._1))
+      Branch.assess(s._2)(λ[Ref ~> Id](ref => Prop.fetch(s._1)(ref)))
     else
       Assessment.Failed
-
-  private def fetch: λ[A => Ref[Promise[A]]] ~> (State[Prg] => ?) =
-    λ[λ[A => Ref[Promise[A]]] ~> (State[Prg] => ?)](pa => s => Prop.fetchResult(propStore[Prg].get(s))(pa).get)
 }

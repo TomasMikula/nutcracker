@@ -19,13 +19,10 @@ class Sat extends FunSpec {
   import Promises._
 
   val B = BoolOps[Prg, Ref]
-
   import B._
 
   implicit val freeKMonad: Monad[FreeKT[Prop.Lang, Id, ?]] = FreeKT.freeKTMonad[Prop.Lang, Id]
 
-
-  val solver = dfsSolver
 
   describe("A simple 3-SAT problem") {
 
@@ -45,7 +42,7 @@ class Sat extends FunSpec {
       r <- promiseResults(a)
     } yield r
 
-    val solutions = solver.solutions(problem).toStream.toList
+    val solutions = solveDfs(problem).toStream.toList
 
     it("should have 4 solutions") {
       assertResult(4)(solutions.size)

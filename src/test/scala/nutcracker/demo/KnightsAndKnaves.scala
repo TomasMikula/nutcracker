@@ -29,8 +29,6 @@ class KnightsAndKnaves extends FreeSpec {
 
   implicit val freeKMonad: Monad[Prg] = FreeKT.freeKTMonad[Lang, Id]
 
-  val solver = dfsSolver
-
   "Problem 1" - {
     // The visitor meets three inhabitants referred to as A, B and C.
     // The visitor asks A what type he is, but does not hear A's answer.
@@ -50,7 +48,7 @@ class KnightsAndKnaves extends FreeSpec {
       pr <- promiseResults(a, b, c)
     } yield pr
 
-    val solutions = solver.solutions(problem).toStream.toList
+    val solutions = solveDfs(problem).toStream.toList
 
     "should have 2 solutions" in {
       assertResult(2)(solutions.size)
@@ -77,7 +75,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b)) >>= { case (a, b) => promiseResults(a, b) }
 
-    val solutions = solver.solutions(problem).toStream.toList
+    val solutions = solveDfs(problem).toStream.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
@@ -102,7 +100,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b)) >>= { case (a, b) => promiseResults(a, b) }
 
-    val solutions = solver.solutions(problem).toStream.toList
+    val solutions = solveDfs(problem).toStream.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
@@ -132,7 +130,7 @@ class KnightsAndKnaves extends FreeSpec {
 
     } yield (a, b)) >>= { case (a, b) => promiseResults(a, b) }
 
-    val solutions = solver.solutions(problem).toStream.toList
+    val solutions = solveDfs(problem).toStream.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }

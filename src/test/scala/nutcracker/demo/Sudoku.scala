@@ -18,8 +18,6 @@ class Sudoku extends FunSuite {
   import P1._
 
 
-  val solver = dfsSolver
-
   type Cell = Ref[DecSet[Int]]
 
   /** A program that sets up an empty Sudoku, that is 81 integer variables
@@ -143,7 +141,7 @@ class Sudoku extends FunSuite {
       } yield solution
     }
 
-    val solutions = problems map { solver.allSolutions1(_) }
+    val solutions = problems map { solveDfsAll1(_) }
 
     // both programs should produce a unique and correct solution
     solutions foreach { case (sols, failureCount) =>

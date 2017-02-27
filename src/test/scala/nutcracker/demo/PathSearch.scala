@@ -3,7 +3,7 @@ package nutcracker.demo
 import nutcracker._
 import nutcracker.algebraic.NonDecreasingMonoid
 import nutcracker.DecSet._
-import nutcracker.util.{FreeKT, InjectK}
+import nutcracker.util.FreeKT
 import org.scalatest.FunSuite
 import scala.annotation.tailrec
 import scalaz.Id._
@@ -23,14 +23,10 @@ class PathSearch extends FunSuite {
 
   val solver = bfsSolver
 
-  // not sure why scalac is not able to find this itself
-  implicit val injC = implicitly[InjectK[CostL, Lang]]
-
-  val C = CostOps[Prg]
+  val C = CostApi[Prg]
+  import C._
 
   implicit val freeKMonad: Monad[Prg] = FreeKT.freeKTMonad[Lang, Id]
-
-  import C._
 
 
   type Vertex = Symbol
