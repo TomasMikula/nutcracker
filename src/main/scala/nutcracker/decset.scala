@@ -36,29 +36,29 @@ object DecSet {
   def singleton[A](a: A): DecSet[A] = new DecSet(Set(a))
   def wrap[A](as: Set[A]): DecSet[A] = new DecSet(as)
 
-  def oneOf[M[_], Ref[_], A](as: Set[A])(implicit M: BranchingPropagation[M, Ref]): M[Ref[DecSet[A]]] =
+  def init[M[_], Ref[_], A](as: Set[A])(implicit M: BranchingPropagation[M, Ref]): M[Ref[DecSet[A]]] =
     M.newVar(wrap(as))
   def oneOf[M[_], Ref[_], A](as: A*)(implicit M: BranchingPropagation[M, Ref]): M[Ref[DecSet[A]]] =
-    oneOf(as.toSet)
+    init(as.toSet)
 
   /** Convenience method to add an exclusive choice of arbitrary free programs
     * to continue. When the choice is made, the chosen program is executed.
     */
   def branchAndExec[M[_], Ref[_]](conts: Set[M[Unit]])(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): M[Unit] =
-    oneOf(conts) >>= { _.whenFinal(k => k) }
+    init(conts) >>= { _.whenFinal(k => k) }
   def branchAndExec[M[_], Ref[_]](conts: M[Unit]*)(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): M[Unit] =
     branchAndExec(conts.toSet)
 
   /** Convenience method to add an exclusive choice of multiple possibilities,
     * presented as a continuation of the chosen element. Note that a "branching
-    * cell" (see [[oneOf[M,Ref,A](as:Set[A])*]]) is added for each callback that
+    * cell" (see [[init]]) is added for each callback that
     * is registered on the returned continuation. Thus, if two callbacks are
     * registered on the returned continuation, it will have the effect of making
     * a choice from the cartesian product `as × as`. If this is not desired,
-    * use [[oneOf[M,Ref,A](as:Set[A])*]] directly.
+    * use [[init]] directly.
     */
   def branchC[M[_], Ref[_], A](as: Set[A])(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): Cont[M[Unit], A] =
-    Cont(f => oneOf(as) >>= { _.asCont.apply(f) })
+    Cont(f => init(as) >>= { _.asCont.apply(f) })
   def branchC[M[_], Ref[_], A](as: A*)(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): Cont[M[Unit], A] =
     branchC(as.toSet)
 

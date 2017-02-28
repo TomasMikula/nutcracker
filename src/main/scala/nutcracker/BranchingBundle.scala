@@ -20,9 +20,11 @@ trait BranchingBundle extends RefBundle with StashBundle {
   def solveDfsAll[D](p: Prg[Ref[D]])(implicit fin: Final[D]): List[fin.Out] =
     toList(solveDfs(p))
 
+  /** Like [[solveDfs[D]*]], but also outputs the number of times it had to backtrack. */
   def solveDfs1[D](p: Prg[Ref[D]])(implicit fin: Final[D]): StreamT[Writer[Int, ?], fin.Out] =
     solveDfsM[Writer[Int, ?], D](p)
 
+  /** Like [[solveDfsAll]], but also returns the number of dead branches explored. */
   def solveDfsAll1[D](p: Prg[Ref[D]])(implicit fin: Final[D]): (List[fin.Out], Int) =
     toList(solveDfs1(p)).run.swap
 
