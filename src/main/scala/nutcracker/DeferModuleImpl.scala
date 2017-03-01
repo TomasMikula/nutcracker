@@ -1,14 +1,30 @@
 package nutcracker
 
-import scala.language.higherKinds
 import nutcracker.DeferLang.Delay
 import nutcracker.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
-import nutcracker.util.{Lst, StateInterpreter, Step, Uncons, `Forall{(* -> *) -> *}`, WriterState}
-
+import nutcracker.util.{FreeK, InjectK, Lst, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
 import scalaz.{Heap, Order, StateT}
 import scalaz.std.option._
 
-final case class DeferStore[D, K[_]] private (
+private[nutcracker] class DeferModuleImpl[D](implicit D: NonDecreasingMonoid[D] with OrderPreservingMonoid[D]) extends PersistentDeferModule[D] { self =>
+  type Lang[K[_], A] = DeferLang[D, K, A]
+  type State[K[_]] = DeferStore[D, K]
+
+  implicit def freeDeferApi[F[_[_], _]](implicit i: InjectK[Lang, F]): Defer[FreeK[F, ?], D] =
+    new Defer[FreeK[F, ?], D] {
+      def defer(delay: D, k: FreeK[F, Unit]): FreeK[F, Unit] =
+        FreeK.injLiftF(DeferLang.defer[D, FreeK[F, ?]](delay, k))
+    }
+
+  def empty[K[_]] = DeferStore.empty[D, K]
+
+  def interpreter: StateInterpreter[Lang, State] = DeferStore.interpreter[D]
+
+  def stashable: StashModule with DeferModule[D] { type Lang[K[_], A] = self.Lang[K, A] } =
+    new DeferListModule[D, Lang, State](this)
+}
+
+private[nutcracker] final case class DeferStore[D, K[_]] private (
   private val currentTime: D,
   private val heap: Heap[(D, K[Unit])]
 )(implicit
@@ -26,7 +42,7 @@ final case class DeferStore[D, K[_]] private (
   }
 }
 
-object DeferStore {
+private[nutcracker] object DeferStore {
   def empty[D, K[_]](implicit D: NonDecreasingMonoid[D] with OrderPreservingMonoid[D]): DeferStore[D, K] =
     DeferStore(D.zero, Heap.Empty[(D, K[Unit])])
 

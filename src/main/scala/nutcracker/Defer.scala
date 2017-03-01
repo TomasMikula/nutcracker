@@ -1,7 +1,6 @@
 package nutcracker
 
 import scala.language.higherKinds
-
 import nutcracker.util.ContU
 
 trait Defer[M[_], D] {
