@@ -2,6 +2,9 @@ package nutcracker
 
 import nutcracker.util.{FreeK, HEqualK, ShowK}
 
+/** Bundle provides multiple APIs and is typically created by composing
+  * multiple [[Module]]s.
+  */
 trait Bundle {
   type Lang[K[_], A]
   type State[K[_]]
