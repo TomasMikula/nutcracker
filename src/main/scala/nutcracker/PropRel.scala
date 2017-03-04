@@ -24,8 +24,8 @@ object PropRel extends PropagationBundle {
   def empty[K[_]]: State[K] =
     Prop.empty[K] :*: RelDB.empty[K]
 
-  def fetch[K[_], A](s: State[K])(ref: Ref[A]) =
-    Prop.fetch(s._1)(ref)
+  def fetch[K[_], A](ref: Ref[A], s: State[K]) =
+    Prop.fetch(ref, s._1)
 
   def interpret[A](p: Prg[A], s: State[Prg]): (State[Prg], A) =
     interpreter(p).run(s)

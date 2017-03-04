@@ -21,7 +21,7 @@ trait RefBundle extends Bundle {
   implicit def refEquality: HEqualK[Ref]
   implicit def refShow: ShowK[Ref]
 
-  def fetch[K[_], A](s: State[K])(ref: Ref[A]): A
+  def fetch[K[_], A](ref: Ref[A], s: State[K]): A
 }
 
 trait StashBundle extends Bundle {

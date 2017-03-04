@@ -30,12 +30,12 @@ object PropBranch extends PropagationBundle with BranchingBundle {
 
   val interpreter = (Prop.interpreter :&&: Branch.interpreter).freeInstance
   def interpret[A](p: Prg[A], s: State[Prg]): (State[Prg], A) = interpreter(p).run(s)
-  def fetch[K[_], A](s: State[K])(ref: Ref[A]): A = Prop.fetch(s._1)(ref)
+  def fetch[K[_], A](ref: Ref[A], s: State[K]): A = Prop.fetch(ref, s._1)
   def empty[K[_]]: State[K] = Prop.empty[K] :*: Branch.empty[K]
 
   def assess(s: State[Prg]): Assessment[List[Prg[Unit]]] =
     if(Prop.isConsistent(s._1))
-      Branch.assess(s._2)(λ[Ref ~> Id](ref => Prop.fetch(s._1)(ref)))
+      Branch.assess(s._2)(λ[Ref ~> Id](ref => Prop.fetch(ref, s._1)))
     else
       Assessment.Failed
 }

@@ -11,10 +11,10 @@ trait PropagationModule extends Module {
 
   def interpreter: StateInterpreter[Lang, State]
   def isConsistent[K[_]](s: State[K]): Boolean
-  def fetch[K[_], A](s: State[K])(ref: Ref[A]): A
+  def fetch[K[_], A](ref: Ref[A], s: State[K]): A
 
   def fetchResult[K[_], D](s: State[K])(ref: Ref[D])(implicit fin: Final[D]): Option[fin.Out] =
-    fin.extract(fetch(s)(ref))
+    fin.extract(fetch(ref, s))
 }
 
 trait PersistentPropagationModule extends PropagationModule with PersistentStateModule { self =>
@@ -42,5 +42,5 @@ extends ListModule[Lang0, State0](base) with PropagationModule {
 
   def interpreter: StateInterpreter[Lang, State] = base.interpreter.inHead
   def isConsistent[K[_]](s: State[K]): Boolean = base.isConsistent[K](s.head)
-  def fetch[K[_], A](s: State[K])(ref: Ref[A]): A = base.fetch[K, A](s.head)(ref)
+  def fetch[K[_], A](ref: Ref[A], s: State[K]): A = base.fetch[K, A](ref, s.head)
 }

@@ -69,7 +69,7 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
         })
     }
 
-  def fetch[K[_], D](s: State[K])(ref: Ref[D]): D =
+  def fetch[K[_], D](ref: Ref[D], s: State[K]): D =
     s.fetch(ref)
 
   def isConsistent[K[_]](s: PropagationStore[K]): Boolean =

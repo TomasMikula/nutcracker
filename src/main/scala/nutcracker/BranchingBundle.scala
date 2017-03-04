@@ -47,7 +47,7 @@ trait BranchingBundle extends RefBundle with StashBundle {
     solveDfsM(p, f)(M0, fakeMonadTell(M1))
 
   private def solveDfsM[M[_], D](p: Prg[Ref[D]])(implicit fin: Final[D], M0: BindRec[M], M1: MonadTell[M, Int]): StreamT[M, fin.Out] =
-    solveDfsM[M, Ref[D], fin.Out](p, (ref, s) => fin.extract(fetch(s)(ref)))
+    solveDfsM[M, Ref[D], fin.Out](p, (ref, s) => fin.extract(fetch(ref, s)))
 
   private def solveDfsM0[M[_], D](p: Prg[Ref[D]])(implicit fin: Final[D], M0: BindRec[M], M1: Monad[M]): StreamT[M, fin.Out] =
     solveDfsM(p)(fin, M0, fakeMonadTell(M1))
