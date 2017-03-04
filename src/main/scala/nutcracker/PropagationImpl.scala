@@ -237,7 +237,7 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
     blockedIdleObservers.get(token) match {
       case Some(ev) =>
         assert(blockedPendingObservers.get(token).isEmpty)
-        val h: Handler[Value] = Leibniz.symm[Nothing, Any, Value, D0](ev).subst[Handler](handler)
+        val h: Handler[Value] = ev.flip.subst[Handler](handler)
         Cell[K, D, Update, Delta, Value](value)(h :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, nextTokenId)
       case None => blockedPendingObservers.get(token) match {
         case Some(δ) =>
