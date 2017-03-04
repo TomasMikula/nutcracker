@@ -6,6 +6,13 @@ import scalaz.{-\/, \/-}
 trait InjectK[F[_[_], _], H[_[_], _]] extends (F ≈~> H) {
   def apply[K[_], A](fa: F[K, A]): H[K, A] = inj(fa)
   def inj[K[_], A](fa: F[K, A]): H[K, A]
+
+  def andThen[I[_[_], _]](implicit that: InjectK[H, I]): InjectK[F, I] = new InjectK[F, I] {
+    def inj[K[_], A](fa: F[K, A]) = that.inj(InjectK.this.inj(fa))
+  }
+
+  def compose[E[_[_], _]](implicit that: InjectK[E, F]): InjectK[E, H] =
+    that andThen this
 }
 
 object InjectK extends InjectK0 {
