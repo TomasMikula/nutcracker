@@ -19,4 +19,9 @@ object StashRestore {
       def stash(s: KPair[F, G, A]) = KPair(F.stash(s._1), G.stash(s._2))
       def restore(s: KPair[F, G, A]) = KPair(F.restore(s._1), G.restore(s._2))
     }
+
+  implicit class StashRestoreOps[G[_[_]], A[_]](G: StashRestore[G[A]]) {
+    def :*:[F[_[_]]](F: StashRestore[F[A]]): StashRestore[KPair[F, G, A]] =
+      kPairInstance[F, G, A](F, G)
+  }
 }
