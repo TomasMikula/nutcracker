@@ -75,7 +75,7 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
   def isConsistent[K[_]](s: PropagationStore[K]): Boolean =
     s.failedVars.isEmpty
 
-  def stashable: StashModule with PropagationModule { type Ref[A] = self.Ref[A]; type Lang[K[_], A] = self.Lang[K, A] } =
+  def stashable: StashPropagationModule { type Ref[A] = self.Ref[A]; type Lang[K[_], A] = self.Lang[K, A] } =
     new PropagationListModule[self.Ref, self.Lang, self.State](this)
 }
 

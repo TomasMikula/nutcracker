@@ -18,7 +18,7 @@ trait PropagationModule extends Module {
 }
 
 trait PersistentPropagationModule extends PropagationModule with PersistentStateModule { self =>
-  override def stashable: (StashModule with PropagationModule) {
+  override def stashable: StashPropagationModule {
     type Ref[A] = self.Ref[A]
     type Lang[K[_], A] = self.Lang[K, A]
   }
@@ -32,8 +32,10 @@ object PersistentPropagationModule {
   }
 }
 
+trait StashPropagationModule extends PropagationModule with StashModule
+
 class PropagationListModule[Ref0[_], Lang0[_[_], _], State0[_[_]]](base: PersistentPropagationModule.Aux[Ref0, Lang0, State0])
-extends ListModule[Lang0, State0](base) with PropagationModule {
+extends ListModule[Lang0, State0](base) with StashPropagationModule {
   type Ref[A] = Ref0[A]
 
   implicit def refEquality: HEqualK[Ref] = base.refEquality

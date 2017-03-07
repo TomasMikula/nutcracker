@@ -20,7 +20,7 @@ private[nutcracker] class DeferModuleImpl[D](implicit D: NonDecreasingMonoid[D] 
 
   def interpreter: StateInterpreter[Lang, State] = DeferStore.interpreter[D]
 
-  def stashable: StashModule with DeferModule[D] { type Lang[K[_], A] = self.Lang[K, A] } =
+  def stashable: StashDeferModule[D] { type Lang[K[_], A] = self.Lang[K, A] } =
     new DeferListModule[D, Lang, State](this)
 }
 

@@ -15,7 +15,7 @@ object DeferModule {
 }
 
 trait PersistentDeferModule[D] extends DeferModule[D] with PersistentStateModule { self =>
-  def stashable: StashModule with DeferModule[D] { type Lang[K[_], A] = self.Lang[K, A] }
+  def stashable: StashDeferModule[D] { type Lang[K[_], A] = self.Lang[K, A] }
 }
 
 object PersistentDeferModule {
@@ -25,9 +25,9 @@ object PersistentDeferModule {
   }
 }
 
+trait StashDeferModule[D] extends DeferModule[D] with StashModule
 
-
-class DeferListModule[D, Lang[_[_], _], State0[_[_]]](base: PersistentDeferModule.Aux[D, Lang, State0]) extends ListModule[Lang, State0](base) with DeferModule[D] {
+class DeferListModule[D, Lang[_[_], _], State0[_[_]]](base: PersistentDeferModule.Aux[D, Lang, State0]) extends ListModule[Lang, State0](base) with StashDeferModule[D] {
   def freeDeferApi[F[_[_], _]](implicit i: InjectK[Lang, F]) = base.freeDeferApi[F]
 
   def interpreter: StateInterpreter[Lang, State] = base.interpreter.inHead
