@@ -24,11 +24,8 @@ object RelLang {
 
   implicit def relationsInstance[F[_[_], _]](implicit inj: InjectK[RelLang, F]): Relations[FreeK[F, ?]] =
     new Relations[FreeK[F, ?]] {
-      def relate[L <: HList](rel: Rel[L])(implicit m: Mapped[L, Order]): RelateBuilder[L, m.Out] =
-        new RelateBuilder[L, m.Out] {
-          def values(vals: L)(implicit os: SummonHList[m.Out]): FreeK[F, Unit] =
-            FreeK.injLiftF(RelLang.relate[FreeK[F, ?], L, m.Out](rel, vals)(m, os))
-        }
+      def relateImpl[L <: HList, OrderL <: HList](rel: Rel[L], values: L)(implicit m: Mapped.Aux[L, Order, OrderL], os: SummonHList[OrderL]): FreeK[F, Unit] =
+        FreeK.injLiftF(RelLang.relate[FreeK[F, ?], L, OrderL](rel, values)(m, os))
 
       def onPatternMatch[V <: HList](p: Pattern[V], a: Assignment[V])(h: V => FreeK[F, Unit]): FreeK[F, Unit] =
         FreeK.injLiftF(RelLang.onPatternMatch[FreeK[F, ?], V](p, a)(h))

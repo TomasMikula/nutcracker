@@ -11,12 +11,12 @@ trait Rel[L <: HList] { self: Singleton =>
   ): RelChoice[V, L] =
     RelChoice(this, ch(ptrs))
 
-  def apply[V <: HList, A1]                    (a1 : A1)                                        (implicit ch: ChooseByPtrs[V, L, A1 :: HNil]):                               RelChoice[V, L] = apply(a1 :: HNil)
-  def apply[V <: HList, A1, A2]                (a1 : A1, a2: A2)                                (implicit ch: ChooseByPtrs[V, L, A1 :: A2 :: HNil]):                         RelChoice[V, L] = apply(a1 :: a2 :: HNil)
-  def apply[V <: HList, A1, A2, A3]            (a1 : A1, a2: A2, a3: A3)                        (implicit ch: ChooseByPtrs[V, L, A1 :: A2 :: A3 :: HNil]):                   RelChoice[V, L] = apply(a1 :: a2 :: a3 :: HNil)
-  def apply[V <: HList, A1, A2, A3, A4]        (a1 : A1, a2: A2, a3: A3, a4: A4)                (implicit ch: ChooseByPtrs[V, L, A1 :: A2 :: A3 :: A4 :: HNil]):             RelChoice[V, L] = apply(a1 :: a2 :: a3 :: a4 :: HNil)
-  def apply[V <: HList, A1, A2, A3, A4, A5]    (a1 : A1, a2: A2, a3: A3, a4: A4, a5: A5)        (implicit ch: ChooseByPtrs[V, L, A1 :: A2 :: A3 :: A4 :: A5 :: HNil]):       RelChoice[V, L] = apply(a1 :: a2 :: a3 :: a4 :: a5 :: HNil)
-  def apply[V <: HList, A1, A2, A3, A4, A5, A6](a1 : A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6)(implicit ch: ChooseByPtrs[V, L, A1 :: A2 :: A3 :: A4 :: A5 :: A6 :: HNil]): RelChoice[V, L] = apply(a1 :: a2 :: a3 :: a4 :: a5 :: a6 :: HNil)
+  def apply[V <: HList, P1]                    (p1: P1)                                        (implicit ch: ChooseByPtrs[V, L, P1 :: HNil]):                               RelChoice[V, L] = apply(p1 :: HNil)
+  def apply[V <: HList, P1, P2]                (p1: P1, p2: P2)                                (implicit ch: ChooseByPtrs[V, L, P1 :: P2 :: HNil]):                         RelChoice[V, L] = apply(p1 :: p2 :: HNil)
+  def apply[V <: HList, P1, P2, P3]            (p1: P1, p2: P2, p3: P3)                        (implicit ch: ChooseByPtrs[V, L, P1 :: P2 :: P3 :: HNil]):                   RelChoice[V, L] = apply(p1 :: p2 :: p3 :: HNil)
+  def apply[V <: HList, P1, P2, P3, P4]        (p1: P1, p2: P2, p3: P3, p4: P4)                (implicit ch: ChooseByPtrs[V, L, P1 :: P2 :: P3 :: P4 :: HNil]):             RelChoice[V, L] = apply(p1 :: p2 :: p3 :: p4 :: HNil)
+  def apply[V <: HList, P1, P2, P3, P4, P5]    (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5)        (implicit ch: ChooseByPtrs[V, L, P1 :: P2 :: P3 :: P4 :: P5 :: HNil]):       RelChoice[V, L] = apply(p1 :: p2 :: p3 :: p4 :: p5 :: HNil)
+  def apply[V <: HList, P1, P2, P3, P4, P5, P6](p1: P1, p2: P2, p3: P3, p4: P4, p5: P5, p6: P6)(implicit ch: ChooseByPtrs[V, L, P1 :: P2 :: P3 :: P4 :: P5 :: P6 :: HNil]): RelChoice[V, L] = apply(p1 :: p2 :: p3 :: p4 :: p5 :: p6 :: HNil)
 }
 
 object Rel {
