@@ -8,6 +8,10 @@ import shapeless.ops.hlist.At
 
 trait ListPtr[L <: HList, N <: Nat] extends At[L, N] {
   def index: Int
+  def get(l: L): Out
+  def set(l: L, a: Out): L
+
+  final def apply(l: L): Out = get(l)
   def lift[F[_]](implicit m: Mapped[L, F]): ListPtr.Aux[m.Out, N, F[Out]] = this.asInstanceOf[ListPtr.Aux[m.Out, N, F[Out]]] // cheating, but screw it
 }
 
@@ -20,7 +24,8 @@ object ListPtr {
   implicit def hlistAtZero[H, T <: HList]: Aux[H :: T, _0, H] =
     new ListPtr[H :: T, _0] {
       type Out = H
-      def apply(l : H :: T): Out = l.head
+      def get(l: H :: T): Out = l.head
+      def set(l: H :: T, h: H): H :: T = h :: l.tail
       def index = 0
     }
 
@@ -28,7 +33,8 @@ object ListPtr {
       att: ListPtr[T, N]): Aux[H :: T, Succ[N], att.Out] =
     new ListPtr[H :: T, Succ[N]] {
       type Out = att.Out
-      def apply(l : H :: T) : Out = att(l.tail)
+      def get(l: H :: T) : Out = att(l.tail)
+      def set(l: H :: T, a: Out): H :: T = l.head :: att.set(l.tail, a)
       def index = att.index + 1
     }
 

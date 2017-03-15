@@ -6,8 +6,12 @@ import scala.language.implicitConversions
 import shapeless._
 
 trait Choose[L <: HList, C <: HList] extends (L => C) {
+  def get(l: L): C
+  def set(l: L, c: C): L
   def vertices: List[Int]
   def vertexSet: Set[Int]
+
+  final def apply(l: L): C = get(l)
 
   def ::[N <: Nat, A](n: N)(implicit ptr: ListPtr.Aux[L, n.N, A]): Choose[L, A :: C] = // linter:ignore UnusedParameter // argument n is there just to infer N
     ptr :: this
@@ -15,7 +19,8 @@ trait Choose[L <: HList, C <: HList] extends (L => C) {
   def ::[N <: Nat, A](ptr: ListPtr.Aux[L, N, A]): Choose[L, A :: C] = new Choose[L, A :: C] {
     override lazy val vertexSet: Set[Int] = Choose.this.vertexSet + ptr.index
     override lazy val vertices: List[Int] = ptr.index :: Choose.this.vertices
-    def apply(l: L): (A :: C) = ptr(l) :: Choose.this.apply(l)
+    def get(l: L): (A :: C) = ptr(l) :: Choose.this.apply(l)
+    def set(l: L, ac: A :: C): L = ptr.set(Choose.this.set(l, ac.tail), ac.head)
   }
 
   def lift[F[_]](implicit ml: Mapped[L, F], mc: Mapped[C, F]): Choose[ml.Out, mc.Out] = this.asInstanceOf[Choose[ml.Out, mc.Out]] // cheating, but screw it
@@ -37,7 +42,8 @@ object Choose {
   def apply[L <: HList]: Choose[L, HNil] = new Choose[L, HNil] {
     def vertexSet: Set[Int] = Set.empty
     def vertices: List[Int] = Nil
-    def apply(v1: L): HNil = HNil
+    def get(v1: L): HNil = HNil
+    def set(l: L, c: HNil): L = l
   }
 
   implicit def chooseByNats[L <: HList, C <: HList, NS <: HList](ns: NS)(implicit ch: ChooseByNats[L, C, NS]): Choose[L, C] = ch(ns)

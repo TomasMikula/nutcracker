@@ -2,7 +2,6 @@ package nutcracker.util
 
 import shapeless.Nat._0
 import shapeless.ops.hlist.Drop
-import shapeless.ops.nat.ToInt
 import shapeless.{Succ, Nat, HNil, HList, ::}
 
 trait Pointers[L <: HList] {
@@ -38,17 +37,11 @@ object Pointers0 {
 
   implicit def hconsPointers[L <: HList, N <: Nat, H, T <: HList](implicit
     d: Drop.Aux[L, N, H :: T],
-    n: ToInt[N],
+    ptr: ListPtr.Aux[L, N, H],
     tp: Pointers0[L, T, Succ[N]]
   ): Aux[L, H :: T, N, ListPtr.Aux[L, N, H] :: tp.Out] = new Pointers0[L, H :: T, N] {
     type Out = ListPtr.Aux[L, N, H] :: tp.Out
 
-    def get = new ListPtr[L, N] {
-      type Out = H
-
-      def index: Int = n()
-
-      def apply(l: L) = d(l).head
-    } :: tp.get
+    def get = ptr :: tp.get
   }
 }
