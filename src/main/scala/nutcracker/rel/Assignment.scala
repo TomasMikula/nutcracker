@@ -14,6 +14,16 @@ case class Assignment[L <: HList] private (values: Vector[Option[_]]) extends An
 
   def isEmpty: Boolean = values all { _.isEmpty }
   def getIfComplete: Option[L] = values.sequence map { _.foldRight[HList](HNil)(_ :: _).asInstanceOf[L] }
+  def isExtensionOf(that: Assignment[L]): Boolean = {
+    @tailrec def from(i: Int): Boolean =
+      if(i >= values.size) true
+      else {
+        val a = this.values(i) // linter:ignore UndesirableTypeInference
+        val b = that.values(i) // linter:ignore UndesirableTypeInference
+        (b.isEmpty || b == a) && from(i+1)
+      }
+    from(0)
+  }
 
   def get[C <: HList](ch: Choose[L, C]): Assignment[C] = Assignment(ch.vertices.map(values(_)).toVector)
   def set[C <: HList](ch: Choose[L, C])(c: C): Assignment[L] = set1(ch.vertices, c)
