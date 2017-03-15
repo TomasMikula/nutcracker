@@ -45,10 +45,12 @@ case class Assignment[L <: HList] private (values: Vector[Option[_]]) extends An
 }
 
 object Assignment {
-  def apply[L <: HList](implicit l: Length[L]): AssignmentBuilder[L, l.Out] = AssignmentBuilder()
+  def apply[L <: HList]: AssignmentBuilder[L] = AssignmentBuilder()
 
-  case class AssignmentBuilder[L <: HList, N <: Nat] private[rel] () {
-    def empty(implicit nToInt: ToInt[N]): Assignment[L] = Assignment(Vector.fill(nToInt())(Option.empty))
+  case class AssignmentBuilder[L <: HList] private[rel] () {
+    def empty[N <: Nat](implicit l: Length.Aux[L, N], nToInt: ToInt[N]): Assignment[L] =
+      Assignment(Vector.fill(nToInt())(Option.empty))
+
     def from[OL <: HList](ol: OL)(implicit m: Mapped.Aux[L, Option, OL]): Assignment[L] =
       Assignment(m.toList(ol).toVector)
   }
