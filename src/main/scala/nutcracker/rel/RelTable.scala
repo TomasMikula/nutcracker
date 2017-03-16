@@ -5,7 +5,7 @@ import nutcracker.util.{Lst, Mapped}
 import scala.annotation.tailrec
 import shapeless.HList
 
-sealed trait RelTable[K[_], L <: HList] {
+private[rel] sealed trait RelTable[K[_], L <: HList] {
   def insert(row: L): Option[RelTable[K, L]]
   def query(q: Assignment[L]): List[L]
   def execWith(q: Assignment[L])(supply: Token[L] => K[Unit])(exec: L => K[Unit]): (Option[RelTable[K, L]], Option[K[Unit]])
@@ -14,7 +14,7 @@ sealed trait RelTable[K[_], L <: HList] {
   def rows: Vector[L]
 }
 
-object RelTable {
+private[rel] object RelTable {
   def apply[K[_], L <: HList](implicit m: Mapped[L, Order]): RelTableBuilder[K, L, m.Out] = RelTableBuilder[K, L, m.Out]()(m)
 
   case class RelTableBuilder[K[_], L <: HList, OS <: HList] private[RelTable] ()(implicit m: Mapped.Aux[L, Order, OS]) {
@@ -79,4 +79,4 @@ private[rel] case class RelTable0[K[_], L <: HList, OS <: HList](
     }
 }
 
-case class Token[L](value: Long) extends AnyVal
+private[rel] case class Token[L](value: Long) extends AnyVal

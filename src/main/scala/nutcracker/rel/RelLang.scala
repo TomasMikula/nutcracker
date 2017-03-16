@@ -1,14 +1,14 @@
 package nutcracker.rel
 
 import algebra.Order
-import nutcracker.util.{ContU, FreeK, InjectK, Mapped, MappedListBuilder, Step, SummonHList}
+import nutcracker.util.{ContU, FreeK, InjectK, Mapped, MappedListBuilder, SummonHList}
 import scala.language.higherKinds
 import scalaz.std.option._
 import shapeless.HList
 
-sealed trait RelLang[K[_], A]
+private[rel] sealed trait RelLang[K[_], A]
 
-object RelLang {
+private[rel] object RelLang {
 
   case class Relate[K[_], L <: HList, OS <: HList](rel: Rel[L], values: L)(implicit m: Mapped.Aux[L, Order, OS], os: OS) extends RelLang[K, Unit] {
     val orders: OS = os
@@ -23,8 +23,6 @@ object RelLang {
   def execWith[K[_], L <: HList, C <: HList, OS <: HList](rel: Rel[L], ass: Assignment[L], supply: Token[L] => K[Unit], exec: L => K[Unit])(implicit m: Mapped.Aux[L, Order, OS], os: OS): RelLang[K, Unit] = ExecWith(rel, ass, supply, exec, m, os)
   def supply[K[_], L <: HList](rel: Rel[L], token: Token[L], value: L): RelLang[K, Unit] = Supply(rel, token, value)
 
-
-  implicit def interpreter: Step[RelLang, RelDB] = RelDB.interpreter
 
   implicit def relationsInstance[F[_[_], _]](implicit inj: InjectK[RelLang, F]): Relations[FreeK[F, ?]] =
     new Relations[FreeK[F, ?]] {

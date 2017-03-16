@@ -2,13 +2,12 @@ package nutcracker.rel
 
 import scala.language.existentials
 import scala.language.higherKinds
-import nutcracker.rel.RelLang._
-import nutcracker.util.{KMapB, Lst, Mapped, Step, TransformedIndex, WriterState}
+import nutcracker.util.{KMapB, Lst, Mapped, TransformedIndex}
 import algebra.Order
 import shapeless.HList
 import RelDB._
 
-case class RelDB[K[_]] private (
+private[rel] case class RelDB[K[_]] private (
   private val tables: KMapB[Rel, λ[`L <: HList` => RelTable[K, L]], HList],
   private val patternTriggers: Map[PartiallyAssignedPattern[_], List[_ => K[Unit]]],
   private val relToPatterns: TransformedIndex[Rel[_ <: HList], PartiallyAssignedPattern[_ <: HList], PartiallyAssignedOrientedPattern[_ <: HList, _ <: HList]]
@@ -131,7 +130,7 @@ case class RelDB[K[_]] private (
     )
 }
 
-object RelDB {
+private[rel] object RelDB {
 
   private[rel] case class PartiallyAssignedPattern[V <: HList](pattern: Pattern[V], assignment: Assignment[V]) {
     def orient[L <: HList](rel: Rel[L]): PartiallyAssignedOrientedPattern[V, L] =
@@ -146,13 +145,4 @@ object RelDB {
     Map.empty,
     TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel))
   )
-
-  def interpreter: Step[RelLang, RelDB] = new Step[RelLang, RelDB] {
-    override def apply[K[_], A](f: RelLang[K, A]): WriterState[Lst[K[Unit]], RelDB[K], A] = f match {
-      case r @ Relate(rel, values) => WriterState(db => db.insert(rel, values)(r.ordersWitness, r.orders) match { case (db1, ks) => (ks, db1, ()) })
-      case OnPatternMatch(p, a, h) => WriterState(db => db.addOnPatternMatch(p, a)(h) match { case (db1, ks) => (ks, db1, ()) })
-      case ExecWith(rel, ass, supp, exec, m, os) => WriterState(db => db.execWith(rel, ass)(supp)(exec)(m, os) match { case (db1, ko) => (Lst.maybe(ko), db1, ()) })
-      case Supply(rel, token, value) => WriterState(db => db.supply(rel, token, value) match { case (db1, ks) => (ks, db1, ()) })
-    }
-  }
 }

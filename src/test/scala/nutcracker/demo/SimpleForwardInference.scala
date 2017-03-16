@@ -3,27 +3,18 @@ package nutcracker.demo
 import algebra.Order
 import algebra.instances.string._
 import nutcracker._
-import nutcracker.rel.{Pattern, Relations}
+import nutcracker.rel.Pattern
 import nutcracker.rel.Rel.Rel2
-import nutcracker.util.FreeK
 import org.scalatest.{FunSpec, Matchers}
-
 import scalaz.NonEmptyList
 import scalaz.std.anyVal._
 import shapeless.{::, HNil}
 
-import scala.language.higherKinds
-
 class SimpleForwardInference extends FunSpec with Matchers {
-  import PropRel.Prop.{Ref => _, _}
   import PropRel._
+  import PropRel.Prop.{Ref => _, _}
+  import PropRel.relationsApi._
   import Promises._
-
-  // our instruction sets will be propagation and relations
-  type Lang[K[_], A] = PropRel.Lang[K, A]
-
-  val R = Relations[FreeK[Lang, ?]]
-  import R._
 
 
   // Define some relations.
@@ -39,7 +30,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
   implicit val symbolOrdering: Order[Symbol] = Order[String].on[Symbol](_.name)
 
   // a program to add some inference rules for LT and LTE
-  val LtLteRules: FreeK[Lang, Unit] = for {
+  val LtLteRules: Prg[Unit] = for {
     // LT(a, b) => LTE(a, b)
     _ <- onPatternMatch(
            Pattern[Pair].build({ case (a :: b :: HNil) => NonEmptyList(LT(a, b)) }))(
