@@ -7,20 +7,20 @@ import shapeless.Nat._
 import shapeless.test.illTyped
 import shapeless.{HList, HNil, ::}
 
-class ListPtrTest extends FunSuite {
+class HListPtrTest extends FunSuite {
 
-  type Pointer[L <: HList, A] = nutcracker.util.ListPtr.Aux[L, _, A]
+  type Pointer[L <: HList, A] = nutcracker.util.HListPtr.Aux[L, _, A]
 
   type ISB = Int :: String :: Boolean :: HNil
 
   test("Ptr creation examples should compile") {
-    ListPtr[ISB, _0]: Pointer[ISB, Int]
-    ListPtr[ISB, _1]: Pointer[ISB, String]
-    ListPtr[ISB, _2]: Pointer[ISB, Boolean]
+    HListPtr[ISB, _0]: Pointer[ISB, Int]
+    HListPtr[ISB, _1]: Pointer[ISB, String]
+    HListPtr[ISB, _2]: Pointer[ISB, Boolean]
 
-    ListPtr(_0): Pointer[ISB, Int]
-    ListPtr(_1): Pointer[ISB, String]
-    ListPtr(_2): Pointer[ISB, Boolean]
+    HListPtr(_0): Pointer[ISB, Int]
+    HListPtr(_1): Pointer[ISB, String]
+    HListPtr(_2): Pointer[ISB, Boolean]
     ()
   }
 

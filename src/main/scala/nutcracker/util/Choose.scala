@@ -13,10 +13,10 @@ trait Choose[L <: HList, C <: HList] extends (L => C) {
 
   final def apply(l: L): C = get(l)
 
-  def ::[N <: Nat, A](n: N)(implicit ptr: ListPtr.Aux[L, n.N, A]): Choose[L, A :: C] = // linter:ignore UnusedParameter // argument n is there just to infer N
+  def ::[N <: Nat, A](n: N)(implicit ptr: HListPtr.Aux[L, n.N, A]): Choose[L, A :: C] = // linter:ignore UnusedParameter // argument n is there just to infer N
     ptr :: this
 
-  def ::[N <: Nat, A](ptr: ListPtr.Aux[L, N, A]): Choose[L, A :: C] = new Choose[L, A :: C] {
+  def ::[N <: Nat, A](ptr: HListPtr.Aux[L, N, A]): Choose[L, A :: C] = new Choose[L, A :: C] {
     override lazy val vertexSet: Set[Int] = Choose.this.vertexSet + ptr.index
     override lazy val vertices: List[Int] = ptr.index :: Choose.this.vertices
     def get(l: L): (A :: C) = ptr(l) :: Choose.this.apply(l)
@@ -58,9 +58,9 @@ object ChooseByPtrs {
     def apply(ptrs: HNil): Choose[L, HNil] = Choose[L]
   }
 
-  implicit def chooseHCons[L <: HList, H, T <: HList, PT <: HList, N <: Nat](implicit ch: ChooseByPtrs[L, T, PT]): ChooseByPtrs[L, H :: T, ListPtr.Aux[L, N, H] :: PT] =
-    new ChooseByPtrs[L, H :: T, ListPtr.Aux[L, N, H] :: PT] {
-      def apply(ptrs: ListPtr.Aux[L, N, H] :: PT): Choose[L, H :: T] = ptrs.head :: ch(ptrs.tail)
+  implicit def chooseHCons[L <: HList, H, T <: HList, PT <: HList, N <: Nat](implicit ch: ChooseByPtrs[L, T, PT]): ChooseByPtrs[L, H :: T, HListPtr.Aux[L, N, H] :: PT] =
+    new ChooseByPtrs[L, H :: T, HListPtr.Aux[L, N, H] :: PT] {
+      def apply(ptrs: HListPtr.Aux[L, N, H] :: PT): Choose[L, H :: T] = ptrs.head :: ch(ptrs.tail)
     }
 }
 
@@ -73,7 +73,7 @@ object ChooseByNats {
 
   implicit def chooseHCons[L <: HList, H, T <: HList, N <: Nat, NS <: HList](implicit
     ch: ChooseByNats[L, T, NS],
-    ptr: ListPtr.Aux[L, N, H]
+    ptr: HListPtr.Aux[L, N, H]
   ): ChooseByNats[L, H :: T, N :: NS] = new ChooseByNats[L, H :: T, N :: NS] {
     def apply(nats: N :: NS): Choose[L, H :: T] = ptr :: ch(nats.tail)
   }

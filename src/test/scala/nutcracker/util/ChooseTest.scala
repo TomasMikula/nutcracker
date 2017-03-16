@@ -6,7 +6,7 @@ import shapeless.nat._
 
 class ChooseTest extends FlatSpec with Matchers {
 
-  type Pointer[L <: HList, A] = nutcracker.util.ListPtr.Aux[L, _, A]
+  type Pointer[L <: HList, A] = nutcracker.util.HListPtr.Aux[L, _, A]
 
   type ISB = Int :: String :: Boolean :: HNil
 

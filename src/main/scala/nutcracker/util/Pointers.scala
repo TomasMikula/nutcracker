@@ -37,10 +37,10 @@ object Pointers0 {
 
   implicit def hconsPointers[L <: HList, N <: Nat, H, T <: HList](implicit
     d: Drop.Aux[L, N, H :: T],
-    ptr: ListPtr.Aux[L, N, H],
+    ptr: HListPtr.Aux[L, N, H],
     tp: Pointers0[L, T, Succ[N]]
-  ): Aux[L, H :: T, N, ListPtr.Aux[L, N, H] :: tp.Out] = new Pointers0[L, H :: T, N] {
-    type Out = ListPtr.Aux[L, N, H] :: tp.Out
+  ): Aux[L, H :: T, N, HListPtr.Aux[L, N, H] :: tp.Out] = new Pointers0[L, H :: T, N] {
+    type Out = HListPtr.Aux[L, N, H] :: tp.Out
 
     def get = ptr :: tp.get
   }
