@@ -30,12 +30,14 @@ trait Src[S, A, M[_]] {
 trait PSrc[F[_], M[_]] {
 
   def observeImpl[A, U, Δ](src: F[A])(f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Unit]
+  def observeImplM[A, U, Δ, B](src: F[A])(f: A => M[(Trigger[M, A, Δ], B)])(implicit dom: Dom.Aux[A, U, Δ]): M[B]
 
   def observe[A](src: F[A])(implicit dom: Dom[A]): ObserveSyntaxHelper[A, dom.Update, dom.Delta] =
     new ObserveSyntaxHelper[A, dom.Update, dom.Delta](src)(dom)
 
   final class ObserveSyntaxHelper[A, U, Δ](src: F[A])(implicit dom: Dom.Aux[A, U, Δ]) {
     def by(f: A => Trigger[M, A, Δ]): M[Unit] = observeImpl(src)(f)
+    def byM[B](f: A => M[(Trigger[M, A, Δ], B)]): M[B] = observeImplM(src)(f)
     def by(f: Id ~> λ[α => (A => TriggerF[M, α])]): M[Unit] = observeImpl(src)(Trigger.valueObserver(f))
     def threshold(f: A => Option[M[Unit]]): M[Unit] = observeImpl(src)(Trigger.threshold(f))
     def untilRight(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Unit] = observeImpl(src)(Trigger.untilRight(f))

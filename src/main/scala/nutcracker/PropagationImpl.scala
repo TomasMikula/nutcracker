@@ -1,13 +1,12 @@
 package nutcracker
 
 import scala.language.higherKinds
-import nutcracker.util.typealigned.APair
+import nutcracker.util.typealigned.{APair, BoundedAPair}
 import nutcracker.util.{FreeK, HEqualK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
-
 import scalaz.{Equal, Leibniz, Show, StateT, ~>}
+import scalaz.Id._
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
-
 import scala.annotation.tailrec
 import scalaz.Leibniz.===
 
@@ -52,6 +51,9 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
               case Observe(ref, f, dom) => s.addDomainObserver[dom.Domain, dom.Update, dom.IDelta](ref, f)(dom) match {
                 case (s1, ko) => (Lst.maybe(ko), s1, ())
               }
+              case Hold(ref) =>
+                val (s1, res) = s.block(ref) // linter:ignore UndesirableTypeInference
+                (Lst.empty, s1, res)
               case Resume(ref, token, handler, dom) =>
                 (Lst.empty, s.resume[dom.Domain, dom.Update, dom.IDelta, token.Arg](ref, token, handler)(dom), ())
               case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
@@ -119,8 +121,12 @@ private[nutcracker] case class PropagationStore[K[_]] private(
 
   def addDomainObserver[D, U, Δ[_, _]](ref: DRef[D], f: SeqPreHandler[Token, K[Unit], D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Option[K[Unit]]) = {
     val (cell, ko) = domains(ref).infer.observe(f)
-    val s1 = copy(domains = domains.put(ref)(cell))
-    (s1, ko)
+    (copy(domains = domains.put(ref)(cell)), ko)
+  }
+
+  def block[D](ref: DRef[D]): (PropagationStore[K], BoundedAPair[D, Id, Token]) = {
+    val (cell, res) = domains(ref).block
+    (copy(domains = domains.put(ref)(cell)), res)
   }
 
   def resume[D, U, Δ[_, _], D0 <: D](ref: DRef[D], token: Token[D0], handler: SeqHandler[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] = {
@@ -224,10 +230,19 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
       case Fire(k)   => (this, Some(k))
       case Sleep(h)  => (addObserver(h), None)
       case FireReload(cont) =>
-        val token = new Token[Value](nextTokenId)
-        val k = cont(token)
-        (Cell[K, D, Update, Delta, Value](value)(idleObservers, pendingObservers, blockedIdleObservers.put(token)(Leibniz.refl[Value]), blockedPendingObservers, nextTokenId + 1), Some(k))
+        val (cell, token) = block0
+        (cell, Some(cont(token)))
     }
+  }
+
+  def block0: (Cell[K, D], Token[Value]) = {
+    val token = new Token[Value](nextTokenId)
+    (Cell[K, D, Update, Delta, Value](value)(idleObservers, pendingObservers, blockedIdleObservers.put(token)(Leibniz.refl[Value]), blockedPendingObservers, nextTokenId + 1), token)
+  }
+
+  def block: (Cell[K, D], BoundedAPair[D, Id, Token]) = {
+    val (cell, token) = block0
+    (cell, BoundedAPair[D, Id, Token, Value](value, token))
   }
 
   private def addObserver(f: Handler[Value]): Cell.Aux[K, D, Update, Delta] =
@@ -346,4 +361,8 @@ private[nutcracker] object DRef {
 
 private[nutcracker] final case class Token[A](val id: Long) extends AnyVal {
   type Arg = A
+}
+
+private[nutcracker] object Token {
+  type Aux[A] = Token[B] forSome { type B <: A }
 }
