@@ -3,7 +3,27 @@ package nutcracker.rel
 import nutcracker.util.ChooseByPtrs
 import shapeless._
 
-trait Rel[L <: HList] { self: Singleton =>
+/** N-ary relation (where N is determined by `L`).
+  * Loosely speaking, it represents the signature of a database table,
+  * i.e. the datatypes of the columns.
+  *
+  * An implementation `MyRel[A, B] extends Rel[F[A, B]]` must ensure that
+  *  - if `(rel1: MyRel[T, U]) == (rel2: MyRel[V, W])`, i.e. two values of `MyRel` with different types are equal, then
+  *    - for all `row1: F[T, U]`, `row2: F[V, W]`
+  *      - `row1 == row2` ⇒ `F[T, U] =:= F[V, W]`
+  *
+  * In other words, the table signature can be somewhat parametric,
+  * as long as the actual row values cannot be mistakenly thought
+  * to be of a different type.
+  *
+  * Moreover, queries have to specify values of enough columns, so
+  * that the types of the remaining columns are uniquely determined
+  * by the types of the given columns.
+  *
+  * @tparam L constituents of this relation.
+  */
+trait Rel[L <: HList] {
+  type Row = L
 
   def apply[V <: HList, Ptrs <: HList](
     ptrs: Ptrs)(implicit
