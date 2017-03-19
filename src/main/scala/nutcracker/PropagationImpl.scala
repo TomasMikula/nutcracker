@@ -11,13 +11,13 @@ import scala.annotation.tailrec
 import scalaz.Leibniz.===
 
 private[nutcracker] object PropagationImpl extends PersistentPropagationModule with PropagationBundle { self =>
-  type Ref[A] = DRef[A]
+  type Ref[A] = CellId[A]
   type Lang[K[_], A] = PropagationLang[Ref, Token, K, A]
   type State[K[_]] = PropagationStore[K]
 
-  implicit val refEquality: HEqualK[Ref] = DRef.equalKInstance
-  implicit def refOrder: HOrderK[Ref] = DRef.orderKInstance
-  implicit def refShow: ShowK[Ref] = DRef.showKInstance
+  implicit val refEquality: HEqualK[Ref] = CellId.equalKInstance
+  implicit def refOrder: HOrderK[Ref] = CellId.orderKInstance
+  implicit def refShow: ShowK[Ref] = CellId.showKInstance
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref] =
     PropagationLang.freePropagation[Ref, Token, F]
 
@@ -27,8 +27,8 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
   def empty[K[_]]: PropagationStore[K] =
     PropagationStore[K](
       nextId = 0L,
-      domains = KMap[DRef, Cell[K, ?]](),
-      selTriggers = KMapB[λ[`L <: HList` => Sel[DRef, L]], λ[L => List[L => (Option[K[Unit]], Boolean)]], HList](),
+      domains = KMap[CellId, Cell[K, ?]](),
+      selTriggers = KMapB[λ[`L <: HList` => Sel[CellId, L]], λ[L => List[L => (Option[K[Unit]], Boolean)]], HList](),
       cellsToSels = Index.empty(sel => sel.cells),
       failedVars = Set(),
       dirtyDomains = Set(),
@@ -85,32 +85,32 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
 
 private[nutcracker] case class PropagationStore[K[_]] private(
   nextId: Long,
-  domains: KMap[DRef, Cell[K, ?]],
-  selTriggers: KMapB[λ[`L <: HList` => Sel[DRef, L]], λ[L => List[L => (Option[K[Unit]], Boolean)]], HList],
-  cellsToSels: Index[DRef[_], Sel[DRef, _ <: HList]],
+  domains: KMap[CellId, Cell[K, ?]],
+  selTriggers: KMapB[λ[`L <: HList` => Sel[CellId, L]], λ[L => List[L => (Option[K[Unit]], Boolean)]], HList],
+  cellsToSels: Index[CellId[_], Sel[CellId, _ <: HList]],
   failedVars: Set[Long],
-  dirtyDomains: Set[DRef[_]],
-  dirtySelections: Set[Sel[DRef, _ <: HList]]
+  dirtyDomains: Set[CellId[_]],
+  dirtySelections: Set[Sel[CellId, _ <: HList]]
 ) {
   import shapeless.PolyDefns.~>
 
-  private val cellFetcher: DRef ~> shapeless.Id = new (DRef ~> shapeless.Id) {
-    def apply[D](cell: DRef[D]): D = fetch(cell)
+  private val cellFetcher: CellId ~> shapeless.Id = new (CellId ~> shapeless.Id) {
+    def apply[D](cell: CellId[D]): D = fetch(cell)
   }
 
-  def addVariable[D](d: D)(implicit dom: IDom[D]): (PropagationStore[K], DRef[D]) = {
-    val ref = DRef[D](nextId)
+  def addVariable[D](d: D)(implicit dom: IDom[D]): (PropagationStore[K], CellId[D]) = {
+    val ref = CellId[D](nextId)
     val domains1 = domains.put(ref)(Cell.init(d))
     val failedVars1 = if(dom.isFailed(d)) failedVars + nextId else failedVars
     (copy(nextId = nextId + 1, domains = domains1, failedVars = failedVars1), ref)
   }
 
-  def fetch[D](ref: DRef[D]): D = domains(ref).value
+  def fetch[D](ref: CellId[D]): D = domains(ref).value
 
-  def fetchVector[D, N <: Nat](refs: Sized[Vector[DRef[D]], N]): Sized[Vector[D], N] =
+  def fetchVector[D, N <: Nat](refs: Sized[Vector[CellId[D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))
 
-  def update[D, U, Δ[_, _]](ref: DRef[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] =
+  def update[D, U, Δ[_, _]](ref: CellId[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] =
     domains(ref).infer.update(u) match {
       case None => this
       case Some(cell) =>
@@ -120,37 +120,37 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         copy(domains = domains1, failedVars = failedVars1, dirtyDomains = dirtyDomains1)
     }
 
-  def addDomainObserver[D, U, Δ[_, _]](ref: DRef[D], f: SeqPreHandler[Token, K[Unit], D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Option[K[Unit]]) = {
+  def addDomainObserver[D, U, Δ[_, _]](ref: CellId[D], f: SeqPreHandler[Token, K[Unit], D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Option[K[Unit]]) = {
     val (cell, ko) = domains(ref).infer.observe(f)
     (copy(domains = domains.put(ref)(cell)), ko)
   }
 
-  def block[D](ref: DRef[D]): (PropagationStore[K], BoundedAPair[D, Id, Token]) = {
+  def block[D](ref: CellId[D]): (PropagationStore[K], BoundedAPair[D, Id, Token]) = {
     val (cell, res) = domains(ref).block
     (copy(domains = domains.put(ref)(cell)), res)
   }
 
-  def resume[D, U, Δ[_, _], D0 <: D](ref: DRef[D], token: Token[D0], handler: SeqHandler[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] = {
+  def resume[D, U, Δ[_, _], D0 <: D](ref: CellId[D], token: Token[D0], handler: SeqHandler[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] = {
     val cell = domains(ref).infer.resume(token, handler)
     val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
     copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains1)
   }
 
 
-  def addSelTrigger[L <: HList](sel: Sel[DRef, L], t: L => (Option[K[Unit]], Boolean)): (PropagationStore[K], Option[K[Unit]]) = {
+  def addSelTrigger[L <: HList](sel: Sel[CellId, L], t: L => (Option[K[Unit]], Boolean)): (PropagationStore[K], Option[K[Unit]]) = {
     val (ko, keep) = t(sel.fetch(cellFetcher))
     if(keep) (addSelTrigger0(sel, t), ko)
     else     (this,                   ko)
   }
 
-  private def addSelTrigger0[L <: HList](sel: Sel[DRef, L], t: L => (Option[K[Unit]], Boolean)): PropagationStore[K] = {
+  private def addSelTrigger0[L <: HList](sel: Sel[CellId, L], t: L => (Option[K[Unit]], Boolean)): PropagationStore[K] = {
     copy(
       selTriggers = selTriggers.put(sel)(t :: selTriggers.getOrElse(sel)(Nil)),
       cellsToSels = cellsToSels.add(sel)
     )
   }
 
-  private def triggersForSel[L <: HList](sel: Sel[DRef, L]): (PropagationStore[K], Lst[K[Unit]]) = {
+  private def triggersForSel[L <: HList](sel: Sel[CellId, L]): (PropagationStore[K], Lst[K[Unit]]) = {
     val d = sel.fetch(cellFetcher)
     collectSelTriggers(d, selTriggers.getOrElse(sel)(Nil)) match {
       case (Nil, fired) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), fired)
@@ -158,7 +158,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     }
   }
 
-  private def getSelsForCell(ref: DRef[_]): Set[Sel[DRef, _ <: HList]] = cellsToSels.get(ref)
+  private def getSelsForCell(ref: CellId[_]): Set[Sel[CellId, _ <: HList]] = cellsToSels.get(ref)
 
   private def collectSelTriggers[L <: HList](l: L, triggers: List[L => (Option[K[Unit]], Boolean)]): (List[L => (Option[K[Unit]], Boolean)], Lst[K[Unit]]) =
     triggers match {
@@ -173,7 +173,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   def uncons: Option[(PropagationStore[K], Lst[K[Unit]])] =
     if(dirtyDomains.nonEmpty) {
       val ref0 = dirtyDomains.head
-      val ref: DRef.Aux[ref0.Domain, ref0.Update, ref0.Delta] = ref0.aux
+      val ref: CellId.Aux[ref0.Domain, ref0.Update, ref0.Delta] = ref0.aux
       val dirtySels = dirtySelections union getSelsForCell(ref)
       val (cell, ks) = domains(ref).trigger
       Some((copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains.tail, dirtySelections = dirtySels), ks))
@@ -320,7 +320,7 @@ private[nutcracker] object Cell {
   }
 }
 
-private[nutcracker] sealed abstract class DRef[D](val domainId: Long) {
+private[nutcracker] sealed abstract class CellId[D](val domainId: Long) {
   type Domain = D
   type Update
   type Delta[_, _]
@@ -328,40 +328,40 @@ private[nutcracker] sealed abstract class DRef[D](val domainId: Long) {
   /** Infer `Update` and `Delta` types. Relies on global uniqueness
     * of `Dom[D]` instances.
     */
-  def infer(implicit dom: IDom[D]): DRef.Aux[D, dom.Update, dom.IDelta] =
-    this.asInstanceOf[DRef.Aux[D, dom.Update, dom.IDelta]]
+  def infer(implicit dom: IDom[D]): CellId.Aux[D, dom.Update, dom.IDelta] =
+    this.asInstanceOf[CellId.Aux[D, dom.Update, dom.IDelta]]
 
-  def aux: DRef.Aux[Domain, Update, Delta] = this
+  def aux: CellId.Aux[Domain, Update, Delta] = this
 }
 
-private[nutcracker] object DRef {
-  type Aux[D, U, Δ[_, _]] = DRef[D] { type Update = U; type Delta[D1, D2] = Δ[D1, D2] }
+private[nutcracker] object CellId {
+  type Aux[D, U, Δ[_, _]] = CellId[D] { type Update = U; type Delta[D1, D2] = Δ[D1, D2] }
 
-  def apply[D](domainId: Long)(implicit dom: IDom[D]): DRef.Aux[D, dom.Update, dom.IDelta] =
-    new DRef[D](domainId) {
+  def apply[D](domainId: Long)(implicit dom: IDom[D]): CellId.Aux[D, dom.Update, dom.IDelta] =
+    new CellId[D](domainId) {
       type Update = dom.Update
       type Delta[D1, D2] = dom.IDelta[D1, D2]
     }
 
-  implicit def equalInstance[D]: Equal[DRef[D]] = new Equal[DRef[D]] {
-    def equal(r1: DRef[D], r2: DRef[D]): Boolean = r1.domainId == r2.domainId
+  implicit def equalInstance[D]: Equal[CellId[D]] = new Equal[CellId[D]] {
+    def equal(r1: CellId[D], r2: CellId[D]): Boolean = r1.domainId == r2.domainId
   }
 
-  implicit val equalKInstance: HEqualK[DRef] = new HEqualK[DRef] {
-    def hEqual[A, B](f1: DRef[A], f2: DRef[B]): Boolean = f1.domainId == f2.domainId
+  implicit val equalKInstance: HEqualK[CellId] = new HEqualK[CellId] {
+    def hEqual[A, B](f1: CellId[A], f2: CellId[B]): Boolean = f1.domainId == f2.domainId
   }
 
-  implicit val orderKInstance: HOrderK[DRef] = new HOrderK[DRef] {
-    override def hOrder[A, B](fa: DRef[A], fb: DRef[B]): Int =
+  implicit val orderKInstance: HOrderK[CellId] = new HOrderK[CellId] {
+    override def hOrder[A, B](fa: CellId[A], fb: CellId[B]): Int =
       if(fa.domainId < fb.domainId) -1 else if(fa.domainId == fb.domainId) 0 else 1
   }
 
-  implicit def showInstance[D]: Show[DRef[D]] = new Show[DRef[D]] {
-    override def shows(ref: DRef[D]): String = s"ref${ref.domainId}"
+  implicit def showInstance[D]: Show[CellId[D]] = new Show[CellId[D]] {
+    override def shows(ref: CellId[D]): String = s"ref${ref.domainId}"
   }
 
-  implicit def showKInstance: ShowK[DRef] = new ShowK[DRef] {
-    def shows[A](ref: DRef[A]): String = s"ref${ref.domainId}"
+  implicit def showKInstance: ShowK[CellId] = new ShowK[CellId] {
+    def shows[A](ref: CellId[A]): String = s"ref${ref.domainId}"
   }
 }
 
