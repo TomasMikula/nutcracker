@@ -1,9 +1,11 @@
 package nutcracker
 
 /** Typeclass for domains that are join-semilattices. */
-trait JoinDom[D] extends Dom[D] {
+trait JoinDom[D] extends SyncDom[D] {
 
   def toJoinUpdate(d: D): Update
+
+  override def toPatch(d: D, δ: Delta): Update = toJoinUpdate(d)
 
   /** Asymmetric join operation: performs join and returns `Updated` if
     * the result is different from the left argument, `Unchanged` if the

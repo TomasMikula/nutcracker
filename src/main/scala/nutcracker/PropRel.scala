@@ -17,6 +17,7 @@ object PropRel extends PropagationBundle {
   type State[K[_]]   = (Prop.State :**: RelMod.State)#Out[K]
 
   implicit def refEquality = Prop.refEquality
+  implicit def refOrder = Prop.refOrder
   implicit def refShow = Prop.refShow
 
   implicit val propagationApi: Propagation[Prg, Ref] =

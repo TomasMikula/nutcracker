@@ -41,7 +41,7 @@ object Mapped {
       case HNil => BoundedAPair.of[HList, Id, Mapped.Aux[L, F, ?]](HNil, hnilMapped[F].asInstanceOf[Mapped.Aux[L, F, HNil]])
       case shapeless.::(h, t) =>
         val ev = pure(t)(F)
-        BoundedAPair.of[HList, Id, Mapped.Aux[L, F, ?]](F.point(h) :: ev._1, ev._2.prepend.asInstanceOf)
+        BoundedAPair[HList, Id, Mapped.Aux[L, F, ?], HList](F.point(h) :: ev._1, ev._2.prepend.asInstanceOf[Mapped.Aux[L, F, HList]])
     }
   }
 

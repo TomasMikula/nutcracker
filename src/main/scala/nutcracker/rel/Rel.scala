@@ -23,7 +23,8 @@ import shapeless._
   * @tparam L constituents of this relation.
   */
 trait Rel[L <: HList] {
-  type Row = L
+
+  type Projection >: L <: HList
 
   def apply[V <: HList, Ptrs <: HList](
     ptrs: Ptrs)(implicit
@@ -40,6 +41,8 @@ trait Rel[L <: HList] {
 }
 
 object Rel {
+  type Aux[L <: HList, L0 >: L <: HList] = Rel[L] { type Projection = L0 }
+
   type Rel1[A1] = Rel[A1 :: HNil]
   type Rel2[A1, A2] = Rel[A1 :: A2 :: HNil]
   type Rel3[A1, A2, A3] = Rel[A1 :: A2 :: A3 :: HNil]

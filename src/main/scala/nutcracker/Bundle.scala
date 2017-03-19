@@ -13,6 +13,9 @@ trait Bundle {
 
   def empty[K[_]]: State[K]
   def interpret[A](p: Prg[A], s: State[Prg]): (State[Prg], A)
+
+  def interpret0[A](p: Prg[A]): (State[Prg], A) =
+    interpret(p, empty[Prg])
 }
 
 trait RefBundle extends Bundle {

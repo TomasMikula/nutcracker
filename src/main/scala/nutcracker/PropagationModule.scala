@@ -1,11 +1,12 @@
 package nutcracker
 
-import nutcracker.util.{FreeK, HEqualK, InjectK, ShowK, StateInterpreter}
+import nutcracker.util.{FreeK, HEqualK, HOrderK, InjectK, ShowK, StateInterpreter}
 
 trait PropagationModule extends Module {
   type Ref[_]
 
   implicit def refEquality: HEqualK[Ref]
+  implicit def refOrder: HOrderK[Ref]
   implicit def refShow: ShowK[Ref]
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref]
 
@@ -39,6 +40,7 @@ extends ListModule[Lang0, State0](base) with StashPropagationModule {
   type Ref[A] = Ref0[A]
 
   implicit def refEquality: HEqualK[Ref] = base.refEquality
+  implicit def refOrder: HOrderK[Ref] = base.refOrder
   implicit def refShow: ShowK[Ref] = base.refShow
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref] = base.freePropagation
 

@@ -2,7 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.util.typealigned.{APair, BoundedAPair}
-import nutcracker.util.{FreeK, HEqualK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
+import nutcracker.util.{FreeK, HEqualK, HOrderK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
 import scalaz.{Equal, Leibniz, Show, StateT, ~>}
 import scalaz.Id._
 import scalaz.std.option._
@@ -16,6 +16,7 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
   type State[K[_]] = PropagationStore[K]
 
   implicit val refEquality: HEqualK[Ref] = DRef.equalKInstance
+  implicit def refOrder: HOrderK[Ref] = DRef.orderKInstance
   implicit def refShow: ShowK[Ref] = DRef.showKInstance
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref] =
     PropagationLang.freePropagation[Ref, Token, F]
@@ -348,6 +349,11 @@ private[nutcracker] object DRef {
 
   implicit val equalKInstance: HEqualK[DRef] = new HEqualK[DRef] {
     def hEqual[A, B](f1: DRef[A], f2: DRef[B]): Boolean = f1.domainId == f2.domainId
+  }
+
+  implicit val orderKInstance: HOrderK[DRef] = new HOrderK[DRef] {
+    override def hOrder[A, B](fa: DRef[A], fb: DRef[B]): Int =
+      if(fa.domainId < fb.domainId) -1 else if(fa.domainId == fb.domainId) 0 else 1
   }
 
   implicit def showInstance[D]: Show[DRef[D]] = new Show[DRef[D]] {

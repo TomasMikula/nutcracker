@@ -46,8 +46,9 @@ private[rel] case class RelDB[K[_]] private (
   }
 
   def supply[L <: HList](rel: Rel[L], t: Token[L], row: L): (RelDB[K], Lst[K[Unit]]) = {
-    val (tbl, ks) = table0(rel).get.supply(t, row)
-    (replaceTable(rel)(tbl), ks)
+    val ks1 = collectTriggers(rel, row) // trigger patterns matching the new row
+    val (tbl, ks2) = table0(rel).get.supply(t, row)
+    (replaceTable(rel)(tbl), ks1 ::: ks2)
   }
 
   private def collectTriggers[L <: HList](rel: Rel[L], row: L): Lst[K[Unit]] =
