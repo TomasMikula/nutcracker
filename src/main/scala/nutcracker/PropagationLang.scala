@@ -8,9 +8,9 @@ import scalaz.~>
 import scalaz.Id._
 import shapeless.HList
 
-sealed trait PropagationLang[Ref[_], Tok[_], K[_], A]
+private[nutcracker] sealed trait PropagationLang[Ref[_], Tok[_], K[_], A]
 
-object PropagationLang {
+private[nutcracker] object PropagationLang {
 
   private type FP[Ref[_], Tok[_], A] = FreeK[PropagationLang[Ref, Tok, ?[_], ?], A]
 

@@ -69,7 +69,7 @@ object Trigger {
     observer[F, D, Δ](λ[Id ~> λ[α => (D, Δ) => TriggerF[F, α]]](α => (d, δ) => FireReload(f(d, δ) map (_ => α))))
 }
 
-sealed trait SeqTrigger[Tok[_], K, D, Δ[_, _], D1] {
+private[nutcracker] sealed trait SeqTrigger[Tok[_], K, D, Δ[_, _], D1] {
 
   import SeqTrigger._
 
@@ -81,7 +81,7 @@ sealed trait SeqTrigger[Tok[_], K, D, Δ[_, _], D1] {
   }
 }
 
-object SeqTrigger {
+private[nutcracker] object SeqTrigger {
 
   case class Discard[Tok[_], K, D, Δ[_, _], D1]() extends SeqTrigger[Tok, K, D, Δ, D1]
 
@@ -93,7 +93,7 @@ object SeqTrigger {
 
 }
 
-trait SeqHandler[Tok[_], K, D, Δ[_, _], D1] {
+private[nutcracker] trait SeqHandler[Tok[_], K, D, Δ[_, _], D1] {
   self =>
   def handle[D2 <: D](d2: D2, δ: Δ[D1, D2]): SeqTrigger[Tok, K, D, Δ, D2]
 
@@ -103,7 +103,7 @@ trait SeqHandler[Tok[_], K, D, Δ[_, _], D1] {
   }
 }
 
-trait SeqPreHandler[Tok[_], K, D, Δ[_, _]] { self =>
+private[nutcracker] trait SeqPreHandler[Tok[_], K, D, Δ[_, _]] { self =>
   def handle[D0 <: D](d: D0): SeqTrigger[Tok, K, D, Δ, D0]
 
   def map[L](f: K => L): SeqPreHandler[Tok, L, D, Δ] = new SeqPreHandler[Tok, L, D, Δ] {
