@@ -26,7 +26,7 @@ class FunctionalRelationTest extends FunSuite {
     val paired = Tupled2[Bool, Bool, Ref]
 
     def init(a: Ref[Bool], b: Ref[Bool]) =
-      establish(paired).matching(a :: b :: HNil)
+      establish(paired).matching2(a, b)
         .by(Tupled2.recipe[Bool, Bool, Ref, Prg].andThen(_ => (initializedTimes += 1).point[Prg]))
 
     def observe(cps: ContU[L]): Prg[Unit] =
