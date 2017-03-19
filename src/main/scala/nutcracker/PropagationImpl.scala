@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 import nutcracker.util.typealigned.{APair, BoundedAPair}
 import nutcracker.util.{FreeK, HEqualK, HOrderK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
-import scalaz.{Equal, Leibniz, Show, StateT, ~>}
+import scalaz.{Equal, Leibniz, Ordering, Show, StateT, ~>}
 import scalaz.Id._
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
@@ -352,8 +352,10 @@ private[nutcracker] object CellId {
   }
 
   implicit val orderKInstance: HOrderK[CellId] = new HOrderK[CellId] {
-    override def hOrder[A, B](fa: CellId[A], fb: CellId[B]): Int =
-      if(fa.domainId < fb.domainId) -1 else if(fa.domainId == fb.domainId) 0 else 1
+    override def hOrder[A, B](fa: CellId[A], fb: CellId[B]): Ordering =
+      if(fa.domainId < fb.domainId) Ordering.LT
+      else if(fa.domainId == fb.domainId) Ordering.EQ
+      else Ordering.GT
   }
 
   implicit def showInstance[D]: Show[CellId[D]] = new Show[CellId[D]] {

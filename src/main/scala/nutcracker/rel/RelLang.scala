@@ -1,8 +1,8 @@
 package nutcracker.rel
 
-import algebra.Order
 import nutcracker.util.{ContU, FreeK, InjectK, Mapped, MappedListBuilder, SummonHList}
 import scala.language.higherKinds
+import scalaz.Order
 import scalaz.std.option._
 import shapeless.HList
 

@@ -1,13 +1,12 @@
 package nutcracker.demo
 
-import algebra.Order
-import algebra.instances.string._
 import nutcracker._
 import nutcracker.rel.Pattern
 import nutcracker.rel.Rel.Rel2
 import org.scalatest.{FunSpec, Matchers}
-import scalaz.NonEmptyList
+import scalaz.{NonEmptyList, Order}
 import scalaz.std.anyVal._
+import scalaz.std.string._
 import shapeless.{::, HNil}
 
 class SimpleForwardInference extends FunSpec with Matchers {
@@ -27,7 +26,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
   type Triple = Symbol :: Symbol :: Symbol :: HNil
 
   // to be able to index Symbol values in a relational database, we need to define an ordering on Symbols
-  implicit val symbolOrdering: Order[Symbol] = Order[String].on[Symbol](_.name)
+  implicit val symbolOrdering: Order[Symbol] = Order.orderBy(_.name)
 
   // a program to add some inference rules for LT and LTE
   val LtLteRules: Prg[Unit] = for {

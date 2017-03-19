@@ -1,9 +1,9 @@
 package nutcracker.util
 
-import algebra.Order
+import scalaz.{Order, Ordering}
 
 trait HOrderK[F[_]] extends Order[∃[F]] {
-  def hOrder[A, B](fa: F[A], fb: F[B]): Int
+  def hOrder[A, B](fa: F[A], fb: F[B]): Ordering
 
-  override def compare(x: ∃[F], y: ∃[F]) = hOrder(x, y)
+  override def order(x: ∃[F], y: ∃[F]) = hOrder(x, y)
 }

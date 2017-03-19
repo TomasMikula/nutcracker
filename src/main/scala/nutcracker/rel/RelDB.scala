@@ -1,10 +1,10 @@
 package nutcracker.rel
 
 import scala.language.existentials
-import scala.language.higherKinds
 import nutcracker.util.{KMapB, Lst, Mapped, TransformedIndex}
-import algebra.Order
+import scalaz.Order
 import shapeless.HList
+
 import RelDB._
 
 private[rel] case class RelDB[K[_]] private (

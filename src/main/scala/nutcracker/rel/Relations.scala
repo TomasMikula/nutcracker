@@ -1,12 +1,11 @@
 package nutcracker.rel
 
 import scala.language.higherKinds
-import algebra.Order
 import nutcracker.rel.RelDB.PartiallyAssignedPattern
 import nutcracker.util.{ContU, Mapped, MappedListBuilder, SummonHList}
-import scalaz.Bind
+import scalaz.{Bind, Order}
 import scalaz.syntax.bind._
-import shapeless.{HList, HNil, ::}
+import shapeless.{::, HList, HNil}
 
 trait Relations[M[_]] {
   def relateImpl[L <: HList, OrderL <: HList](rel: Rel[L], values: L)(implicit m: Mapped.Aux[L, Order, OrderL], os: SummonHList[OrderL]): M[Unit]

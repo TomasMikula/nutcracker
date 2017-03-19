@@ -1,8 +1,8 @@
 package nutcracker.rel
 
-import algebra.Order
 import nutcracker.util.{Lst, Mapped}
 import scala.annotation.tailrec
+import scalaz.Order
 import shapeless.HList
 
 private[rel] sealed trait RelTable[K[_], L <: HList] {
