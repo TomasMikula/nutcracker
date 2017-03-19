@@ -10,9 +10,8 @@ import nutcracker.{Final, RelativelyComplementedDom, SplittableDomWithBottom, Up
 final case class Bool private(intValue: Int) extends AnyVal
 
 object Bool {
-  sealed abstract class Update
-  final case class Join(value: Bool) extends Update
-  final case class Diff(value: Bool) extends Update
+  final case class Join(value: Bool) // extends AnyVal // value class may not wrap another user-defined value class
+  type Update = Join
 
   type BoolDom = RelativelyComplementedDom[Bool] with SplittableDomWithBottom.Aux[Bool, Update, Unit]
 
@@ -47,14 +46,11 @@ object Bool {
         case _ => Refined
       }
       override def update[B <: Bool](d: B, u: Update): UpdateResult[Bool, IDelta, B] = {
-        val res = u match {
-          case Join(x) => Bool(d.intValue &  x.intValue)
-          case Diff(x) => Bool(d.intValue & ~x.intValue)
-        }
+        val res = Bool(d.intValue &  u.value.intValue)
         if(res == d) UpdateResult() else UpdateResult(res, ())
       }
       override def toJoinUpdate(d: Bool): Update = Join(d)
-      override def toComplementUpdate(d: Bool): Update = Diff(d)
+      override def toComplementUpdate(d: Bool): Update = Join(Bool(Anything.intValue & ~d.intValue))
       override def ljoin[B <: Bool](d1: B, d2: Bool): UpdateResult[Bool, IDelta, B] = update(d1, Join(d2))
       override def appendDeltas(d1: Delta, d2: Delta): Delta = ()
       override def bottom: Bool = Anything
