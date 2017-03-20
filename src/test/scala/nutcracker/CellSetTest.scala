@@ -6,24 +6,24 @@ import scala.collection.mutable
 import scalaz.std.anyVal._
 import scalaz.syntax.monad._
 
-class IncRefSetTest extends FunSuite {
+class CellSetTest extends FunSuite {
   val Prop = Propagation.bundle
   import Prop._
 
   val P = Prop.propagationApi
-  val incRefSets = new IncRefSets[Prg, Ref]
+  val cellSets = new CellSets[Prg, Ref]
 
   test("autoclean") {
     val observed = mutable.Buffer[Ref[Promise[Int]]]()
 
     val prg = for {
-      res <- incRefSets.init[Promise[Int]]
+      res <- cellSets.init[Promise[Int]]
       _ <- P.observe(res).by(_ => Trigger.sleep(Trigger.continually((d, δ) => δ.value.foreach(r => observed += r).point[Prg])))
       p1 <- P.newCell[Promise[Int]](Promise.Conflict)
       p2 <- Promises.promise[Int]()
       _ <- Promises.complete(p2, 42)
-      _ <- incRefSets.insert(p1, res)
-      _ <- incRefSets.insert(p2, res)
+      _ <- cellSets.insert(p1, res)
+      _ <- cellSets.insert(p2, res)
     } yield (res, p2)
 
     val (s, (res, p2)) = interpret0(prg)
