@@ -46,13 +46,14 @@ object Discrete extends DiscreteInstances {
   def cellC[M[_], Ref[_], A](a: A)(implicit M: Propagation[M, Ref], MB: Bind[M]): ContT[M, Unit, Ref[Discrete[A]]] =
     ContT.liftM[Id, M, Unit, Ref[Discrete[A]]](M.newCell(Discrete(a)))
 
-  implicit def domInstance[A]: Dom.Aux[Discrete[A], Update[A], Delta[A]] = new Dom[Discrete[A]] {
+  implicit def domInstance[A]: RDom.Aux[Discrete[A], Update[A], Delta[A]] = new RDom[Discrete[A]] {
     type Update = Discrete.Update[A]
     type Delta = Discrete.Delta[A]
 
     def update[D <: Discrete[A]](d: D, u: Update): UpdateResult[Discrete[A], IDelta, D] = sys.error("unreachable code")
     def appendDeltas(d1: Delta, d2: Delta): Delta = sys.error("unreachable code")
     def isFailed(d: Discrete[A]): Boolean = false
+    def recur(δ: Delta): Update = δ
   }
 
   implicit def finalInstance[A]: Final.Aux[Discrete[A], A] = new Final[Discrete[A]] {
