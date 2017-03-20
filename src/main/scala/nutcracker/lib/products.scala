@@ -1,9 +1,9 @@
 package nutcracker.lib
 
 import nutcracker.{Dom, Propagation, SyncDom, Trigger}
-import nutcracker.rel.Recipe
+import nutcracker.rel.{Recipe, Relations}
 import nutcracker.rel.Rel.Rel3
-import nutcracker.util.{Choose, ∃}
+import nutcracker.util.{Choose, ContU, HOrderK, ∃}
 import scalaz.{Monad, \&/}
 import scalaz.syntax.monad._
 import shapeless.{::, HNil}
@@ -24,6 +24,10 @@ case class Tupled2[A, B, Ref[_]]() extends Rel3[Ref[A], Ref[B], Ref[(A, B)]] {
 object Tupled2 {
   private type L[A, B, Ref[_]] = Ref[A] :: Ref[B] :: Ref[(A, B)] :: HNil
   private type C[A, B, Ref[_]] = Ref[A] :: Ref[B]                :: HNil
+
+  def establish[A, B, Ref[_], K[_]](ra: Ref[A], rb: Ref[B])(implicit P: Propagation[K, Ref], R: Relations[K], O: HOrderK[Ref], K: Monad[K], da: SyncDom[A], db: SyncDom[B]): ContU[K, Ref[(A, B)]] = {
+    R.establish(Tupled2[A, B, Ref]).matching2(ra, rb).by(recipe).map(_.tail.tail.head)
+  }
 
   def recipe[A, B, Ref[_], K[_]](implicit P: Propagation[K, Ref], K: Monad[K], da: SyncDom[A], db: SyncDom[B]): Recipe[L[A, B, Ref], C[A, B, Ref], K] =
     new Recipe[L[A, B, Ref], C[A, B, Ref], K](_0 :: _1 :: Choose[L[A, B, Ref]]) {
