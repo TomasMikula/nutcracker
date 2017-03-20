@@ -38,9 +38,10 @@ final case class IteratorOps[A](it: Iterator[A]) extends AnyVal {
   }
 
   def sequence_[F[_]](implicit F: Applicative[F], ev: A === F[Unit]): F[Unit] =
-    ev.subst[IteratorOps](this).balancedReduce(new Semigroup[F[Unit]] {
-      def append(f1: F[Unit], f2: => F[Unit]): F[Unit] = F.apply2(f1, f2)((_, _) => ())
-    }).getOrElse(F.point(()))
+    traverse_(ev(_))
+
+  def traverse_[F[_]](f: A => F[Unit])(implicit F: Applicative[F]): F[Unit] =
+    balancedMapReduce(f)(applicativeSemigroup[F]).getOrElse(F.point(()))
 
   def intersperse(a: A): Iterator[A] = new Iterator[A] {
     var nextIsSeparator: Boolean = false
@@ -75,23 +76,30 @@ final case class IteratorOps[A](it: Iterator[A]) extends AnyVal {
     }
   }
 
-  def balancedReduce(implicit A: Semigroup[A]): Option[A] = {
-    @tailrec def append(l: List[A], lFactor: Int, a: A): List[A] = {
-      // |l| = lFactor * |a|
+  def balancedReduce(implicit A: Semigroup[A]): Option[A] =
+    balancedMapReduce(identity[A])
+
+  def balancedMapReduce[B](f: A => B)(implicit B: Semigroup[B]): Option[B] = {
+    @tailrec def append(l: List[B], lFactor: Int, b: B): List[B] = {
+      // |l| = lFactor * |b|
       //   where
       //     |l| is the total number of elements accumulated in (all elements of) l,
-      //     |a| number of elements accumulated in a
-      if (lFactor % 2 == 0) a :: l
-      else append(l.tail, lFactor / 2, A.append(l.head, a))
+      //     |b| is the number of elements accumulated in b
+      if (lFactor % 2 == 0) b :: l
+      else append(l.tail, lFactor / 2, B.append(l.head, b))
     }
 
-    var l = List[A]()
+    var l = List[B]()
     var n = 0 // number of elements accumulated in l
     while(it.hasNext) {
-      l = append(l, n, it.next)
+      l = append(l, n, f(it.next))
       n = n + 1
     }
 
-    l.reduceLeftOption((acc, a) => A.append(a, acc))
+    l.reduceLeftOption((acc, b) => B.append(b, acc))
+  }
+
+  private def applicativeSemigroup[F[_]](implicit F: Applicative[F]): Semigroup[F[Unit]] = new Semigroup[F[Unit]] {
+    def append(f1: F[Unit], f2: => F[Unit]): F[Unit] = F.apply2(f1, f2)((_, _) => ())
   }
 }
