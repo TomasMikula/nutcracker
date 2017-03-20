@@ -56,6 +56,13 @@ object Trigger {
       case Some(k) => Fire(k)
     }))
 
+  /** Keep trying `f` until it returns `Some`. */
+  def threshold1[F[_], D, Δ](f: D => Option[F[Unit]]): (D, Δ) => Trigger[F, D, Δ] =
+    observer[F, D, Δ](λ[Id ~> λ[α => (D, Δ) => TriggerF[F, α]]](α => (d, _) => f(d) match {
+      case None => Sleep(α)
+      case Some(k) => Fire(k)
+    }))
+
   def untilRight[F[_], D, Δ](f: D => Either[F[Unit], F[Unit]])(implicit F: Functor[F]): D => Trigger[F, D, Δ] =
     valueObserver[F, D, Δ](λ[Id ~> λ[α => D => TriggerF[F, α]]](α => d => f(d) match {
       case Left(k) => FireReload(k map (_ => α))
