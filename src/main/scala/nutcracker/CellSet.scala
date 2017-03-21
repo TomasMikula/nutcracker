@@ -24,8 +24,8 @@ object CellSet {
   def wrap[Ref[_], A](refs: Set[Ref[A]]): CellSet[Ref, A] = new CellSet(refs)
 
   sealed trait Update[Ref[_], A]
-  case class Insert[Ref[_], A](value: Set[Ref[A]]) extends Update[Ref, A]
-  case class RemoveFailed[Ref[_], A](ref: Ref[A]) extends Update[Ref, A]
+  private case class Insert[Ref[_], A](value: Set[Ref[A]]) extends Update[Ref, A]
+  private case class RemoveFailed[Ref[_], A](ref: Ref[A]) extends Update[Ref, A]
 
   final case class Added[Ref[_], A](value: Set[Ref[A]]) extends AnyVal
   type Delta[Ref[_], A] = Added[Ref, A]
