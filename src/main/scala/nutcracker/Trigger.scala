@@ -5,7 +5,16 @@ import scalaz.{Functor, ~>}
 import scalaz.Id._
 import scalaz.syntax.functor._
 
-sealed trait TriggerF[F[_], A]
+sealed trait TriggerF[F[_], A] {
+  import TriggerF._
+
+  def map[B](f: A => B)(implicit F: Functor[F]): TriggerF[F, B] = this match {
+    case Discard() => Discard()
+    case Fire(exec) => Fire(exec)
+    case Sleep(a) => Sleep(f(a))
+    case FireReload(fa) => FireReload(F.map(fa)(f))
+  }
+}
 
 object TriggerF {
 
@@ -48,6 +57,12 @@ object Trigger {
 
       def apply(d: D): Trigger[F, D, Δ] = Trigger(g(d))
     }
+
+  def observerS[F[_]: Functor, D, Δ, S](s: S)(f: (S, D, Δ) => TriggerF[F, S]): (D, Δ) => Trigger[F, D, Δ] =
+    (d, δ) => Trigger(f(s, d, δ).map(s => observerS(s)(f)))
+
+  def valueObserverS[F[_]: Functor, D, Δ, S](s: S)(f: (S, D) => TriggerF[F, S]): D => Trigger[F, D, Δ] =
+    d => Trigger(f(s, d).map(s => observerS(s)((s, d, _) => f(s, d))))
 
   /** Keep trying `f` until it returns `Some`. */
   def threshold[F[_], D, Δ](f: D => Option[F[Unit]]): D => Trigger[F, D, Δ] =
