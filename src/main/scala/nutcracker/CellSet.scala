@@ -63,19 +63,18 @@ object CellSet {
       def serialize[M[_]](a: CellSet[Ptr, A])(implicit M: MonadObjectOutput[M, String, Ptr]): M[Unit] =
         DeepShow.set(ev.pointer).serialize(a.value)
     }
-}
 
+  def init[A]: InitSyntaxHelper[A] = new InitSyntaxHelper[A]
 
-class CellSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
-  import CellSet._
-
-  def init[A]: F[Ref[CellSet[Ref, A]]] =
-    P.newCell(CellSet.empty[Ref, A])
+  final class InitSyntaxHelper[A] {
+    def apply[Ref[_], F[_]]()(implicit P: Propagation[F, Ref]): F[Ref[CellSet[Ref, A]]] =
+      P.newCell(CellSet.empty[Ref, A])
+  }
 
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
     */
-  def forEach[A](ref: Ref[CellSet[Ref, A]])(implicit A: Applicative[F]): ContU[F, Ref[A]] = {
+  def forEach[Ref[_], F[_], A](ref: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], F: Applicative[F]): ContU[F, Ref[A]] = {
     import scalaz.syntax.traverse._
     ContU(f => P.observe(ref).by(as => {
       val now = as.toList.traverse_(f)
@@ -84,7 +83,7 @@ class CellSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
     }))
   }
 
-  def insert[A](ref: Ref[A], into: Ref[CellSet[Ref, A]])(implicit dom: Dom[A], F: Functor[F]): F[Unit] =
+  def insert[Ref[_], F[_], A](ref: Ref[A], into: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Functor[F]): F[Unit] =
     P.observe(ref).by(a =>
       if(dom.isFailed(a)) Trigger.discard
       else Trigger.fireReload(P.update(into).by(Insert(Set(ref))) map { _ => Trigger.threshold1(a =>
@@ -93,34 +92,34 @@ class CellSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
       ) })
     )
 
-  def insertAll[A](add: Set[Ref[A]], into: Ref[CellSet[Ref, A]])(implicit dom: Dom[A], F: Applicative[F]): F[Unit] =
+  def insertAll[Ref[_], F[_], A](add: Set[Ref[A]], into: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Applicative[F]): F[Unit] =
     add.iterator.traverse_(ra => insert(ra, into))
 
-  def include[A](sub: Ref[CellSet[Ref, A]], sup: Ref[CellSet[Ref, A]])(implicit dom: Dom[A], F: Applicative[F]): F[Unit] =
+  def include[Ref[_], F[_], A](sub: Ref[CellSet[Ref, A]], sup: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Applicative[F]): F[Unit] =
     P.observe(sub).by((sa: CellSet[Ref, A]) => {
       val now = insertAll(sa.value, sup)
       val onChange = Trigger.continually((sa: CellSet[Ref, A], delta: Added[Ref, A]) => insertAll(delta.value, sup))
       Trigger.fireReload(now map (_ => onChange))
     })
 
-  def includeC[A](cps: ContU[F, Ref[A]], ref: Ref[CellSet[Ref, A]])(implicit dom: Dom[A], F: Functor[F]): F[Unit] =
+  def includeC[Ref[_], F[_], A](cps: ContU[F, Ref[A]], ref: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Functor[F]): F[Unit] =
     cps(a => insert(a, ref))
 
-  def collect[A](cps: ContU[F, Ref[A]])(implicit dom: Dom[A], F: Bind[F]): F[Ref[CellSet[Ref, A]]] = for {
-    res <- init[A]
+  def collect[Ref[_], F[_], A](cps: ContU[F, Ref[A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Bind[F]): F[Ref[CellSet[Ref, A]]] = for {
+    res <- init[A]()
     _   <- includeC(cps, res)
   } yield res
 
-  def collectAll[A](cps: ContU[F, Ref[A]]*)(implicit dom: Dom[A], F: Monad[F]): F[Ref[CellSet[Ref, A]]] =
+  def collectAll[Ref[_], F[_], A](cps: ContU[F, Ref[A]]*)(implicit P: Propagation[F, Ref], dom: Dom[A], F: Monad[F]): F[Ref[CellSet[Ref, A]]] =
     collectAll(cps)
 
-  def collectAll[A](cps: Iterable[ContU[F, Ref[A]]])(implicit dom: Dom[A], F: Monad[F]): F[Ref[CellSet[Ref, A]]] =
+  def collectAll[Ref[_], F[_], A](cps: Iterable[ContU[F, Ref[A]]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Monad[F]): F[Ref[CellSet[Ref, A]]] =
     collect(ContU.sequence(cps))
 
-  def relBind[A, B](sref: Ref[CellSet[Ref, A]])(f: Ref[A] => F[Ref[CellSet[Ref, B]]])(implicit domB: Dom[B], M: Monad[F]): F[Ref[CellSet[Ref, B]]] = {
+  def relBind[Ref[_], F[_], A, B](sref: Ref[CellSet[Ref, A]])(f: Ref[A] => F[Ref[CellSet[Ref, B]]])(implicit P: Propagation[F, Ref], domB: Dom[B], M: Monad[F]): F[Ref[CellSet[Ref, B]]] = {
     import scalaz.syntax.traverse._
     for {
-      res <- init[B]
+      res <- init[B]()
       _ <- P.observe[CellSet[Ref, A]](sref).by((sa: CellSet[Ref, A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
         val onChange = Trigger.continually((sa: CellSet[Ref, A], delta: Added[Ref, A]) => delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res))))

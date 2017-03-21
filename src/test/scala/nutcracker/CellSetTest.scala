@@ -11,19 +11,18 @@ class CellSetTest extends FunSuite {
   import Prop._
 
   val P = Prop.propagationApi
-  val cellSets = new CellSets[Prg, Ref]
 
   test("autoclean") {
     val observed = mutable.Buffer[Ref[Promise[Int]]]()
 
     val prg = for {
-      res <- cellSets.init[Promise[Int]]
+      res <- CellSet.init[Promise[Int]]()
       _ <- P.observe(res).by(_ => Trigger.sleep(Trigger.continually((d, δ) => δ.value.foreach(r => observed += r).point[Prg])))
       p1 <- P.newCell[Promise[Int]](Promise.Conflict)
       p2 <- Promises.promise[Int]()
       _ <- Promises.complete(p2, 42)
-      _ <- cellSets.insert(p1, res)
-      _ <- cellSets.insert(p2, res)
+      _ <- CellSet.insert(p1, res)
+      _ <- CellSet.insert(p2, res)
     } yield (res, p2)
 
     val (s, (res, p2)) = interpret0(prg)
