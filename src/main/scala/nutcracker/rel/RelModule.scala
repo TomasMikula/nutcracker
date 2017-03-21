@@ -1,7 +1,6 @@
 package nutcracker.rel
 
-import nutcracker.Module
-import nutcracker.rel.RelLang.{ExecWith, OnPatternMatch, Relate, Supply}
+import nutcracker.{ListModule, Module, PersistentStateModule, StashModule}
 import nutcracker.util.{FreeK, InjectK, Lst, Step, WriterState}
 
 trait RelModule extends Module {
@@ -10,10 +9,23 @@ trait RelModule extends Module {
 }
 
 object RelModule {
-  val instance: RelModule = RelModuleImpl
+  val instance: PersistentRelModule = RelModuleImpl
 }
 
-private[rel] object RelModuleImpl extends RelModule {
+trait PersistentRelModule extends RelModule with PersistentStateModule { self =>
+  override def stashable: StashRelModule { type Lang[K[_], A] = self.Lang[K, A] }
+}
+
+object PersistentRelModule {
+  type Aux[Lang0[_[_], _], State0[_[_]]] = PersistentRelModule {
+    type Lang[K[_], A] = Lang0[K, A]
+    type State[K[_]] = State0[K]
+  }
+}
+
+trait StashRelModule extends RelModule with StashModule
+
+private[rel] object RelModuleImpl extends PersistentRelModule {
   type Lang[K[_], A] = RelLang[K, A]
   type State[K[_]] = RelDB[K]
 
@@ -23,6 +35,7 @@ private[rel] object RelModuleImpl extends RelModule {
     RelLang.relationsInstance
 
   def interpreter: Step[RelLang, RelDB] = new Step[RelLang, RelDB] {
+    import RelLang._
     override def apply[K[_], A](f: RelLang[K, A]): WriterState[Lst[K[Unit]], RelDB[K], A] = f match {
       case r @ Relate(rel, values) => WriterState(db => db.insert(rel, values)(r.ordersWitness, r.orders) match { case (db1, ks) => (ks, db1, ()) })
       case OnPatternMatch(p, a, h) => WriterState(db => db.addOnPatternMatch(p, a)(h) match { case (db1, ks) => (ks, db1, ()) })
@@ -30,4 +43,11 @@ private[rel] object RelModuleImpl extends RelModule {
       case Supply(rel, token, value) => WriterState(db => db.supply(rel, token, value) match { case (db1, ks) => (ks, db1, ()) })
     }
   }
+
+  def stashable = new RelListModule[Lang, State](this)
+}
+
+private[rel] class RelListModule[Lang[_[_], _], State0[_[_]]](base: PersistentRelModule.Aux[Lang, State0]) extends ListModule[Lang, State0](base) with StashRelModule {
+  def freeRelations[F[_[_], _]](implicit i: InjectK[Lang, F]) = base.freeRelations[F]
+  def interpreter: Step[Lang, State] = base.interpreter.inHead
 }
