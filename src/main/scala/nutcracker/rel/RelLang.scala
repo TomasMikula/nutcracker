@@ -37,7 +37,7 @@ private[rel] object RelLang {
         val noneL_ev = Mapped.empty[L, Option]
         val someC_ev = Mapped.pure[C, Option](values)
         val ass: Assignment[L] = Assignment[L].from(recipe.choose.lift[Option](noneL_ev._2, someC_ev._2).set(noneL_ev._1, someC_ev._1))(noneL_ev._2)
-        val supply: Token[L] => FreeK[F, Unit] = tok => recipe.create(values) >>= { this.supply(rel, tok, _) }
+        val supply: Token[L] => FreeK[F, Unit] = tok => recipe.create(values) >>= (ls => this.supply(rel, tok, ls._1)) // FIXME ignored subscription (`ls._2`)
         ContU(f => FreeK.injLiftF(RelLang.execWith(rel, ass, supply, f)(m, os.get)))
       }
 

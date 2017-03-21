@@ -45,7 +45,7 @@ object DecSet {
     * to continue. When the choice is made, the chosen program is executed.
     */
   def branchAndExec[M[_], Ref[_]](conts: Set[M[Unit]])(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): M[Unit] =
-    init(conts) >>= { _.whenFinal(k => k) }
+    init(conts) >>= { _.whenFinal_(k => k) }
   def branchAndExec[M[_], Ref[_]](conts: M[Unit]*)(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): M[Unit] =
     branchAndExec(conts.toSet)
 
@@ -58,7 +58,7 @@ object DecSet {
     * use [[init]] directly.
     */
   def branchC[M[_], Ref[_], A](as: Set[A])(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): Cont[M[Unit], A] =
-    Cont(f => init(as) >>= { _.asCont.apply(f) })
+    Cont(f => init(as) >>= { _.asCont_.run(f) })
   def branchC[M[_], Ref[_], A](as: A*)(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): Cont[M[Unit], A] =
     branchC(as.toSet)
 

@@ -1,12 +1,11 @@
 package nutcracker
 
 import scala.language.higherKinds
-import scalaz.{Applicative, Bind, ~>}
+import scalaz.{Applicative, Bind, Functor, ~>}
 import scalaz.syntax.bind._
 import shapeless.{::, HList, HNil}
 import Trigger._
 import nutcracker.util.ops.applicative._
-
 import scalaz.Id.Id
 
 trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
@@ -47,8 +46,11 @@ trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
       case Some(mu) => TriggerF.Fire(mu)
     }))
 
-  def peek[D](ref: Ref[D])(f: D => M[Unit])(implicit dom: Dom[D]): M[Unit] =
-    observe(ref).by(d => fire(f(d)))
+  def _selThreshold2[D1, D2](ref1: Ref[D1], ref2: Ref[D2])(f: (D1, D2) => Option[M[_]])(implicit M: Functor[M]): M[Unit] =
+    selThreshold2(ref1, ref2)((d1, d2) => f(d1, d2).map(M.map(_)(_ => ())))
+
+  def peek[D](ref: Ref[D])(f: D => M[Unit])(implicit dom: Dom[D], M: Functor[M]): M[Unit] =
+    observe(ref).by(d => fire(f(d))).map((_: Subscription[M]) => ())
 
   def alternate[D1, D2, L, R](ref1: Ref[D1], ref2: Ref[D2])(
     f: (D1, D2) => Alternator,
@@ -67,12 +69,12 @@ trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
       case Alternator.Left  => Sleep(α)
       case Alternator.Right => Fire(onSwitchToRight(l) >>= { observeRight(d1, _) })
       case Alternator.Stop  => Fire(onStop(Some(Left(l))))
-    }))
+    })).map(_ => ())
     def observeRight(d1: D1, r: R): M[Unit] = observe(ref2).by(λ[Id ~> λ[α => D2 => TriggerF[M, α]]](α => d2 => f(d1, d2) match {
       case Alternator.Left  => Fire(onSwitchToLeft(r) >>= { observeLeft(d2, _) })
       case Alternator.Right => Sleep(α)
       case Alternator.Stop  => Fire(onStop(Some(Right(r))))
-    }))
+    })).map(_ => ())
     peek(ref1)(d1 => {
       peek(ref2)(d2 => {
         f(d1, d2) match {

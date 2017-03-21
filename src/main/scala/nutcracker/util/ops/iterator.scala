@@ -37,11 +37,11 @@ final case class IteratorOps[A](it: Iterator[A]) extends AnyVal {
     })
   }
 
-  def sequence_[F[_]](implicit F: Applicative[F], ev: A === F[Unit]): F[Unit] =
+  def sequence_[F[_], B](implicit ev: A === F[B], F: Applicative[F]): F[Unit] =
     traverse_(ev(_))
 
-  def traverse_[F[_]](f: A => F[Unit])(implicit F: Applicative[F]): F[Unit] =
-    balancedMapReduce(f)(applicativeSemigroup[F]).getOrElse(F.point(()))
+  def traverse_[F[_], B](f: A => F[B])(implicit F: Applicative[F]): F[Unit] =
+    balancedMapReduce(f)(applicativeSemigroup[F, B]).fold(F.point(()))(F.map(_)(_ => ()))
 
   def intersperse(a: A): Iterator[A] = new Iterator[A] {
     var nextIsSeparator: Boolean = false
@@ -99,7 +99,7 @@ final case class IteratorOps[A](it: Iterator[A]) extends AnyVal {
     l.reduceLeftOption((acc, b) => B.append(b, acc))
   }
 
-  private def applicativeSemigroup[F[_]](implicit F: Applicative[F]): Semigroup[F[Unit]] = new Semigroup[F[Unit]] {
-    def append(f1: F[Unit], f2: => F[Unit]): F[Unit] = F.apply2(f1, f2)((_, _) => ())
+  private def applicativeSemigroup[F[_], B](implicit F: Applicative[F]): Semigroup[F[B]] = new Semigroup[F[B]] {
+    def append(f1: F[B], f2: => F[B]): F[B] = F.apply2(f1, f2)((_, a) => a)
   }
 }

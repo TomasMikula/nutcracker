@@ -9,10 +9,11 @@ import scalaz.~>
 final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
-  def head: (K[A], V[A]) forSome { type A } = map.head.asInstanceOf[(K[A], V[A]) forSome { type A }]
+  def head: ∃[λ[α => (K[α], V[α])]] = map.head.asInstanceOf[∃[λ[α => (K[α], V[α])]]]
   def tail: KMap[K, V] = KMap[K, V](map.tail)
   def apply[A](k: K[A]): V[A] = map(k).asInstanceOf[V[A]]
   def get[A](k: K[A]): Option[V[A]] = map.get(k).asInstanceOf[Option[V[A]]]
+  def find(p: ∃[V] => Boolean): Option[∃[λ[α => (K[α], V[α])]]] = map.find(kv => p(kv._2)).asInstanceOf[Option[∃[λ[α => (K[α], V[α])]]]]
   def getOrElse[A](k: K[A])(default: => V[A]): V[A] = get(k).getOrElse(default)
   def put[A](k: K[A])(v: V[A]): KMap[K, V] = KMap[K, V](map.updated(k, v))
   def updated[A](k: K[A])(v: V[A])(combineIfPresent: (V[A], V[A]) => V[A]): KMap[K, V] =

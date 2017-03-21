@@ -2,7 +2,7 @@ package nutcracker
 
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
 import nutcracker.util.ops.iterator._
-import scalaz.{Applicative, Bind, Functor, Monad}
+import scalaz.{Applicative, Bind, Functor, IndexedContT, Monad}
 import scalaz.std.list._
 import scalaz.syntax.bind._
 
@@ -74,9 +74,9 @@ object CellSet {
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
     */
-  def forEach[Ref[_], F[_], A](ref: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], F: Applicative[F]): ContU[F, Ref[A]] = {
+  def forEach[Ref[_], F[_], A](set: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], F: Applicative[F]): IndexedContT[F, Subscription[F], Unit, Ref[A]] = {
     import scalaz.syntax.traverse._
-    ContU(f => P.observe(ref).by(as => {
+    IndexedContT(f => P.observe(set).by(as => {
       val now = as.toList.traverse_(f)
       val onChange = Trigger.continually((as: CellSet[Ref, A], delta: Added[Ref, A]) => delta.value.toList.traverse_(f))
       Trigger.fireReload(now map (_ => onChange))
@@ -86,11 +86,11 @@ object CellSet {
   def insert[Ref[_], F[_], A](ref: Ref[A], into: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Functor[F]): F[Unit] =
     P.observe(ref).by(a =>
       if(dom.isFailed(a)) Trigger.discard
-      else Trigger.fireReload(P.update(into).by(Insert(Set(ref))) map { _ => Trigger.threshold1(a =>
+      else Trigger.fireReload(P.update(into).by(Insert(Set(ref))) map { (_: Unit) => Trigger.threshold1(a =>
         if(dom.isFailed(a)) Some(P.update(into).by(RemoveFailed(ref)))
         else None
       ) })
-    )
+    ).map(_ => ())
 
   def insertAll[Ref[_], F[_], A](add: Set[Ref[A]], into: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Applicative[F]): F[Unit] =
     add.iterator.traverse_(ra => insert(ra, into))
@@ -100,7 +100,7 @@ object CellSet {
       val now = insertAll(sa.value, sup)
       val onChange = Trigger.continually((sa: CellSet[Ref, A], delta: Added[Ref, A]) => insertAll(delta.value, sup))
       Trigger.fireReload(now map (_ => onChange))
-    })
+    }).map(_ => ())
 
   def includeC[Ref[_], F[_], A](cps: ContU[F, Ref[A]], ref: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Functor[F]): F[Unit] =
     cps(a => insert(a, ref))

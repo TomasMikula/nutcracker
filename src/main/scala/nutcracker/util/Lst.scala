@@ -160,6 +160,8 @@ object Lst {
     case None => Nil
   }
 
+  def apply[A](as: A*): Lst[A] = as.foldRight(Lst.empty[A])(_ :: _)
+
   @inline
   private final def revPrepend[A](as: Iterable[A], lst: Lst[A]): Lst[A] = {
     @tailrec def loop(it: Iterator[A], lst: Lst[A]): Lst[A] =

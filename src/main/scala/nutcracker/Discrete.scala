@@ -2,9 +2,8 @@ package nutcracker
 
 import nutcracker.ops._
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput, Uninhabited}
-
 import scala.language.higherKinds
-import scalaz.{Bind, ContT, Monad, Show}
+import scalaz.{Bind, ContT, Functor, Monad, Show}
 import scalaz.Id.Id
 
 /** Marker wrapper meaning that any two distinct values of type `Discrete[A]`
@@ -25,18 +24,18 @@ object Discrete extends DiscreteInstances {
 
   def map[M[_], Ref[_], A, B](refC: ContU[M, Ref[Discrete[A]]])(f: A => B)(implicit M: Propagation[M, Ref], MB: Bind[M]): ContU[M, Ref[Discrete[B]]] = for {
     ref <- refC
-    a   <- ref.asCont[M]
+    a   <- ref.asCont_[M]
     res <- cellC(f(a))
   } yield res
 
-  def mapC[M[_], Ref[_]: Propagation[M, ?[_]], A, B](ref: Ref[Discrete[A]])(f: A => ContU[M, Ref[Discrete[B]]]): ContU[M, Ref[Discrete[B]]] = for {
-    a   <- ref.asCont[M]
+  def mapC[M[_]: Functor, Ref[_]: Propagation[M, ?[_]], A, B](ref: Ref[Discrete[A]])(f: A => ContU[M, Ref[Discrete[B]]]): ContU[M, Ref[Discrete[B]]] = for {
+    a   <- ref.asCont_[M]
     res <- f(a)
   } yield res
 
   def filterMap[M[_], Ref[_], A, B](refC: ContT[M, Unit, Ref[Discrete[A]]])(f: A => Option[B])(implicit P: Propagation[M, Ref], M: Monad[M]): ContT[M, Unit, Ref[Discrete[B]]] = for {
     ref <- refC
-    a   <- ref.asCont[M]
+    a   <- ref.asCont_[M]
     res <- f(a) match {
       case Some(b) => ContU.liftM(P.newCell(Discrete(b)))
       case None    => ContU.noop[M, Ref[Discrete[B]]]

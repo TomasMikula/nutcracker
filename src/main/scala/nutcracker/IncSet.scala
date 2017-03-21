@@ -2,8 +2,7 @@ package nutcracker
 
 import scala.language.higherKinds
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
-
-import scalaz.{Applicative, Bind, Functor, Monad}
+import scalaz.{Applicative, Bind, Functor, IndexedContT, Monad}
 import scalaz.std.list._
 import scalaz.syntax.bind._
 
@@ -71,9 +70,9 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
     */
-  def forEach[A](ref: Ref[IncSet[A]])(implicit A: Applicative[F]): ContU[F, A] = {
+  def forEach[A](ref: Ref[IncSet[A]])(implicit A: Applicative[F]): IndexedContT[F, Subscription[F], Unit, A] = {
     import scalaz.syntax.traverse._
-    ContU(f => P.observe(ref).by(as => {
+    IndexedContT(f => P.observe(ref).by(as => {
       val now = as.toList.traverse_(f)
       val onChange = Trigger.continually((as: IncSet[A], delta: Delta[A]) => delta.value.toList.traverse_(f))
       Trigger.fireReload(now map (_ => onChange))
@@ -91,7 +90,7 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
       val now = insertAll(sa.value, sup)
       val onChange = Trigger.continually((sa: IncSet[A], delta: Delta[A]) => insertAll(delta.value, sup))
       Trigger.fireReload(now map (_ => onChange))
-    })
+    }).map(_ => ())
 
   def includeC[A](cps: ContU[F, A], ref: Ref[IncSet[A]]): F[Unit] =
     cps(a => insert(a, ref))

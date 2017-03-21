@@ -13,11 +13,11 @@ class BoolOps[M[_], Ref[_]](implicit P: BranchingPropagation[M, Ref]) {
 
   def and(x: Ref[Bool], y: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = {
     newVar[Bool] >>= { res =>
-      x.whenFinal({ r =>
+      x._whenFinal[M]({ r =>
         if (r) y <=> res
         else res.set(false)
       }) >>
-        y.whenFinal({ r =>
+        y._whenFinal({ r =>
           if (r) x <=> res
           else res.set(false)
         }) >>
@@ -31,7 +31,7 @@ class BoolOps[M[_], Ref[_]](implicit P: BranchingPropagation[M, Ref]) {
 
   def or(x: Ref[Bool]*)(implicit M: Monad[M]): M[Ref[Bool]] = {
     newVar[Bool] >>= { res =>
-      def watch(i: Int, j: Int): M[Unit] = {
+      def watch(i: Int, j: Int): M[_] = {
         require(i < j)
         if(j < 0) {
           // all variables have been set to false,
@@ -42,11 +42,11 @@ class BoolOps[M[_], Ref[_]](implicit P: BranchingPropagation[M, Ref]) {
           // the result is equal to the remaining one
           x(j) <=> res
         } else {
-          P.propagation.selThreshold2(x(i), x(j))((di, dj) => {
+          P.propagation._selThreshold2(x(i), x(j))((di, dj) => {
             if (di == MustBeTrue || dj == MustBeTrue) {
               // found a variable set to true,
               // thus the result must be true
-              Some(res.set(true))
+              Some(res.set[M, Boolean](true))
             } else if (di == MustBeFalse) {
               // pick next variable to watch instead of x(i)
               Some(watch(i-1, j))
@@ -88,7 +88,7 @@ class BoolOps[M[_], Ref[_]](implicit P: BranchingPropagation[M, Ref]) {
       if (r) y.set(true)
       else M.pure(())
     }) *>
-    y.whenFinal({ r =>
+    y.whenFinal_({ r =>
       if (r) M.pure(())
       else x.set(false)
     })
@@ -106,15 +106,15 @@ class BoolOps[M[_], Ref[_]](implicit P: BranchingPropagation[M, Ref]) {
   implicit class BoolRefOps(self: Ref[Bool]) {
 
     def ===(that: Ref[Bool])(implicit M: Apply[M]): M[Unit] = {
-      (self >>= { (x: Boolean) => that.set(x) }) *>
-      (that >>= { (x: Boolean) => self.set(x) })
+      (self whenFinal_ { (x: Boolean) => that.set(x) }) *>
+      (that whenFinal_ { (x: Boolean) => self.set(x) })
     }
 
     def =?=(that: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = {
       newVar[Bool] >>= { res =>
-        (res  >>= { (x: Boolean) => if(x) (self === that) else (self =!= that) }) *>
-        (self >>= { (x: Boolean) => if(x) (res  === that) else (res  =!= that) }) *>
-        (that >>= { (x: Boolean) => if(x) (res  === self) else (res  =!= self) }) *>
+        (res  whenFinal { (x: Boolean) => if(x) (self === that) else (self =!= that) }) *>
+        (self whenFinal { (x: Boolean) => if(x) (res  === that) else (res  =!= that) }) *>
+        (that whenFinal { (x: Boolean) => if(x) (res  === self) else (res  =!= self) }) *>
         M.pure(res)
       }
     }

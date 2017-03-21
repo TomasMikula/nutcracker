@@ -50,11 +50,11 @@ class Sudoku extends FunSuite {
     def segNumConstraint(seg: Seq[Cell], x: Int): Prg[Unit] = {
       for {
         xPos <- oneOf(seg: _*)
-        _ <- sequence_(seg map { cell => observe(cell).threshold(ys =>
+        _ <- (seg map { cell => observe(cell).threshold(ys =>
           if(!ys.contains(x)) Some(xPos.remove(cell))
           else if(ys.size == 1) Some(xPos.set(cell))
           else None
-        )})
+        )}).sequence_
         _ <- xPos.whenFinal(cell => cell.set(x))
       } yield ()
     }
