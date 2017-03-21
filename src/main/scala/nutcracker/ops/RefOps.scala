@@ -10,7 +10,8 @@ import scalaz.Id.Id
 import scalaz.{Applicative, Apply, Bind, Functor, Traverse, ~>}
 import scalaz.syntax.bind._
 
-final case class RefOps[Ref[_], D, U, Δ](ref: Ref[D])(implicit dom: Dom.Aux[D, U, Δ]) {
+final case class RefOps[Ref[_], D, U, Δ](ref: Ref[D])(implicit val dom: Dom.Aux[D, U, Δ]) {
+  def observe[M[_]](implicit P: Propagation[M, Ref]) = P.observe(ref)
 
   def peekC[M[_]](implicit P: Propagation[M, Ref]): ContU[M, D] =
     ContU(f => P.peek(ref)(f))
