@@ -4,7 +4,6 @@ import nutcracker._
 import nutcracker.DecSet._
 import nutcracker.ops._
 import nutcracker.util.ops._
-import nutcracker.util.FreeK._
 import org.scalatest.FunSuite
 
 import scalaz.std.anyVal._
@@ -29,13 +28,13 @@ class Sudoku extends FunSuite {
       cells <- oneOf((1 to 9): _*).replicate(81)
 
       // numbers in each row are all different
-      _ <- sequence_(rows(cells) map { _.allDifferent })
+      _ <- rows(cells) traverse_ { _.allDifferent }
 
       // numbers in each column are all different
-      _ <- sequence_(cols(cells) map { _.allDifferent })
+      _ <- cols(cells) traverse_ { _.allDifferent }
 
       // numbers in each 3x3 square are all different
-      _ <- sequence_(sqrs(cells) map { _.allDifferent })
+      _ <- sqrs(cells) traverse_ { _.allDifferent }
     } yield cells
   }
 
@@ -59,15 +58,14 @@ class Sudoku extends FunSuite {
       } yield ()
     }
 
-    def segConstraints(seg: Seq[Cell]): Prg[Unit] = {
-      sequence_((1 to 9) map { segNumConstraint(seg, _) })
-    }
+    def segConstraints(seg: Seq[Cell]): Prg[Unit] =
+      (1 to 9) traverse_ { segNumConstraint(seg, _) }
 
     for {
       cells <- sudoku0
-      _ <- sequence_(rows(cells) map { segConstraints(_) })
-      _ <- sequence_(cols(cells) map { segConstraints(_) })
-      _ <- sequence_(sqrs(cells) map { segConstraints(_) })
+      _ <- rows(cells) traverse_ { segConstraints(_) }
+      _ <- cols(cells) traverse_ { segConstraints(_) }
+      _ <- sqrs(cells) traverse_ { segConstraints(_) }
     } yield cells
   }
 
@@ -123,7 +121,7 @@ class Sudoku extends FunSuite {
       for {
         cells <- sudoku
 
-        _ <- sequence_(Seq(
+        _ <- Seq(
           set(0, 2, 3), set(0, 6, 6), set(0, 7, 1),
           set(1, 1, 6), set(1, 4, 2), set(1, 5, 4), set(1, 8, 3),
           set(2, 0, 5), set(2, 7, 8),
@@ -133,9 +131,9 @@ class Sudoku extends FunSuite {
           set(6, 1, 5), set(6, 8, 7),
           set(7, 0, 3), set(7, 3, 8), set(7, 4, 4),
           set(8, 0, 8), set(8, 1, 4), set(8, 2, 6), set(8, 6, 1)
-        ) map {
+        ) traverse_ {
           _ (cells)
-        })
+        }
 
         solution <- promiseResults(cells)
       } yield solution

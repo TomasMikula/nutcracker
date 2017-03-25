@@ -5,8 +5,10 @@ import scalaz.Id._
 import scalaz.{-\/, BindRec, Monad, MonadTell, StreamT, Writer, WriterT, \/, \/-}
 import scalaz.std.anyVal._
 
-trait BranchingBundle extends RefBundle with StashBundle {
-  implicit def branchingApi: BranchingPropagation[Prg, Ref]
+trait BranchingBundle extends RefBundle with StashBundle with BranchingToolkit
+
+trait BranchingToolkit extends RefToolkit with StashToolkit {
+  implicit val branchingApi: BranchingPropagation[Prg, Ref]
   implicit def stashRestore[K[_]]: StashRestore[State[K]]
 
   def assess(s: State[Prg]): Assessment[List[Prg[Unit]]]

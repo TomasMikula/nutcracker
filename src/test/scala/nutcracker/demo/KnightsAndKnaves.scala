@@ -1,14 +1,11 @@
 package nutcracker.demo
 
-import nutcracker.{Promises, PropBranch}
+import nutcracker.Promises
 import nutcracker.lib.bool.Bool._
 import nutcracker.lib.bool._
-import nutcracker.util._
 import org.scalatest.FreeSpec
-
-import scalaz.Monad
-import scalaz.Id._
 import scalaz.std.anyVal._
+import scalaz.syntax.monad._
 
 // From https://en.wikipedia.org/wiki/Knights_and_Knaves:
 //
@@ -19,15 +16,14 @@ import scalaz.std.anyVal._
 // the inhabitants' type from their statements.
 
 class KnightsAndKnaves extends FreeSpec {
-  import PropBranch._
-  import PropBranch.branchingApi.{propagation => _, _}
+  val tk = nutcracker.PropBranchToolkit.instance
+  import tk._
+  import tk.branchingApi.{propagation => _, _}
   import Promises._
 
   val B = BoolOps[Prg, Ref]
 
   import B._
-
-  implicit val freeKMonad: Monad[Prg] = FreeKT.freeKTMonad[Lang, Id]
 
   "Problem 1" - {
     // The visitor meets three inhabitants referred to as A, B and C.

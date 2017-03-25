@@ -1,5 +1,7 @@
 package nutcracker
 
-trait PropagationBundle extends RefBundle {
-  implicit def propagationApi: Propagation[Prg, Ref]
+trait PropagationBundle extends RefBundle with PropagationToolkit
+
+trait PropagationToolkit extends RefToolkit {
+  implicit val propagationApi: Propagation[Prg, Ref]
 }

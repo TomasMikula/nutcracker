@@ -1,12 +1,21 @@
 package nutcracker
 
 import nutcracker.util.CoproductK.:++:
+import nutcracker.util.{FreeKT}
 import nutcracker.util.KPair._
 import scala.language.existentials
 import scalaz.Id.Id
-import scalaz.~>
+import scalaz.{Monad, ~>}
 
-object PropBranch extends PropagationBundle with BranchingBundle {
+trait PropBranchToolkit extends PropagationToolkit with BranchingToolkit {
+  implicit def prgMonad: Monad[Prg]
+}
+
+object PropBranchToolkit {
+  val instance: PropBranchToolkit = PropBranch
+}
+
+object PropBranch extends PropagationBundle with BranchingBundle with PropBranchToolkit {
   val Prop = Propagation.module.stashable
   val Branch = BranchingPropagation.module[Prop.Ref].stashable
 
@@ -17,6 +26,7 @@ object PropBranch extends PropagationBundle with BranchingBundle {
 
   implicit def refEquality = Prop.refEquality
   implicit def refShow = Prop.refShow
+  implicit def prgMonad = FreeKT.freeKTMonad
 
   implicit val propagationApi: Propagation[Prg, Ref] =
     Prop.freePropagation[Lang]

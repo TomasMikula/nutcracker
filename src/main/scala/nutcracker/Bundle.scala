@@ -4,12 +4,22 @@ import nutcracker.util.{FreeK, HEqualK, ShowK}
 
 /** Bundle provides multiple APIs and is typically created by composing
   * multiple [[Module]]s.
+  *
+  * It implements [[Toolkit]] with [[Toolkit#Prg]] being a free monad.
   */
-trait Bundle {
+trait Bundle extends Toolkit {
   type Lang[K[_], A]
-  type State[K[_]]
 
-  type Prg[A] = FreeK[Lang, A]
+  override type Prg[A] = FreeK[Lang, A]
+}
+
+trait RefBundle extends Bundle with RefToolkit
+
+trait StashBundle extends Bundle with StashToolkit
+
+trait Toolkit {
+  type Prg[_]
+  type State[K[_]]
 
   def empty[K[_]]: State[K]
   def interpret[A](p: Prg[A], s: State[Prg]): (State[Prg], A)
@@ -18,7 +28,7 @@ trait Bundle {
     interpret(p, empty[Prg])
 }
 
-trait RefBundle extends Bundle {
+trait RefToolkit extends Toolkit {
   type Ref[_]
 
   implicit def refEquality: HEqualK[Ref]
@@ -27,6 +37,6 @@ trait RefBundle extends Bundle {
   def fetch[K[_], A](ref: Ref[A], s: State[K]): A
 }
 
-trait StashBundle extends Bundle {
+trait StashToolkit extends Toolkit {
   implicit def stashRestore[K[_]]: StashRestore[State[K]]
 }

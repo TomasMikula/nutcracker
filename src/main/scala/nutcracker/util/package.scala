@@ -3,11 +3,10 @@ package nutcracker
 import scala.language.higherKinds
 import scalaz.Id.Id
 import scalaz.{Applicative, Bind, ContT, Monad, Traverse, |>=|}
-import scalaz.std.list._
 import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
 
 package object util {
+  import ops._
 
   // workaround for https://issues.scala-lang.org/browse/SI-9453
   // suggested by Miles Sabin in the comments
@@ -107,15 +106,6 @@ package object util {
       inj: InjectK[F, G]
     ): FreeK[G, A] =
       liftF(inj(a))
-
-    def sequence_[F[_[_], _]](ps: Iterable[FreeK[F, Unit]]): FreeK[F, Unit] =
-      ps.foldLeft[FreeK[F, Unit]](FreeK.pure(())) { _ >> _ }
-
-    def sequence_[F[_[_], _]](ps: FreeK[F, Unit]*): FreeK[F, Unit] =
-      sequence_(ps)
-
-    def traverse_[F[_[_], _], A](ps: Iterable[A])(f: A => FreeK[F, Unit]): FreeK[F, Unit] =
-      ps.foldLeft[FreeK[F, Unit]](FreeK.pure(())) { _ >> f(_) }
 
     def sequence[F[_[_], _], C[_]: Traverse, A](ps: C[FreeK[F, A]]): FreeK[F, C[A]] =
       Traverse[C].sequence[FreeKT[F, Id, ?], A](ps)(FreeKT.freeKTMonad[F, Id])

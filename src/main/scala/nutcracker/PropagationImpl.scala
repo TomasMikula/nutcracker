@@ -22,7 +22,7 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref] =
     PropagationLang.freePropagation[Ref, Token, ObserverId, F]
 
-  def propagationApi: Propagation[Prg, Ref] =
+  val propagationApi: Propagation[Prg, Ref] =
     PropagationLang.freePropagation[Ref, Token, ObserverId, Lang]
 
   def empty[K[_]]: PropagationStore[K] =
