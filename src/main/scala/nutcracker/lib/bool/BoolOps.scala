@@ -11,23 +11,21 @@ import scalaz.syntax.bind._
 class BoolOps[M[_], Ref[_]](implicit P: BranchingPropagation[M, Ref]) {
   import P._
 
-  def and(x: Ref[Bool], y: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = {
-    newVar[Bool] >>= { res =>
-      x._whenFinal[M]({ r =>
-        if (r) y <=> res
-        else res.set(false)
-      }) >>
-        y._whenFinal({ r =>
-          if (r) x <=> res
-          else res.set(false)
-        }) >>
-        res.whenFinal({ r =>
-          if (r) x.set(true) >> y.set(true)
-          else M.pure(())
-        }) >>
-        M.pure(res)
-    }
-  }
+  def and(x: Ref[Bool], y: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = for {
+    res <- newVar[Bool]
+    _ <- x._whenFinal[M]({ r =>
+      if (r) y <=> res
+      else res.set(false)
+    })
+    _ <- y._whenFinal[M]({ r =>
+      if (r) x <=> res
+      else res.set(false)
+    })
+    _ <- res._whenFinal({ r =>
+      if (r) x.set(true) >> y.set(true)
+      else M.pure(())
+    })
+  } yield res
 
   def or(x: Ref[Bool]*)(implicit M: Monad[M]): M[Ref[Bool]] = {
     newVar[Bool] >>= { res =>
@@ -63,19 +61,17 @@ class BoolOps[M[_], Ref[_]](implicit P: BranchingPropagation[M, Ref]) {
     }
   }
 
-  def neg(x: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = {
-    newVar[Bool] >>= { res =>
-      x.whenFinal({ r =>
-        if (r) res.set(false)
-        else res.set(true)
-      }) *>
-      res.whenFinal({ r =>
-        if (r) x.set(false)
-        else x.set(true)
-      }) *>
-      M.pure(res)
-    }
-  }
+  def neg(x: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = for {
+    res <- newVar[Bool]
+    _ <- x.whenFinal({ r =>
+      if (r) res.set(false)
+      else res.set(true)
+    })
+    _ <- res.whenFinal({ r =>
+      if (r) x.set(false)
+      else x.set(true)
+    })
+  } yield res
 
   def negM(x: M[Ref[Bool]])(implicit M: Monad[M]): M[Ref[Bool]] =
     x >>= { neg(_) }
@@ -110,14 +106,12 @@ class BoolOps[M[_], Ref[_]](implicit P: BranchingPropagation[M, Ref]) {
       (that whenFinal_ { (x: Boolean) => self.set(x) })
     }
 
-    def =?=(that: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = {
-      newVar[Bool] >>= { res =>
-        (res  whenFinal { (x: Boolean) => if(x) (self === that) else (self =!= that) }) *>
-        (self whenFinal { (x: Boolean) => if(x) (res  === that) else (res  =!= that) }) *>
-        (that whenFinal { (x: Boolean) => if(x) (res  === self) else (res  =!= self) }) *>
-        M.pure(res)
-      }
-    }
+    def =?=(that: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = for {
+      res <- newVar[Bool]
+      _ <- res  whenFinal { (x: Boolean) => if(x) (self === that) else (self =!= that) }
+      _ <- self whenFinal { (x: Boolean) => if(x) (res  === that) else (res  =!= that) }
+      _ <- that whenFinal { (x: Boolean) => if(x) (res  === self) else (res  =!= self) }
+    } yield res
 
     def =??=(that: M[Ref[Bool]])(implicit M: Monad[M]): M[Ref[Bool]] =
       that >>= { self =?= _ }
