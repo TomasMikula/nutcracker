@@ -4,6 +4,7 @@ import nutcracker.Dom.Aux
 import scala.language.higherKinds
 import scalaz.{Functor, IndexedContT, ~>}
 import scalaz.Id._
+import scalaz.syntax.functor._
 
 /** If we are allowed effects `M`, then `S` can be observed for changes to a (mutable) value of type `A`. */
 trait Src[S, A, M[_]] {
@@ -35,10 +36,19 @@ trait PSrc[F[_], M[_]] {
 
   final class ObserveSyntaxHelper[A, U, Δ](src: F[A])(implicit dom: Dom.Aux[A, U, Δ]) {
     def by(f: A => Trigger[M, A, Δ]): M[Subscription[M]] = observeImpl(src)(f)
+    def by_(f: A => Trigger[M, A, Δ])(implicit M: Functor[M]): M[Unit] = by(f).map(_ => ())
+
     def byM[B](f: A => M[(Trigger[M, A, Δ], B)]): M[(Subscription[M], B)] = observeImplM(src)(f)
+    def byM_[B](f: A => M[(Trigger[M, A, Δ], B)])(implicit M: Functor[M]): M[B] = byM(f).map(_._2)
+
     def by(f: Id ~> λ[α => (A => TriggerF[M, α])]): M[Subscription[M]] = observeImpl(src)(Trigger.valueObserver(f))
+    def by_(f: Id ~> λ[α => (A => TriggerF[M, α])])(implicit M: Functor[M]): M[Unit] = by(f).map(_ => ())
+
     def threshold(f: A => Option[M[Unit]]): M[Subscription[M]] = observeImpl(src)(Trigger.threshold(f))
+    def threshold_(f: A => Option[M[Unit]])(implicit M: Functor[M]): M[Unit] = threshold(f).map(_ => ())
+
     def untilRight(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Subscription[M]] = observeImpl(src)(Trigger.untilRight(f))
+    def untilRight_(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Unit] = untilRight(f).map(_ => ())
   }
 
   def source[A](src: F[A]): Source[A, M] = new Source[A, M] {

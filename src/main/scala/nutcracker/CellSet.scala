@@ -83,6 +83,11 @@ object CellSet {
     }))
   }
 
+  def forEach_[Ref[_], F[_], A](set: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], F: Applicative[F]): ContU[F, Ref[A]] = {
+    val cps = forEach(set)
+    ContU(f => cps(f).map(_ => ()))
+  }
+
   def insert[Ref[_], F[_], A](ref: Ref[A], into: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Functor[F]): F[Unit] =
     P.observe(ref).by(a =>
       if(dom.isFailed(a)) Trigger.discard

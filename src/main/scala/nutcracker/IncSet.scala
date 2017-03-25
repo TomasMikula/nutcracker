@@ -70,13 +70,18 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
     */
-  def forEach[A](ref: Ref[IncSet[A]])(implicit A: Applicative[F]): IndexedContT[F, Subscription[F], Unit, A] = {
+  def forEach[A](ref: Ref[IncSet[A]])(implicit F: Applicative[F]): IndexedContT[F, Subscription[F], Unit, A] = {
     import scalaz.syntax.traverse._
     IndexedContT(f => P.observe(ref).by(as => {
       val now = as.toList.traverse_(f)
       val onChange = Trigger.continually((as: IncSet[A], delta: Delta[A]) => delta.value.toList.traverse_(f))
       Trigger.fireReload(now map (_ => onChange))
     }))
+  }
+
+  def forEach_[A](ref: Ref[IncSet[A]])(implicit F: Applicative[F]): ContU[F, A] = {
+    val cps = forEach(ref)
+    ContU(f => cps(f).map(_ => ()))
   }
 
   def insert[A](a: A, into: Ref[IncSet[A]]): F[Unit] =
