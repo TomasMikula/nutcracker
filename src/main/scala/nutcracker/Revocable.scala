@@ -2,12 +2,16 @@ package nutcracker
 
 import scala.language.higherKinds
 
+/** Represents a discrete (non-refinable) value that can be revoked.
+  * Is isomorphic to `Closeable[Discrete[A]]`.
+  * @see [[Discrete]], [[Closeable]]
+  */
 sealed trait Revocable[+A]
 
-final case class Valid[A](value: A) extends Revocable[A]
-final case object Revoked extends Revocable[Nothing]
-
 object Revocable {
+  final case class Valid[A](value: A) extends Revocable[A]
+  final case object Revoked extends Revocable[Nothing]
+
   /** Meaning of update is to revoke the value. */
   type Update = Unit
 
@@ -32,7 +36,8 @@ object Revocable {
         case Revoked  => UpdateResult()
       }
 
-      def appendDeltas(d1: Delta, d2: Delta): Delta = ()
+      def appendDeltas(d1: Delta, d2: Delta): Delta =
+        sys.error("There can never be two deltas, since after revocation, there can be no other change")
 
       def isFailed(d: Revocable[A]): Boolean = d match {
         case Valid(a) => false
