@@ -30,7 +30,7 @@ object DecSet {
   final case class Removed[A](value: Set[A]) extends AnyVal
   final type Delta[A] = Removed[A]
 
-  type Dom[A] = SplittableJoinDom.Aux[DecSet[A], Update[A], Delta[A]] with RelativelyComplementedDom[DecSet[A]]
+  type Dom[A] = SplittableJoinDom.Aux[DecSet[A], Update[A], Delta[A]] with RelativelyComplementedDom[DecSet[A]] with TerminalDom[DecSet[A]]
 
   def apply[A](as: A*): DecSet[A] = new DecSet(Set(as: _*))
   def singleton[A](a: A): DecSet[A] = new DecSet(Set(a))
@@ -62,42 +62,45 @@ object DecSet {
   def branchC[M[_], Ref[_], A](as: A*)(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): Cont[M[Unit], A] =
     branchC(as.toSet)
 
-  implicit def domInstance[A]: DecSet.Dom[A] = new SplittableJoinDom[DecSet[A]] with RelativelyComplementedDom[DecSet[A]] {
-    type Update = DecSet.Update[A]
-    type Delta = DecSet.Delta[A]
+  implicit def domInstance[A]: DecSet.Dom[A] =
+    new SplittableJoinDom[DecSet[A]] with RelativelyComplementedDom[DecSet[A]] with TerminalDom[DecSet[A]] {
+      type Update = DecSet.Update[A]
+      type Delta = DecSet.Delta[A]
 
-    import Splittable._
-    override def assess(d: DecSet[A]): Status[Update] = d.size match {
-      case 0 => Failed
-      case 1 => Refined
-      case _ => Unrefined(() => Some(d.toList map (x => Join(singleton(x))))) // split into singleton sets
+      import Splittable._
+      override def assess(d: DecSet[A]): Status[Update] = d.size match {
+        case 0 => Failed
+        case 1 => Refined
+        case _ => Unrefined(() => Some(d.toList map (x => Join(singleton(x))))) // split into singleton sets
+      }
+
+      override def update[S <: DecSet[A]](s: S, u: Update): UpdateResult[DecSet[A], IDelta, S] = u match {
+        case Join(m) => intersect(s, m)
+        case Diff(d) => diff(s, d)
+      }
+
+      def toJoinUpdate(d: DecSet[A]) = Join(d)
+      def toComplementUpdate(d: DecSet[A]) = Diff(d)
+
+      override def appendDeltas(d1: Delta, d2: Delta): Delta =
+        Removed(d1.value union d2.value)
+
+      override def terminate: Update = Join(DecSet())
+
+      @inline
+      private def intersect[D <: DecSet[A]](a: DecSet[A], b: DecSet[A]): UpdateResult[DecSet[A], IDelta, D] = {
+        val res = a intersect b
+        if(res.size < a.size) UpdateResult(res, Removed(a.value diff b.value))
+        else UpdateResult()
+      }
+
+      @inline
+      private def diff[D <: DecSet[A]](a: DecSet[A], b: DecSet[A]): UpdateResult[DecSet[A], IDelta, D] = {
+        val res = a diff b
+        if(res.size < a.size) UpdateResult(res, Removed(a.value intersect b.value))
+        else UpdateResult()
+      }
     }
-
-    override def update[S <: DecSet[A]](s: S, u: Update): UpdateResult[DecSet[A], IDelta, S] = u match {
-      case Join(m) => intersect(s, m)
-      case Diff(d) => diff(s, d)
-    }
-
-    def toJoinUpdate(d: DecSet[A]) = Join(d)
-    def toComplementUpdate(d: DecSet[A]) = Diff(d)
-
-    override def appendDeltas(d1: Delta, d2: Delta): Delta =
-      Removed(d1.value union d2.value)
-
-    @inline
-    private def intersect[D <: DecSet[A]](a: DecSet[A], b: DecSet[A]): UpdateResult[DecSet[A], IDelta, D] = {
-      val res = a intersect b
-      if(res.size < a.size) UpdateResult(res, Removed(a.value diff b.value))
-      else UpdateResult()
-    }
-
-    @inline
-    private def diff[D <: DecSet[A]](a: DecSet[A], b: DecSet[A]): UpdateResult[DecSet[A], IDelta, D] = {
-      val res = a diff b
-      if(res.size < a.size) UpdateResult(res, Removed(a.value intersect b.value))
-      else UpdateResult()
-    }
-  }
 
   implicit def finalInstance[A]: Final.Aux[DecSet[A], A] = new Final[DecSet[A]] {
     type Out = A

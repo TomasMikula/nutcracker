@@ -1,6 +1,6 @@
 package nutcracker.lib.bool
 
-import nutcracker.{Final, RelativelyComplementedDom, SplittableDomWithBottom, UpdateResult}
+import nutcracker.{Final, RelativelyComplementedDom, SplittableDomWithBottom, TerminalDom, UpdateResult}
 
 /** A domain for boolean values. It is a boolean algebra, with interpretation
   * of operations that is dual to the standard interpretation in a boolean
@@ -13,7 +13,7 @@ object Bool {
   final case class Join(value: Bool) // extends AnyVal // value class may not wrap another user-defined value class
   type Update = Join
 
-  type BoolDom = RelativelyComplementedDom[Bool] with SplittableDomWithBottom.Aux[Bool, Update, Unit]
+  type BoolDom = RelativelyComplementedDom[Bool] with SplittableDomWithBottom.Aux[Bool, Update, Unit] with TerminalDom[Bool]
 
   val Contradiction = Bool(0)
   val MustBeTrue = Bool(1)
@@ -35,7 +35,7 @@ object Bool {
   }
 
   implicit val boolDomain: BoolDom =
-    new RelativelyComplementedDom[Bool] with SplittableDomWithBottom[Bool] {
+    new RelativelyComplementedDom[Bool] with SplittableDomWithBottom[Bool] with TerminalDom[Bool] {
       type Update = Bool.Update
       type Delta = Unit
 
@@ -54,5 +54,6 @@ object Bool {
       override def ljoin[B <: Bool](d1: B, d2: Bool): UpdateResult[Bool, IDelta, B] = update(d1, Join(d2))
       override def appendDeltas(d1: Delta, d2: Delta): Delta = ()
       override def bottom: Bool = Anything
+      override def terminate: Update = Join(Bool.Contradiction)
     }
 }

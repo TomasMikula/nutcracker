@@ -22,20 +22,23 @@ object Revocable {
   def revoke[F[_], Ref[_], A](ref: Ref[Revocable[A]])(implicit P: Propagation[F, Ref]): F[Unit] =
     P.update(ref).by(())
 
-  implicit def domInstance[A]: Dom.Aux[Revocable[A], Update, Delta] = new Dom[Revocable[A]] {
-    type Update = Revocable.Update
-    type Delta = Revocable.Delta
+  implicit def domInstance[A]: Dom.Aux[Revocable[A], Update, Delta] with TerminalDom[Revocable[A]] =
+    new TerminalDom[Revocable[A]] {
+      type Update = Revocable.Update
+      type Delta = Revocable.Delta
 
-    def update[R <: Revocable[A]](d: R, u: Update): UpdateResult[Revocable[A], IDelta, R] = d match {
-      case Valid(a) => UpdateResult(Revoked, ())
-      case Revoked  => UpdateResult()
+      def update[R <: Revocable[A]](d: R, u: Update): UpdateResult[Revocable[A], IDelta, R] = d match {
+        case Valid(a) => UpdateResult(Revoked, ())
+        case Revoked  => UpdateResult()
+      }
+
+      def appendDeltas(d1: Delta, d2: Delta): Delta = ()
+
+      def isFailed(d: Revocable[A]): Boolean = d match {
+        case Valid(a) => false
+        case Revoked  => true
+      }
+
+      def terminate: Update = ()
     }
-
-    def appendDeltas(d1: Delta, d2: Delta): Delta = ()
-
-    def isFailed(d: Revocable[A]): Boolean = d match {
-      case Valid(a) => false
-      case Revoked  => true
-    }
-  }
 }
