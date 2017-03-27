@@ -150,4 +150,9 @@ object Dom {
 
       override val deltaSemigroup = \&/.TheseSemigroup(dom1.deltaSemigroup, dom2.deltaSemigroup)
     }
+
+  /** import content to get implicit tupled Doms */
+  object tupled {
+    implicit def tuple2[D1, D2](implicit dom1: Dom[D1], dom2: Dom[D2]) = Dom.tuple2[D1, D2]
+  }
 }
