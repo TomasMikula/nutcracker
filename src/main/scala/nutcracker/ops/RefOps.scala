@@ -13,7 +13,7 @@ final case class RefOps[Ref[_], D, U, Δ](ref: Ref[D])(implicit val dom: Dom.Aux
   def observe[M[_]](implicit P: Propagation[M, Ref]) = P.observe(ref)
 
   def peekC[M[_]](implicit P: Propagation[M, Ref], M: Functor[M]): ContU[M, D] =
-    ContU(f => P.peek(ref)(f))
+    ContU(f => P.peek_(ref)(f))
 }
 
 trait ToRefOps {

@@ -50,7 +50,7 @@ trait PSrc[F[_], M[_]] {
     def untilRight_(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Unit] = untilRight(f).map(_ => ())
   }
 
-  def peek[A](ref: F[A])(f: A => M[Unit])(implicit dom: Dom[A], M: Functor[M]): M[Unit] =
+  def peek_[A](ref: F[A])(f: A => M[Unit])(implicit dom: Dom[A], M: Functor[M]): M[Unit] =
     observe(ref).by(d => Trigger.fire(f(d))).map((_: Subscription[M]) => ())
 
   def alternate[A, B, L, R](ref1: F[A], ref2: F[B])(
@@ -76,8 +76,8 @@ trait PSrc[F[_], M[_]] {
       case Alternator.Right => Sleep(α)
       case Alternator.Stop  => Fire(onStop(Some(Right(r))))
     })).map(_ => ())
-    peek(ref1)(a => {
-      peek(ref2)(b => {
+    peek_(ref1)(a => {
+      peek_(ref2)(b => {
         f(a, b) match {
           case Alternator.Left  => onStartLeft() >>= { observeLeft(b, _) }
           case Alternator.Right => onStartRight() >>= { observeRight(a, _) }
