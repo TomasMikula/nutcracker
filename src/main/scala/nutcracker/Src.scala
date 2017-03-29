@@ -1,10 +1,9 @@
 package nutcracker
 
-import nutcracker.Dom.Aux
 import scala.language.higherKinds
-import scalaz.{Functor, IndexedContT, ~>}
+import scalaz.{Bind, Functor, IndexedContT, ~>}
 import scalaz.Id._
-import scalaz.syntax.functor._
+import scalaz.syntax.bind._
 
 /** If we are allowed effects `M`, then `S` can be observed for changes to a (mutable) value of type `A`. */
 trait Src[S, A, M[_]] {
@@ -51,8 +50,64 @@ trait PSrc[F[_], M[_]] {
     def untilRight_(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Unit] = untilRight(f).map(_ => ())
   }
 
+  def peek[A](ref: F[A])(f: A => M[Unit])(implicit dom: Dom[A], M: Functor[M]): M[Unit] =
+    observe(ref).by(d => Trigger.fire(f(d))).map((_: Subscription[M]) => ())
+
+  def alternate[A, B, L, R](ref1: F[A], ref2: F[B])(
+    f: (A, B) => Alternator,
+    onStartLeft: () => M[L],
+    onStartRight: () => M[R],
+    onSwitchToLeft: R => M[L],
+    onSwitchToRight: L => M[R],
+    onStop: Option[Either[L, R]] => M[Unit]
+  )(implicit
+    domA: Dom[A],
+    domB: Dom[B],
+    M: Bind[M]
+  ): M[Unit] = {
+    import TriggerF._
+    def observeLeft(b: B, l: L): M[Unit] = observe(ref1).by(λ[Id ~> λ[α => A => TriggerF[M, α]]](α => a => f(a, b) match {
+      case Alternator.Left  => Sleep(α)
+      case Alternator.Right => Fire(onSwitchToRight(l) >>= { observeRight(a, _) })
+      case Alternator.Stop  => Fire(onStop(Some(Left(l))))
+    })).map(_ => ())
+    def observeRight(a: A, r: R): M[Unit] = observe(ref2).by(λ[Id ~> λ[α => B => TriggerF[M, α]]](α => b => f(a, b) match {
+      case Alternator.Left  => Fire(onSwitchToLeft(r) >>= { observeLeft(b, _) })
+      case Alternator.Right => Sleep(α)
+      case Alternator.Stop  => Fire(onStop(Some(Right(r))))
+    })).map(_ => ())
+    peek(ref1)(a => {
+      peek(ref2)(b => {
+        f(a, b) match {
+          case Alternator.Left  => onStartLeft() >>= { observeLeft(b, _) }
+          case Alternator.Right => onStartRight() >>= { observeRight(a, _) }
+          case Alternator.Stop  => onStop(None)
+        }
+      })
+    })
+  }
+
+  def alternate0[A, B](ref1: F[A], ref2: F[B])(
+    f: (A, B) => Alternator,
+    onSwitchToLeft: M[Unit],
+    onSwitchToRight: M[Unit],
+    onStop: M[Unit]
+  )(implicit
+    domA: Dom[A],
+    domB: Dom[B],
+    M: Bind[M]
+  ): M[Unit] =
+    alternate[A, B, Unit, Unit](ref1, ref2)(
+      f,
+      () => onSwitchToLeft,
+      () => onSwitchToRight,
+      (_ => onSwitchToLeft),
+      (_ => onSwitchToRight),
+      (_ => onStop)
+    )
+
   def source[A](src: F[A]): Source[A, M] = new Source[A, M] {
-    def observeImpl[U, Δ](f: A => Trigger[M, A, Δ])(implicit dom: Aux[A, U, Δ]): M[Subscription[M]] =
+    def observeImpl[U, Δ](f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]] =
       PSrc.this.observeImpl(src)(f)
   }
 }
