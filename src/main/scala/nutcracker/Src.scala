@@ -1,5 +1,6 @@
 package nutcracker
 
+import nutcracker.util.Mediated
 import scala.language.higherKinds
 import scalaz.{Bind, Functor, IndexedContT, ~>}
 import scalaz.Id._
@@ -28,7 +29,7 @@ trait Src[S, A, M[_]] {
 trait PSrc[F[_], M[_]] {
 
   def observeImpl[A, U, Δ](src: F[A])(f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]]
-  def observeImplM[A, U, Δ, B](src: F[A])(f: A => M[(Trigger[M, A, Δ], B)])(implicit dom: Dom.Aux[A, U, Δ]): M[(Subscription[M], B)]
+  def peek[A](ref: F[A])(implicit dom: Dom[A]): Mediated[M, A, (A, dom.Delta) => Trigger[M, A, dom.Delta], Subscription[M]]
 
   def observe[A](src: F[A])(implicit dom: Dom[A]): ObserveSyntaxHelper[A, dom.Update, dom.Delta] =
     new ObserveSyntaxHelper[A, dom.Update, dom.Delta](src)(dom)
@@ -37,8 +38,11 @@ trait PSrc[F[_], M[_]] {
     def by(f: A => Trigger[M, A, Δ]): M[Subscription[M]] = observeImpl(src)(f)
     def by_(f: A => Trigger[M, A, Δ])(implicit M: Functor[M]): M[Unit] = by(f).map(_ => ())
 
-    def byM[B](f: A => M[(Trigger[M, A, Δ], B)]): M[(Subscription[M], B)] = observeImplM(src)(f)
-    def byM_[B](f: A => M[(Trigger[M, A, Δ], B)])(implicit M: Functor[M]): M[B] = byM(f).map(_._2)
+    def byM[B](f: A => M[(Trigger[M, A, Δ], B)])(implicit M: Bind[M]): M[(Subscription[M], B)] = {
+      val g = (a: A) => M.map(f(a)){ case (t, b) => ((a: A, δ: Δ) => t, b) }
+      peek(src).snd(identity[B]).completeM(g)
+    }
+    def byM_[B](f: A => M[(Trigger[M, A, Δ], B)])(implicit M: Bind[M]): M[B] = byM(f).map(_._2)
 
     def by(f: Id ~> λ[α => (A => TriggerF[M, α])]): M[Subscription[M]] = observeImpl(src)(Trigger.valueObserver(f))
     def by_(f: Id ~> λ[α => (A => TriggerF[M, α])])(implicit M: Functor[M]): M[Unit] = by(f).map(_ => ())

@@ -1,9 +1,8 @@
 package nutcracker
 
-import nutcracker.Dom.Aux
 import nutcracker.util.typealigned.BoundedAPair
+import nutcracker.util.{FreeK, InjectK, Mediated}
 import scala.language.higherKinds
-import nutcracker.util.{FreeK, InjectK}
 import scalaz.~>
 import scalaz.Id._
 import shapeless.HList
@@ -80,14 +79,14 @@ private[nutcracker] class FreePropagation[Ref[_], Tok[_], ObsId, F[_[_], _]](imp
     }).map(_.fold(Subscription[FreeK[F, ?]]())(subscription(ref, _)))
   }
 
-  def observeImplM[D, U, Δ, B](ref: Ref[D])(f: D => FreeK[F, (Trigger[FreeK[F, ?], D, Δ], B)])(implicit dom: Aux[D, U, Δ]) =
-    for {
-      dto <- PropagationLang.holdF(ref)
-      (dt, oid) = dto
-      tb <- f(dt._1)
-      (trigger, b) = tb
-      _ <- PropagationLang.resumeF[F, Ref, Tok, ObsId, D, U, dom.IDelta, dt.A](ref, dt._2, seqHandler(ref, (d, δ) => trigger))
-    } yield (subscription(ref, oid), b)
+  override def peek[D](ref: Ref[D])(implicit dom: Dom[D]): Mediated[FreeK[F, ?], D, (D, dom.Delta) => Trigger[FreeK[F, ?], D, dom.Delta], Subscription[FreeK[F, ?]]] =
+    peek0[D, dom.Update, dom.Delta](ref)(dom)
+
+  @inline
+  private def peek0[D, U, Δ](ref: Ref[D])(implicit dom: Dom.Aux[D, U, Δ]): Mediated[FreeK[F, ?], D, (D, Δ) => Trigger[FreeK[F, ?], D, Δ], Subscription[FreeK[F, ?]]] =
+    Mediated(PropagationLang.holdF(ref) map { case (dt, oid) =>
+      (dt._1, handler => PropagationLang.resumeF[F, Ref, Tok, ObsId, D, U, dom.IDelta, dt.A](ref, dt._2, seqHandler(ref, handler)) map (_ =>  subscription(ref, oid)))
+    })
 
   def selTrigger[L <: HList](sel: Sel[Ref, L])(f: Id ~> λ[α => L => TriggerF[FreeK[F, ?], α]]): FreeK[F, Unit] = {
     import TriggerF._
