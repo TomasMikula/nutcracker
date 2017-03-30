@@ -55,8 +55,8 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
               case Hold(ref) =>
                 val (s1, res) = s.hold(ref) // linter:ignore UndesirableTypeInference
                 (Lst.empty, s1, res)
-              case Resume(ref, token, handler, dom) =>
-                (Lst.empty, s.resume[dom.Domain, dom.Update, dom.IDelta, token.Arg](ref, token, handler)(dom), ())
+              case r @ Resume(ref, token, handler, dom) =>
+                (Lst.empty, s.resume[dom.Domain, dom.Update, dom.IDelta, r.Arg](ref, token, handler)(dom), ())
               case RmObserver(ref, oid) =>
                 (Lst.empty, s.rmObserver(ref, oid), ())
               case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
@@ -131,8 +131,8 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   }
 
   def hold[D](ref: CellId[D]): (PropagationStore[K], (BoundedAPair[D, Id, Token], ObserverId)) = {
-    val (cell, res) = domains(ref).hold
-    (copy(domains = domains.put(ref)(cell)), res)
+    val (cell, d, token, obsId) = domains(ref).hold
+    (copy(domains = domains.put(ref)(cell)), (BoundedAPair[D, Id, Token, D](d, token), obsId))
   }
 
   def resume[D, U, Δ[_, _], D0 <: D](ref: CellId[D], token: Token[D0], handler: SeqHandler[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] = {
@@ -220,7 +220,7 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
 
   def rmObserver(oid: ObserverId): Cell[K, D]
 
-  def hold: (Cell[K, D], (BoundedAPair[D, Id, Token], ObserverId))
+  def hold: (Cell[K, D], D, Token[D], ObserverId)
 
   def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell.Aux[K, D, Update, Delta]
 
@@ -325,9 +325,9 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
     }
   }
 
-  def hold: (SimpleCell[K, D], (BoundedAPair[D, Id, Token], ObserverId)) = {
+  def hold: (SimpleCell[K, D], D, Token[D], ObserverId) = {
     val (cell, token, oid) = block0
-    (cell, (BoundedAPair[D, Id, Token, Value](value, token), oid))
+    (cell, value, token, oid)
   }
 
   private def block0: (SimpleCell[K, D], Token[Value], ObserverId) = {
@@ -492,8 +492,6 @@ private[nutcracker] object CellId {
   }
 }
 
-private[nutcracker] final case class Token[A](val id: Long) extends AnyVal {
-  type Arg = A
-}
+private[nutcracker] final case class Token[+A](val id: Long) extends AnyVal
 
 private[nutcracker] final case class ObserverId(val id: Long) extends AnyVal

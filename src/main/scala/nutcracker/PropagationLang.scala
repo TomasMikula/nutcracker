@@ -16,7 +16,9 @@ private[nutcracker] object PropagationLang {
   case class Update[Ref[_], Tok[_], ObsId, K[_], D, U, Δ[_, _]](ref: Ref[D], u: U, dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, ObsId, K, Unit]
   case class Observe[Ref[_], Tok[_], ObsId, K[_], D, U, Δ[_, _]](ref: Ref[D], f: SeqPreHandler[Tok, K[Unit], D, Δ], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, ObsId, K, Option[ObsId]]
   case class Hold[Ref[_], Tok[_], ObsId, K[_], D](ref: Ref[D]) extends PropagationLang[Ref, Tok, ObsId, K, (BoundedAPair[D, Id, Tok], ObsId)]
-  case class Resume[Ref[_], Tok[_], ObsId, K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Tok[D0], handler: SeqHandler[Tok, K[Unit], D, Δ, D0], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, ObsId, K, Unit]
+  case class Resume[Ref[_], Tok[_], ObsId, K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Tok[D0], handler: SeqHandler[Tok, K[Unit], D, Δ, D0], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, ObsId, K, Unit] {
+    type Arg = D0
+  }
   case class RmObserver[Ref[_], Tok[_], ObsId, K[_], D](ref: Ref[D], oid: ObsId) extends PropagationLang[Ref, Tok, ObsId, K, Unit]
   case class SelTrigger[Ref[_], Tok[_], ObsId, K[_], L <: HList](sel: Sel[Ref, L], f: L => (Option[K[Unit]], Boolean)) extends PropagationLang[Ref, Tok, ObsId, K, Unit]
 
