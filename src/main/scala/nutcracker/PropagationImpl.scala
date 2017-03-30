@@ -1,6 +1,5 @@
 package nutcracker
 
-import nutcracker.Cell.{BlockedIdleObserver, IdleObserver}
 import scala.language.higherKinds
 import nutcracker.util.typealigned.BoundedAPair
 import nutcracker.util.{FreeK, HEqualK, HOrderK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`, ∃}
@@ -54,7 +53,7 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
                 case (s1, oo, ko) => (Lst.maybe(ko), s1, oo)
               }
               case Hold(ref) =>
-                val (s1, res) = s.block(ref) // linter:ignore UndesirableTypeInference
+                val (s1, res) = s.hold(ref) // linter:ignore UndesirableTypeInference
                 (Lst.empty, s1, res)
               case Resume(ref, token, handler, dom) =>
                 (Lst.empty, s.resume[dom.Domain, dom.Update, dom.IDelta, token.Arg](ref, token, handler)(dom), ())
@@ -103,12 +102,15 @@ private[nutcracker] case class PropagationStore[K[_]] private(
 
   def addVariable[D](d: D)(implicit dom: IDom[D]): (PropagationStore[K], CellId[D]) = {
     val ref = CellId[D](nextId)
-    val domains1 = domains.put(ref)(Cell.init(d))
+    val domains1 = domains.put(ref)(SimpleCell.init(d))
     val failedVars1 = if(dom.isFailed(d)) failedVars + nextId else failedVars
     (copy(nextId = nextId + 1, domains = domains1, failedVars = failedVars1), ref)
   }
 
-  def fetch[D](ref: CellId[D]): D = domains(ref).value
+  def tryFetch[D](ref: CellId[D]): Option[D] = domains(ref).getValue
+
+  // unsafe, should only be allowed on simple cells
+  def fetch[D](ref: CellId[D]): D = tryFetch(ref).get
 
   def fetchVector[D, N <: Nat](refs: Sized[Vector[CellId[D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))
@@ -117,7 +119,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     domains(ref).infer.update(u) match {
       case None => this
       case Some(cell) =>
-        val failedVars1 = if(cell.isFailed) failedVars + ref.domainId else failedVars
+        val failedVars1 = if(cell.getValue.fold(false)(dom.isFailed(_))) failedVars + ref.domainId else failedVars
         val domains1 = domains.put(ref.infer)(cell)
         val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
         copy(domains = domains1, failedVars = failedVars1, dirtyDomains = dirtyDomains1)
@@ -128,8 +130,8 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     (copy(domains = domains.put(ref)(cell)), oid, ko)
   }
 
-  def block[D](ref: CellId[D]): (PropagationStore[K], (BoundedAPair[D, Id, Token], ObserverId)) = {
-    val (cell, res) = domains(ref).block
+  def hold[D](ref: CellId[D]): (PropagationStore[K], (BoundedAPair[D, Id, Token], ObserverId)) = {
+    val (cell, res) = domains(ref).hold
     (copy(domains = domains.put(ref)(cell)), res)
   }
 
@@ -183,7 +185,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
       val ref0 = dirtyDomains.head
       val ref: CellId.Aux[ref0.Domain, ref0.Update, ref0.Delta] = ref0.aux
       val dirtySels = dirtySelections union getSelsForCell(ref)
-      val (cell, ks) = domains(ref).trigger
+      val (cell, ks) = domains(ref).triggerPendingObservers
       Some((copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains.tail, dirtySelections = dirtySels), ks))
     } else if(dirtySelections.nonEmpty) {
       val sel = dirtySelections.head
@@ -199,158 +201,30 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
   type Value <: D
 
   type Handler[D1] = SeqHandler[Token, K[Unit], D, Delta, D1]
+
   type IdleObserver[Val] = Cell.IdleObserver[K, D, Delta, Val]
   type PendingObserver[Val] = Cell.PendingObserver[K, D, Delta, Val]
   type BlockedIdleObserver[D0, Val] = Cell.BlockedIdleObserver[D, Delta, D0, Val]
   type BlockedPendingObserver[D0, Val] = Cell.BlockedPendingObserver[D, Delta, D0, Val]
 
-  val value: Value
-  val idleObservers: List[IdleObserver[Value]]
-  val pendingObservers: List[PendingObserver[Value]]
-  val blockedIdleObservers: KMap[Token, BlockedIdleObserver[?, Value]]
-  val blockedPendingObservers: KMap[Token, BlockedPendingObserver[?, Value]]
-  val nextObserverId: Long
-  val nextTokenId: Long
-
-  def copy(
-    idleObservers: List[IdleObserver[Value]] = idleObservers,
-    pendingObservers: List[PendingObserver[Value]] = pendingObservers,
-    blockedIdleObservers: KMap[Token, BlockedIdleObserver[?, Value]] = blockedIdleObservers,
-    blockedPendingObservers: KMap[Token, BlockedPendingObserver[?, Value]] = blockedPendingObservers,
-    nextObserverId: Long = nextObserverId,
-    nextTokenId: Long = nextTokenId
-  ): Cell.Aux[K, D, Update, Delta] =
-    Cell[K, D, Update, Delta, Value](value)(idleObservers, pendingObservers, blockedIdleObservers, blockedPendingObservers, nextObserverId, nextTokenId)
-
   def infer(implicit dom: IDom[D]): Cell.Aux[K, D, dom.Update, dom.IDelta] =
     this.asInstanceOf[Cell.Aux[K, D, dom.Update, dom.IDelta]]
 
-  def hasPendingObservers: Boolean = pendingObservers.nonEmpty
+  def hasPendingObservers: Boolean
 
-  def update(u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[Cell.Aux[K, D, Update, Delta]] =
-    dom.update(value, u) match {
-      case up @ Updated(newVal, delta) =>
-        val pending0 = pendingObservers.map(_.addDelta(delta))
-        val pending1 = idleObservers.map(_.addDelta(delta))
-        val pending = pending1 ::: pending0
+  def getValue: Option[Value]
 
-        val blocked0 = blockedPendingObservers.mapValues[BlockedPendingObserver[?, up.NewValue]](
-          λ[BlockedPendingObserver[?, Value] ~> BlockedPendingObserver[?, up.NewValue]](_.addDelta(delta))
-        )
-        val blocked1 = blockedIdleObservers.mapValues[BlockedPendingObserver[?, up.NewValue]](
-          λ[BlockedIdleObserver[?, Value] ~> BlockedPendingObserver[?, up.NewValue]](_.addDelta(delta))
-        )
-        val blocked = blocked0 ++ blocked1
+  def update(u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[Cell.Aux[K, D, Update, Delta]]
 
-        Some(Cell(newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[?, up.NewValue]](), blocked, nextObserverId, nextTokenId))
+  def observe(f: SeqPreHandler[Token, K[Unit], D, Delta]): (Cell[K, D], Option[ObserverId], Option[K[Unit]])
 
-      case Unchanged() => None
-    }
+  def rmObserver(oid: ObserverId): Cell[K, D]
 
-  def observe(f: SeqPreHandler[Token, K[Unit], D, Delta]): (Cell[K, D], Option[ObserverId], Option[K[Unit]]) = {
-    import SeqTrigger._
-    f.handle(value) match {
-      case Discard() => (this, None, None)
-      case Fire(k)   => (this, None, Some(k))
-      case Sleep(h)  =>
-        val (cell, oid) = addObserver(h)
-        (cell, Some(oid), None)
-      case FireReload(cont) =>
-        val (cell, token, oid) = block0
-        (cell, Some(oid), Some(cont(token)))
-    }
-  }
+  def hold: (Cell[K, D], (BoundedAPair[D, Id, Token], ObserverId))
 
-  def block: (Cell[K, D], (BoundedAPair[D, Id, Token], ObserverId)) = {
-    val (cell, token, oid) = block0
-    (cell, (BoundedAPair[D, Id, Token, Value](value, token), oid))
-  }
+  def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell.Aux[K, D, Update, Delta]
 
-  private def block0: (Cell[K, D], Token[Value], ObserverId) = {
-    val token = new Token[Value](nextTokenId)
-    val oid = new ObserverId(nextObserverId)
-    (Cell[K, D, Update, Delta, Value](value)(idleObservers, pendingObservers, blockedIdleObservers.put(token)(Cell.BlockedIdleObserver(oid, Leibniz.refl[Value])), blockedPendingObservers, nextObserverId + 1, nextTokenId + 1), token, oid)
-  }
-
-  private def addObserver(f: Handler[Value]): (Cell.Aux[K, D, Update, Delta], ObserverId) = {
-    val oid = new ObserverId(nextObserverId)
-    val obs = IdleObserver(oid, f)
-    (Cell[K, D, Update, Delta, Value](value)(obs :: idleObservers, pendingObservers, blockedIdleObservers, blockedPendingObservers, nextObserverId + 1, nextTokenId), oid)
-  }
-
-  def rmObserver(oid: ObserverId): Cell[K, D] = {
-    listRemoveFirst(idleObservers)(_.id == oid) match {
-      case Some(idles) => copy(idleObservers = idles)
-      case None => listRemoveFirst(pendingObservers)(_.id == oid) match {
-        case Some(pendings) => copy(pendingObservers = pendings)
-        case None => mapRemoveFirst[Token, BlockedIdleObserver[?, Value]](blockedIdleObservers)(_.id == oid) match {
-          case Some(blockedIdles) => copy(blockedIdleObservers = blockedIdles)
-          case None => mapRemoveFirst[Token, BlockedPendingObserver[?, Value]](blockedPendingObservers)(_.id == oid) match {
-            case Some(blockedPendings) => copy(blockedPendingObservers = blockedPendings)
-            case None => this
-          }
-        }
-      }
-    }
-  }
-
-  private def listRemoveFirst[A](l: List[A])(p: A => Boolean): Option[List[A]] = {
-    @tailrec def go(revChecked: List[A], l: List[A]): Option[List[A]] = l match {
-      case a :: as =>
-        if(p(a)) Some(revChecked reverse_::: as)
-        else go(a :: revChecked, as)
-      case Nil =>
-        None
-    }
-
-    go(Nil, l)
-  }
-
-  private def mapRemoveFirst[Key[_], V[_]](m: KMap[Key, V])(p: ∃[V] => Boolean): Option[KMap[Key, V]] =
-    m.find(p).map(m - _._1)
-
-  def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell.Aux[K, D, Update, Delta] =
-    blockedIdleObservers.get(token) match {
-      case Some(obs) =>
-        assert(blockedPendingObservers.get(token).isEmpty)
-        val obs1 = obs.resume(handler)
-        Cell[K, D, Update, Delta, Value](value)(obs1 :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, nextObserverId, nextTokenId)
-      case None => blockedPendingObservers.get(token) match {
-        case Some(obs) =>
-          val obs1 = obs.resume(handler)
-          Cell[K, D, Update, Delta, Value](value)(idleObservers, obs1 :: pendingObservers, blockedIdleObservers, blockedPendingObservers - token, nextObserverId, nextTokenId)
-        case None =>
-          sys.error(s"unrecognized token $token")
-      }
-    }
-
-  def trigger: (Cell[K, D], Lst[K[Unit]]) = {
-    @tailrec def go(
-      pending: List[PendingObserver[Value]],
-      idleAcc: List[IdleObserver[Value]],
-      blockedIdleAcc: KMap[Token, BlockedIdleObserver[?, Value]],
-      firedAcc: Lst[K[Unit]],
-      nextTokenId: Long
-    ): (Cell.Aux[K, D, Update, Delta], Lst[K[Unit]]) =
-    pending match {
-      case Nil => (Cell[K, D, Update, Delta, Value](value)(idleAcc, Nil, blockedIdleAcc, blockedPendingObservers, nextObserverId, nextTokenId), firedAcc)
-      case po :: tail =>
-        import SeqTrigger._
-        po.handler.handle(value, po.delta) match {
-          case Discard() => go(tail, idleAcc, blockedIdleAcc, firedAcc, nextTokenId)
-          case Fire(k) => go(tail, idleAcc, blockedIdleAcc, k :: firedAcc, nextTokenId)
-          case Sleep(h) => go(tail, IdleObserver(po.id, h) :: idleAcc, blockedIdleAcc, firedAcc, nextTokenId)
-          case FireReload(f) =>
-            val token = new Token[Value](nextTokenId)
-            val k = f(token)
-            go(tail, idleAcc, blockedIdleAcc.put(token)(BlockedIdleObserver(po.id, Leibniz.refl[Value])), k :: firedAcc, nextTokenId + 1)
-        }
-    }
-
-    go(pendingObservers, idleObservers, blockedIdleObservers, Lst.empty, nextTokenId)
-  }
-
-  def isFailed(implicit dom: IDom.Aux[D, Update, Delta]) = dom.isFailed(value)
+  def triggerPendingObservers: (Cell[K, D], Lst[K[Unit]])
 }
 
 private[nutcracker] object Cell {
@@ -390,9 +264,164 @@ private[nutcracker] object Cell {
     def resume[K[_]](handler: SeqHandler[Token, K[Unit], D, Δ, D0]): PendingObserver.Aux[K, D, Δ, D0, Val] =
       PendingObserver(id, delta, handler)
   }
+}
 
-  def init[K[_], D](d: D)(implicit dom: IDom[D]): Cell.Aux[K, D, dom.Update, dom.IDelta] =
-    Cell[K, D, dom.Update, dom.IDelta, D](d)(Nil, Nil, KMap[Token, BlockedIdleObserver[D, dom.IDelta, ?, D]](), KMap[Token, BlockedPendingObserver[D, dom.IDelta, ?, D]](), 0L, 0L)
+private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
+  import nutcracker.Cell._
+
+  val value: Value
+  val idleObservers: List[IdleObserver[Value]]
+  val pendingObservers: List[PendingObserver[Value]]
+  val blockedIdleObservers: KMap[Token, BlockedIdleObserver[?, Value]]
+  val blockedPendingObservers: KMap[Token, BlockedPendingObserver[?, Value]]
+  val nextObserverId: Long
+  val nextTokenId: Long
+
+  def copy(
+    idleObservers: List[IdleObserver[Value]] = idleObservers,
+    pendingObservers: List[PendingObserver[Value]] = pendingObservers,
+    blockedIdleObservers: KMap[Token, BlockedIdleObserver[?, Value]] = blockedIdleObservers,
+    blockedPendingObservers: KMap[Token, BlockedPendingObserver[?, Value]] = blockedPendingObservers,
+    nextObserverId: Long = nextObserverId,
+    nextTokenId: Long = nextTokenId
+  ): SimpleCell.Aux[K, D, Update, Delta] =
+    SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, pendingObservers, blockedIdleObservers, blockedPendingObservers, nextObserverId, nextTokenId)
+
+  def getValue: Option[Value] = Some(value)
+
+  def hasPendingObservers: Boolean = pendingObservers.nonEmpty
+
+  def update(u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[SimpleCell.Aux[K, D, Update, Delta]] =
+    dom.update(value, u) match {
+      case up @ Updated(newVal, delta) =>
+        val pending0 = pendingObservers.map(_.addDelta(delta))
+        val pending1 = idleObservers.map(_.addDelta(delta))
+        val pending = pending1 ::: pending0
+
+        val blocked0 = blockedPendingObservers.mapValues[BlockedPendingObserver[?, up.NewValue]](
+          λ[BlockedPendingObserver[?, Value] ~> BlockedPendingObserver[?, up.NewValue]](_.addDelta(delta))
+        )
+        val blocked1 = blockedIdleObservers.mapValues[BlockedPendingObserver[?, up.NewValue]](
+          λ[BlockedIdleObserver[?, Value] ~> BlockedPendingObserver[?, up.NewValue]](_.addDelta(delta))
+        )
+        val blocked = blocked0 ++ blocked1
+
+        Some(SimpleCell(newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[?, up.NewValue]](), blocked, nextObserverId, nextTokenId))
+
+      case Unchanged() => None
+    }
+
+  def observe(f: SeqPreHandler[Token, K[Unit], D, Delta]): (SimpleCell[K, D], Option[ObserverId], Option[K[Unit]]) = {
+    import SeqTrigger._
+    f.handle(value) match {
+      case Discard() => (this, None, None)
+      case Fire(k)   => (this, None, Some(k))
+      case Sleep(h)  =>
+        val (cell, oid) = addObserver(h)
+        (cell, Some(oid), None)
+      case FireReload(cont) =>
+        val (cell, token, oid) = block0
+        (cell, Some(oid), Some(cont(token)))
+    }
+  }
+
+  def hold: (SimpleCell[K, D], (BoundedAPair[D, Id, Token], ObserverId)) = {
+    val (cell, token, oid) = block0
+    (cell, (BoundedAPair[D, Id, Token, Value](value, token), oid))
+  }
+
+  private def block0: (SimpleCell[K, D], Token[Value], ObserverId) = {
+    val token = new Token[Value](nextTokenId)
+    val oid = new ObserverId(nextObserverId)
+    (SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, pendingObservers, blockedIdleObservers.put(token)(BlockedIdleObserver(oid, Leibniz.refl[Value])), blockedPendingObservers, nextObserverId + 1, nextTokenId + 1), token, oid)
+  }
+
+  private def addObserver(f: Handler[Value]): (SimpleCell.Aux[K, D, Update, Delta], ObserverId) = {
+    val oid = new ObserverId(nextObserverId)
+    val obs = IdleObserver(oid, f)
+    (SimpleCell[K, D, Update, Delta, Value](value)(obs :: idleObservers, pendingObservers, blockedIdleObservers, blockedPendingObservers, nextObserverId + 1, nextTokenId), oid)
+  }
+
+  def rmObserver(oid: ObserverId): SimpleCell[K, D] = {
+    listRemoveFirst(idleObservers)(_.id == oid) match {
+      case Some(idles) => copy(idleObservers = idles)
+      case None => listRemoveFirst(pendingObservers)(_.id == oid) match {
+        case Some(pendings) => copy(pendingObservers = pendings)
+        case None => mapRemoveFirst[Token, BlockedIdleObserver[?, Value]](blockedIdleObservers)(_.id == oid) match {
+          case Some(blockedIdles) => copy(blockedIdleObservers = blockedIdles)
+          case None => mapRemoveFirst[Token, BlockedPendingObserver[?, Value]](blockedPendingObservers)(_.id == oid) match {
+            case Some(blockedPendings) => copy(blockedPendingObservers = blockedPendings)
+            case None => this
+          }
+        }
+      }
+    }
+  }
+
+  private def listRemoveFirst[A](l: List[A])(p: A => Boolean): Option[List[A]] = {
+    @tailrec def go(revChecked: List[A], l: List[A]): Option[List[A]] = l match {
+      case a :: as =>
+        if(p(a)) Some(revChecked reverse_::: as)
+        else go(a :: revChecked, as)
+      case Nil =>
+        None
+    }
+
+    go(Nil, l)
+  }
+
+  private def mapRemoveFirst[Key[_], V[_]](m: KMap[Key, V])(p: ∃[V] => Boolean): Option[KMap[Key, V]] =
+    m.find(p).map(m - _._1)
+
+  def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): SimpleCell.Aux[K, D, Update, Delta] =
+    blockedIdleObservers.get(token) match {
+      case Some(obs) =>
+        assert(blockedPendingObservers.get(token).isEmpty)
+        val obs1 = obs.resume(handler)
+        SimpleCell[K, D, Update, Delta, Value](value)(obs1 :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, nextObserverId, nextTokenId)
+      case None => blockedPendingObservers.get(token) match {
+        case Some(obs) =>
+          val obs1 = obs.resume(handler)
+          SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, obs1 :: pendingObservers, blockedIdleObservers, blockedPendingObservers - token, nextObserverId, nextTokenId)
+        case None =>
+          sys.error(s"unrecognized token $token")
+      }
+    }
+
+  def triggerPendingObservers: (SimpleCell[K, D], Lst[K[Unit]]) = {
+    @tailrec def go(
+      pending: List[PendingObserver[Value]],
+      idleAcc: List[IdleObserver[Value]],
+      blockedIdleAcc: KMap[Token, BlockedIdleObserver[?, Value]],
+      firedAcc: Lst[K[Unit]],
+      nextTokenId: Long
+    ): (SimpleCell.Aux[K, D, Update, Delta], Lst[K[Unit]]) =
+    pending match {
+      case Nil => (SimpleCell[K, D, Update, Delta, Value](value)(idleAcc, Nil, blockedIdleAcc, blockedPendingObservers, nextObserverId, nextTokenId), firedAcc)
+      case po :: tail =>
+        import SeqTrigger._
+        po.handler.handle(value, po.delta) match {
+          case Discard() => go(tail, idleAcc, blockedIdleAcc, firedAcc, nextTokenId)
+          case Fire(k) => go(tail, idleAcc, blockedIdleAcc, k :: firedAcc, nextTokenId)
+          case Sleep(h) => go(tail, IdleObserver(po.id, h) :: idleAcc, blockedIdleAcc, firedAcc, nextTokenId)
+          case FireReload(f) =>
+            val token = new Token[Value](nextTokenId)
+            val k = f(token)
+            go(tail, idleAcc, blockedIdleAcc.put(token)(BlockedIdleObserver(po.id, Leibniz.refl[Value])), k :: firedAcc, nextTokenId + 1)
+        }
+    }
+
+    go(pendingObservers, idleObservers, blockedIdleObservers, Lst.empty, nextTokenId)
+  }
+}
+
+private[nutcracker] object SimpleCell {
+  import Cell._
+
+  type Aux[K[_], D, U, Δ[_, _]] = SimpleCell[K, D] { type Update = U; type Delta[D1, D2] = Δ[D1, D2] }
+
+  def init[K[_], D](d: D)(implicit dom: IDom[D]): SimpleCell.Aux[K, D, dom.Update, dom.IDelta] =
+    SimpleCell[K, D, dom.Update, dom.IDelta, D](d)(Nil, Nil, KMap[Token, BlockedIdleObserver[D, dom.IDelta, ?, D]](), KMap[Token, BlockedPendingObserver[D, dom.IDelta, ?, D]](), 0L, 0L)
 
   def apply[K[_], D, U, Δ[_, _], Val <: D](d: Val)(
     idleObservers0: List[IdleObserver[K, D, Δ, Val]],
@@ -401,7 +430,7 @@ private[nutcracker] object Cell {
     blockedPendingObservers0: KMap[Token, BlockedPendingObserver[D, Δ, ?, Val]],
     nextObserver: Long,
     nextToken: Long
-  ): Cell.Aux[K, D, U, Δ] = new Cell[K, D] {
+  ): SimpleCell.Aux[K, D, U, Δ] = new SimpleCell[K, D] {
     type Update = U
     type Delta[D1, D2] = Δ[D1, D2]
     type Value = Val
