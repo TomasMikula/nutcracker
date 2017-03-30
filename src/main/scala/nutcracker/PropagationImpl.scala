@@ -274,18 +274,18 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
   val pendingObservers: List[PendingObserver[Value]]
   val blockedIdleObservers: KMap[Token, BlockedIdleObserver[?, Value]]
   val blockedPendingObservers: KMap[Token, BlockedPendingObserver[?, Value]]
-  val nextObserverId: Long
-  val nextTokenId: Long
+  val lastObserverId: ObserverId
+  val lastToken: Token[_]
 
   def copy(
     idleObservers: List[IdleObserver[Value]] = idleObservers,
     pendingObservers: List[PendingObserver[Value]] = pendingObservers,
     blockedIdleObservers: KMap[Token, BlockedIdleObserver[?, Value]] = blockedIdleObservers,
     blockedPendingObservers: KMap[Token, BlockedPendingObserver[?, Value]] = blockedPendingObservers,
-    nextObserverId: Long = nextObserverId,
-    nextTokenId: Long = nextTokenId
+    nextObserverId: ObserverId = lastObserverId,
+    lastToken: Token[_] = lastToken
   ): SimpleCell.Aux[K, D, Update, Delta] =
-    SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, pendingObservers, blockedIdleObservers, blockedPendingObservers, nextObserverId, nextTokenId)
+    SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, pendingObservers, blockedIdleObservers, blockedPendingObservers, nextObserverId, lastToken)
 
   def getValue: Option[Value] = Some(value)
 
@@ -306,7 +306,7 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
         )
         val blocked = blocked0 ++ blocked1
 
-        Some(SimpleCell(newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[?, up.NewValue]](), blocked, nextObserverId, nextTokenId))
+        Some(SimpleCell(newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[?, up.NewValue]](), blocked, lastObserverId, lastToken))
 
       case Unchanged() => None
     }
@@ -331,15 +331,15 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
   }
 
   private def block0: (SimpleCell[K, D], Token[Value], ObserverId) = {
-    val token = new Token[Value](nextTokenId)
-    val oid = new ObserverId(nextObserverId)
-    (SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, pendingObservers, blockedIdleObservers.put(token)(BlockedIdleObserver(oid, Leibniz.refl[Value])), blockedPendingObservers, nextObserverId + 1, nextTokenId + 1), token, oid)
+    val token = lastToken.inc[Value]
+    val oid = lastObserverId.inc
+    (SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, pendingObservers, blockedIdleObservers.put(token)(BlockedIdleObserver(oid, Leibniz.refl[Value])), blockedPendingObservers, oid, token), token, oid)
   }
 
   private def addObserver(f: Handler[Value]): (SimpleCell.Aux[K, D, Update, Delta], ObserverId) = {
-    val oid = new ObserverId(nextObserverId)
+    val oid = lastObserverId.inc
     val obs = IdleObserver(oid, f)
-    (SimpleCell[K, D, Update, Delta, Value](value)(obs :: idleObservers, pendingObservers, blockedIdleObservers, blockedPendingObservers, nextObserverId + 1, nextTokenId), oid)
+    (SimpleCell[K, D, Update, Delta, Value](value)(obs :: idleObservers, pendingObservers, blockedIdleObservers, blockedPendingObservers, oid, lastToken), oid)
   }
 
   def rmObserver(oid: ObserverId): SimpleCell[K, D] = {
@@ -378,11 +378,11 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
       case Some(obs) =>
         assert(blockedPendingObservers.get(token).isEmpty)
         val obs1 = obs.resume(handler)
-        SimpleCell[K, D, Update, Delta, Value](value)(obs1 :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, nextObserverId, nextTokenId)
+        SimpleCell[K, D, Update, Delta, Value](value)(obs1 :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, lastObserverId, lastToken)
       case None => blockedPendingObservers.get(token) match {
         case Some(obs) =>
           val obs1 = obs.resume(handler)
-          SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, obs1 :: pendingObservers, blockedIdleObservers, blockedPendingObservers - token, nextObserverId, nextTokenId)
+          SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, obs1 :: pendingObservers, blockedIdleObservers, blockedPendingObservers - token, lastObserverId, lastToken)
         case None =>
           sys.error(s"unrecognized token $token")
       }
@@ -394,24 +394,24 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
       idleAcc: List[IdleObserver[Value]],
       blockedIdleAcc: KMap[Token, BlockedIdleObserver[?, Value]],
       firedAcc: Lst[K[Unit]],
-      nextTokenId: Long
+      lastToken: Token[_]
     ): (SimpleCell.Aux[K, D, Update, Delta], Lst[K[Unit]]) =
     pending match {
-      case Nil => (SimpleCell[K, D, Update, Delta, Value](value)(idleAcc, Nil, blockedIdleAcc, blockedPendingObservers, nextObserverId, nextTokenId), firedAcc)
+      case Nil => (SimpleCell[K, D, Update, Delta, Value](value)(idleAcc, Nil, blockedIdleAcc, blockedPendingObservers, lastObserverId, lastToken), firedAcc)
       case po :: tail =>
         import SeqTrigger._
         po.handler.handle(value, po.delta) match {
-          case Discard() => go(tail, idleAcc, blockedIdleAcc, firedAcc, nextTokenId)
-          case Fire(k) => go(tail, idleAcc, blockedIdleAcc, k :: firedAcc, nextTokenId)
-          case Sleep(h) => go(tail, IdleObserver(po.id, h) :: idleAcc, blockedIdleAcc, firedAcc, nextTokenId)
+          case Discard() => go(tail, idleAcc, blockedIdleAcc, firedAcc, lastToken)
+          case Fire(k) => go(tail, idleAcc, blockedIdleAcc, k :: firedAcc, lastToken)
+          case Sleep(h) => go(tail, IdleObserver(po.id, h) :: idleAcc, blockedIdleAcc, firedAcc, lastToken)
           case FireReload(f) =>
-            val token = new Token[Value](nextTokenId)
+            val token = lastToken.inc[Value]
             val k = f(token)
-            go(tail, idleAcc, blockedIdleAcc.put(token)(BlockedIdleObserver(po.id, Leibniz.refl[Value])), k :: firedAcc, nextTokenId + 1)
+            go(tail, idleAcc, blockedIdleAcc.put(token)(BlockedIdleObserver(po.id, Leibniz.refl[Value])), k :: firedAcc, token)
         }
     }
 
-    go(pendingObservers, idleObservers, blockedIdleObservers, Lst.empty, nextTokenId)
+    go(pendingObservers, idleObservers, blockedIdleObservers, Lst.empty, lastToken)
   }
 }
 
@@ -421,15 +421,22 @@ private[nutcracker] object SimpleCell {
   type Aux[K[_], D, U, Δ[_, _]] = SimpleCell[K, D] { type Update = U; type Delta[D1, D2] = Δ[D1, D2] }
 
   def init[K[_], D](d: D)(implicit dom: IDom[D]): SimpleCell.Aux[K, D, dom.Update, dom.IDelta] =
-    SimpleCell[K, D, dom.Update, dom.IDelta, D](d)(Nil, Nil, KMap[Token, BlockedIdleObserver[D, dom.IDelta, ?, D]](), KMap[Token, BlockedPendingObserver[D, dom.IDelta, ?, D]](), 0L, 0L)
+    SimpleCell[K, D, dom.Update, dom.IDelta, D](d)(
+      Nil,
+      Nil,
+      KMap[Token, BlockedIdleObserver[D, dom.IDelta, ?, D]](),
+      KMap[Token, BlockedPendingObserver[D, dom.IDelta, ?, D]](),
+      ObserverId.zero,
+      Token.zero
+    )
 
   def apply[K[_], D, U, Δ[_, _], Val <: D](d: Val)(
     idleObservers0: List[IdleObserver[K, D, Δ, Val]],
     pendingObservers0: List[PendingObserver[K, D, Δ, Val]],
     blockedIdleObservers0: KMap[Token, BlockedIdleObserver[D, Δ, ?, Val]],
     blockedPendingObservers0: KMap[Token, BlockedPendingObserver[D, Δ, ?, Val]],
-    nextObserver: Long,
-    nextToken: Long
+    lastObsId: ObserverId,
+    lastTok: Token[_]
   ): SimpleCell.Aux[K, D, U, Δ] = new SimpleCell[K, D] {
     type Update = U
     type Delta[D1, D2] = Δ[D1, D2]
@@ -440,8 +447,8 @@ private[nutcracker] object SimpleCell {
     val pendingObservers = pendingObservers0
     val blockedIdleObservers = blockedIdleObservers0
     val blockedPendingObservers = blockedPendingObservers0
-    val nextObserverId: Long = nextObserver
-    val nextTokenId = nextToken
+    val lastObserverId = lastObsId
+    val lastToken = lastTok
   }
 }
 
@@ -492,6 +499,16 @@ private[nutcracker] object CellId {
   }
 }
 
-private[nutcracker] final case class Token[+A](val id: Long) extends AnyVal
+private[nutcracker] final class Token[+A] private(val id: Long) extends AnyVal {
+  def inc[B]: Token[B] = new Token(id + 1)
+}
+private[nutcracker] object Token {
+  def zero[A]: Token[A] = new Token(0)
+}
 
-private[nutcracker] final case class ObserverId(val id: Long) extends AnyVal
+private[nutcracker] final class ObserverId private(val id: Long) extends AnyVal {
+  def inc: ObserverId = new ObserverId(id + 1)
+}
+private[nutcracker] object ObserverId {
+  def zero: ObserverId = new ObserverId(0)
+}
