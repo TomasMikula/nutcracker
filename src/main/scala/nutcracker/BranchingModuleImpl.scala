@@ -2,7 +2,7 @@ package nutcracker
 
 import nutcracker.util.{FreeK, InjectK, Lst, Step, WriterState}
 import scalaz.Id.Id
-import scalaz.~>
+import scalaz.{Monad, ~>}
 
 private[nutcracker] class BranchingModuleImpl[Ref0[_]] extends PersistentBranchingModule {
   type Ref[A] = Ref0[A]
@@ -34,7 +34,7 @@ private[nutcracker] class BranchingModuleImpl[Ref0[_]] extends PersistentBranchi
 
   def interpreter: Step[Lang, State] = new Step[Lang, State] {
     import BranchLang._
-    def apply[K[_], A](f: BranchLang[Ref, K, A]): WriterState[Lst[K[Unit]], State[K], A] = f match {
+    def apply[K[_]: Monad, A](f: BranchLang[Ref, K, A]): WriterState[Lst[K[Unit]], State[K], A] = f match {
       case Track(ref, ev) => WriterState(s => (Lst.empty, s.addVar(ref, ev), ()))
       case Untrack(ref) => WriterState(s => (Lst.empty, s.removeVar(ref), ()))
     }

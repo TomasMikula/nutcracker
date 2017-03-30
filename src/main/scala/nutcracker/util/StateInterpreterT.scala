@@ -89,7 +89,8 @@ object StateInterpreterT {
     M0: Monad[M],
     M1: BindRec[M]
   ): FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?] = {
-    val step1 = step.papply[FreeK[F, ?]]
+    type FF[A] = FreeK[F, A] // https://issues.scala-lang.org/browse/SI-10238
+    val step1 = step.papply[FF]
     val uncons1 = uncons[FreeK[F, ?]]
 
     def runUntilClean[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] = {

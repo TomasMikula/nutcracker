@@ -3,7 +3,7 @@ package nutcracker
 import nutcracker.DeferLang.Delay
 import nutcracker.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
 import nutcracker.util.{FreeK, InjectK, Lst, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
-import scalaz.{Heap, Order, StateT}
+import scalaz.{Heap, Monad, Order, StateT}
 import scalaz.std.option._
 
 private[nutcracker] class DeferModuleImpl[D](implicit D: NonDecreasingMonoid[D] with OrderPreservingMonoid[D]) extends PersistentDeferModule[D] { self =>
@@ -50,7 +50,7 @@ private[nutcracker] object DeferStore {
     new StateInterpreter[DeferLang[D, ?[_], ?], DeferStore[D, ?[_]]] {
 
       def step: Step[DeferLang[D, ?[_], ?], DeferStore[D, ?[_]]] = new Step[DeferLang[D, ?[_], ?], DeferStore[D, ?[_]]] {
-        def apply[K[_], A](f: DeferLang[D, K, A]): WriterState[Lst[K[Unit]], DeferStore[D, K], A] =
+        def apply[K[_]: Monad, A](f: DeferLang[D, K, A]): WriterState[Lst[K[Unit]], DeferStore[D, K], A] =
           WriterState(s => f match {
             case Delay(d, k) => (Lst.empty, s.add(d, k), ())
           })

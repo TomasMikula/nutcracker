@@ -1,7 +1,7 @@
 package nutcracker
 
 import nutcracker.util.{FreeK, InjectK, Lst, Step, WriterState}
-import scalaz.Monoid
+import scalaz.{Monad, Monoid}
 
 private[nutcracker] class CostModuleImpl[C](implicit C: Monoid[C]) extends PersistentCostModule[C] {
   import CostLang._
@@ -17,7 +17,7 @@ private[nutcracker] class CostModuleImpl[C](implicit C: Monoid[C]) extends Persi
 
   val interpreter: Step[Lang, State] =
     new Step[Lang, State] {
-      override def apply[K[_], A](f: CostLang[C, K, A]): WriterState[Lst[K[Unit]], State[K], A] = {
+      override def apply[K[_]: Monad, A](f: CostLang[C, K, A]): WriterState[Lst[K[Unit]], State[K], A] = {
         f match {
           case Cost(c1) => WriterState(c0 => (Lst.empty, C.append(c0, c1), ()))
           case GetCost(ev) => WriterState(c0 => (Lst.empty, c0, ev(c0)))

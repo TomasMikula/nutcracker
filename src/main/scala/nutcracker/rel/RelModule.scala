@@ -2,6 +2,7 @@ package nutcracker.rel
 
 import nutcracker.{ListModule, Module, PersistentStateModule, StashModule}
 import nutcracker.util.{FreeK, InjectK, Lst, Step, WriterState}
+import scalaz.Monad
 
 trait RelModule extends Module {
   def interpreter: Step[Lang, State]
@@ -36,7 +37,7 @@ private[rel] object RelModuleImpl extends PersistentRelModule {
 
   def interpreter: Step[RelLang, RelDB] = new Step[RelLang, RelDB] {
     import RelLang._
-    override def apply[K[_], A](f: RelLang[K, A]): WriterState[Lst[K[Unit]], RelDB[K], A] = f match {
+    override def apply[K[_]: Monad, A](f: RelLang[K, A]): WriterState[Lst[K[Unit]], RelDB[K], A] = f match {
       case r @ Relate(rel, values) => WriterState(db => db.insert(rel, values)(r.ordersWitness, r.orders) match { case (db1, ks) => (ks, db1, ()) })
       case OnPatternMatch(p, a, h) => WriterState(db => db.addOnPatternMatch(p, a)(h) match { case (db1, ks) => (ks, db1, ()) })
       case ExecWith(rel, ass, supp, exec, m, os) => WriterState(db => db.execWith(rel, ass)(supp)(exec)(m, os) match { case (db1, ko) => (Lst.maybe(ko), db1, ()) })

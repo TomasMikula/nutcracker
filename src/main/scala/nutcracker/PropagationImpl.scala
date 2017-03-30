@@ -3,7 +3,7 @@ package nutcracker
 import scala.language.higherKinds
 import nutcracker.util.typealigned.BoundedAPair
 import nutcracker.util.{FreeK, HEqualK, HOrderK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`, ∃}
-import scalaz.{Equal, Leibniz, Ordering, Show, StateT, ~>}
+import scalaz.{Equal, Leibniz, Monad, Ordering, Show, StateT, ~>}
 import scalaz.Id._
 import scalaz.std.option._
 import shapeless.{HList, Nat, Sized}
@@ -44,7 +44,7 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
       def step: Step[PropagationLang[Ref, Token, ObserverId, ?[_], ?], PropagationStore] =
         new Step[PropagationLang[Ref, Token, ObserverId, ?[_], ?], PropagationStore] {
           import PropagationLang._
-          override def apply[K[_], A](p: PropagationLang[Ref, Token, ObserverId, K, A]): WriterState[Lst[K[Unit]], PropagationStore[K], A] = WriterState(s =>
+          override def apply[K[_]: Monad, A](p: PropagationLang[Ref, Token, ObserverId, K, A]): WriterState[Lst[K[Unit]], PropagationStore[K], A] = WriterState(s =>
             p match {
               case NewCell(d, dom) => s.addVariable(d)(dom) match {
                 case (s1, ref) => (Lst.empty, s1, ref)
