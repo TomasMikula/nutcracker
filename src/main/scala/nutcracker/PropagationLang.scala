@@ -19,6 +19,9 @@ private[nutcracker] object PropagationLang {
   case class Resume[Ref[_], Tok[_], ObsId, K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Tok[D0], handler: SeqHandler[Tok, K[Unit], D, Δ, D0], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, ObsId, K, Unit] {
     type Arg = D0
   }
+  case class Triggered[Ref[_], Tok[_], ObsId, K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Tok[D0], trigger: SeqTrigger[Tok, K[Unit], D, Δ, D0], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, Tok, ObsId, K, Unit] {
+    type Arg = D0
+  }
   case class RmObserver[Ref[_], Tok[_], ObsId, K[_], D](ref: Ref[D], oid: ObsId) extends PropagationLang[Ref, Tok, ObsId, K, Unit]
   case class SelTrigger[Ref[_], Tok[_], ObsId, K[_], L <: HList](sel: Sel[Ref, L], f: L => (Option[K[Unit]], Boolean)) extends PropagationLang[Ref, Tok, ObsId, K, Unit]
 
@@ -33,6 +36,8 @@ private[nutcracker] object PropagationLang {
     Hold[Ref, Tok, ObsId, K, D](ref)
   def resume[Ref[_], Tok[_], ObsId, K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Tok[D0], handler: SeqHandler[Tok, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationLang[Ref, Tok, ObsId, K, Unit] =
     Resume[Ref, Tok, ObsId, K, D, U, Δ, D0](ref, token, handler, dom)
+  def triggered[Ref[_], Tok[_], ObsId, K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Tok[D0], trigger: SeqTrigger[Tok, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationLang[Ref, Tok, ObsId, K, Unit] =
+    Triggered[Ref, Tok, ObsId, K, D, U, Δ, D0](ref, token, trigger, dom)
   def rmObserver[Ref[_], Tok[_], ObsId, K[_], D](ref: Ref[D], oid: ObsId): PropagationLang[Ref, Tok, ObsId, K, Unit] =
     RmObserver(ref, oid)
   def selTrigger[Ref[_], Tok[_], ObsId, K[_], L <: HList](sel: Sel[Ref, L])(f: L => (Option[K[Unit]], Boolean)): PropagationLang[Ref, Tok, ObsId, K, Unit] =
@@ -49,6 +54,8 @@ private[nutcracker] object PropagationLang {
     FreeK.injLiftF(hold[Ref, Tok, ObsId, FreeK[F, ?], D](ref))
   def resumeF[F[_[_], _], Ref[_], Tok[_], ObsId, D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Tok[D0], handler: SeqHandler[Tok, FreeK[F, Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ], inj: InjectK[PropagationLang[Ref, Tok, ObsId, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(resume[Ref, Tok, ObsId, FreeK[F, ?], D, U, Δ, D0](ref, token, handler))
+  def triggeredF[F[_[_], _], Ref[_], Tok[_], ObsId, D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Tok[D0], trigger: SeqTrigger[Tok, FreeK[F, Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ], inj: InjectK[PropagationLang[Ref, Tok, ObsId, ?[_], ?], F]): FreeK[F, Unit] =
+    FreeK.injLiftF(triggered[Ref, Tok, ObsId, FreeK[F, ?], D, U, Δ, D0](ref, token, trigger))
   def rmObserverF[F[_[_], _], Ref[_], Tok[_], ObsId, D](ref: Ref[D], oid: ObsId)(implicit inj: InjectK[PropagationLang[Ref, Tok, ObsId, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(rmObserver[Ref, Tok, ObsId, FreeK[F, ?], D](ref, oid))
 
@@ -81,13 +88,13 @@ private[nutcracker] class FreePropagation[Ref[_], Tok[_], ObsId, F[_[_], _]](imp
     }).map(_.fold(Subscription[FreeK[F, ?]]())(subscription(ref, _)))
   }
 
-  override def peek[D](ref: Ref[D])(implicit dom: Dom[D]): Mediated[FreeK[F, ?], D, (D, dom.Delta) => Trigger[FreeK[F, ?], D, dom.Delta], Subscription[FreeK[F, ?]]] =
+  override def peek[D](ref: Ref[D])(implicit dom: Dom[D]): Mediated[FreeK[F, ?], D, Trigger[FreeK[F, ?], D, dom.Delta], Subscription[FreeK[F, ?]]] =
     peek0[D, dom.Update, dom.Delta](ref)(dom)
 
   @inline
-  private def peek0[D, U, Δ](ref: Ref[D])(implicit dom: Dom.Aux[D, U, Δ]): Mediated[FreeK[F, ?], D, (D, Δ) => Trigger[FreeK[F, ?], D, Δ], Subscription[FreeK[F, ?]]] =
+  private def peek0[D, U, Δ](ref: Ref[D])(implicit dom: Dom.Aux[D, U, Δ]): Mediated[FreeK[F, ?], D, Trigger[FreeK[F, ?], D, Δ], Subscription[FreeK[F, ?]]] =
     Mediated(PropagationLang.holdF(ref) map { case (dt, oid) =>
-      (dt._1, handler => PropagationLang.resumeF[F, Ref, Tok, ObsId, D, U, dom.IDelta, dt.A](ref, dt._2, seqHandler(ref, handler)) map (_ =>  subscription(ref, oid)))
+      (dt._1, trigger => PropagationLang.triggeredF[F, Ref, Tok, ObsId, D, U, dom.IDelta, dt.A](ref, dt._2, seqTrigger(ref, trigger)) map (_ =>  subscription(ref, oid)))
     })
 
   def selTrigger[L <: HList](sel: Sel[Ref, L])(f: Id ~> λ[α => L => TriggerF[FreeK[F, ?], α]]): FreeK[F, Unit] = {
@@ -112,15 +119,18 @@ private[nutcracker] class FreePropagation[Ref[_], Tok[_], ObsId, F[_[_], _]](imp
   private def seqHandler[D, U, Δ, D1](ref: Ref[D], f: (D, Δ) => Trigger[FreeK[F, ?], D, Δ])(implicit dom: Dom.Aux[D, U, Δ]): SeqHandler[Tok, FreeK[F, Unit], D, λ[(α, β) => Δ], D1] =
     new SeqHandler[Tok, FreeK[F, Unit], D, λ[(α, β) => Δ], D1] {
       def handle[D2 <: D](d2: D2, δ: Δ): SeqTrigger[Tok, FreeK[F, Unit], D, λ[(α, β) => Δ], D2] =
-        f(d2, δ).unfix match {
-          case TriggerF.Discard() => Discard[Tok, FreeK[F, Unit], D, λ[(α, β) => Δ], D2]()
-          case TriggerF.Fire(k) => Fire[Tok, FreeK[F, Unit], D, λ[(α, β) => Δ], D2](k)
-          case TriggerF.Sleep(next) => Sleep[Tok, FreeK[F, Unit], D, λ[(α, β) => Δ], D2](seqHandler(ref, next))
-          case TriggerF.FireReload(cont) => FireReload[Tok, FreeK[F, Unit], D, λ[(α, β) => Δ], D2](
-            (token: Tok[D2]) => cont >>= { h =>
-              PropagationLang.resumeF[F, Ref, Tok, ObsId, D, U, λ[(α, β) => Δ], D2](ref, token, seqHandler(ref, h))
-            }
-          )
+        seqTrigger(ref, f(d2, δ))
+    }
+
+  private def seqTrigger[D, U, Δ, D1 <: D](ref: Ref[D], trigger: Trigger[FreeK[F, ?], D, Δ])(implicit dom: Dom.Aux[D, U, Δ]): SeqTrigger[Tok, FreeK[F, Unit], D, λ[(α, β) => Δ], D1] =
+    trigger.unfix match {
+      case TriggerF.Discard() => Discard[Tok, FreeK[F, Unit], D, λ[(α, β) => Δ], D1]()
+      case TriggerF.Fire(k) => Fire[Tok, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](k)
+      case TriggerF.Sleep(next) => Sleep[Tok, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](seqHandler(ref, next))
+      case TriggerF.FireReload(cont) => FireReload[Tok, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](
+        (token: Tok[D1]) => cont >>= { h =>
+          PropagationLang.resumeF[F, Ref, Tok, ObsId, D, U, λ[(α, β) => Δ], D1](ref, token, seqHandler(ref, h))
         }
+      )
     }
 }

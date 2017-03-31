@@ -57,6 +57,9 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
                 (Lst.empty, s1, res)
               case r @ Resume(ref, token, handler, dom) =>
                 (Lst.empty, s.resume[dom.Domain, dom.Update, dom.IDelta, r.Arg](ref, token, handler)(dom), ())
+              case t @ Triggered(ref, token, trigger, dom) =>
+                val (s1, ks) = s.triggered[dom.Domain, dom.Update, dom.IDelta, t.Arg](ref, token, trigger)(dom)
+                (ks, s1, ())
               case RmObserver(ref, oid) =>
                 (Lst.empty, s.rmObserver(ref, oid), ())
               case SelTrigger(sel, f) => s.addSelTrigger(sel, f) match {
@@ -141,6 +144,12 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains1)
   }
 
+  def triggered[D, U, Δ[_, _], D0 <: D](ref: CellId[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Lst[K[Unit]]) = {
+    val (cell, ks) = domains(ref).infer.triggered(token, trigger)
+    val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
+    (copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains1), ks)
+  }
+
   def rmObserver[D](ref: CellId[D], oid: ObserverId): PropagationStore[K] = {
     val cell = domains(ref).rmObserver(oid)
     copy(domains = domains.put(ref)(cell))
@@ -201,6 +210,7 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
   type Value <: D
 
   type Handler[D1] = SeqHandler[Token, K[Unit], D, Delta, D1]
+  type Trigger[D1] = SeqTrigger[Token, K[Unit], D, Delta, D1]
 
   type IdleObserver[Val] = Cell.IdleObserver[K, D, Delta, Val]
   type PendingObserver[Val] = Cell.PendingObserver[K, D, Delta, Val]
@@ -223,6 +233,8 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
   def hold: (Cell[K, D], D, Token[D], ObserverId)
 
   def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell.Aux[K, D, Update, Delta]
+
+  def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell.Aux[K, D, Update, Delta], Lst[K[Unit]])
 
   def triggerPendingObservers: (Cell[K, D], Lst[K[Unit]])
 }
@@ -387,6 +399,37 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
           sys.error(s"unrecognized token $token")
       }
     }
+
+  def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (SimpleCell.Aux[K, D, Update, Delta], Lst[K[Unit]]) = {
+    import SeqTrigger._
+    trigger match {
+      case Discard() => (copy(blockedIdleObservers = blockedIdleObservers - token, blockedPendingObservers = blockedPendingObservers - token), Lst.empty)
+      case Fire(k)   => (copy(blockedIdleObservers = blockedIdleObservers - token, blockedPendingObservers = blockedPendingObservers - token), Lst.singleton(k))
+      case Sleep(h)  => (resume(token, h), Lst.empty)
+      case FireReload(f) =>
+        val nextToken = lastToken.inc[D0]
+        val k = f(nextToken)
+        blockedIdleObservers.get(token) match {
+          case Some(obs) =>
+            assert(blockedPendingObservers.get(token).isEmpty)
+            val cell = copy(
+              blockedIdleObservers = (blockedIdleObservers - token).put(nextToken)(obs),
+              lastToken = nextToken
+            )
+            (cell, Lst.singleton(k))
+          case None => blockedPendingObservers.get(token) match {
+            case Some(obs) =>
+              val cell = copy(
+                blockedPendingObservers = (blockedPendingObservers - token).put(nextToken)(obs),
+                lastToken = nextToken
+              )
+              (cell, Lst.singleton(k))
+            case None =>
+              sys.error(s"unrecognized token $token")
+          }
+        }
+    }
+  }
 
   def triggerPendingObservers: (SimpleCell[K, D], Lst[K[Unit]]) = {
     @tailrec def go(
