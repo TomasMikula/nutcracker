@@ -1,6 +1,5 @@
 package nutcracker
 
-import nutcracker.Cell.Aux
 import nutcracker.util.{FreeK, HEqualK, HOrderK, Index, InjectK, KMap, KMapB, Lst, Mediated, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`, ∃}
 import scala.annotation.tailrec
 import scalaz.{Bind, Equal, Leibniz, Monad, Ordering, Show, StateT, Value, ~>}
@@ -12,17 +11,17 @@ import shapeless.{HList, Nat, Sized}
 
 private[nutcracker] object PropagationImpl extends PersistentPropagationModule with PropagationBundle { self =>
   type Ref[A] = CellId[A]
-  type Lang[K[_], A] = PropagationLang[Ref, Token, ObserverId, K, A]
+  type Lang[K[_], A] = PropagationLang[Ref, K, A]
   type State[K[_]] = PropagationStore[K]
 
   implicit val refEquality: HEqualK[Ref] = CellId.equalKInstance
   implicit def refOrder: HOrderK[Ref] = CellId.orderKInstance
   implicit def refShow: ShowK[Ref] = CellId.showKInstance
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref] =
-    PropagationLang.freePropagation[Ref, Token, ObserverId, F]
+    PropagationLang.freePropagation[Ref, F]
 
   val propagationApi: Propagation[Prg, Ref] =
-    PropagationLang.freePropagation[Ref, Token, ObserverId, Lang]
+    PropagationLang.freePropagation[Ref, Lang]
 
   def empty[K[_]]: PropagationStore[K] =
     PropagationStore[K](
@@ -39,12 +38,12 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
     interpreter.freeInstance.apply(p).run(s)
 
   val interpreter: StateInterpreter[Lang, State] =
-    new StateInterpreter[PropagationLang[Ref, Token, ObserverId, ?[_], ?], PropagationStore] {
+    new StateInterpreter[PropagationLang[Ref, ?[_], ?], PropagationStore] {
 
-      def step: Step[PropagationLang[Ref, Token, ObserverId, ?[_], ?], PropagationStore] =
-        new Step[PropagationLang[Ref, Token, ObserverId, ?[_], ?], PropagationStore] {
+      def step: Step[PropagationLang[Ref, ?[_], ?], PropagationStore] =
+        new Step[PropagationLang[Ref, ?[_], ?], PropagationStore] {
           import PropagationLang._
-          override def apply[K[_]: Monad, A](p: PropagationLang[Ref, Token, ObserverId, K, A]): WriterState[Lst[K[Unit]], PropagationStore[K], A] = WriterState(s =>
+          override def apply[K[_]: Monad, A](p: PropagationLang[Ref, K, A]): WriterState[Lst[K[Unit]], PropagationStore[K], A] = WriterState(s =>
             p match {
               case NewCell(d, dom) => s.addVariable(d)(dom) match {
                 case (s1, ref) => (Lst.empty, s1, ref)
