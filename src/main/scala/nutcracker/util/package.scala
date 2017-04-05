@@ -53,11 +53,6 @@ package object util {
     def tuple6[F[_], A1, A2, A3, A4, A5, A6](c1: ContU[F, A1], c2: ContU[F, A2], c3: ContU[F, A3], c4: ContU[F, A4], c5: ContU[F, A5], c6: ContU[F, A6]): ContU[F, (A1, A2, A3, A4, A5, A6)] =
       for { a1 <- c1; a2 <- c2; a3 <- c3; a4 <- c4; a5 <- c5; a6 <- c6 } yield (a1, a2, a3, a4, a5, a6)
 
-    implicit class ContUOps[F[_], A](self: ContU[F, A]) {
-      def absorbEffect[B](implicit ev: A =:= F[B], F: Bind[F]): ContU[F, B] =
-        self.flatMap(a => ContU.liftM(ev(a)))
-    }
-
     implicit class WrappedContU[F[_], A](self: F[ContU[F, A]]) {
       def wrapEffect(implicit F: Bind[F]): ContU[F, A] = ContU.wrapEffect(self)
     }

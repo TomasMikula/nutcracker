@@ -9,3 +9,4 @@ package object ops
      with ToIteratorOps
      with ToApplicativeOps
      with ToContTOps
+     with ToIndexedContTOps
