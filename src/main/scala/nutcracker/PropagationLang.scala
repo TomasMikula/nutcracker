@@ -1,5 +1,6 @@
 package nutcracker
 
+import nutcracker.CellCycle.LiveCycle
 import nutcracker.util.{ContU, FreeK, FreeKT, InjectK, Mediated}
 import scalaz.{Bind, IndexedContT, ~>}
 import scalaz.Id._
@@ -15,7 +16,7 @@ private[nutcracker] object PropagationLang {
   case class Update[Ref[_], K[_], D, U, Δ[_, _]](ref: Ref[D], u: U, dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Unit]
   case class Observe[Ref[_], K[_], D, U, Δ[_, _]](ref: Ref[D], f: SeqPreHandler[Token, K[Unit], D, Δ], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Option[ObserverId]]
   case class Hold[Ref[_], K[_], D](ref: Ref[D], f: (D, Token[D], ObserverId) => K[Unit]) extends PropagationLang[Ref, K, ObserverId]
-  case class Supply[Ref[_], K[_], D](ref: Ref[D], cycle: CellCycle[D], value: D) extends PropagationLang[Ref, K, Unit]
+  case class Supply[Ref[_], K[_], D](ref: Ref[D], cycle: LiveCycle[D], value: D) extends PropagationLang[Ref, K, Unit]
   case class Resume[Ref[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], handler: SeqHandler[Token, K[Unit], D, Δ, D0], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Unit] {
     type Arg = D0
   }
@@ -25,10 +26,10 @@ private[nutcracker] object PropagationLang {
   case class RmObserver[Ref[_], K[_], D](ref: Ref[D], oid: ObserverId) extends PropagationLang[Ref, K, Unit]
   case class SelTrigger[Ref[_], K[_], L <: HList](sel: Sel[Ref, L], f: L => (Option[K[Unit]], Boolean)) extends PropagationLang[Ref, K, Unit]
 
-  case class NewAutoCell[Ref[_], K[_], A](setup: Mediated[K, A, (Ref[A], CellCycle[A]), Unit], supply: (Ref[A], CellCycle[A], A) => K[Unit], dom: Dom[A], bnd: Bind[K]) extends PropagationLang[Ref, K, Ref[A]]
-  case class AddFinalizer[Ref[_], K[_], A](ref: Ref[A], cycle: CellCycle[A], value: Subscription[K]) extends PropagationLang[Ref, K, Option[FinalizerId]]
-  case class RemoveFinalizer[Ref[_], K[_], A](ref: Ref[A], cycle: CellCycle[A], id: FinalizerId) extends PropagationLang[Ref, K, Unit]
-  case class ExclUpdate[Ref[_], K[_], A, U, Δ[_, _]](ref: Ref[A], cycle: CellCycle[A], u: U, dom: IDom.Aux[A, U, Δ]) extends PropagationLang[Ref, K, Unit]
+  case class NewAutoCell[Ref[_], K[_], A](setup: Mediated[K, A, (Ref[A], LiveCycle[A]), Unit], supply: (Ref[A], LiveCycle[A], A) => K[Unit], dom: Dom[A], bnd: Bind[K]) extends PropagationLang[Ref, K, Ref[A]]
+  case class AddFinalizer[Ref[_], K[_], A](ref: Ref[A], cycle: LiveCycle[A], value: Subscription[K]) extends PropagationLang[Ref, K, Option[FinalizerId]]
+  case class RemoveFinalizer[Ref[_], K[_], A](ref: Ref[A], cycle: LiveCycle[A], id: FinalizerId) extends PropagationLang[Ref, K, Unit]
+  case class ExclUpdate[Ref[_], K[_], A, U, Δ[_, _]](ref: Ref[A], cycle: LiveCycle[A], u: U, dom: IDom.Aux[A, U, Δ]) extends PropagationLang[Ref, K, Unit]
 
   // constructors returning less specific types, and curried to help with type inference
   def newCell[Ref[_], K[_], D](d: D)(implicit dom: Dom[D]): PropagationLang[Ref, K, Ref[D]] =
@@ -39,7 +40,7 @@ private[nutcracker] object PropagationLang {
     Observe[Ref, K, D, U, Δ](ref, f, dom)
   def hold[Ref[_], K[_], D](ref: Ref[D])(f: (D, Token[D], ObserverId) => K[Unit]): PropagationLang[Ref, K, ObserverId] =
     Hold[Ref, K, D](ref, f)
-  def supply[Ref[_], K[_], D](ref: Ref[D])(cycle: CellCycle[D], value: D): PropagationLang[Ref, K, Unit] =
+  def supply[Ref[_], K[_], D](ref: Ref[D])(cycle: LiveCycle[D], value: D): PropagationLang[Ref, K, Unit] =
     Supply(ref, cycle, value)
   def resume[Ref[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], handler: SeqHandler[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationLang[Ref, K, Unit] =
     Resume[Ref, K, D, U, Δ, D0](ref, token, handler, dom)
@@ -49,13 +50,13 @@ private[nutcracker] object PropagationLang {
     RmObserver(ref, oid)
   def selTrigger[Ref[_], K[_], L <: HList](sel: Sel[Ref, L])(f: L => (Option[K[Unit]], Boolean)): PropagationLang[Ref, K, Unit] =
     SelTrigger(sel, f)
-  def newAutoCell[Ref[_], K[_], A](setup: Mediated[K, A, (Ref[A], CellCycle[A]), Unit], supply: (Ref[A], CellCycle[A], A) => K[Unit])(implicit dom: Dom[A], K: Bind[K]): PropagationLang[Ref, K, Ref[A]] =
+  def newAutoCell[Ref[_], K[_], A](setup: Mediated[K, A, (Ref[A], LiveCycle[A]), Unit], supply: (Ref[A], LiveCycle[A], A) => K[Unit])(implicit dom: Dom[A], K: Bind[K]): PropagationLang[Ref, K, Ref[A]] =
     NewAutoCell(setup, supply, dom, K)
-  def addFinalizer[Ref[_], K[_], A](ref: Ref[A], cycle: CellCycle[A], value: Subscription[K]): PropagationLang[Ref, K, Option[FinalizerId]] =
+  def addFinalizer[Ref[_], K[_], A](ref: Ref[A], cycle: LiveCycle[A], value: Subscription[K]): PropagationLang[Ref, K, Option[FinalizerId]] =
     AddFinalizer(ref, cycle, value)
-  def removeFinalizer[Ref[_], K[_], A](ref: Ref[A], cycle: CellCycle[A], id: FinalizerId): PropagationLang[Ref, K, Unit] =
+  def removeFinalizer[Ref[_], K[_], A](ref: Ref[A], cycle: LiveCycle[A], id: FinalizerId): PropagationLang[Ref, K, Unit] =
     RemoveFinalizer(ref, cycle, id)
-  def exclUpdate[Ref[_], K[_], A, U, Δ[_, _]](ref: Ref[A], cycle: CellCycle[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): PropagationLang[Ref, K, Unit] =
+  def exclUpdate[Ref[_], K[_], A, U, Δ[_, _]](ref: Ref[A], cycle: LiveCycle[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): PropagationLang[Ref, K, Unit] =
     ExclUpdate(ref, cycle, u, dom)
 
 
@@ -74,7 +75,7 @@ private[nutcracker] object PropagationLang {
   def holdF[F[_[_], _], Ref[_], D](ref: Ref[D])(f: (D, Token[D], ObserverId) => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, ObserverId] =
     FreeK.injLiftF(hold[Ref, FreeK[F, ?], D](ref)(f))
 
-  def supplyF[F[_[_], _], Ref[_], D](ref: Ref[D])(cycle: CellCycle[D], value: D)(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
+  def supplyF[F[_[_], _], Ref[_], D](ref: Ref[D])(cycle: LiveCycle[D], value: D)(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(supply[Ref, FreeK[F, ?], D](ref)(cycle, value))
 
   def resumeF[F[_[_], _], Ref[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], handler: SeqHandler[Token, FreeK[F, Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ], inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
@@ -86,16 +87,16 @@ private[nutcracker] object PropagationLang {
   def rmObserverF[F[_[_], _], Ref[_], D](ref: Ref[D], oid: ObserverId)(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(rmObserver[Ref, FreeK[F, ?], D](ref, oid))
 
-  def newAutoCellF[F[_[_], _], Ref[_], A](setup: Mediated[FreeK[F, ?], A, (Ref[A], CellCycle[A]), Unit])(supply: (Ref[A], CellCycle[A], A) => FreeK[F, Unit])(implicit dom: Dom[A], inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Ref[A]] =
+  def newAutoCellF[F[_[_], _], Ref[_], A](setup: Mediated[FreeK[F, ?], A, (Ref[A], LiveCycle[A]), Unit])(supply: (Ref[A], LiveCycle[A], A) => FreeK[F, Unit])(implicit dom: Dom[A], inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Ref[A]] =
     FreeK.injLiftF(newAutoCell[Ref, FreeK[F, ?], A](setup, supply)(dom, FreeKT.freeKTMonad[F, Id]))
 
-  def addFinalizerF[F[_[_], _], Ref[_], A](ref: Ref[A], cycle: CellCycle[A], value: Subscription[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Option[FinalizerId]] =
+  def addFinalizerF[F[_[_], _], Ref[_], A](ref: Ref[A], cycle: LiveCycle[A], value: Subscription[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Option[FinalizerId]] =
     FreeK.injLiftF(addFinalizer[Ref, FreeK[F, ?], A](ref, cycle, value))
 
-  def removeFinalizerF[F[_[_], _], Ref[_], A](ref: Ref[A], cycle: CellCycle[A], id: FinalizerId)(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
+  def removeFinalizerF[F[_[_], _], Ref[_], A](ref: Ref[A], cycle: LiveCycle[A], id: FinalizerId)(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(removeFinalizer[Ref, FreeK[F, ?], A](ref, cycle, id))
 
-  def exclUpdateF[F[_[_], _], Ref[_], A, U, Δ[_, _]](ref: Ref[A], cycle: CellCycle[A], u: U)(implicit dom: IDom.Aux[A, U, Δ], inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
+  def exclUpdateF[F[_[_], _], Ref[_], A, U, Δ[_, _]](ref: Ref[A], cycle: LiveCycle[A], u: U)(implicit dom: IDom.Aux[A, U, Δ], inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(exclUpdate[Ref, FreeK[F, ?], A, U, Δ](ref, cycle, u))
 
 
@@ -109,7 +110,7 @@ private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: Inje
   import SeqTrigger._
 
   type ExclRef[A] = Ref[A]
-  type CellCycle[A] = nutcracker.CellCycle[A]
+  type CellCycle[A] = LiveCycle[A]
 
   def newCell[D](d: D)(implicit dom: Dom[D]): FreeK[F, Ref[D]] =
     newCellF[F, Ref, D](d)

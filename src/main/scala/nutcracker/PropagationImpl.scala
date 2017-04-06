@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.IDom.Aux
+import nutcracker.CellCycle.{LiveCycle, SporeCycle}
 import nutcracker.util.{FreeK, HEqualK, HOrderK, Index, InjectK, KMap, KMapB, Lst, Mediated, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`, ∃}
 import scala.annotation.tailrec
 import scalaz.{Bind, Equal, Leibniz, Monad, Ordering, Show, StateT, ~>}
@@ -128,9 +128,9 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     (copy(nextId = nextId + 1, domains = domains1, failedVars = failedVars1), ref)
   }
 
-  def newAutoCell[D](setup: Mediated[K, D, (CellId[D], CellCycle[D]), Unit], supply: (CellId[D], CellCycle[D], D) => K[Unit])(implicit dom: IDom[D], K: Bind[K]): (PropagationStore[K], CellId[D]) = {
+  def newAutoCell[D](setup: Mediated[K, D, (CellId[D], LiveCycle[D]), Unit], supply: (CellId[D], LiveCycle[D], D) => K[Unit])(implicit dom: IDom[D], K: Bind[K]): (PropagationStore[K], CellId[D]) = {
     val ref = CellId[D](nextId)
-    val setup1 = (c: CellCycle[D]) => setup.completeM(d => supply(ref, c, d).as((ref, c)))
+    val setup1 = (c: LiveCycle[D]) => setup.completeM(d => supply(ref, c, d).as((ref, c)))
     val cell = InactiveCell.init[K, D, dom.Update, dom.IDelta](setup1)
     (copy(nextId = nextId + 1, domains = domains.put(ref)(cell)), ref)
   }
@@ -153,7 +153,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         copy(domains = domains1, failedVars = failedVars1, dirtyDomains = dirtyDomains1)
     }
 
-  def exclUpdate[D, U, Δ[_, _]](ref: CellId[D], cycle: CellCycle[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] = {
+  def exclUpdate[D, U, Δ[_, _]](ref: CellId[D], cycle: LiveCycle[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] = {
     domains(ref).infer.exclUpdate(cycle, u) match {
       case None => this
       case Some(cell) =>
@@ -173,15 +173,9 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     (copy(domains = domains.put(ref)(cell)), obsId, ko)
   }
 
-  def supply[D](ref: CellId[D])(cycle: CellCycle[D], value: D): (PropagationStore[K], Lst[K[Unit]]) = {
+  def supply[D](ref: CellId[D])(cycle: LiveCycle[D], value: D): (PropagationStore[K], Lst[K[Unit]]) = {
     val (cell, ks) = domains(ref).supply(cycle, value)
     (copy(domains = domains.put(ref)(cell)), ks)
-  }
-
-  def resume[D, U, Δ[_, _], D0 <: D](ref: CellId[D], token: Token[D0], handler: SeqHandler[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] = {
-    val cell = domains(ref).infer.resume(token, handler)
-    val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
-    copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains1)
   }
 
   def triggered[D, U, Δ[_, _], D0 <: D](ref: CellId[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Lst[K[Unit]]) = {
@@ -195,22 +189,22 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     (copy(domains = domains.put(ref)(cell)), ks)
   }
 
-  def addFinalizer[A](ref: CellId[A], cycle: CellCycle[A], sub: Subscription[K]): (Lst[K[Unit]], PropagationStore[K], Option[FinalizerId]) = {
+  def addFinalizer[A](ref: CellId[A], cycle: LiveCycle[A], sub: Subscription[K]): (Lst[K[Unit]], PropagationStore[K], Option[FinalizerId]) = {
     val (ks, cell, fid) = domains(ref).addFinalizer(cycle, sub)
     (ks, copy(domains = domains.put(ref)(cell)), fid)
   }
 
-  def removeFinalizer[A](ref: CellId[A], cycle: CellCycle[A], fid: FinalizerId): PropagationStore[K] = {
+  def removeFinalizer[A](ref: CellId[A], cycle: LiveCycle[A], fid: FinalizerId): PropagationStore[K] = {
     val cell = domains(ref).removeFinalizer(cycle, fid)
     copy(domains = domains.put(ref)(cell))
   }
-
 
   def addSelTrigger[L <: HList](sel: Sel[CellId, L], t: L => (Option[K[Unit]], Boolean)): (PropagationStore[K], Option[K[Unit]]) = {
     val (ko, keep) = t(sel.fetch(cellFetcher))
     if(keep) (addSelTrigger0(sel, t), ko)
     else     (this,                   ko)
   }
+
 
   private def addSelTrigger0[L <: HList](sel: Sel[CellId, L], t: L => (Option[K[Unit]], Boolean)): PropagationStore[K] = {
     copy(
@@ -225,6 +219,12 @@ private[nutcracker] case class PropagationStore[K[_]] private(
       case (Nil, fired) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), fired)
       case (forLater, fired) => (copy(selTriggers = selTriggers.put(sel)(forLater)), fired)
     }
+  }
+
+  def resume[D, U, Δ[_, _], D0 <: D](ref: CellId[D], token: Token[D0], handler: SeqHandler[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] = {
+    val cell = domains(ref).infer.resume(token, handler)
+    val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
+    copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains1)
   }
 
   private def getSelsForCell(ref: CellId[_]): Set[Sel[CellId, _ <: HList]] = cellsToSels.get(ref)
@@ -276,20 +276,20 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
 
   def update(u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[Cell[K, D]]
 
-  def exclUpdate(cycle: CellCycle[D], u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[Cell[K, D]]
+  def exclUpdate(cycle: LiveCycle[D], u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[Cell[K, D]]
 
   def observe(f: SeqPreHandler[Token, K[Unit], D, Delta]): (Cell[K, D], Option[ObserverId], Option[K[Unit]])
 
   def rmObserver(oid: ObserverId): (Cell[K, D], Lst[K[Unit]])
 
-  def addFinalizer(cycle: CellCycle[D], sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId])
+  def addFinalizer(cycle: LiveCycle[D], sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId])
 
-  def removeFinalizer(cycle: CellCycle[D], fid: FinalizerId): Cell[K, D]
+  def removeFinalizer(cycle: LiveCycle[D], fid: FinalizerId): Cell[K, D]
 
   /** Making observer ID available both to the callback `f` and as part of the result, leaving the choice of how to consume it to the user. */
   def hold(f: (D, Token[D], ObserverId) => K[Unit]): (Cell[K, D], ObserverId, Option[K[Unit]])
 
-  def supply[D0 <: D](cycle: CellCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]])
+  def supply[D0 <: D](cycle: LiveCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]])
 
   def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell.Aux[K, D, Update, Delta]
 
@@ -407,13 +407,13 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
     }
 
   // TODO: this method should not exist on SimpleCell
-  override def exclUpdate(cycle: CellCycle[D], u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[Cell[K, D]] =
+  override def exclUpdate(cycle: LiveCycle[D], u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[Cell[K, D]] =
     sys.error("exclUpdate only allowed on on-demand cells")
 
-  override def addFinalizer(cycle: CellCycle[D], sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId]) =
+  override def addFinalizer(cycle: LiveCycle[D], sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId]) =
     sys.error("addFinalizer only allowed on on-demand cells")
 
-  override def removeFinalizer(cycle: CellCycle[D], fid: FinalizerId): Cell[K, D] =
+  override def removeFinalizer(cycle: LiveCycle[D], fid: FinalizerId): Cell[K, D] =
     sys.error("removeFinalizer only allowed on on-demand cells")
 
   def observe(f: SeqPreHandler[Token, K[Unit], D, Delta]): (SimpleCell.Aux1[K, D, Update, Delta, Value], Option[ObserverId], Option[K[Unit]]) = {
@@ -539,7 +539,7 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
     go(pendingObservers, idleObservers, blockedIdleObservers, Lst.empty, lastToken)
   }
 
-  def supply[D0 <: D](cycle: CellCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]]) =
+  def supply[D0 <: D](cycle: LiveCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]]) =
     sys.error("operation valid only for OnDemandCells")
 }
 
@@ -585,26 +585,13 @@ private[nutcracker] sealed abstract class OnDemandCell[K[_], D, U, Δ[_, _]] ext
   type Update = U
   type Delta[D0, D1] = Δ[D0, D1]
 
-  val cycle: CellCycle[D]
-
   final override def update(u: U)(implicit dom: IDom.Aux[D, U, Δ]): Option[Cell.Aux[K, D, U, Δ]] =
     sys.error("Cannot update OnDemandCell")
-
-  final override def addFinalizer(cycle: CellCycle[D], sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId]) =
-    if(cycle === this.cycle) addFinalizer(sub)
-    else (sub.unsubscribe, this, None)
-
-  final override def removeFinalizer(cycle: CellCycle[D], fid: FinalizerId): Cell[K, D] =
-    if(cycle === this.cycle) removeFinalizer(fid)
-    else this
-
-  protected def addFinalizer(sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId])
-  protected def removeFinalizer(fid: FinalizerId): Cell[K, D]
 }
 
 private[nutcracker] case class InactiveCell[K[_], D, U, Δ[_, _]](
-  setup: CellCycle[D] => K[Unit],
-  cycle: CellCycle[D],
+  setup: LiveCycle[D] => K[Unit],
+  cycle: SporeCycle[D],
   lastObserverId: ObserverId,
   lastToken: Token[_]
 ) extends OnDemandCell[K, D, U, Δ] {
@@ -627,13 +614,13 @@ private[nutcracker] case class InactiveCell[K[_], D, U, Δ[_, _]](
     (cell, obsId, Some(setup(newCycle)))
   }
 
-  override def supply[D0 <: D](cycle: CellCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]]) = {
+  override def supply[D0 <: D](cycle: LiveCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]]) = {
     // Must have lost all observers before it was initialized. Do nothing.
     assert(cycle.value <= this.cycle.value)
     (this, Lst.empty)
   }
 
-  override def exclUpdate(cycle: CellCycle[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): Option[Cell[K, D]] = {
+  override def exclUpdate(cycle: LiveCycle[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): Option[Cell[K, D]] = {
     // Must be an update from a previous cell cycle. Do nothing
     assert(cycle.value <= this.cycle.value)
     None
@@ -655,21 +642,21 @@ private[nutcracker] case class InactiveCell[K[_], D, U, Δ[_, _]](
     // there are no pending observers
     (this, Lst.empty)
 
-  override def addFinalizer(sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId]) =
-    sys.error("Unreachable code: no one has access to the current cycle")
+  override def addFinalizer(cycle: LiveCycle[D], sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId]) =
+    (sub.unsubscribe, this, None)
 
-  override def removeFinalizer(fid: FinalizerId): Cell[K, D] =
-    sys.error("Unreachable code: no one has access to the current cycle")
+  override def removeFinalizer(cycle: LiveCycle[D], fid: FinalizerId): Cell[K, D] =
+    this
 }
 
 private[nutcracker] object InactiveCell {
-  def init[K[_], D, U, Δ[_, _]](setup: CellCycle[D] => K[Unit]): InactiveCell[K, D, U, Δ] =
+  def init[K[_], D, U, Δ[_, _]](setup: LiveCycle[D] => K[Unit]): InactiveCell[K, D, U, Δ] =
     InactiveCell(setup, CellCycle.zero, ObserverId.zero, Token.zero)
 }
 
 private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
-  setup: CellCycle[D] => K[Unit],
-  cycle: CellCycle[D],
+  setup: LiveCycle[D] => K[Unit],
+  cycle: LiveCycle[D],
   preHandlers: List[(ObserverId, SeqPreHandler[Token, K[Unit], D, Δ])],
   preHandlersM: List[(ObserverId, (D, Token[D], ObserverId) => K[Unit])],
   lastObserverId: ObserverId,
@@ -697,7 +684,7 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
     (cell, obsId, None)
   }
 
-  override def supply[D0 <: D](cycle: CellCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]]) = {
+  override def supply[D0 <: D](cycle: LiveCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]]) = {
     if(cycle === this.cycle) {
       import SeqTrigger._
 
@@ -733,16 +720,18 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
     }
   }
 
-  override def exclUpdate(cycle: CellCycle[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): Option[Cell[K, D]] = {
+  override def exclUpdate(cycle: LiveCycle[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): Option[Cell[K, D]] = {
     assert(cycle.value < this.cycle.value, "Cannot have an update in a cycle whose initialization hasn't finished")
     None
   }
 
-  override def addFinalizer(sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId]) =
-    sys.error("Unreachable code: no one has access to the current cycle yet")
+  override def addFinalizer(cycle: LiveCycle[D], sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId]) =
+    if(cycle === this.cycle) sys.error("Unreachable code: no one has access to the current cycle yet")
+    else (sub.unsubscribe, this, None)
 
-  override def removeFinalizer(fid: FinalizerId): Cell[K, D] =
-    sys.error("Unreachable code: no one has access to the current cycle yet")
+  override def removeFinalizer(cycle: LiveCycle[D], fid: FinalizerId): Cell[K, D] =
+    if(cycle === this.cycle) sys.error("Unreachable code: no one has access to the current cycle yet")
+    else this
 
   override def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell.Aux[K, D, U, Δ] =
     // must be resumption of an observer that has been unsubscribed already
@@ -773,8 +762,8 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
 }
 
 private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
-  setup: CellCycle[D] => K[Unit],
-  cycle: CellCycle[D],
+  setup: LiveCycle[D] => K[Unit],
+  cycle: LiveCycle[D],
   impl: SimpleCell.Aux1[K, D, U, Δ, Val],
   finalizers: Map[FinalizerId, Subscription[K]],
   lastFinalizerId: FinalizerId
@@ -784,8 +773,8 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
   require(impl.hasObserver)
 
   def this(
-    setup: CellCycle[D] => K[Unit],
-    cycle: CellCycle[D],
+    setup: LiveCycle[D] => K[Unit],
+    cycle: LiveCycle[D],
     finalizers: Map[FinalizerId, Subscription[K]],
     lastFinalizerId: FinalizerId,
     lastObserverId: ObserverId,
@@ -832,7 +821,7 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
     else (InactiveCell(setup, cycle.inc, cell.lastObserverId, cell.lastToken), collectFinalizers)
   }
 
-  override def supply[D0 <: D](cycle: CellCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]]) = {
+  override def supply[D0 <: D](cycle: LiveCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]]) = {
     if(cycle === this.cycle) sys.error("trying to initialize a cell twice in the same cell cycle")
     else {
       assert(cycle.value <= this.cycle.value)
@@ -847,7 +836,7 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
     else (InactiveCell(setup, cycle.inc, cell.lastObserverId, cell.lastToken), ks ++ collectFinalizers)
   }
 
-  override def exclUpdate(cycle: CellCycle[D], u: U)(implicit dom: Aux[D, U, Δ]): Option[Cell[K, D]] = {
+  override def exclUpdate(cycle: LiveCycle[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): Option[Cell[K, D]] = {
     if(cycle === this.cycle) impl.update(u) match { // linter:ignore UseOptionMapNotPatMatch
       case Some(cell) => Some(ActiveCell[K, D, cell.Update, cell.Delta, cell.Value](setup, cycle, cell, finalizers, lastFinalizerId))
       case None => None
@@ -857,13 +846,17 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
     }
   }
 
-  override def addFinalizer(sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId]) = {
-    val fid = lastFinalizerId.inc
-    (Lst.empty, copy(finalizers = finalizers.updated(fid, sub), lastFinalizerId = fid), Some(fid))
-  }
+  override def addFinalizer(cycle: LiveCycle[D], sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId]) =
+    if(cycle === this.cycle) {
+      val fid = lastFinalizerId.inc
+      (Lst.empty, copy(finalizers = finalizers.updated(fid, sub), lastFinalizerId = fid), Some(fid))
+    } else {
+      (sub.unsubscribe, this, None)
+    }
 
-  override def removeFinalizer(fid: FinalizerId): Cell[K, D] =
-    copy(finalizers = finalizers - fid)
+  override def removeFinalizer(cycle: LiveCycle[D], fid: FinalizerId): Cell[K, D] =
+    if(cycle === this.cycle) copy(finalizers = finalizers - fid)
+    else this
 
   private def collectFinalizers: Lst[K[Unit]] =
     finalizers.valuesIterator.foldLeft(Lst.empty[K[Unit]])((ks, sub) => sub.unsubscribe ++ ks)
@@ -945,13 +938,22 @@ private[nutcracker] object FinalizerId {
   }
 }
 
-private[nutcracker] final class CellCycle[D] private(val value: Long) extends AnyVal {
-  def inc: CellCycle[D] = new CellCycle(value + 1)
-}
 private[nutcracker] object CellCycle {
-  def zero[D]: CellCycle[D] = new CellCycle(0)
 
-  implicit def equalInstance[D]: Equal[CellCycle[D]] = new Equal[CellCycle[D]] {
-    def equal(a1: CellCycle[D], a2: CellCycle[D]): Boolean = a1.value == a2.value
+  final class LiveCycle[D] private[CellCycle](val value: Long) extends AnyVal {
+    def inc: SporeCycle[D] = new SporeCycle[D](value + 1)
   }
+
+  object LiveCycle {
+    implicit def equalInstance[D]: Equal[LiveCycle[D]] = new Equal[LiveCycle[D]] {
+      def equal(a1: LiveCycle[D], a2: LiveCycle[D]): Boolean = a1.value == a2.value
+    }
+  }
+
+  final class SporeCycle[D] private[CellCycle](val value: Long) extends AnyVal {
+    def inc: LiveCycle[D] = new LiveCycle[D](value + 1)
+  }
+
+  def zero[D]: SporeCycle[D] = new SporeCycle(0)
+
 }
