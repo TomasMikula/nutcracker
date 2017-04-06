@@ -35,6 +35,9 @@ final class Mediated[M[_], A, B, C](private val value: M[(A, B => M[C])]) extend
     c <- g(b)
   } yield (c, h))
 
+  def contramap[B0](f: B0 => B)(implicit M: Functor[M]): Mediated[M, A, B0, C] =
+    Mediated(M.map(value) { case (a, g) => (a, b0 => g(f(b0))) })
+
   def fst[S, T](f: S => T)(implicit M: Functor[M]): Mediated[M, A, (S, B), (T, C)] =
     Mediated(M.map(value) { case (a, g) => (a, sb => M.map(g(sb._2))(c => (f(sb._1), c))) })
 

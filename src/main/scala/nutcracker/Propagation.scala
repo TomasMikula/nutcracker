@@ -1,5 +1,6 @@
 package nutcracker
 
+import nutcracker.util.Mediated
 import scala.language.higherKinds
 import scalaz.{Applicative, Functor, ~>}
 import shapeless.{::, HList, HNil}
@@ -55,3 +56,27 @@ object Propagation {
   val bundle: PropagationBundle = PropagationImpl
 }
 
+trait OnDemandPropagation[M[_], Ref[_]] extends Propagation[M, Ref] {
+  type ExclRef[A]
+  type CellCycle[A]
+
+  /** Creates a cell that will setup itself when the first observer is registered.
+    * Typically the `setup` routine starts to observe other cells.
+    *
+    * The `setup` routine can use the [[addFinalizer*]] method to register
+    * cleanup routines (finalizers) that will be executed when all observers
+    * leave. Typically, such finalizers will stop observing other cells.
+    */
+  def newAutoCell[A](setup: Mediated[M, A, (ExclRef[A], CellCycle[A]), Unit])(implicit dom: Dom[A]): M[Ref[A]]
+
+  /** Register a cleanup routine to execute at the end of the cell-cycle,
+    * i.e. when all of cell's observers unregister.
+    * If the given cell cycle already ended, the cleanup will be executed immediately.
+    *
+    * @return A subscription that can be used to remove the registered finalizer early,
+    *         before the end of the cell cycle. In such case, the finalizer is not executed.
+    */
+  def addFinalizer[A](ref: ExclRef[A], cycle: CellCycle[A], value: Subscription[M]): M[Subscription[M]]
+
+  def update[A, U, Δ[_, _]](ref: Ref[A], cycle: CellCycle[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): M[Unit]
+}
