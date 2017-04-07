@@ -26,7 +26,7 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
 
   def empty[K[_]]: PropagationStore[K] =
     PropagationStore[K](
-      nextId = 0L,
+      lastId = CellId.zero,
       domains = KMap[CellId, Cell[K, ?]](),
       selTriggers = KMapB[λ[`L <: HList` => Sel[CellId, L]], λ[L => List[L => (Option[K[Unit]], Boolean)]], HList](),
       cellsToSels = Index.empty(sel => sel.cells),
@@ -107,11 +107,11 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
 
 
 private[nutcracker] case class PropagationStore[K[_]] private(
-  nextId: Long,
+  lastId: CellId[_],
   domains: KMap[CellId, Cell[K, ?]],
   selTriggers: KMapB[λ[`L <: HList` => Sel[CellId, L]], λ[L => List[L => (Option[K[Unit]], Boolean)]], HList],
   cellsToSels: Index[CellId[_], Sel[CellId, _ <: HList]],
-  failedVars: Set[Long],
+  failedVars: Set[CellId[_]],
   dirtyDomains: Set[CellId[_]],
   dirtySelections: Set[Sel[CellId, _ <: HList]]
 ) {
@@ -122,17 +122,17 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   }
 
   def addVariable[D](d: D)(implicit dom: IDom[D]): (PropagationStore[K], CellId[D]) = {
-    val ref = CellId[D](nextId)
+    val ref = lastId.inc[D]
     val domains1 = domains.put(ref)(SimpleCell.init(d))
-    val failedVars1 = if(dom.isFailed(d)) failedVars + nextId else failedVars
-    (copy(nextId = nextId + 1, domains = domains1, failedVars = failedVars1), ref)
+    val failedVars1 = if(dom.isFailed(d)) failedVars + ref else failedVars
+    (copy(lastId = ref, domains = domains1, failedVars = failedVars1), ref)
   }
 
   def newAutoCell[D](setup: IndexedContT[K, Unit, (CellId[D], LiveCycle[D]), D], supply: (CellId[D], LiveCycle[D], D) => K[Unit])(implicit dom: IDom[D], K: Functor[K]): (PropagationStore[K], CellId[D]) = {
-    val ref = CellId[D](nextId)
+    val ref = lastId.inc[D]
     val setup1 = (c: LiveCycle[D]) => setup.run(d => supply(ref, c, d).as((ref, c)))
     val cell = InactiveCell.init[K, D, dom.Update, dom.IDelta](setup1)
-    (copy(nextId = nextId + 1, domains = domains.put(ref)(cell)), ref)
+    (copy(lastId = ref, domains = domains.put(ref)(cell)), ref)
   }
 
   def tryFetch[D](ref: CellId[D]): Option[D] = domains(ref).getValue
@@ -147,7 +147,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     domains(ref).infer.update(u) match {
       case None => this
       case Some(cell) =>
-        val failedVars1 = if(cell.getValue.fold(false)(dom.isFailed(_))) failedVars + ref.domainId else failedVars
+        val failedVars1 = if(cell.getValue.fold(false)(dom.isFailed(_))) failedVars + ref else failedVars
         val domains1 = domains.put(ref)(cell)
         val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
         copy(domains = domains1, failedVars = failedVars1, dirtyDomains = dirtyDomains1)
@@ -862,7 +862,7 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
     finalizers.valuesIterator.foldLeft(Lst.empty[K[Unit]])((ks, sub) => sub.unsubscribe ++ ks)
 }
 
-private[nutcracker] sealed abstract class CellId[D](val domainId: Long) {
+private[nutcracker] sealed abstract class CellId[D] private(val domainId: Long) {
   type Domain = D
   type Update
   type Delta[_, _]
@@ -874,15 +874,20 @@ private[nutcracker] sealed abstract class CellId[D](val domainId: Long) {
     this.asInstanceOf[CellId.Aux[D, dom.Update, dom.IDelta]]
 
   def aux: CellId.Aux[Domain, Update, Delta] = this
+
+  def inc[B](implicit dom: IDom[B]): CellId[B] =
+    CellId[B, dom.Update, dom.IDelta](domainId + 1)
 }
 
 private[nutcracker] object CellId {
   type Aux[D, U, Δ[_, _]] = CellId[D] { type Update = U; type Delta[D1, D2] = Δ[D1, D2] }
 
-  def apply[D](domainId: Long)(implicit dom: IDom[D]): CellId.Aux[D, dom.Update, dom.IDelta] =
+  val zero: CellId[Nothing] = CellId[Nothing, Nothing, Nothing](0)
+
+  private[CellId] def apply[D, U, Δ[_, _]](domainId: Long): CellId.Aux[D, U, Δ] =
     new CellId[D](domainId) {
-      type Update = dom.Update
-      type Delta[D1, D2] = dom.IDelta[D1, D2]
+      type Update = U
+      type Delta[D1, D2] = Δ[D1, D2]
     }
 
   implicit def equalInstance[D]: Equal[CellId[D]] = new Equal[CellId[D]] {
