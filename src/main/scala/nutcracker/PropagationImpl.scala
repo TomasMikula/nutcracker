@@ -1,9 +1,9 @@
 package nutcracker
 
 import nutcracker.CellCycle.{LiveCycle, SporeCycle}
-import nutcracker.util.{FreeK, HEqualK, HOrderK, Index, InjectK, KMap, KMapB, Lst, Mediated, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`, ∃}
+import nutcracker.util.{FreeK, HEqualK, HOrderK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`, ∃}
 import scala.annotation.tailrec
-import scalaz.{Bind, Equal, Leibniz, Monad, Ordering, Show, StateT, ~>}
+import scalaz.{Equal, Functor, IndexedContT, Leibniz, Monad, Ordering, Show, StateT, ~>}
 import scalaz.std.option._
 import scalaz.Leibniz.===
 import scalaz.syntax.equal._
@@ -76,8 +76,8 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
 
               case ExclUpdate(ref, cycle, u, dom) =>
                 (Lst.empty, s.exclUpdate[dom.Domain, dom.Update, dom.IDelta](ref, cycle, u)(dom), ())
-              case NewAutoCell(setup, supply, dom, bnd) =>
-                val (s1, ref: CellId[dom.Domain]) = s.newAutoCell(setup, supply)(dom, bnd)
+              case NewAutoCell(setup, supply, dom, ftor) =>
+                val (s1, ref: CellId[dom.Domain]) = s.newAutoCell(setup, supply)(dom, ftor)
                 (Lst.empty, s1, ref)
               case AddFinalizer(ref, cycle, sub) =>
                 s.addFinalizer(ref, cycle, sub)
@@ -128,9 +128,9 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     (copy(nextId = nextId + 1, domains = domains1, failedVars = failedVars1), ref)
   }
 
-  def newAutoCell[D](setup: Mediated[K, D, (CellId[D], LiveCycle[D]), Unit], supply: (CellId[D], LiveCycle[D], D) => K[Unit])(implicit dom: IDom[D], K: Bind[K]): (PropagationStore[K], CellId[D]) = {
+  def newAutoCell[D](setup: IndexedContT[K, Unit, (CellId[D], LiveCycle[D]), D], supply: (CellId[D], LiveCycle[D], D) => K[Unit])(implicit dom: IDom[D], K: Functor[K]): (PropagationStore[K], CellId[D]) = {
     val ref = CellId[D](nextId)
-    val setup1 = (c: LiveCycle[D]) => setup.completeM(d => supply(ref, c, d).as((ref, c)))
+    val setup1 = (c: LiveCycle[D]) => setup.run(d => supply(ref, c, d).as((ref, c)))
     val cell = InactiveCell.init[K, D, dom.Update, dom.IDelta](setup1)
     (copy(nextId = nextId + 1, domains = domains.put(ref)(cell)), ref)
   }

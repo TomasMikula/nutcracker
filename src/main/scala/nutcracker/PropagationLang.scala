@@ -1,8 +1,8 @@
 package nutcracker
 
 import nutcracker.CellCycle.LiveCycle
-import nutcracker.util.{ContU, FreeK, FreeKT, InjectK, Mediated}
-import scalaz.{Bind, IndexedContT, ~>}
+import nutcracker.util.{ContU, FreeK, FreeKT, InjectK}
+import scalaz.{Functor, IndexedContT, ~>}
 import scalaz.Id._
 import scalaz.syntax.monad._
 import shapeless.HList
@@ -26,7 +26,7 @@ private[nutcracker] object PropagationLang {
   case class RmObserver[Ref[_], K[_], D](ref: Ref[D], oid: ObserverId) extends PropagationLang[Ref, K, Unit]
   case class SelTrigger[Ref[_], K[_], L <: HList](sel: Sel[Ref, L], f: L => (Option[K[Unit]], Boolean)) extends PropagationLang[Ref, K, Unit]
 
-  case class NewAutoCell[Ref[_], K[_], A](setup: Mediated[K, A, (Ref[A], LiveCycle[A]), Unit], supply: (Ref[A], LiveCycle[A], A) => K[Unit], dom: Dom[A], bnd: Bind[K]) extends PropagationLang[Ref, K, Ref[A]]
+  case class NewAutoCell[Ref[_], K[_], A](setup: IndexedContT[K, Unit, (Ref[A], LiveCycle[A]), A], supply: (Ref[A], LiveCycle[A], A) => K[Unit], dom: Dom[A], ftor: Functor[K]) extends PropagationLang[Ref, K, Ref[A]]
   case class AddFinalizer[Ref[_], K[_], A](ref: Ref[A], cycle: LiveCycle[A], value: Subscription[K]) extends PropagationLang[Ref, K, Option[FinalizerId]]
   case class RemoveFinalizer[Ref[_], K[_], A](ref: Ref[A], cycle: LiveCycle[A], id: FinalizerId) extends PropagationLang[Ref, K, Unit]
   case class ExclUpdate[Ref[_], K[_], A, U, Δ[_, _]](ref: Ref[A], cycle: LiveCycle[A], u: U, dom: IDom.Aux[A, U, Δ]) extends PropagationLang[Ref, K, Unit]
@@ -50,7 +50,7 @@ private[nutcracker] object PropagationLang {
     RmObserver(ref, oid)
   def selTrigger[Ref[_], K[_], L <: HList](sel: Sel[Ref, L])(f: L => (Option[K[Unit]], Boolean)): PropagationLang[Ref, K, Unit] =
     SelTrigger(sel, f)
-  def newAutoCell[Ref[_], K[_], A](setup: Mediated[K, A, (Ref[A], LiveCycle[A]), Unit], supply: (Ref[A], LiveCycle[A], A) => K[Unit])(implicit dom: Dom[A], K: Bind[K]): PropagationLang[Ref, K, Ref[A]] =
+  def newAutoCell[Ref[_], K[_], A](setup: IndexedContT[K, Unit, (Ref[A], LiveCycle[A]), A], supply: (Ref[A], LiveCycle[A], A) => K[Unit])(implicit dom: Dom[A], K: Functor[K]): PropagationLang[Ref, K, Ref[A]] =
     NewAutoCell(setup, supply, dom, K)
   def addFinalizer[Ref[_], K[_], A](ref: Ref[A], cycle: LiveCycle[A], value: Subscription[K]): PropagationLang[Ref, K, Option[FinalizerId]] =
     AddFinalizer(ref, cycle, value)
@@ -87,7 +87,7 @@ private[nutcracker] object PropagationLang {
   def rmObserverF[F[_[_], _], Ref[_], D](ref: Ref[D], oid: ObserverId)(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(rmObserver[Ref, FreeK[F, ?], D](ref, oid))
 
-  def newAutoCellF[F[_[_], _], Ref[_], A](setup: Mediated[FreeK[F, ?], A, (Ref[A], LiveCycle[A]), Unit])(supply: (Ref[A], LiveCycle[A], A) => FreeK[F, Unit])(implicit dom: Dom[A], inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Ref[A]] =
+  def newAutoCellF[F[_[_], _], Ref[_], A](setup: IndexedContT[FreeK[F, ?], Unit, (Ref[A], LiveCycle[A]), A])(supply: (Ref[A], LiveCycle[A], A) => FreeK[F, Unit])(implicit dom: Dom[A], inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Ref[A]] =
     FreeK.injLiftF(newAutoCell[Ref, FreeK[F, ?], A](setup, supply)(dom, FreeKT.freeKTMonad[F, Id]))
 
   def addFinalizerF[F[_[_], _], Ref[_], A](ref: Ref[A], cycle: LiveCycle[A], value: Subscription[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Option[FinalizerId]] =
@@ -115,7 +115,7 @@ private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: Inje
   def newCell[D](d: D)(implicit dom: Dom[D]): FreeK[F, Ref[D]] =
     newCellF[F, Ref, D](d)
 
-  def newAutoCell[A](setup: Mediated[FreeK[F, ?], A, (ExclRef[A], CellCycle[A]), Unit])(implicit dom: Dom[A]): FreeK[F, Ref[A]] =
+  def newAutoCell[A](setup: IndexedContT[FreeK[F, ?], Unit, (ExclRef[A], LiveCycle[A]), A])(implicit dom: Dom[A]): FreeK[F, Ref[A]] =
     newAutoCellF(setup)(supplyF(_)(_, _)(inj))
 
   def addFinalizer[A](ref: ExclRef[A], cycle: CellCycle[A], value: Subscription[FreeK[F, ?]]): FreeK[F, Subscription[FreeK[F, ?]]] =

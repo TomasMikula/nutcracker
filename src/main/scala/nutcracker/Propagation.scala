@@ -1,8 +1,6 @@
 package nutcracker
 
-import nutcracker.util.Mediated
-import scala.language.higherKinds
-import scalaz.{Applicative, Functor, ~>}
+import scalaz.{Applicative, Functor, IndexedContT, ~>}
 import shapeless.{::, HList, HNil}
 import nutcracker.util.ops.applicative._
 import scalaz.Id.Id
@@ -67,7 +65,7 @@ trait OnDemandPropagation[M[_], Ref[_]] extends Propagation[M, Ref] {
     * cleanup routines (finalizers) that will be executed when all observers
     * leave. Typically, such finalizers will stop observing other cells.
     */
-  def newAutoCell[A](setup: Mediated[M, A, (ExclRef[A], CellCycle[A]), Unit])(implicit dom: Dom[A]): M[Ref[A]]
+  def newAutoCell[A](setup: IndexedContT[M, Unit, (ExclRef[A], CellCycle[A]), A])(implicit dom: Dom[A]): M[Ref[A]]
 
   /** Register a cleanup routine to execute at the end of the cell-cycle,
     * i.e. when all of cell's observers unregister.
