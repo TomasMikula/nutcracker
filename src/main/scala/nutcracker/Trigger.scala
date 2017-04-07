@@ -1,39 +1,39 @@
 package nutcracker
 
-import scala.language.higherKinds
-import scalaz.{Functor, ~>}
-import scalaz.Id._
+import scalaz.Functor
 import scalaz.syntax.functor._
 
-sealed trait TriggerF[F[_], A] {
+sealed trait TriggerF[F[_], D, Δ, A] {
   import TriggerF._
 
-  def map[B](f: A => B)(implicit F: Functor[F]): TriggerF[F, B] = this match {
+  def map[B](f: A => B)(implicit F: Functor[F]): TriggerF[F, D, Δ, B] = this match {
     case Discard() => Discard()
     case Fire(exec) => Fire(exec)
-    case Sleep(a) => Sleep(f(a))
+    case Sleep(next) => Sleep((d, δ) => f(next(d, δ)))
     case FireReload(fa) => FireReload(F.map(fa)(f))
+  }
+
+  def contramap[D0, Δ0](f: D0 => D, g: Δ0 => Δ): TriggerF[F, D0, Δ0, A] = this match {
+    case Discard() => Discard()
+    case Sleep(next) => Sleep((d0, δ0) => next(f(d0), g(δ0)))
+    case Fire(exec) => Fire(exec)
+    case FireReload(cont) => FireReload(cont)
   }
 }
 
 object TriggerF {
 
-  case class Discard[F[_], A]() extends TriggerF[F, A]
-  case class Fire[F[_], A](exec: F[Unit]) extends TriggerF[F, A]
-  case class Sleep[F[_], A](next: A) extends TriggerF[F, A]
-  case class FireReload[F[_], A](cont: F[A]) extends TriggerF[F, A]
+  case class Discard[F[_], D, Δ, A]() extends TriggerF[F, D, Δ, A]
+  case class Fire[F[_], D, Δ, A](exec: F[Unit]) extends TriggerF[F, D, Δ, A]
+  case class Sleep[F[_], D, Δ, A](next: (D, Δ) => A) extends TriggerF[F, D, Δ, A]
+  case class FireReload[F[_], D, Δ, A](cont: F[A]) extends TriggerF[F, D, Δ, A]
 }
 
-final case class Trigger[F[_], D, Δ](unfix: TriggerF[F, (D, Δ) => Trigger[F, D, Δ]]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-9600
-  import Trigger._
-  import TriggerF._
+final case class Trigger[F[_], D, Δ](unfix: TriggerF[F, D, Δ, Trigger[F, D, Δ]]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-9600
 
-  def contramap[D0, Δ0](f: D0 => D, g: Δ0 => Δ)(implicit F: Functor[F]): Trigger[F, D0, Δ0] = unfix match {
-    case Discard() => discard
-    case Sleep(next) => sleep((d0, δ0) => next(f(d0), g(δ0)).contramap(f, g))
-    case Fire(exec) => fire(exec)
-    case FireReload(cont) => fireReload(cont map (next => (d0, δ0) => next(f(d0), g(δ0)).contramap(f, g)))
-  }
+  def contramap[D0, Δ0](f: D0 => D, g: Δ0 => Δ)(implicit F: Functor[F]): Trigger[F, D0, Δ0] =
+    Trigger(unfix.contramap(f, g).map(_.contramap(f, g)))
+
 }
 
 object Trigger {
@@ -42,53 +42,48 @@ object Trigger {
   def discard[F[_], D, Δ]: Trigger[F, D, Δ] = Trigger(Discard())
   def sleep[F[_], D, Δ](next: (D, Δ) => Trigger[F, D, Δ]): Trigger[F, D, Δ] = Trigger(Sleep(next))
   def fire[F[_], D, Δ](exec: F[Unit]): Trigger[F, D, Δ] = Trigger(Fire(exec))
-  def fireReload[F[_], D, Δ](cont: F[(D, Δ) => Trigger[F, D, Δ]]): Trigger[F, D, Δ] = Trigger(FireReload(cont))
+  def fireReload[F[_], D, Δ](cont: F[Trigger[F, D, Δ]]): Trigger[F, D, Δ] = Trigger(FireReload(cont))
 
-  def observer[F[_], D, Δ](f: Id ~> λ[α => (D, Δ) => TriggerF[F, α]]): (D, Δ) => Trigger[F, D, Δ] =
-    new ((D, Δ) => Trigger[F, D, Δ]) {
-      val g: (D, Δ) => TriggerF[F, (D, Δ) => Trigger[F, D, Δ]] = f[(D, Δ) => Trigger[F, D, Δ]](this)
-
-      def apply(d: D, δ: Δ): Trigger[F, D, Δ] = Trigger(g(d, δ))
-    }
-
-  def valueObserver[F[_], D, Δ](f: Id ~> λ[α => D => TriggerF[F, α]]): D => Trigger[F, D, Δ] =
-    new (D => Trigger[F, D, Δ]) {
-      val g: D => TriggerF[F, (D, Δ) => Trigger[F, D, Δ]] = f[(D, Δ) => Trigger[F, D, Δ]]((d, δ) => this(d))
-
-      def apply(d: D): Trigger[F, D, Δ] = Trigger(g(d))
-    }
-
-  def observerS[F[_]: Functor, D, Δ, S](s: S)(f: (S, D, Δ) => TriggerF[F, S]): (D, Δ) => Trigger[F, D, Δ] =
-    (d, δ) => Trigger(f(s, d, δ).map(s => observerS(s)(f)))
-
-  def valueObserverS[F[_]: Functor, D, Δ, S](s: S)(f: (S, D) => TriggerF[F, S]): D => Trigger[F, D, Δ] =
-    d => Trigger(f(s, d).map(s => observerS(s)((s, d, _) => f(s, d))))
+  def observerS[F[_]: Functor, D, Δ, S](s: S)(f: S => TriggerF[F, D, Δ, S]): Trigger[F, D, Δ] =
+    Trigger(f(s) map (observerS(_)(f)))
 
   /** Keep trying `f` until it returns `Some`. */
   def threshold[F[_], D, Δ](f: D => Option[F[Unit]]): D => Trigger[F, D, Δ] =
-    valueObserver[F, D, Δ](λ[Id ~> λ[α => D => TriggerF[F, α]]](α => d => f(d) match {
-      case None => Sleep(α)
-      case Some(k) => Fire(k)
-    }))
+    d => f(d) match {
+      case None => sleep(threshold1(f))
+      case Some(k) => fire(k)
+    }
 
   /** Keep trying `f` until it returns `Some`. */
   def threshold1[F[_], D, Δ](f: D => Option[F[Unit]]): (D, Δ) => Trigger[F, D, Δ] =
-    observer[F, D, Δ](λ[Id ~> λ[α => (D, Δ) => TriggerF[F, α]]](α => (d, _) => f(d) match {
-      case None => Sleep(α)
-      case Some(k) => Fire(k)
-    }))
+    new ((D, Δ) => Trigger[F, D, Δ]) {
+      def apply(d: D, δ: Δ): Trigger[F, D, Δ] = f(d) match {
+        case None => sleep(this)
+        case Some(k) => fire(k)
+      }
+    }
 
   def untilRight[F[_], D, Δ](f: D => Either[F[Unit], F[Unit]])(implicit F: Functor[F]): D => Trigger[F, D, Δ] =
-    valueObserver[F, D, Δ](λ[Id ~> λ[α => D => TriggerF[F, α]]](α => d => f(d) match {
-      case Left(k) => FireReload(k map (_ => α))
-      case Right(k) => Fire(k)
-    }))
+    d => f(d) match {
+      case Left(k) => fireReload(k.as(sleep(untilRight((d, δ) => f(d)))))
+      case Right(k) => fire(k)
+    }
+
+  def untilRight[F[_], D, Δ](f: (D, Δ) => Either[F[Unit], F[Unit]])(implicit F: Functor[F]): (D, Δ) => Trigger[F, D, Δ] =
+    new ((D, Δ) => Trigger[F, D, Δ]) {
+      def apply(d: D, δ: Δ): Trigger[F, D, Δ] = f(d, δ) match {
+        case Left(k) => fireReload(k.as(sleep(this)))
+        case Right(k) => fire(k)
+      }
+    }
 
   def continually[F[_], D, Δ](f: D => F[Unit])(implicit F: Functor[F]): D => Trigger[F, D, Δ] =
-    valueObserver[F, D, Δ](λ[Id ~> λ[α => D => TriggerF[F, α]]](α => d => FireReload(f(d) map (_ => α))))
+    d => fireReload(f(d).as(sleep(continually((d, δ) => f(d)))))
 
   def continually[F[_], D, Δ](f: (D, Δ) => F[Unit])(implicit F: Functor[F]): (D, Δ) => Trigger[F, D, Δ] =
-    observer[F, D, Δ](λ[Id ~> λ[α => (D, Δ) => TriggerF[F, α]]](α => (d, δ) => FireReload(f(d, δ) map (_ => α))))
+    new ((D, Δ) => Trigger[F, D, Δ]) {
+      def apply(d: D, δ: Δ): Trigger[F, D, Δ] = fireReload(f(d, δ).as(sleep(this)))
+    }
 }
 
 private[nutcracker] sealed trait SeqTrigger[Tok[_], K, D, Δ[_, _], D1] {

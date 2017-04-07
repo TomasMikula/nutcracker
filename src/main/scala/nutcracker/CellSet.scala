@@ -79,7 +79,7 @@ object CellSet {
     IndexedContT(f => P.observe(set).by(as => {
       val now = as.toList.traverse_(f)
       val onChange = Trigger.continually((as: CellSet[Ref, A], delta: Added[Ref, A]) => delta.value.toList.traverse_(f))
-      Trigger.fireReload(now map (_ => onChange))
+      Trigger.fireReload(now.as(Trigger.sleep(onChange)))
     }))
   }
 
@@ -91,10 +91,10 @@ object CellSet {
   def insert[Ref[_], F[_], A](ref: Ref[A], into: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Functor[F]): F[Unit] =
     P.observe(ref).by(a =>
       if(dom.isFailed(a)) Trigger.discard
-      else Trigger.fireReload(P.update(into).by(Insert(Set(ref))) map { (_: Unit) => Trigger.threshold1(a =>
+      else Trigger.fireReload(P.update(into).by(Insert(Set(ref))) map { (_: Unit) => Trigger.sleep(Trigger.threshold1(a =>
         if(dom.isFailed(a)) Some(P.update(into).by(RemoveFailed(ref)))
         else None
-      ) })
+      )) })
     ).void
 
   def insertAll[Ref[_], F[_], A](add: Set[Ref[A]], into: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Applicative[F]): F[Unit] =
@@ -104,7 +104,7 @@ object CellSet {
     P.observe(sub).by((sa: CellSet[Ref, A]) => {
       val now = insertAll(sa.value, sup)
       val onChange = Trigger.continually((sa: CellSet[Ref, A], delta: Added[Ref, A]) => insertAll(delta.value, sup))
-      Trigger.fireReload(now map (_ => onChange))
+      Trigger.fireReload(now.as(Trigger.sleep(onChange)))
     }).void
 
   def includeC[Ref[_], F[_], A](cps: ContU[F, Ref[A]], ref: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Functor[F]): F[Unit] =
@@ -128,7 +128,7 @@ object CellSet {
       _ <- P.observe[CellSet[Ref, A]](sref).by((sa: CellSet[Ref, A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
         val onChange = Trigger.continually((sa: CellSet[Ref, A], delta: Added[Ref, A]) => delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res))))
-        Trigger.fireReload(now map (_ => onChange))
+        Trigger.fireReload(now.as(Trigger.sleep(onChange)))
       })
     } yield res
   }

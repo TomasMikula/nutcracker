@@ -61,8 +61,6 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
               case Supply(ref, cycle, value) =>
                 val (s1, ks) = s.supply(ref)(cycle, value)
                 (ks, s1, ())
-              case r @ Resume(ref, token, handler, dom) =>
-                (Lst.empty, s.resume[dom.Domain, dom.Update, dom.IDelta, r.Arg](ref, token, handler)(dom), ())
               case t @ Triggered(ref, token, trigger, dom) =>
                 val (s1, ks) = s.triggered[dom.Domain, dom.Update, dom.IDelta, t.Arg](ref, token, trigger)(dom)
                 (ks, s1, ())
@@ -221,12 +219,6 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     }
   }
 
-  def resume[D, U, Δ[_, _], D0 <: D](ref: CellId[D], token: Token[D0], handler: SeqHandler[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] = {
-    val cell = domains(ref).infer.resume(token, handler)
-    val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
-    copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains1)
-  }
-
   private def getSelsForCell(ref: CellId[_]): Set[Sel[CellId, _ <: HList]] = cellsToSels.get(ref)
 
   private def collectSelTriggers[L <: HList](l: L, triggers: List[L => (Option[K[Unit]], Boolean)]): (List[L => (Option[K[Unit]], Boolean)], Lst[K[Unit]]) =
@@ -290,8 +282,6 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
   def hold(f: (D, Token[D], ObserverId) => K[Unit]): (Cell[K, D], ObserverId, Option[K[Unit]])
 
   def supply[D0 <: D](cycle: LiveCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]])
-
-  def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell[K, D]
 
   def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell[K, D], Lst[K[Unit]])
 
@@ -467,49 +457,47 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
     }
   }
 
-  def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): SimpleCell.Aux1[K, D, Update, Delta, Value] =
-    blockedIdleObservers.get(token) match {
-      case Some(obs) =>
-        assert(blockedPendingObservers.get(token).isEmpty)
-        val obs1 = obs.resume(handler)
-        SimpleCell[K, D, Update, Delta, Value](value)(obs1 :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, lastObserverId, lastToken)
-      case None => blockedPendingObservers.get(token) match {
-        case Some(obs) =>
-          val obs1 = obs.resume(handler)
-          SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, obs1 :: pendingObservers, blockedIdleObservers, blockedPendingObservers - token, lastObserverId, lastToken)
-        case None =>
-          sys.error(s"unrecognized token $token")
-      }
-    }
-
   def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (SimpleCell.Aux1[K, D, Update, Delta, Value], Lst[K[Unit]]) = {
     import SeqTrigger._
     trigger match {
       case Discard() => (copy(blockedIdleObservers = blockedIdleObservers - token, blockedPendingObservers = blockedPendingObservers - token), Lst.empty)
       case Fire(k)   => (copy(blockedIdleObservers = blockedIdleObservers - token, blockedPendingObservers = blockedPendingObservers - token), Lst.singleton(k))
-      case Sleep(h)  => (resume(token, h), Lst.empty)
-      case FireReload(f) =>
-        val nextToken = lastToken.inc[D0]
-        val k = f(nextToken)
-        blockedIdleObservers.get(token) match {
+      case Sleep(handler)  =>
+        val cell = blockedIdleObservers.get(token) match {
           case Some(obs) =>
             assert(blockedPendingObservers.get(token).isEmpty)
-            val cell = copy(
-              blockedIdleObservers = (blockedIdleObservers - token).put(nextToken)(obs),
-              lastToken = nextToken
-            )
-            (cell, Lst.singleton(k))
+            val obs1 = obs.resume(handler)
+            SimpleCell[K, D, Update, Delta, Value](value)(obs1 :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, lastObserverId, lastToken)
           case None => blockedPendingObservers.get(token) match {
             case Some(obs) =>
-              val cell = copy(
-                blockedPendingObservers = (blockedPendingObservers - token).put(nextToken)(obs),
-                lastToken = nextToken
-              )
-              (cell, Lst.singleton(k))
+              val obs1 = obs.resume(handler)
+              SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, obs1 :: pendingObservers, blockedIdleObservers, blockedPendingObservers - token, lastObserverId, lastToken)
             case None =>
               sys.error(s"unrecognized token $token")
           }
         }
+        (cell, Lst.empty)
+      case FireReload(f) =>
+        val nextToken = lastToken.inc[D0]
+        val k = f(nextToken)
+        val cell = blockedIdleObservers.get(token) match {
+          case Some(obs) =>
+            assert(blockedPendingObservers.get(token).isEmpty)
+            copy(
+              blockedIdleObservers = (blockedIdleObservers - token).put(nextToken)(obs),
+              lastToken = nextToken
+            )
+          case None => blockedPendingObservers.get(token) match {
+            case Some(obs) =>
+              copy(
+                blockedPendingObservers = (blockedPendingObservers - token).put(nextToken)(obs),
+                lastToken = nextToken
+              )
+            case None =>
+              sys.error(s"unrecognized token $token")
+          }
+        }
+        (cell, Lst.singleton(k))
     }
   }
 
@@ -626,10 +614,6 @@ private[nutcracker] case class InactiveCell[K[_], D, U, Δ[_, _]](
     None
   }
 
-  override def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell.Aux[K, D, U, Δ] =
-    // must be resumption of an observer that has been unsubscribed already
-    this
-
   override def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell.Aux[K, D, U, Δ], Lst[K[Unit]]) =
   // must be resumption of an observer that has been unsubscribed already
     (this, Lst.empty)
@@ -733,10 +717,6 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
     if(cycle === this.cycle) sys.error("Unreachable code: no one has access to the current cycle yet")
     else this
 
-  override def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell.Aux[K, D, U, Δ] =
-    // must be resumption of an observer that has been unsubscribed already
-    this
-
   override def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell.Aux[K, D, U, Δ], Lst[K[Unit]]) =
   // must be resumption of an observer that has been unsubscribed already
     (this, Lst.empty)
@@ -802,11 +782,6 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
   override def hold(f: (D, Token[D], ObserverId) => K[Unit]): (OnDemandCell[K, D, U, Δ], ObserverId, Option[K[Unit]]) = {
     val (cell, oid, ko) = impl.hold(f)
     (copy(impl = cell), oid, ko)
-  }
-
-  override def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell.Aux[K, D, U, Δ] = {
-    val cell = impl.resume(token, handler)
-    copy[K, D, U, Δ, Val](impl = cell)
   }
 
   override def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell[K, D], Lst[K[Unit]]) = {

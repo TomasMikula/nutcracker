@@ -17,9 +17,6 @@ private[nutcracker] object PropagationLang {
   case class Observe[Ref[_], K[_], D, U, Δ[_, _]](ref: Ref[D], f: SeqPreHandler[Token, K[Unit], D, Δ], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Option[ObserverId]]
   case class Hold[Ref[_], K[_], D](ref: Ref[D], f: (D, Token[D], ObserverId) => K[Unit]) extends PropagationLang[Ref, K, ObserverId]
   case class Supply[Ref[_], K[_], D](ref: Ref[D], cycle: LiveCycle[D], value: D) extends PropagationLang[Ref, K, Unit]
-  case class Resume[Ref[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], handler: SeqHandler[Token, K[Unit], D, Δ, D0], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Unit] {
-    type Arg = D0
-  }
   case class Triggered[Ref[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Unit] {
     type Arg = D0
   }
@@ -42,8 +39,6 @@ private[nutcracker] object PropagationLang {
     Hold[Ref, K, D](ref, f)
   def supply[Ref[_], K[_], D](ref: Ref[D])(cycle: LiveCycle[D], value: D): PropagationLang[Ref, K, Unit] =
     Supply(ref, cycle, value)
-  def resume[Ref[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], handler: SeqHandler[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationLang[Ref, K, Unit] =
-    Resume[Ref, K, D, U, Δ, D0](ref, token, handler, dom)
   def triggered[Ref[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationLang[Ref, K, Unit] =
     Triggered[Ref, K, D, U, Δ, D0](ref, token, trigger, dom)
   def rmObserver[Ref[_], K[_], D](ref: Ref[D], oid: ObserverId): PropagationLang[Ref, K, Unit] =
@@ -77,9 +72,6 @@ private[nutcracker] object PropagationLang {
 
   def supplyF[F[_[_], _], Ref[_], D](ref: Ref[D])(cycle: LiveCycle[D], value: D)(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(supply[Ref, FreeK[F, ?], D](ref)(cycle, value))
-
-  def resumeF[F[_[_], _], Ref[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], handler: SeqHandler[Token, FreeK[F, Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ], inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
-    FreeK.injLiftF(resume[Ref, FreeK[F, ?], D, U, Δ, D0](ref, token, handler))
 
   def triggeredF[F[_[_], _], Ref[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, FreeK[F, Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ], inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(triggered[Ref, FreeK[F, ?], D, U, Δ, D0](ref, token, trigger))
@@ -138,7 +130,7 @@ private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: Inje
           case TriggerF.Fire(k) => Fire(k)
           case TriggerF.Sleep(next) => Sleep[Token, FreeK[F, Unit], D, dom.IDelta, D0](seqHandler(ref, next))
           case TriggerF.FireReload(cont) => FireReload[Token, FreeK[F, Unit], D, dom.IDelta, D0](
-            token => cont >>= (h => resumeF[F, Ref, D, U, dom.IDelta, D0](ref, token, seqHandler(ref, h))))
+            token => cont >>= (tr => triggeredF[F, Ref, D, U, dom.IDelta, D0](ref, token, seqTrigger(ref, tr))))
         }
       }
     }).map(_.fold(Subscription[FreeK[F, ?]]())(subscription(ref, _)))
@@ -169,8 +161,8 @@ private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: Inje
       case TriggerF.Fire(k) => Fire[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](k)
       case TriggerF.Sleep(next) => Sleep[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](seqHandler(ref, next))
       case TriggerF.FireReload(cont) => FireReload[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](
-        (token: Token[D1]) => cont >>= { h =>
-          resumeF[F, Ref, D, U, λ[(α, β) => Δ], D1](ref, token, seqHandler(ref, h))
+        (token: Token[D1]) => cont >>= { tr =>
+          triggeredF[F, Ref, D, U, λ[(α, β) => Δ], D1](ref, token, seqTrigger(ref, tr))
         }
       )
     }
