@@ -2,8 +2,7 @@ package nutcracker
 
 import nutcracker.util.ContU
 import scala.language.higherKinds
-import scalaz.{Bind, Functor, IndexedContT, ~>}
-import scalaz.Id._
+import scalaz.{Bind, Functor, IndexedContT}
 import scalaz.syntax.bind._
 
 /** If we are allowed effects `M`, then `S` can be observed for changes to a (mutable) value of type `A`. */
@@ -44,9 +43,6 @@ trait PSrc[F[_], M[_]] {
     def byM[B](f: A => M[(Trigger[M, A, Δ], B)])(implicit M: Bind[M]): ContU[M, (Subscription[M], B)] = byC(a => ContU.liftM(f(a)))
     def byM_[B](f: A => M[(Trigger[M, A, Δ], B)])(implicit M: Bind[M]): ContU[M, B] = byM(f).map(_._2)
 
-    def by(f: Id ~> λ[α => (A => TriggerF[M, α])]): M[Subscription[M]] = observeImpl(src)(Trigger.valueObserver(f))
-    def by_(f: Id ~> λ[α => (A => TriggerF[M, α])])(implicit M: Functor[M]): M[Unit] = by(f).void
-
     def threshold(f: A => Option[M[Unit]]): M[Subscription[M]] = observeImpl(src)(Trigger.threshold(f))
     def threshold_(f: A => Option[M[Unit]])(implicit M: Functor[M]): M[Unit] = threshold(f).void
 
@@ -69,17 +65,16 @@ trait PSrc[F[_], M[_]] {
     domB: Dom[B],
     M: Bind[M]
   ): M[Unit] = {
-    import TriggerF._
-    def observeLeft(b: B, l: L): M[Unit] = observe(ref1).by(λ[Id ~> λ[α => A => TriggerF[M, α]]](α => a => f(a, b) match {
-      case Alternator.Left  => Sleep(α)
-      case Alternator.Right => Fire(onSwitchToRight(l) >>= { observeRight(a, _) })
-      case Alternator.Stop  => Fire(onStop(Some(Left(l))))
-    })).void
-    def observeRight(a: A, r: R): M[Unit] = observe(ref2).by(λ[Id ~> λ[α => B => TriggerF[M, α]]](α => b => f(a, b) match {
-      case Alternator.Left  => Fire(onSwitchToLeft(r) >>= { observeLeft(b, _) })
-      case Alternator.Right => Sleep(α)
-      case Alternator.Stop  => Fire(onStop(Some(Right(r))))
-    })).void
+    def observeLeft(b: B, l: L): M[Unit] = observe(ref1).threshold_(a => f(a, b) match {
+      case Alternator.Left  => None
+      case Alternator.Right => Some(onSwitchToRight(l) >>= { observeRight(a, _) })
+      case Alternator.Stop  => Some(onStop(Some(Left(l))))
+    })
+    def observeRight(a: A, r: R): M[Unit] = observe(ref2).threshold_(b => f(a, b) match {
+      case Alternator.Left  => Some(onSwitchToLeft(r) >>= { observeLeft(b, _) })
+      case Alternator.Right => None
+      case Alternator.Stop  => Some(onStop(Some(Right(r))))
+    })
     peek_(ref1)(a => {
       peek_(ref2)(b => {
         f(a, b) match {
@@ -150,9 +145,6 @@ trait Source[A, M[_]] {
     def by(f: A => Trigger[M, A, Δ]): M[Subscription[M]] = observeImpl(f)
   }
 
-  def observeValues(f: Id ~> λ[α => (A => TriggerF[M, α])])(implicit dom: Dom[A]): M[Subscription[M]] =
-    observeImpl[dom.Update, dom.Delta](Trigger.valueObserver(f))(dom)
-
   def map[B](f: A => B)(implicit da: Dom[A], db: Dom[B]): MapSyntaxHelper[B, da.Update, da.Delta, db.Update, db.Delta] =
     new MapSyntaxHelper(f)(da, db)
 
@@ -172,18 +164,13 @@ trait Source[A, M[_]] {
     new WhenFinalSyntaxHelper(fin)
 
   final class WhenFinalSyntaxHelper[A0] private[nutcracker](fin: Final.Aux[A, A0])(implicit dom: Dom[A]) {
-    import TriggerF._
-
     def exec(f: A0 => M[Unit]): M[Subscription[M]] =
-      observeValues(λ[Id ~> λ[α => (A => TriggerF[M, α])]](α => a => fin.extract(a) match {
-        case Some(a0) => Fire(f(a0))
-        case None => Sleep(α)
-      }))
+      observe.by(Trigger.threshold(a => fin.extract(a) map f))
 
     def exec0(f: A => M[Unit]): M[Subscription[M]] =
-      observeValues(λ[Id ~> λ[α => (A => TriggerF[M, α])]](α => a =>
-        if(fin.isFinal(a)) Fire(f(a))
-        else Sleep(α)
+      observe.by(Trigger.threshold(a =>
+        if(fin.isFinal(a)) Some(f(a))
+        else None
       ))
   }
 }

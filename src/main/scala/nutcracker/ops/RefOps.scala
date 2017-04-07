@@ -1,12 +1,11 @@
 package nutcracker.ops
 
 import scala.language.{higherKinds, implicitConversions}
-import nutcracker.{BranchingPropagation, Dom, Final, JoinDom, Propagation, RelativelyComplementedDom, Subscription, TriggerF, Unchanged, Updated}
+import nutcracker.{BranchingPropagation, Dom, Final, JoinDom, Propagation, RelativelyComplementedDom, Subscription, Unchanged, Updated}
 import nutcracker.Trigger.continually
 import nutcracker.lib.bool.Bool
 import nutcracker.util.ContU
-import scalaz.Id.Id
-import scalaz.{Applicative, Apply, Bind, Functor, IndexedContT, Traverse, ~>}
+import scalaz.{Applicative, Apply, Bind, Functor, IndexedContT, Traverse}
 import scalaz.syntax.bind._
 
 final case class RefOps[Ref[_], D, U, Δ](ref: Ref[D])(implicit val dom: Dom.Aux[D, U, Δ]) {
@@ -22,13 +21,9 @@ trait ToRefOps {
 }
 
 final case class FinalRefOps[Ref[_], D, U, Δ, A](ref: Ref[D])(implicit dom: Dom.Aux[D, U, Δ], fin: Final.Aux[D, A]) {
-  import TriggerF._
 
   def whenFinal[M[_]](f: A => M[Unit])(implicit P: Propagation[M, Ref]): M[Subscription[M]] =
-    P.observe(ref).by(λ[Id ~> λ[α => (D => TriggerF[M, α])]](α => d => fin.extract(d) match {
-      case Some(a) => Fire(f(a))
-      case None => Sleep(α)
-    }))
+    P.observe(ref).threshold(d => fin.extract(d) map f)
 
   def _whenFinal[M[_]](f: A => M[_])(implicit P: Propagation[M, Ref], M: Functor[M]): M[Subscription[M]] =
     whenFinal(a => M.map(f(a))(_ => ()))
@@ -37,10 +32,10 @@ final case class FinalRefOps[Ref[_], D, U, Δ, A](ref: Ref[D])(implicit dom: Dom
     whenFinal(f).void
 
   def whenFinal0[M[_]](f: D => M[Unit])(implicit P: Propagation[M, Ref]): M[Subscription[M]] =
-    P.observe(ref).by(λ[Id ~> λ[α => (D => TriggerF[M, α])]](α => d =>
-      if(fin.isFinal(d)) Fire(f(d))
-      else Sleep(α)
-    ))
+    P.observe(ref).threshold(d =>
+      if(fin.isFinal(d)) Some(f(d))
+      else None
+    )
 
   def _whenFinal0[M[_]](f: D => M[_])(implicit P: Propagation[M, Ref], M: Functor[M]): M[Subscription[M]] =
     whenFinal0(d => M.map(f(d))(_ => ()))
