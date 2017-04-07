@@ -2,7 +2,7 @@ package nutcracker
 
 import nutcracker.CellCycle.LiveCycle
 import nutcracker.util.{ContU, FreeK, FreeKT, InjectK}
-import scalaz.{Functor, IndexedContT, ~>}
+import scalaz.{Functor, IndexedContT}
 import scalaz.Id._
 import scalaz.syntax.monad._
 import shapeless.HList
@@ -151,21 +151,8 @@ private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: Inje
       ).void)
   }
 
-  def selTrigger[L <: HList](sel: Sel[Ref, L])(f: Id ~> λ[α => L => TriggerF[FreeK[F, ?], α]]): FreeK[F, Unit] = {
-    import TriggerF._
-
-    val fu = f(())
-    val g: L => (Option[FreeK[F, Unit]], Boolean) = l => {
-      fu(l) match {
-        case Discard() => (None, false)
-        case Fire(k) => (Some(k), false)
-        case Sleep(()) => (None, true)
-        case FireReload(k) => (Some(k), true)
-      }
-    }
-
-    FreeK.injLiftF(PropagationLang.selTrigger[Ref, FreeK[F, ?], L](sel)(g))
-  }
+  def selTrigger[L <: HList](sel: Sel[Ref, L])(f: L => (Option[FreeK[F, Unit]], Boolean)): FreeK[F, Unit] =
+    FreeK.injLiftF(PropagationLang.selTrigger[Ref, FreeK[F, ?], L](sel)(f))
 
   private def subscription[D](ref: Ref[D], oid: ObserverId): Subscription[FreeK[F, ?]] =
     Subscription(rmObserverF(ref, oid))

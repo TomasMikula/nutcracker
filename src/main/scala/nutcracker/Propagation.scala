@@ -1,9 +1,9 @@
 package nutcracker
 
-import scalaz.{Applicative, Functor, IndexedContT, ~>}
-import shapeless.{::, HList, HNil}
 import nutcracker.util.ops.applicative._
-import scalaz.Id.Id
+import scalaz.{Applicative, Functor, IndexedContT}
+import scalaz.syntax.functor._
+import shapeless.{::, HList, HNil}
 
 trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
 
@@ -13,7 +13,7 @@ trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
 
   def updateImpl[D, U, Δ[_, _]](ref: Ref[D])(u: U)(implicit dom: IDom.Aux[D, U, Δ]): M[Unit]
 
-  def selTrigger[L <: HList](sel: Sel[Ref, L])(f: Id ~> λ[α => L => TriggerF[M, α]]): M[Unit]
+  def selTrigger[L <: HList](sel: Sel[Ref, L])(f: L => (Option[M[Unit]], Boolean)): M[Unit]
 
 
   def newCell[D](implicit dom: DomWithBottom[D]): M[Ref[D]] =
@@ -32,19 +32,17 @@ trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
   def cells[D](d: D, n: Int)(implicit dom: Dom[D], M: Applicative[M]): M[Vector[Ref[D]]] =
     newCell(d).replicate(n)
 
-  def selTrigger2[D1, D2](ref1: Ref[D1], ref2: Ref[D2])(f: Id ~> λ[α => (D1, D2) => TriggerF[M, α]]): M[Unit] =
-    selTrigger[D1 :: D2 :: HNil](Sel(ref1, ref2))(λ[Id ~> λ[α => (D1 :: D2 :: HNil) => TriggerF[M, α]]](
-      α => l => f(α)(l.head, l.tail.head)
-    ))
+  def selTrigger2[D1, D2](ref1: Ref[D1], ref2: Ref[D2])(f: (D1, D2) => (Option[M[Unit]], Boolean)): M[Unit] =
+    selTrigger[D1 :: D2 :: HNil](Sel(ref1, ref2))((l: D1 :: D2 :: HNil) => f(l.head, l.tail.head))
 
   def selThreshold2[D1, D2](ref1: Ref[D1], ref2: Ref[D2])(f: (D1, D2) => Option[M[Unit]]): M[Unit] =
-    selTrigger2[D1, D2](ref1, ref2)(λ[Id ~> λ[α => (D1, D2) => TriggerF[M, α]]](α => (d1, d2) => f(d1, d2) match {
-      case None => TriggerF.Sleep(α)
-      case Some(mu) => TriggerF.Fire(mu)
-    }))
+    selTrigger2[D1, D2](ref1, ref2)((d1, d2) => f(d1, d2) match {
+      case None => (None, true)
+      case Some(mu) => (Some(mu), false)
+    })
 
   def _selThreshold2[D1, D2](ref1: Ref[D1], ref2: Ref[D2])(f: (D1, D2) => Option[M[_]])(implicit M: Functor[M]): M[Unit] =
-    selThreshold2(ref1, ref2)((d1, d2) => f(d1, d2).map(M.map(_)(_ => ())))
+    selThreshold2(ref1, ref2)((d1, d2) => f(d1, d2).map(_.void))
 }
 
 object Propagation {
