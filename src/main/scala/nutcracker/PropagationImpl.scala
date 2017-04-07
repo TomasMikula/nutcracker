@@ -61,8 +61,8 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
               case Supply(ref, cycle, value) =>
                 val (s1, ks) = s.supply(ref)(cycle, value)
                 (ks, s1, ())
-              case t @ Triggered(ref, token, trigger, dom) =>
-                val (s1, ks) = s.triggered[dom.Domain, dom.Update, dom.IDelta, t.Arg](ref, token, trigger)(dom)
+              case r @ Resume(ref, token, trigger, dom) =>
+                val (s1, ks) = s.resume[dom.Domain, dom.Update, dom.IDelta, r.Arg](ref, token, trigger)(dom)
                 (ks, s1, ())
               case RmObserver(ref, oid) =>
                 val (s1, ks) = s.rmObserver(ref, oid)
@@ -176,8 +176,8 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     (copy(domains = domains.put(ref)(cell)), ks)
   }
 
-  def triggered[D, U, Δ[_, _], D0 <: D](ref: CellId[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Lst[K[Unit]]) = {
-    val (cell, ks) = domains(ref).infer.triggered(token, trigger)
+  def resume[D, U, Δ[_, _], D0 <: D](ref: CellId[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Lst[K[Unit]]) = {
+    val (cell, ks) = domains(ref).infer.resume(token, trigger)
     val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
     (copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains1), ks)
   }
@@ -283,7 +283,7 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
 
   def supply[D0 <: D](cycle: LiveCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]])
 
-  def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell[K, D], Lst[K[Unit]])
+  def resume[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell[K, D], Lst[K[Unit]])
 
   def triggerPendingObservers: (Cell[K, D], Lst[K[Unit]])
 }
@@ -457,7 +457,7 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
     }
   }
 
-  def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (SimpleCell.Aux1[K, D, Update, Delta, Value], Lst[K[Unit]]) = {
+  def resume[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (SimpleCell.Aux1[K, D, Update, Delta, Value], Lst[K[Unit]]) = {
     import SeqTrigger._
     trigger match {
       case Discard() => (copy(blockedIdleObservers = blockedIdleObservers - token, blockedPendingObservers = blockedPendingObservers - token), Lst.empty)
@@ -614,7 +614,7 @@ private[nutcracker] case class InactiveCell[K[_], D, U, Δ[_, _]](
     None
   }
 
-  override def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell.Aux[K, D, U, Δ], Lst[K[Unit]]) =
+  override def resume[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell.Aux[K, D, U, Δ], Lst[K[Unit]]) =
   // must be resumption of an observer that has been unsubscribed already
     (this, Lst.empty)
 
@@ -717,7 +717,7 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
     if(cycle === this.cycle) sys.error("Unreachable code: no one has access to the current cycle yet")
     else this
 
-  override def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell.Aux[K, D, U, Δ], Lst[K[Unit]]) =
+  override def resume[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell.Aux[K, D, U, Δ], Lst[K[Unit]]) =
   // must be resumption of an observer that has been unsubscribed already
     (this, Lst.empty)
 
@@ -784,8 +784,8 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
     (copy(impl = cell), oid, ko)
   }
 
-  override def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell[K, D], Lst[K[Unit]]) = {
-    val (cell, ks) = impl.triggered(token, trigger)
+  override def resume[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell[K, D], Lst[K[Unit]]) = {
+    val (cell, ks) = impl.resume(token, trigger)
     if(cell.hasObserver) (copy(impl = cell), ks)
     else (InactiveCell(setup, cycle.inc, cell.lastObserverId, cell.lastToken), ks ++ collectFinalizers)
   }

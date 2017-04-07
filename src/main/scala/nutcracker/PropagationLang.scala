@@ -17,7 +17,7 @@ private[nutcracker] object PropagationLang {
   case class Observe[Ref[_], K[_], D, U, Δ[_, _]](ref: Ref[D], f: SeqPreHandler[Token, K[Unit], D, Δ], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Option[ObserverId]]
   case class Hold[Ref[_], K[_], D](ref: Ref[D], f: (D, Token[D], ObserverId) => K[Unit]) extends PropagationLang[Ref, K, ObserverId]
   case class Supply[Ref[_], K[_], D](ref: Ref[D], cycle: LiveCycle[D], value: D) extends PropagationLang[Ref, K, Unit]
-  case class Triggered[Ref[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Unit] {
+  case class Resume[Ref[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Unit] {
     type Arg = D0
   }
   case class RmObserver[Ref[_], K[_], D](ref: Ref[D], oid: ObserverId) extends PropagationLang[Ref, K, Unit]
@@ -39,8 +39,8 @@ private[nutcracker] object PropagationLang {
     Hold[Ref, K, D](ref, f)
   def supply[Ref[_], K[_], D](ref: Ref[D])(cycle: LiveCycle[D], value: D): PropagationLang[Ref, K, Unit] =
     Supply(ref, cycle, value)
-  def triggered[Ref[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationLang[Ref, K, Unit] =
-    Triggered[Ref, K, D, U, Δ, D0](ref, token, trigger, dom)
+  def resume[Ref[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationLang[Ref, K, Unit] =
+    Resume[Ref, K, D, U, Δ, D0](ref, token, trigger, dom)
   def rmObserver[Ref[_], K[_], D](ref: Ref[D], oid: ObserverId): PropagationLang[Ref, K, Unit] =
     RmObserver(ref, oid)
   def selTrigger[Ref[_], K[_], L <: HList](sel: Sel[Ref, L])(f: L => (Option[K[Unit]], Boolean)): PropagationLang[Ref, K, Unit] =
@@ -73,8 +73,8 @@ private[nutcracker] object PropagationLang {
   def supplyF[F[_[_], _], Ref[_], D](ref: Ref[D])(cycle: LiveCycle[D], value: D)(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(supply[Ref, FreeK[F, ?], D](ref)(cycle, value))
 
-  def triggeredF[F[_[_], _], Ref[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, FreeK[F, Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ], inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
-    FreeK.injLiftF(triggered[Ref, FreeK[F, ?], D, U, Δ, D0](ref, token, trigger))
+  def resumeF[F[_[_], _], Ref[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, FreeK[F, Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ], inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
+    FreeK.injLiftF(resume[Ref, FreeK[F, ?], D, U, Δ, D0](ref, token, trigger))
 
   def rmObserverF[F[_[_], _], Ref[_], D](ref: Ref[D], oid: ObserverId)(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(rmObserver[Ref, FreeK[F, ?], D](ref, oid))
@@ -130,7 +130,7 @@ private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: Inje
           case TriggerF.Fire(k) => Fire(k)
           case TriggerF.Sleep(next) => Sleep[Token, FreeK[F, Unit], D, dom.IDelta, D0](seqHandler(ref, next))
           case TriggerF.FireReload(cont) => FireReload[Token, FreeK[F, Unit], D, dom.IDelta, D0](
-            token => cont >>= (tr => triggeredF[F, Ref, D, U, dom.IDelta, D0](ref, token, seqTrigger(ref, tr))))
+            token => cont >>= (tr => resumeF[F, Ref, D, U, dom.IDelta, D0](ref, token, seqTrigger(ref, tr))))
         }
       }
     }).map(_.fold(Subscription[FreeK[F, ?]]())(subscription(ref, _)))
@@ -139,7 +139,7 @@ private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: Inje
   override def observeImplC[A, U, Δ, B](src: Ref[A])(f: A => ContU[FreeK[F, ?], (Trigger[FreeK[F, ?], A, Δ], B)])(implicit dom: Dom.Aux[A, U, Δ]): ContU[FreeK[F, ?], (Subscription[FreeK[F, ?]], B)] = {
     IndexedContT((k: ((Subscription[FreeK[F, ?]], B)) => FreeK[F, Unit]) =>
       holdF[F, Ref, A](src)((a: A, t: Token[A], oid: ObserverId) =>
-        f(a).run({ case (tr, b) => triggeredF[F, Ref, A, U, dom.IDelta, A](src, t, seqTrigger(src, tr)) >> k((subscription(src, oid), b)) })
+        f(a).run({ case (tr, b) => resumeF[F, Ref, A, U, dom.IDelta, A](src, t, seqTrigger(src, tr)) >> k((subscription(src, oid), b)) })
       ).void)
   }
 
@@ -162,7 +162,7 @@ private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: Inje
       case TriggerF.Sleep(next) => Sleep[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](seqHandler(ref, next))
       case TriggerF.FireReload(cont) => FireReload[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](
         (token: Token[D1]) => cont >>= { tr =>
-          triggeredF[F, Ref, D, U, λ[(α, β) => Δ], D1](ref, token, seqTrigger(ref, tr))
+          resumeF[F, Ref, D, U, λ[(α, β) => Δ], D1](ref, token, seqTrigger(ref, tr))
         }
       )
     }
