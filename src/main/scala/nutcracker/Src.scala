@@ -36,7 +36,7 @@ trait PSrc[F[_], M[_]] {
 
   final class ObserveSyntaxHelper[A, U, Δ](src: F[A])(implicit dom: Dom.Aux[A, U, Δ]) {
     def by(f: A => Trigger[M, A, Δ]): M[Subscription[M]] = observeImpl(src)(f)
-    def by_(f: A => Trigger[M, A, Δ])(implicit M: Functor[M]): M[Unit] = by(f).map(_ => ())
+    def by_(f: A => Trigger[M, A, Δ])(implicit M: Functor[M]): M[Unit] = by(f).void
 
     def byC[B](f: A => ContU[M, (Trigger[M, A, Δ], B)])(implicit M: Bind[M]): ContU[M, (Subscription[M], B)] = observeImplC(src)(f)
     def byC_[B](f: A => ContU[M, (Trigger[M, A, Δ], B)])(implicit M: Bind[M]): ContU[M, B] = byC(f).map(_._2)
@@ -45,13 +45,13 @@ trait PSrc[F[_], M[_]] {
     def byM_[B](f: A => M[(Trigger[M, A, Δ], B)])(implicit M: Bind[M]): ContU[M, B] = byM(f).map(_._2)
 
     def by(f: Id ~> λ[α => (A => TriggerF[M, α])]): M[Subscription[M]] = observeImpl(src)(Trigger.valueObserver(f))
-    def by_(f: Id ~> λ[α => (A => TriggerF[M, α])])(implicit M: Functor[M]): M[Unit] = by(f).map(_ => ())
+    def by_(f: Id ~> λ[α => (A => TriggerF[M, α])])(implicit M: Functor[M]): M[Unit] = by(f).void
 
     def threshold(f: A => Option[M[Unit]]): M[Subscription[M]] = observeImpl(src)(Trigger.threshold(f))
-    def threshold_(f: A => Option[M[Unit]])(implicit M: Functor[M]): M[Unit] = threshold(f).map(_ => ())
+    def threshold_(f: A => Option[M[Unit]])(implicit M: Functor[M]): M[Unit] = threshold(f).void
 
     def untilRight(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Subscription[M]] = observeImpl(src)(Trigger.untilRight(f))
-    def untilRight_(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Unit] = untilRight(f).map(_ => ())
+    def untilRight_(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Unit] = untilRight(f).void
   }
 
   def peek_[A](ref: F[A])(f: A => M[Unit])(implicit dom: Dom[A], M: Functor[M]): M[Unit] =
@@ -74,12 +74,12 @@ trait PSrc[F[_], M[_]] {
       case Alternator.Left  => Sleep(α)
       case Alternator.Right => Fire(onSwitchToRight(l) >>= { observeRight(a, _) })
       case Alternator.Stop  => Fire(onStop(Some(Left(l))))
-    })).map(_ => ())
+    })).void
     def observeRight(a: A, r: R): M[Unit] = observe(ref2).by(λ[Id ~> λ[α => B => TriggerF[M, α]]](α => b => f(a, b) match {
       case Alternator.Left  => Fire(onSwitchToLeft(r) >>= { observeLeft(b, _) })
       case Alternator.Right => Sleep(α)
       case Alternator.Stop  => Fire(onStop(Some(Right(r))))
-    })).map(_ => ())
+    })).void
     peek_(ref1)(a => {
       peek_(ref2)(b => {
         f(a, b) match {

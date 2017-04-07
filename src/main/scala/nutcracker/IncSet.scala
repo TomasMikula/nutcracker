@@ -81,7 +81,7 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
 
   def forEach_[A](ref: Ref[IncSet[A]])(implicit F: Applicative[F]): ContU[F, A] = {
     val cps = forEach(ref)
-    ContU(f => cps(f).map(_ => ()))
+    ContU(f => cps(f).void)
   }
 
   def insert[A](a: A, into: Ref[IncSet[A]]): F[Unit] =
@@ -95,7 +95,7 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
       val now = insertAll(sa.value, sup)
       val onChange = Trigger.continually((sa: IncSet[A], delta: Delta[A]) => insertAll(delta.value, sup))
       Trigger.fireReload(now map (_ => onChange))
-    }).map(_ => ())
+    }).void
 
   def includeC[A](cps: ContU[F, A], ref: Ref[IncSet[A]]): F[Unit] =
     cps(a => insert(a, ref))

@@ -85,7 +85,7 @@ object CellSet {
 
   def forEach_[Ref[_], F[_], A](set: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], F: Applicative[F]): ContU[F, Ref[A]] = {
     val cps = forEach(set)
-    ContU(f => cps(f).map(_ => ()))
+    ContU(f => cps(f).void)
   }
 
   def insert[Ref[_], F[_], A](ref: Ref[A], into: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Functor[F]): F[Unit] =
@@ -95,7 +95,7 @@ object CellSet {
         if(dom.isFailed(a)) Some(P.update(into).by(RemoveFailed(ref)))
         else None
       ) })
-    ).map(_ => ())
+    ).void
 
   def insertAll[Ref[_], F[_], A](add: Set[Ref[A]], into: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Applicative[F]): F[Unit] =
     add.iterator.traverse_(ra => insert(ra, into))
@@ -105,7 +105,7 @@ object CellSet {
       val now = insertAll(sa.value, sup)
       val onChange = Trigger.continually((sa: CellSet[Ref, A], delta: Added[Ref, A]) => insertAll(delta.value, sup))
       Trigger.fireReload(now map (_ => onChange))
-    }).map(_ => ())
+    }).void
 
   def includeC[Ref[_], F[_], A](cps: ContU[F, Ref[A]], ref: Ref[CellSet[Ref, A]])(implicit P: Propagation[F, Ref], dom: Dom[A], F: Functor[F]): F[Unit] =
     cps(a => insert(a, ref))

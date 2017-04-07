@@ -291,7 +291,7 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
 
   def supply[D0 <: D](cycle: LiveCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]])
 
-  def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell.Aux[K, D, Update, Delta]
+  def resume[D0 <: D](token: Token[D0], handler: Handler[D0]): Cell[K, D]
 
   def triggered[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell[K, D], Lst[K[Unit]])
 

@@ -34,7 +34,7 @@ final case class FinalRefOps[Ref[_], D, U, Δ, A](ref: Ref[D])(implicit dom: Dom
     whenFinal(a => M.map(f(a))(_ => ()))
 
   def whenFinal_[M[_]](f: A => M[Unit])(implicit P: Propagation[M, Ref], M: Functor[M]): M[Unit] =
-    whenFinal(f).map(_ => ())
+    whenFinal(f).void
 
   def whenFinal0[M[_]](f: D => M[Unit])(implicit P: Propagation[M, Ref]): M[Subscription[M]] =
     P.observe(ref).by(λ[Id ~> λ[α => (D => TriggerF[M, α])]](α => d =>
@@ -46,7 +46,7 @@ final case class FinalRefOps[Ref[_], D, U, Δ, A](ref: Ref[D])(implicit dom: Dom
     whenFinal0(d => M.map(f(d))(_ => ()))
 
   def whenFinal0_[M[_]](f: D => M[Unit])(implicit P: Propagation[M, Ref], M: Functor[M]): M[Unit] =
-    whenFinal0(f).map(_ => ())
+    whenFinal0(f).void
 
   def asCont[M[_]](implicit P: Propagation[M, Ref]): IndexedContT[M, Subscription[M], Unit, A] =
     IndexedContT { whenFinal(_) }
@@ -107,7 +107,7 @@ final case class RelativelyComplementedRefOps[Ref[_], D, U, Δ](ref: Ref[D])(imp
     import P._
     for {
       res <- P.newVar[Bool]
-      _ <- res.whenFinal(r => if (r) ref =!= that else (ref <=> that).map(_ => ()))
+      _ <- res.whenFinal(r => if (r) ref =!= that else (ref <=> that).void)
       _ <- ref.whenFinal0_(r1 => that.whenFinal0_(r2 => {
         val r = dom.ljoin(r1, r2) match {
           case Unchanged() => false
