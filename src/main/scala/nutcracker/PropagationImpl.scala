@@ -323,8 +323,8 @@ private[nutcracker] object Cell {
       type D0 = From
     }
   }
-  final case class BlockedIdleObserver[D, Δ[_, _], D0, Val](id: ObserverId, ev: Val === D0) {
-    def addDelta[Val1](δ: Δ[Val, Val1]): BlockedPendingObserver[D, Δ, D0, Val1] =
+  final case class BlockedIdleObserver[D, Δ[_, _], Val, D0](id: ObserverId, ev: Val === D0) {
+    def addDelta[Val1](δ: Δ[Val, Val1]): BlockedPendingObserver[D, Δ, Val1, D0] =
       BlockedPendingObserver(id, ev.subst[Δ[?, Val1]](δ))
     def resume[K[_]](handler: SeqHandler[Token, K[Unit], D, Δ, D0]): IdleObserver[K, D, Δ, Val] =
       IdleObserver(id, ev.flip.subst[SeqHandler[Token, K[Unit], D, Δ, ?]](handler))
@@ -332,8 +332,8 @@ private[nutcracker] object Cell {
   object BlockedIdleObserver {
     def apply[D, Δ[_, _], D0](id: ObserverId): BlockedIdleObserver[D, Δ, D0, D0] = BlockedIdleObserver(id, Leibniz.refl[D0])
   }
-  final case class BlockedPendingObserver[D, Δ[_, _], D0, Val](id: ObserverId, delta: Δ[D0, Val]) {
-    def addDelta[Val1, U](δ: Δ[Val, Val1])(implicit dom: IDom.Aux[D, U, Δ]): BlockedPendingObserver[D, Δ, D0, Val1] =
+  final case class BlockedPendingObserver[D, Δ[_, _], Val, D0](id: ObserverId, delta: Δ[D0, Val]) {
+    def addDelta[Val1, U](δ: Δ[Val, Val1])(implicit dom: IDom.Aux[D, U, Δ]): BlockedPendingObserver[D, Δ, Val1, D0] =
       BlockedPendingObserver(id, dom.composeDeltas(δ, delta))
     def resume[K[_]](handler: SeqHandler[Token, K[Unit], D, Δ, D0]): PendingObserver.Aux[K, D, Δ, D0, Val] =
       PendingObserver(id, delta, handler)
@@ -362,8 +362,8 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
 
   val idleObservers: List[IdleObserver[Value]]
   val pendingObservers: List[PendingObserver[Value]]
-  val blockedIdleObservers: KMap[Token, BlockedIdleObserver[?, Value]]
-  val blockedPendingObservers: KMap[Token, BlockedPendingObserver[?, Value]]
+  val blockedIdleObservers: KMap[Token, BlockedIdleObserver[Value, ?]]
+  val blockedPendingObservers: KMap[Token, BlockedPendingObserver[Value, ?]]
 
   val lastObserverId: ObserverId
   val lastToken: Token[_]
@@ -373,8 +373,8 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
   def copy(
     idleObservers: List[IdleObserver[Value]] = idleObservers,
     pendingObservers: List[PendingObserver[Value]] = pendingObservers,
-    blockedIdleObservers: KMap[Token, BlockedIdleObserver[?, Value]] = blockedIdleObservers,
-    blockedPendingObservers: KMap[Token, BlockedPendingObserver[?, Value]] = blockedPendingObservers,
+    blockedIdleObservers: KMap[Token, BlockedIdleObserver[Value, ?]] = blockedIdleObservers,
+    blockedPendingObservers: KMap[Token, BlockedPendingObserver[Value, ?]] = blockedPendingObservers,
     nextObserverId: ObserverId = lastObserverId,
     lastToken: Token[_] = lastToken
   ): SimpleCell.Aux1[K, D, Update, Delta, Value] =
@@ -393,15 +393,15 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
         val pending1 = idleObservers.map(_.addDelta(delta))
         val pending = pending1 ::: pending0
 
-        val blocked0 = blockedPendingObservers.mapValues[BlockedPendingObserver[?, up.NewValue]](
-          λ[BlockedPendingObserver[?, Value] ~> BlockedPendingObserver[?, up.NewValue]](_.addDelta(delta))
+        val blocked0 = blockedPendingObservers.mapValues[BlockedPendingObserver[up.NewValue, ?]](
+          λ[BlockedPendingObserver[Value, ?] ~> BlockedPendingObserver[up.NewValue, ?]](_.addDelta(delta))
         )
-        val blocked1 = blockedIdleObservers.mapValues[BlockedPendingObserver[?, up.NewValue]](
-          λ[BlockedIdleObserver[?, Value] ~> BlockedPendingObserver[?, up.NewValue]](_.addDelta(delta))
+        val blocked1 = blockedIdleObservers.mapValues[BlockedPendingObserver[up.NewValue, ?]](
+          λ[BlockedIdleObserver[Value, ?] ~> BlockedPendingObserver[up.NewValue, ?]](_.addDelta(delta))
         )
         val blocked = blocked0 ++ blocked1
 
-        Some(SimpleCell(newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[?, up.NewValue]](), blocked, lastObserverId, lastToken))
+        Some(SimpleCell(newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[up.NewValue, ?]](), blocked, lastObserverId, lastToken))
 
       case Unchanged() => None
     }
@@ -456,9 +456,9 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
       case Some(idles) => copy(idleObservers = idles)
       case None => listRemoveFirst(pendingObservers)(_.id === oid) match {
         case Some(pendings) => copy(pendingObservers = pendings)
-        case None => mapRemoveFirst[Token, BlockedIdleObserver[?, Value]](blockedIdleObservers)(_.id === oid) match {
+        case None => mapRemoveFirst(blockedIdleObservers)(_.id === oid) match {
           case Some(blockedIdles) => copy(blockedIdleObservers = blockedIdles)
-          case None => mapRemoveFirst[Token, BlockedPendingObserver[?, Value]](blockedPendingObservers)(_.id === oid) match {
+          case None => mapRemoveFirst(blockedPendingObservers)(_.id === oid) match {
             case Some(blockedPendings) => copy(blockedPendingObservers = blockedPendings)
             case None => this
           }
@@ -517,7 +517,7 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
     @tailrec def go(
       pending: List[PendingObserver[Value]],
       idleAcc: List[IdleObserver[Value]],
-      blockedIdleAcc: KMap[Token, BlockedIdleObserver[?, Value]],
+      blockedIdleAcc: KMap[Token, BlockedIdleObserver[Value, ?]],
       firedAcc: Lst[K[Unit]],
       lastToken: Token[_]
     ): (SimpleCell.Aux1[K, D, Update, Delta, Value], Lst[K[Unit]]) =
@@ -553,8 +553,8 @@ private[nutcracker] object SimpleCell {
     SimpleCell[K, D, dom.Update, dom.IDelta, D](d)(
       Nil,
       Nil,
-      KMap[Token, BlockedIdleObserver[D, dom.IDelta, ?, D]](),
-      KMap[Token, BlockedPendingObserver[D, dom.IDelta, ?, D]](),
+      KMap(),
+      KMap(),
       ObserverId.zero,
       Token.zero
     )
@@ -562,8 +562,8 @@ private[nutcracker] object SimpleCell {
   def apply[K[_], D, U, Δ[_, _], Val <: D](d: Val)(
     idleObservers0: List[IdleObserver[K, D, Δ, Val]],
     pendingObservers0: List[PendingObserver[K, D, Δ, Val]] = Nil,
-    blockedIdleObservers0: KMap[Token, BlockedIdleObserver[D, Δ, ?, Val]],
-    blockedPendingObservers0: KMap[Token, BlockedPendingObserver[D, Δ, ?, Val]] = KMap[Token, BlockedPendingObserver[D, Δ, ?, Val]](),
+    blockedIdleObservers0: KMap[Token, BlockedIdleObserver[D, Δ, Val, ?]],
+    blockedPendingObservers0: KMap[Token, BlockedPendingObserver[D, Δ, Val, ?]] = KMap[Token, BlockedPendingObserver[D, Δ, Val, ?]](), // https://github.com/scala/scala-dev/issues/366
     lastObsId: ObserverId,
     lastTok: Token[_]
   ): SimpleCell.Aux1[K, D, U, Δ, Val] = new SimpleCell[K, D] {
@@ -689,7 +689,7 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
       import SeqTrigger._
 
       var idleObservers: List[IdleObserver[D0]] = Nil
-      var blockedIdleObservers: KMap[Token, BlockedIdleObserver[?, D0]] = KMap[Token, BlockedIdleObserver[?, D0]]()
+      var blockedIdleObservers: KMap[Token, BlockedIdleObserver[D0, ?]] = KMap()
       var ks: Lst[K[Unit]] = Lst.empty
       var token: Token[_] = lastToken
 
@@ -781,7 +781,7 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
     lastToken: Token[_],
     value: Val,
     idleObservers: List[Cell.IdleObserver[K, D, Δ, Val]],
-    blockedIdleObservers: KMap[Token, Cell.BlockedIdleObserver[D, Δ, ?, Val]]
+    blockedIdleObservers: KMap[Token, Cell.BlockedIdleObserver[D, Δ, Val, ?]]
   ) = this(
     setup,
     cycle,
