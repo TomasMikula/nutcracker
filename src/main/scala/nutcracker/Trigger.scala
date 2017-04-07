@@ -47,19 +47,41 @@ object Trigger {
   def observerS[F[_]: Functor, D, Δ, S](s: S)(f: S => TriggerF[F, D, Δ, S]): Trigger[F, D, Δ] =
     Trigger(f(s) map (observerS(_)(f)))
 
-  /** Keep trying `f` until it returns `Some`. */
+  /** Keep trying `f` until it returns `Some`. Then fire the returned program. */
   def threshold[F[_], D, Δ](f: D => Option[F[Unit]]): D => Trigger[F, D, Δ] =
     d => f(d) match {
       case None => sleep(threshold1(f))
       case Some(k) => fire(k)
     }
 
-  /** Keep trying `f` until it returns `Some`. */
+  /** Keep trying `f` until it returns `Some`. Then fire the returned program. */
   def threshold1[F[_], D, Δ](f: D => Option[F[Unit]]): (D, Δ) => Trigger[F, D, Δ] =
     new ((D, Δ) => Trigger[F, D, Δ]) {
       def apply(d: D, δ: Δ): Trigger[F, D, Δ] = f(d) match {
         case None => sleep(this)
         case Some(k) => fire(k)
+      }
+    }
+
+  /** Keep trying `f` until it returns `Some`. Then fire the returned program, if any. */
+  def thresholdOpt[F[_], D, Δ](f: D => Option[Option[F[Unit]]]): D => Trigger[F, D, Δ] =
+    d => f(d) match {
+      case None => sleep(thresholdOpt1(f))
+      case Some(ko) => ko match {
+        case Some(k) => fire(k)
+        case None => discard
+      }
+    }
+
+  /** Keep trying `f` until it returns `Some`. Then fire the returned program, if any. */
+  def thresholdOpt1[F[_], D, Δ](f: D => Option[Option[F[Unit]]]): (D, Δ) => Trigger[F, D, Δ] =
+    new ((D, Δ) => Trigger[F, D, Δ]) {
+      def apply(d: D, δ: Δ): Trigger[F, D, Δ] = f(d) match {
+        case None => sleep(this)
+        case Some(ko) => ko match {
+          case Some(k) => fire(k)
+          case None => discard
+        }
       }
     }
 
