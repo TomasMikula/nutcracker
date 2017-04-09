@@ -5,11 +5,9 @@ import nutcracker.util.FreeKT
 import nutcracker.util.KPair._
 import scala.language.existentials
 import scalaz.Id.Id
-import scalaz.{Monad, ~>}
+import scalaz.~>
 
-trait PropBranchToolkit extends PropagationToolkit with BranchingToolkit {
-  implicit def prgMonad: Monad[Prg]
-}
+trait PropBranchToolkit extends PropagationToolkit with BranchingToolkit
 
 object PropBranchToolkit {
   val instance: PropBranchToolkit = PropBranch

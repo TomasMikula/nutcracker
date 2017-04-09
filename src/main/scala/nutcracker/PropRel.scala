@@ -1,13 +1,19 @@
 package nutcracker
 
-import scala.language.higherKinds
-import nutcracker.rel.{RelModule, Relations}
+import nutcracker.rel.{RelModule, RelToolkit, Relations}
+import nutcracker.util.FreeKT
 import nutcracker.util.CoproductK._
 import nutcracker.util.KPair._
-import scalaz.Lens
-import scalaz.~>
+import scalaz.{Lens, Monad}
+import scalaz.Id.Id
 
-object PropRel extends PropagationBundle {
+trait PropRelToolkit extends PropagationToolkit with RelToolkit
+
+object PropRelToolkit {
+  val instance: PropRelToolkit = PropRel
+}
+
+object PropRel extends PropagationBundle with PropRelToolkit {
   val Prop = Propagation.module
   val RelMod = RelModule.instance
 
@@ -20,6 +26,7 @@ object PropRel extends PropagationBundle {
   implicit def refEquality = Prop.refEquality
   implicit def refOrder = Prop.refOrder
   implicit def refShow = Prop.refShow
+  implicit def prgMonad: Monad[Prg] = FreeKT.freeKTMonad[Lang, Id]
 
   implicit val propagationApi: Propagation[Prg, Var, Val] =
     Prop.freePropagation[Lang]
@@ -38,7 +45,4 @@ object PropRel extends PropagationBundle {
 
   val interpreter = (Prop.interpreter :&&: RelMod.interpreter).freeInstance
   def propStore: Lens[State[Prg], Prop.State[Prg]] = implicitly[Lens[State[Prg], Prop.State[Prg]]]
-
-  private def fetch: λ[A => Val[Promise[A]]] ~> (State[Prg] => ?) =
-    λ[λ[A => Val[Promise[A]]] ~> (State[Prg] => ?)](pa => s => Prop.fetchResult(propStore.get(s))(pa).get)
 }

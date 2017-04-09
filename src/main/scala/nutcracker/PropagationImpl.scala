@@ -1,9 +1,10 @@
 package nutcracker
 
 import nutcracker.CellCycle.{LiveCycle, SporeCycle}
-import nutcracker.util.{FreeK, HEqualK, HOrderK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`, ∃}
+import nutcracker.util.{FreeK, FreeKT, HEqualK, HOrderK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`, ∃}
 import scala.annotation.tailrec
 import scalaz.{Equal, Functor, IndexedContT, Leibniz, Monad, Ordering, Show, StateT, ~>}
+import scalaz.Id.Id
 import scalaz.std.option._
 import scalaz.Leibniz.===
 import scalaz.syntax.equal._
@@ -19,6 +20,7 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
   implicit val refEquality: HEqualK[Var] = CellId.equalKInstance
   implicit def refOrder: HOrderK[Var] = CellId.orderKInstance
   implicit def refShow: ShowK[Var] = CellId.showKInstance
+  implicit def prgMonad: Monad[FreeK[Lang, ?]] = FreeKT.freeKTMonad[Lang, Id]
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Var, Val] =
     PropagationLang.freePropagation[Var, F]
 

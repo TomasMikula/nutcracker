@@ -2,6 +2,7 @@ package nutcracker
 
 import nutcracker.util.{FreeK, HEqualK, ShowK}
 import scala.language.implicitConversions
+import scalaz.Monad
 
 /** Bundle provides multiple APIs and is typically created by composing
   * multiple [[Module]]s.
@@ -22,6 +23,8 @@ trait Toolkit {
   type Prg[_]
   type State[K[_]]
 
+  implicit def prgMonad: Monad[Prg]
+
   def empty[K[_]]: State[K]
   def interpret[A](p: Prg[A], s: State[Prg]): (State[Prg], A)
 
@@ -36,9 +39,12 @@ trait RefToolkit extends Toolkit {
   implicit def refEquality: HEqualK[Var]
   implicit def refShow: ShowK[Var]
 
+  implicit def readOnly[A](ref: Var[A]): Val[A]
+
   def fetch[K[_], A](ref: Val[A], s: State[K]): A
 
-  implicit def readOnly[A](ref: Var[A]): Val[A]
+  def fetchResult[K[_], A](ref: Val[A], s: State[K])(implicit fin: Final[A]): Option[fin.Out] =
+    fin.extract(fetch(ref, s))
 }
 
 trait StashToolkit extends Toolkit {
