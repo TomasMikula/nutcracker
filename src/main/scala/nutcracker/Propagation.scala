@@ -1,58 +1,61 @@
 package nutcracker
 
 import nutcracker.util.ops.applicative._
+import scala.language.implicitConversions
 import scalaz.{Applicative, Functor, IndexedContT}
 import scalaz.syntax.functor._
 import shapeless.{::, HList, HNil}
 
-trait Propagation[M[_], Ref[_]] extends PSrc[Ref, M] {
+trait Propagation[M[_], Var[_], Val[_]] extends PSrc[Val, M] {
+
+  implicit def readOnly[A](a: Var[A]): Val[A]
 
   // basic instructions
 
-  def newCell[D](d: D)(implicit dom: Dom[D]): M[Ref[D]]
+  def newCell[D](d: D)(implicit dom: Dom[D]): M[Var[D]]
 
-  def updateImpl[D, U, Δ[_, _]](ref: Ref[D])(u: U)(implicit dom: IDom.Aux[D, U, Δ]): M[Unit]
+  def updateImpl[D, U, Δ[_, _]](ref: Var[D])(u: U)(implicit dom: IDom.Aux[D, U, Δ]): M[Unit]
 
-  def selTrigger[L <: HList](sel: Sel[Ref, L])(f: L => (Option[M[Unit]], Boolean)): M[Unit]
+  def selTrigger[L <: HList](sel: Sel[Var, L])(f: L => (Option[M[Unit]], Boolean)): M[Unit]
 
 
-  def newCell[D](implicit dom: DomWithBottom[D]): M[Ref[D]] =
+  def newCell[D](implicit dom: DomWithBottom[D]): M[Var[D]] =
     newCell(dom.bottom)
 
-  def update[D](ref: Ref[D])(implicit dom: Dom[D]): UpdateSyntaxHelper[D, dom.Update, dom.Delta] =
+  def update[D](ref: Var[D])(implicit dom: Dom[D]): UpdateSyntaxHelper[D, dom.Update, dom.Delta] =
     new UpdateSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
 
-  final class UpdateSyntaxHelper[D, U, Δ](ref: Ref[D])(implicit dom: Dom.Aux[D, U, Δ]) {
+  final class UpdateSyntaxHelper[D, U, Δ](ref: Var[D])(implicit dom: Dom.Aux[D, U, Δ]) {
     def by(u: U): M[Unit] = updateImpl[D, U, λ[(α, β) => Δ]](ref)(u)
   }
 
 
   // derived methods
 
-  def cells[D](d: D, n: Int)(implicit dom: Dom[D], M: Applicative[M]): M[Vector[Ref[D]]] =
+  def cells[D](d: D, n: Int)(implicit dom: Dom[D], M: Applicative[M]): M[Vector[Var[D]]] =
     newCell(d).replicate(n)
 
-  def selTrigger2[D1, D2](ref1: Ref[D1], ref2: Ref[D2])(f: (D1, D2) => (Option[M[Unit]], Boolean)): M[Unit] =
+  def selTrigger2[D1, D2](ref1: Var[D1], ref2: Var[D2])(f: (D1, D2) => (Option[M[Unit]], Boolean)): M[Unit] =
     selTrigger[D1 :: D2 :: HNil](Sel(ref1, ref2))((l: D1 :: D2 :: HNil) => f(l.head, l.tail.head))
 
-  def selThreshold2[D1, D2](ref1: Ref[D1], ref2: Ref[D2])(f: (D1, D2) => Option[M[Unit]]): M[Unit] =
+  def selThreshold2[D1, D2](ref1: Var[D1], ref2: Var[D2])(f: (D1, D2) => Option[M[Unit]]): M[Unit] =
     selTrigger2[D1, D2](ref1, ref2)((d1, d2) => f(d1, d2) match {
       case None => (None, true)
       case Some(mu) => (Some(mu), false)
     })
 
-  def _selThreshold2[D1, D2](ref1: Ref[D1], ref2: Ref[D2])(f: (D1, D2) => Option[M[_]])(implicit M: Functor[M]): M[Unit] =
+  def _selThreshold2[D1, D2](ref1: Var[D1], ref2: Var[D2])(f: (D1, D2) => Option[M[_]])(implicit M: Functor[M]): M[Unit] =
     selThreshold2(ref1, ref2)((d1, d2) => f(d1, d2).map(_.void))
 }
 
 object Propagation {
-  def apply[M[_], Ref[_]](implicit M: Propagation[M, Ref]): Propagation[M, Ref] = M
+  def apply[M[_], Ref[_], Val[_]](implicit M: Propagation[M, Ref, Val]): Propagation[M, Ref, Val] = M
 
   val module: PersistentPropagationModule = PropagationImpl
   val bundle: PropagationBundle = PropagationImpl
 }
 
-trait OnDemandPropagation[M[_], Ref[_]] extends Propagation[M, Ref] {
+trait OnDemandPropagation[M[_], Var[_], Val[_]] extends Propagation[M, Var, Val] {
   type ExclRef[A]
   type CellCycle[A]
 
@@ -63,7 +66,7 @@ trait OnDemandPropagation[M[_], Ref[_]] extends Propagation[M, Ref] {
     * cleanup routines (finalizers) that will be executed when all observers
     * leave. Typically, such finalizers will stop observing other cells.
     */
-  def newAutoCell[A](setup: IndexedContT[M, Unit, (ExclRef[A], CellCycle[A]), A])(implicit dom: Dom[A]): M[Ref[A]]
+  def newAutoCell[A](setup: IndexedContT[M, Unit, (ExclRef[A], CellCycle[A]), A])(implicit dom: Dom[A]): M[Val[A]]
 
   /** Register a cleanup routine to execute at the end of the cell-cycle,
     * i.e. when all of cell's observers unregister.
@@ -74,5 +77,5 @@ trait OnDemandPropagation[M[_], Ref[_]] extends Propagation[M, Ref] {
     */
   def addFinalizer[A](ref: ExclRef[A], cycle: CellCycle[A], value: Subscription[M]): M[Subscription[M]]
 
-  def update[A, U, Δ[_, _]](ref: Ref[A], cycle: CellCycle[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): M[Unit]
+  def update[A, U, Δ[_, _]](ref: ExclRef[A], cycle: CellCycle[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): M[Unit]
 }

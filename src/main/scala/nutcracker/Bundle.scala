@@ -29,12 +29,13 @@ trait Toolkit {
 }
 
 trait RefToolkit extends Toolkit {
-  type Ref[_]
+  type Var[_]
+  type Val[_]
 
-  implicit def refEquality: HEqualK[Ref]
-  implicit def refShow: ShowK[Ref]
+  implicit def refEquality: HEqualK[Var]
+  implicit def refShow: ShowK[Var]
 
-  def fetch[K[_], A](ref: Ref[A], s: State[K]): A
+  def fetch[K[_], A](ref: Val[A], s: State[K]): A
 }
 
 trait StashToolkit extends Toolkit {

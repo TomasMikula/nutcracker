@@ -12,12 +12,12 @@ class Sudoku extends FunSuite {
   import PropBranch._
   import Promises._
 
-  val P1 = Propagation[Prg, Ref]
+  val P1 = Propagation[Prg, Var, Val]
 
   import P1._
 
 
-  type Cell = Ref[DecSet[Int]]
+  type Cell = Var[DecSet[Int]]
 
   /** A program that sets up an empty Sudoku, that is 81 integer variables
     * and definitional constraints.
@@ -54,7 +54,7 @@ class Sudoku extends FunSuite {
           else if(ys.size == 1) Some(xPos.set(cell))
           else None
         )}).sequence_
-        _ <- xPos.whenFinal(cell => cell.set(x))
+        _ <- xPos.asVal.whenFinal(cell => cell.set(x))
       } yield ()
     }
 

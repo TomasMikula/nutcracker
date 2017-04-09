@@ -18,7 +18,7 @@ class Sat extends FunSpec {
   import PropBranch.branchingApi.{propagation => _, _}
   import Promises._
 
-  val B = BoolOps[Prg, Ref]
+  val B = BoolOps[Prg, Var, Val]
   import B._
 
   implicit val freeKMonad: Monad[FreeKT[Prop.Lang, Id, ?]] = FreeKT.freeKTMonad[Prop.Lang, Id]

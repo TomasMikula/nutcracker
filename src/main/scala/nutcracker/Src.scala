@@ -1,7 +1,6 @@
 package nutcracker
 
 import nutcracker.util.ContU
-import scala.language.higherKinds
 import scalaz.{Bind, Functor, IndexedContT}
 import scalaz.syntax.bind._
 

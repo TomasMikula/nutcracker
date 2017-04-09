@@ -2,7 +2,6 @@ package nutcracker
 
 import nutcracker.ops._
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput, Uninhabited}
-import scala.language.higherKinds
 import scalaz.{Bind, ContT, Functor, Monad, Show}
 import scalaz.Id.Id
 
@@ -22,28 +21,28 @@ object Discrete extends DiscreteInstances {
   type Update[A] = Uninhabited
   type Delta[A] = Uninhabited
 
-  def map[M[_], Ref[_], A, B](refC: ContU[M, Ref[Discrete[A]]])(f: A => B)(implicit M: Propagation[M, Ref], MB: Bind[M]): ContU[M, Ref[Discrete[B]]] = for {
+  def map[M[_], Var[_], Val[_], A, B](refC: ContU[M, Var[Discrete[A]]])(f: A => B)(implicit M: Propagation[M, Var, Val], MB: Bind[M]): ContU[M, Var[Discrete[B]]] = for {
     ref <- refC
-    a   <- ref.asCont_[M]
+    a   <- ref.asVal.asCont_
     res <- cellC(f(a))
   } yield res
 
-  def mapC[M[_]: Functor, Ref[_]: Propagation[M, ?[_]], A, B](ref: Ref[Discrete[A]])(f: A => ContU[M, Ref[Discrete[B]]]): ContU[M, Ref[Discrete[B]]] = for {
-    a   <- ref.asCont_[M]
+  def mapC[M[_], Var[_], Val[_], A, B](ref: Var[Discrete[A]])(f: A => ContU[M, Var[Discrete[B]]])(implicit P: Propagation[M, Var, Val], M: Functor[M]): ContU[M, Var[Discrete[B]]] = for {
+    a   <- ref.asVal.asCont_
     res <- f(a)
   } yield res
 
-  def filterMap[M[_], Ref[_], A, B](refC: ContT[M, Unit, Ref[Discrete[A]]])(f: A => Option[B])(implicit P: Propagation[M, Ref], M: Monad[M]): ContT[M, Unit, Ref[Discrete[B]]] = for {
+  def filterMap[M[_], Var[_], Val[_], A, B](refC: ContT[M, Unit, Var[Discrete[A]]])(f: A => Option[B])(implicit P: Propagation[M, Var, Val], M: Monad[M]): ContT[M, Unit, Var[Discrete[B]]] = for {
     ref <- refC
-    a   <- ref.asCont_[M]
+    a   <- ref.asVal.asCont_
     res <- f(a) match {
       case Some(b) => ContU.liftM(P.newCell(Discrete(b)))
-      case None    => ContU.noop[M, Ref[Discrete[B]]]
+      case None    => ContU.noop[M, Var[Discrete[B]]]
     }
   } yield res
 
-  def cellC[M[_], Ref[_], A](a: A)(implicit M: Propagation[M, Ref], MB: Bind[M]): ContT[M, Unit, Ref[Discrete[A]]] =
-    ContT.liftM[Id, M, Unit, Ref[Discrete[A]]](M.newCell(Discrete(a)))
+  def cellC[M[_], Var[_], Val[_], A](a: A)(implicit M: Propagation[M, Var, Val], MB: Bind[M]): ContT[M, Unit, Var[Discrete[A]]] =
+    ContT.liftM[Id, M, Unit, Var[Discrete[A]]](M.newCell(Discrete(a)))
 
   implicit def domInstance[A]: RDom.Aux[Discrete[A], Update[A], Delta[A]] = new RDom[Discrete[A]] {
     type Update = Discrete.Update[A]

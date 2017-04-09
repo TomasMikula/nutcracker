@@ -1,9 +1,11 @@
 package nutcracker
 
 package object ops
-  extends ToRefOps
+  extends ToValOps
+    with ToVarOps
     with ToDomOps
-    with ToFinalRefOps
-    with ToJoinRefOps
+    with ToFinalValOps
+    with ToJoinValOps
+    with ToJoinVarOps
     with ToRelativelyComplementedRefOps
     with ToRelativelyComplementedRefSeqOps

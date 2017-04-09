@@ -36,17 +36,17 @@ object DecSet {
   def singleton[A](a: A): DecSet[A] = new DecSet(Set(a))
   def wrap[A](as: Set[A]): DecSet[A] = new DecSet(as)
 
-  def init[M[_], Ref[_], A](as: Set[A])(implicit M: BranchingPropagation[M, Ref]): M[Ref[DecSet[A]]] =
+  def init[M[_], Var[_], Val[_], A](as: Set[A])(implicit M: BranchingPropagation[M, Var, Val]): M[Var[DecSet[A]]] =
     M.newVar(wrap(as))
-  def oneOf[M[_], Ref[_], A](as: A*)(implicit M: BranchingPropagation[M, Ref]): M[Ref[DecSet[A]]] =
+  def oneOf[M[_], Var[_], Val[_], A](as: A*)(implicit M: BranchingPropagation[M, Var, Val]): M[Var[DecSet[A]]] =
     init(as.toSet)
 
   /** Convenience method to add an exclusive choice of arbitrary free programs
     * to continue. When the choice is made, the chosen program is executed.
     */
-  def branchAndExec[M[_], Ref[_]](conts: Set[M[Unit]])(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): M[Unit] =
-    init(conts) >>= { _.whenFinal_(k => k) }
-  def branchAndExec[M[_], Ref[_]](conts: M[Unit]*)(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): M[Unit] =
+  def branchAndExec[M[_], Var[_], Val[_]](conts: Set[M[Unit]])(implicit M: BranchingPropagation[M, Var, Val], B: Bind[M]): M[Unit] =
+    init(conts) >>= { _.asVal.whenFinal_(k => k) }
+  def branchAndExec[M[_], Var[_], Val[_]](conts: M[Unit]*)(implicit M: BranchingPropagation[M, Var, Val], B: Bind[M]): M[Unit] =
     branchAndExec(conts.toSet)
 
   /** Convenience method to add an exclusive choice of multiple possibilities,
@@ -57,9 +57,9 @@ object DecSet {
     * a choice from the cartesian product `as × as`. If this is not desired,
     * use [[init]] directly.
     */
-  def branchC[M[_], Ref[_], A](as: Set[A])(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): Cont[M[Unit], A] =
-    Cont(f => init(as) >>= { _.asCont_.run(f) })
-  def branchC[M[_], Ref[_], A](as: A*)(implicit M: BranchingPropagation[M, Ref], B: Bind[M]): Cont[M[Unit], A] =
+  def branchC[M[_], Var[_], Val[_], A](as: Set[A])(implicit M: BranchingPropagation[M, Var, Val], B: Bind[M]): Cont[M[Unit], A] =
+    Cont(f => init(as) >>= { _.asVal.asCont_.run(f) })
+  def branchC[M[_], Var[_], Val[_], A](as: A*)(implicit M: BranchingPropagation[M, Var, Val], B: Bind[M]): Cont[M[Unit], A] =
     branchC(as.toSet)
 
   implicit def domInstance[A]: DecSet.Dom[A] =

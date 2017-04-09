@@ -11,18 +11,19 @@ import scalaz.syntax.monad._
 import shapeless.{HList, Nat, Sized}
 
 private[nutcracker] object PropagationImpl extends PersistentPropagationModule with PropagationBundle { self =>
-  type Ref[A] = CellId[A]
-  type Lang[K[_], A] = PropagationLang[Ref, K, A]
+  type Var[A] = CellId[A]
+  type Val[A] = CellId[A]
+  type Lang[K[_], A] = PropagationLang[Var, K, A]
   type State[K[_]] = PropagationStore[K]
 
-  implicit val refEquality: HEqualK[Ref] = CellId.equalKInstance
-  implicit def refOrder: HOrderK[Ref] = CellId.orderKInstance
-  implicit def refShow: ShowK[Ref] = CellId.showKInstance
-  implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Ref] =
-    PropagationLang.freePropagation[Ref, F]
+  implicit val refEquality: HEqualK[Var] = CellId.equalKInstance
+  implicit def refOrder: HOrderK[Var] = CellId.orderKInstance
+  implicit def refShow: ShowK[Var] = CellId.showKInstance
+  implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Var, Val] =
+    PropagationLang.freePropagation[Var, F]
 
-  val propagationApi: Propagation[Prg, Ref] =
-    PropagationLang.freePropagation[Ref, Lang]
+  val propagationApi: Propagation[Prg, Var, Val] =
+    PropagationLang.freePropagation[Var, Lang]
 
   def empty[K[_]]: PropagationStore[K] =
     PropagationStore[K](
@@ -39,12 +40,12 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
     interpreter.freeInstance.apply(p).run(s)
 
   val interpreter: StateInterpreter[Lang, State] =
-    new StateInterpreter[PropagationLang[Ref, ?[_], ?], PropagationStore] {
+    new StateInterpreter[PropagationLang[Var, ?[_], ?], PropagationStore] {
 
-      def step: Step[PropagationLang[Ref, ?[_], ?], PropagationStore] =
-        new Step[PropagationLang[Ref, ?[_], ?], PropagationStore] {
+      def step: Step[PropagationLang[Var, ?[_], ?], PropagationStore] =
+        new Step[PropagationLang[Var, ?[_], ?], PropagationStore] {
           import PropagationLang._
-          override def apply[K[_]: Monad, A](p: PropagationLang[Ref, K, A]): WriterState[Lst[K[Unit]], PropagationStore[K], A] = WriterState(s =>
+          override def apply[K[_]: Monad, A](p: PropagationLang[Var, K, A]): WriterState[Lst[K[Unit]], PropagationStore[K], A] = WriterState(s =>
             p match {
               case Update(ref, u, dom) =>
                 (Lst.empty, s.update[dom.Domain, dom.Update, dom.IDelta](ref, u)(dom), ())
@@ -93,14 +94,14 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
         })
     }
 
-  def fetch[K[_], D](ref: Ref[D], s: State[K]): D =
+  def fetch[K[_], D](ref: Var[D], s: State[K]): D =
     s.fetch(ref)
 
   def isConsistent[K[_]](s: PropagationStore[K]): Boolean =
     s.failedVars.isEmpty
 
-  def stashable: StashPropagationModule { type Ref[A] = self.Ref[A]; type Lang[K[_], A] = self.Lang[K, A] } =
-    new PropagationListModule[self.Ref, self.Lang, self.State](this)
+  def stashable: StashPropagationModule { type Var[A] = self.Var[A]; type Val[A] = self.Val[A]; type Lang[K[_], A] = self.Lang[K, A] } =
+    new PropagationListModule[self.Var, self.Val, self.Lang, self.State](this)
 }
 
 

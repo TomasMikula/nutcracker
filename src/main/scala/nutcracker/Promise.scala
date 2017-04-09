@@ -1,6 +1,5 @@
 package nutcracker
 
-import scala.language.higherKinds
 import nutcracker.Promise.Empty
 import nutcracker.util.{DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
 

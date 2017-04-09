@@ -1,6 +1,7 @@
 package nutcracker.demo
 
 import nutcracker._
+import nutcracker.ops._
 import nutcracker.rel.Pattern
 import nutcracker.rel.Rel.Rel2
 import org.scalatest.{FunSpec, Matchers}
@@ -11,7 +12,7 @@ import shapeless.{::, HNil}
 
 class SimpleForwardInference extends FunSpec with Matchers {
   import PropRel._
-  import PropRel.Prop.{Ref => _, _}
+  import PropRel.Prop.{Var => _, _}
   import PropRel.relationsApi._
   import Promises._
 
@@ -73,7 +74,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
 
     it("should follow that a < e") {
       val (s, promise) = PropRel.interpreter(problem)(PropRel.empty)
-      Prop.fetchResult(PropRel.propStore.get(s))(promise) should be (Some(()))
+      Prop.fetchResult(PropRel.propStore.get(s))(promise.asVal) should be (Some(()))
     }
   }
 }

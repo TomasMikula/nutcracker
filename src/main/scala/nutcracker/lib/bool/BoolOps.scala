@@ -8,26 +8,26 @@ import nutcracker.ops._
 import scalaz.{Applicative, Apply, Bind, Monad}
 import scalaz.syntax.bind._
 
-class BoolOps[M[_], Ref[_]](implicit P: BranchingPropagation[M, Ref]) {
+class BoolOps[M[_], Var[_], Val[_]](implicit P: BranchingPropagation[M, Var, Val]) {
   import P._
 
-  def and(x: Ref[Bool], y: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = for {
+  def and(x: Var[Bool], y: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
     res <- newVar[Bool]
-    _ <- x._whenFinal[M]({ r =>
+    _ <- x.asVal._whenFinal({ r =>
       if (r) y <=> res
       else res.set(false)
     })
-    _ <- y._whenFinal[M]({ r =>
+    _ <- y.asVal._whenFinal({ r =>
       if (r) x <=> res
       else res.set(false)
     })
-    _ <- res._whenFinal({ r =>
+    _ <- res.asVal._whenFinal({ r =>
       if (r) x.set(true) >> y.set(true)
       else M.pure(())
     })
   } yield res
 
-  def or(x: Ref[Bool]*)(implicit M: Monad[M]): M[Ref[Bool]] = {
+  def or(x: Var[Bool]*)(implicit M: Monad[M]): M[Var[Bool]] = {
     newVar[Bool] >>= { res =>
       def watch(i: Int, j: Int): M[_] = {
         require(i < j)
@@ -44,7 +44,7 @@ class BoolOps[M[_], Ref[_]](implicit P: BranchingPropagation[M, Ref]) {
             if (di == MustBeTrue || dj == MustBeTrue) {
               // found a variable set to true,
               // thus the result must be true
-              Some(res.set[M, Boolean](true))
+              Some(res.set(true))
             } else if (di == MustBeFalse) {
               // pick next variable to watch instead of x(i)
               Some(watch(i-1, j))
@@ -61,84 +61,84 @@ class BoolOps[M[_], Ref[_]](implicit P: BranchingPropagation[M, Ref]) {
     }
   }
 
-  def neg(x: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = for {
+  def neg(x: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
     res <- newVar[Bool]
-    _ <- x.whenFinal({ r =>
+    _ <- x.asVal.whenFinal({ r =>
       if (r) res.set(false)
       else res.set(true)
     })
-    _ <- res.whenFinal({ r =>
+    _ <- res.asVal.whenFinal({ r =>
       if (r) x.set(false)
       else x.set(true)
     })
   } yield res
 
-  def negM(x: M[Ref[Bool]])(implicit M: Monad[M]): M[Ref[Bool]] =
+  def negM(x: M[Var[Bool]])(implicit M: Monad[M]): M[Var[Bool]] =
     x >>= { neg(_) }
 
-  def not(x: Ref[Bool]): M[Unit] =
+  def not(x: Var[Bool]): M[Unit] =
     x.set(false)
 
-  def imp(x: Ref[Bool], y: Ref[Bool])(implicit M: Applicative[M]): M[Unit] = {
-    x.whenFinal({ r =>
+  def imp(x: Var[Bool], y: Var[Bool])(implicit M: Applicative[M]): M[Unit] = {
+    x.asVal.whenFinal({ r =>
       if (r) y.set(true)
       else M.pure(())
     }) *>
-    y.whenFinal_({ r =>
+    y.asVal.whenFinal_({ r =>
       if (r) M.pure(())
       else x.set(false)
     })
   }
 
-  def atLeastOneTrue(x: Ref[Bool]*)(implicit M: Monad[M]): M[Unit] =
+  def atLeastOneTrue(x: Var[Bool]*)(implicit M: Monad[M]): M[Unit] =
     presume(or(x: _*))
 
-  def presume(x: Ref[Bool]): M[Unit] =
+  def presume(x: Var[Bool]): M[Unit] =
     x.set(true)
 
-  def presume(x: M[Ref[Bool]])(implicit B: Bind[M]): M[Unit] =
+  def presume(x: M[Var[Bool]])(implicit B: Bind[M]): M[Unit] =
     x >>= { _.set(true) }
 
-  implicit class BoolRefOps(self: Ref[Bool]) {
+  implicit class BoolRefOps(self: Var[Bool]) {
 
-    def ===(that: Ref[Bool])(implicit M: Apply[M]): M[Unit] = {
-      (self whenFinal_ { (x: Boolean) => that.set(x) }) *>
-      (that whenFinal_ { (x: Boolean) => self.set(x) })
+    def ===(that: Var[Bool])(implicit M: Apply[M]): M[Unit] = {
+      (self.asVal whenFinal_ { (x: Boolean) => that.set(x) }) *>
+      (that.asVal whenFinal_ { (x: Boolean) => self.set(x) })
     }
 
-    def =?=(that: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = for {
+    def =?=(that: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
       res <- newVar[Bool]
-      _ <- res  whenFinal { (x: Boolean) => if(x) (self === that) else (self =!= that) }
-      _ <- self whenFinal { (x: Boolean) => if(x) (res  === that) else (res  =!= that) }
-      _ <- that whenFinal { (x: Boolean) => if(x) (res  === self) else (res  =!= self) }
+      _ <- res.asVal  whenFinal { (x: Boolean) => if(x) (self === that) else (self =!= that) }
+      _ <- self.asVal whenFinal { (x: Boolean) => if(x) (res  === that) else (res  =!= that) }
+      _ <- that.asVal whenFinal { (x: Boolean) => if(x) (res  === self) else (res  =!= self) }
     } yield res
 
-    def =??=(that: M[Ref[Bool]])(implicit M: Monad[M]): M[Ref[Bool]] =
+    def =??=(that: M[Var[Bool]])(implicit M: Monad[M]): M[Var[Bool]] =
       that >>= { self =?= _ }
 
-    def |(that: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] =
+    def |(that: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] =
       or(self, that)
-    def ||(that: M[Ref[Bool]])(implicit M: Monad[M]): M[Ref[Bool]] =
+    def ||(that: M[Var[Bool]])(implicit M: Monad[M]): M[Var[Bool]] =
       that >>= { self | _ }
 
-    def &(that: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = and(self, that)
-    def &&(that: M[Ref[Bool]])(implicit M: Monad[M]): M[Ref[Bool]] =
+    def &(that: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = and(self, that)
+    def &&(that: M[Var[Bool]])(implicit M: Monad[M]): M[Var[Bool]] =
       that >>= { self & _ }
   }
 
-  implicit class BoolRefOps1(self: M[Ref[Bool]]) {
-    def ===(that: Ref[Bool])(implicit B: Bind[M]): M[Unit] = self >>= { _ === that }
-    def =!=(that: Ref[Bool])(implicit B: Bind[M]): M[Unit] = self >>= { _ =!= that }
-    def =?=(that: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = self >>= { _ =?= that }
-    def =??=(that: M[Ref[Bool]])(implicit M: Monad[M]): M[Ref[Bool]] = self >>= { _ =??= that }
-    def |(that: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = self >>= { _ | that }
-    def ||(that: M[Ref[Bool]])(implicit M: Monad[M]): M[Ref[Bool]] = self >>= { _ || that }
-    def &(that: Ref[Bool])(implicit M: Monad[M]): M[Ref[Bool]] = self >>= { _ & that }
-    def &&(that: M[Ref[Bool]])(implicit M: Monad[M]): M[Ref[Bool]] = self >>= { _ && that }
+  implicit class BoolRefOps1(self: M[Var[Bool]]) {
+    def ===(that: Var[Bool])(implicit B: Bind[M]): M[Unit] = self >>= { _ === that }
+    def =!=(that: Var[Bool])(implicit B: Bind[M]): M[Unit] = self >>= { _ =!= that }
+    def =?=(that: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = self >>= { _ =?= that }
+    def =??=(that: M[Var[Bool]])(implicit M: Monad[M]): M[Var[Bool]] = self >>= { _ =??= that }
+    def |(that: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = self >>= { _ | that }
+    def ||(that: M[Var[Bool]])(implicit M: Monad[M]): M[Var[Bool]] = self >>= { _ || that }
+    def &(that: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = self >>= { _ & that }
+    def &&(that: M[Var[Bool]])(implicit M: Monad[M]): M[Var[Bool]] = self >>= { _ && that }
   }
 
 }
 
 object BoolOps {
-  def apply[M[_], Ref[_]](implicit P: BranchingPropagation[M, Ref]): BoolOps[M, Ref] = new BoolOps()
+  def apply[M[_], Var[_], Val[_]](implicit P: BranchingPropagation[M, Var, Val]): BoolOps[M, Var, Val] = new BoolOps()
 }

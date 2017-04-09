@@ -1,7 +1,5 @@
 package nutcracker
 
-import scala.language.higherKinds
-
 /** Represents a discrete (non-refinable) value that can be revoked.
   * Is isomorphic to `Closeable[Discrete[A]]`.
   * @see [[Discrete]], [[Closeable]]
@@ -20,10 +18,10 @@ object Revocable {
 
   def apply[A](a: A): Revocable[A] = Valid(a)
 
-  def init[F[_], Ref[_], A](a: A)(implicit P: Propagation[F, Ref]): F[Ref[Revocable[A]]] =
+  def init[F[_], Var[_], Val[_], A](a: A)(implicit P: Propagation[F, Var, Val]): F[Var[Revocable[A]]] =
     P.newCell(Revocable(a))
 
-  def revoke[F[_], Ref[_], A](ref: Ref[Revocable[A]])(implicit P: Propagation[F, Ref]): F[Unit] =
+  def revoke[F[_], Var[_], Val[_], A](ref: Var[Revocable[A]])(implicit P: Propagation[F, Var, Val]): F[Unit] =
     P.update(ref).by(())
 
   implicit def domInstance[A]: Dom.Aux[Revocable[A], Update, Delta] with TerminalDom[Revocable[A]] =

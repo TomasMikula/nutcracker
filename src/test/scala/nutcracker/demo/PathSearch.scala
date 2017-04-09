@@ -1,6 +1,7 @@
 package nutcracker.demo
 
 import nutcracker._
+import nutcracker.ops._
 import nutcracker.algebraic.NonDecreasingMonoid
 import nutcracker.DecSet._
 import nutcracker.util.FreeKT
@@ -82,24 +83,24 @@ class PathSearch extends FunSuite {
 
   def successors(v: Vertex): List[(Int, Vertex)] = edges filter { _._1 == v } map { _._2 }
 
-  def findPath(u: Vertex, v: Vertex): Prg[Ref[Promise[Path]]] = for {
+  def findPath(u: Vertex, v: Vertex): Prg[Val[Promise[Path]]] = for {
     pr <- promise[Path]()
     _ <- findPath(Nil, u, v, pr)
-  } yield pr
+  } yield pr.asVal
 
-  def findPath(visited: List[Vertex], u: Vertex, v: Vertex, pr: Ref[Promise[Path]]): Prg[Unit] = {
+  def findPath(visited: List[Vertex], u: Vertex, v: Vertex, pr: Var[Promise[Path]]): Prg[Unit] = {
     branchAndExec(
       zeroLengthPaths(visited, u, v, pr),
       nonZeroLengthPaths(visited, u, v, pr)
     )
   }
 
-  def zeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Ref[Promise[Path]]): Prg[Unit] = {
+  def zeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Var[Promise[Path]]): Prg[Unit] = {
     if(u == v) complete(pr, revPath(u::visited))
     else branchAndExec()
   }
 
-  def nonZeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Ref[Promise[Path]]): Prg[Unit] = {
+  def nonZeroLengthPaths(visited: List[Vertex], u: Vertex, v: Vertex, pr: Var[Promise[Path]]): Prg[Unit] = {
     val branches = successors(u) filter {
       case (c, w) => w != u && !visited.contains(w)
     } map {

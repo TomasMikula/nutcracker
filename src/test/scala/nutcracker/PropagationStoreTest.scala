@@ -9,14 +9,14 @@ import nutcracker.Trigger._
 class PropagationStoreTest extends FunSuite {
   import PropBranch._
 
-  val P = Propagation[Prg, Ref]
+  val P = Propagation[Prg, Var, Val]
   import P._
 
   test("diff accumulation") {
     val prg = for {
       ref <- oneOf(1, 2, 3, 4, 5)
-      log <- newLog[Prg, Ref, Removed[Int]]
-      _   <- observe(ref).by(_ => sleep(continually((s: DecSet[Int], d: Removed[Int]) => log.write[Prg](d))))
+      log <- newLog[Removed[Int]]()
+      _   <- observe(ref).by(_ => sleep(continually((s: DecSet[Int], d: Removed[Int]) => log.write(d))))
       _   <- ref.exclude(DecSet(1, 2))
       _   <- ref.exclude(DecSet(4, 5))
     } yield log
@@ -29,8 +29,8 @@ class PropagationStoreTest extends FunSuite {
   test("delta is cleared after being handled") {
     val prg1 = for {
       ref <- oneOf(1, 2, 3, 4, 5)
-      log <- newLog[Prg, Ref, Removed[Int]]
-      _   <- observe(ref).by(_ => sleep(continually((s: DecSet[Int], d: Removed[Int]) => log.write[Prg](d))))
+      log <- newLog[Removed[Int]]()
+      _   <- observe(ref).by(_ => sleep(continually((s: DecSet[Int], d: Removed[Int]) => log.write(d))))
       _   <- ref.exclude(DecSet(1, 2))
     } yield (ref, log)
 
@@ -48,8 +48,8 @@ class PropagationStoreTest extends FunSuite {
     val prg = for {
       ref <- oneOf(1, 2, 3, 4, 5)
       _   <- ref.exclude(DecSet(4, 5, 6, 7)) // should not be logged
-      log <- newLog[Prg, Ref, Removed[Int]]
-      _   <- observe(ref).by(_ => sleep(continually((s: DecSet[Int], d: Removed[Int]) => log.write[Prg](d))))
+      log <- newLog[Removed[Int]]()
+      _   <- observe(ref).by(_ => sleep(continually((s: DecSet[Int], d: Removed[Int]) => log.write(d))))
       _   <- ref.exclude(DecSet(2, 3, 4, 5)) // only removal of {2, 3} should be logged
     } yield log
 

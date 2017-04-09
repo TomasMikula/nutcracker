@@ -1,6 +1,6 @@
 package nutcracker
 
-import scala.language.higherKinds
+import nutcracker.ops._
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
 import scalaz.{Applicative, Bind, Functor, IndexedContT, Monad}
 import scalaz.std.list._
@@ -61,65 +61,65 @@ object IncSet {
 }
 
 
-class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
+class IncSets[F[_], Var[_], Val[_]](implicit P: Propagation[F, Var, Val]) {
   import IncSet._
 
-  def init[A]: F[Ref[IncSet[A]]] =
+  def init[A]: F[Var[IncSet[A]]] =
     P.newCell(IncSet.empty[A])
 
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
     */
-  def forEach[A](ref: Ref[IncSet[A]])(implicit F: Applicative[F]): IndexedContT[F, Subscription[F], Unit, A] = {
+  def forEach[A](ref: Var[IncSet[A]])(implicit F: Applicative[F]): IndexedContT[F, Subscription[F], Unit, A] = {
     import scalaz.syntax.traverse._
-    IndexedContT(f => P.observe(ref).by(as => {
+    IndexedContT(f => ref.asVal.observe.by(as => {
       val now = as.toList.traverse_(f)
       val onChange = Trigger.continually((as: IncSet[A], delta: Delta[A]) => delta.value.toList.traverse_(f))
       Trigger.fireReload(now.as(Trigger.sleep(onChange)))
     }))
   }
 
-  def forEach_[A](ref: Ref[IncSet[A]])(implicit F: Applicative[F]): ContU[F, A] = {
+  def forEach_[A](ref: Var[IncSet[A]])(implicit F: Applicative[F]): ContU[F, A] = {
     val cps = forEach(ref)
     ContU(f => cps(f).void)
   }
 
-  def insert[A](a: A, into: Ref[IncSet[A]]): F[Unit] =
+  def insert[A](a: A, into: Var[IncSet[A]]): F[Unit] =
     insertAll(Set(a), into)
 
-  def insertAll[A](add: Set[A], into: Ref[IncSet[A]]): F[Unit] =
+  def insertAll[A](add: Set[A], into: Var[IncSet[A]]): F[Unit] =
     P.update(into).by(Join(IncSet.wrap(add)))
 
-  def include[A](sub: Ref[IncSet[A]], sup: Ref[IncSet[A]])(implicit F: Functor[F]): F[Unit] =
-    P.observe(sub).by((sa: IncSet[A]) => {
+  def include[A](sub: Var[IncSet[A]], sup: Var[IncSet[A]])(implicit F: Functor[F]): F[Unit] =
+    sub.asVal.observe.by((sa: IncSet[A]) => {
       val now = insertAll(sa.value, sup)
       val onChange = Trigger.continually((sa: IncSet[A], delta: Delta[A]) => insertAll(delta.value, sup))
       Trigger.fireReload(now.as(Trigger.sleep(onChange)))
     }).void
 
-  def includeC[A](cps: ContU[F, A], ref: Ref[IncSet[A]]): F[Unit] =
+  def includeC[A](cps: ContU[F, A], ref: Var[IncSet[A]]): F[Unit] =
     cps(a => insert(a, ref))
 
-  def collect[A](cps: ContU[F, A])(implicit B: Bind[F]): F[Ref[IncSet[A]]] = for {
+  def collect[A](cps: ContU[F, A])(implicit B: Bind[F]): F[Var[IncSet[A]]] = for {
     res <- init[A]
     _   <- includeC(cps, res)
   } yield res
 
-  def collectAll[A](cps: ContU[F, A]*)(implicit M: Monad[F]): F[Ref[IncSet[A]]] =
+  def collectAll[A](cps: ContU[F, A]*)(implicit M: Monad[F]): F[Var[IncSet[A]]] =
     collectAll(cps)
 
-  def collectAll[A](cps: Iterable[ContU[F, A]])(implicit M: Monad[F]): F[Ref[IncSet[A]]] =
+  def collectAll[A](cps: Iterable[ContU[F, A]])(implicit M: Monad[F]): F[Var[IncSet[A]]] =
     collect(ContU.sequence(cps))
 
-  /** Relative monadic bind. `Ref[IncSet[A]]` is a monad relative to `F`,
+  /** Relative monadic bind. `Var[IncSet[A]]` is a monad relative to `F`,
     * i.e. we can implement `bind` if additional effects of type `F` are allowed.
-    * This is equivalent to having a monad instance for `λ[A => F[Ref[IncSet[A]]]]`.
+    * This is equivalent to having a monad instance for `λ[A => F[Var[IncSet[A]]]]`.
     */
-  def relBind[A, B](sref: Ref[IncSet[A]])(f: A => F[Ref[IncSet[B]]])(implicit M: Monad[F]): F[Ref[IncSet[B]]] = {
+  def relBind[A, B](sref: Var[IncSet[A]])(f: A => F[Var[IncSet[B]]])(implicit M: Monad[F]): F[Var[IncSet[B]]] = {
     import scalaz.syntax.traverse._
     for {
       res <- init[B]
-      _ <- P.observe[IncSet[A]](sref).by((sa: IncSet[A]) => {
+      _ <- sref.asVal.observe.by((sa: IncSet[A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
         val onChange = Trigger.continually((sa: IncSet[A], delta: Delta[A]) => delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res))))
         Trigger.fireReload(now.as(Trigger.sleep(onChange)))
@@ -127,11 +127,11 @@ class IncSets[F[_], Ref[_]](implicit P: Propagation[F, Ref]) {
     } yield res
   }
 
-  implicit def monad(implicit M: Monad[F]): Monad[λ[A => F[Ref[IncSet[A]]]]] =
-    new Monad[λ[A => F[Ref[IncSet[A]]]]] {
-      def point[A](a: => A): F[Ref[IncSet[A]]] = P.newCell(IncSet.singleton(a))
+  implicit def monad(implicit M: Monad[F]): Monad[λ[A => F[Var[IncSet[A]]]]] =
+    new Monad[λ[A => F[Var[IncSet[A]]]]] {
+      def point[A](a: => A): F[Var[IncSet[A]]] = P.newCell(IncSet.singleton(a))
 
-      def bind[A, B](fa: F[Ref[IncSet[A]]])(f: A => F[Ref[IncSet[B]]]): F[Ref[IncSet[B]]] =
+      def bind[A, B](fa: F[Var[IncSet[A]]])(f: A => F[Var[IncSet[B]]]): F[Var[IncSet[B]]] =
         fa.flatMap(sa => relBind(sa)(f))
     }
 }

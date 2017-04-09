@@ -1,6 +1,6 @@
 package nutcracker.ops
 
-import scala.language.{higherKinds, implicitConversions}
+import scala.language.implicitConversions
 import nutcracker.{BranchingPropagation, Dom, Final, JoinDom, Propagation, RelativelyComplementedDom, Subscription, Unchanged, Updated}
 import nutcracker.Trigger.continually
 import nutcracker.lib.bool.Bool
@@ -8,102 +8,124 @@ import nutcracker.util.ContU
 import scalaz.{Applicative, Apply, Bind, Functor, IndexedContT, Traverse}
 import scalaz.syntax.bind._
 
-final case class RefOps[Ref[_], D, U, Δ](ref: Ref[D])(implicit val dom: Dom.Aux[D, U, Δ]) {
-  def observe[M[_]](implicit P: Propagation[M, Ref]) = P.observe(ref)
+final case class ValOps[Val[_], D, U, Δ](ref: Val[D])(implicit val dom: Dom.Aux[D, U, Δ]) {
+  def observe[M[_], Var[_]](implicit P: Propagation[M, Var, Val]) = P.observe(ref)
 
-  def peekC[M[_]](implicit P: Propagation[M, Ref], M: Functor[M]): ContU[M, D] =
+  def peekC[M[_], Var[_]](implicit P: Propagation[M, Var, Val], M: Functor[M]): ContU[M, D] =
     ContU(f => P.peek_(ref)(f))
 }
 
-trait ToRefOps {
-  implicit def toRefOps[Ref[_], D](ref: Ref[D])(implicit dom: Dom[D]): RefOps[Ref, D, dom.Update, dom.Delta] =
-    RefOps[Ref, D, dom.Update, dom.Delta](ref)(dom)
+trait ToValOps {
+  implicit def toValOps[Val[_], D](ref: Val[D])(implicit dom: Dom[D]): ValOps[Val, D, dom.Update, dom.Delta] =
+    ValOps[Val, D, dom.Update, dom.Delta](ref)(dom)
 }
 
-final case class FinalRefOps[Ref[_], D, U, Δ, A](ref: Ref[D])(implicit dom: Dom.Aux[D, U, Δ], fin: Final.Aux[D, A]) {
+final case class VarOps[Var[_], D](ref: Var[D]) extends AnyVal {
+  def asVal[M[_], Val[_]](implicit P: Propagation[M, Var, Val]): Val[D] =
+    P.readOnly(ref)
+}
 
-  def whenFinal[M[_]](f: A => M[Unit])(implicit P: Propagation[M, Ref]): M[Subscription[M]] =
+trait ToVarOps {
+  implicit def toVarOps[Var[_], D](ref: Var[D]): VarOps[Var, D] =
+    VarOps(ref)
+}
+
+final case class FinalValOps[M[_], Var[_], Val[_], D, U, Δ, A](ref: Val[D])(implicit dom: Dom.Aux[D, U, Δ], fin: Final.Aux[D, A], P: Propagation[M, Var, Val]) {
+
+  def whenFinal(f: A => M[Unit]): M[Subscription[M]] =
     P.observe(ref).threshold(d => fin.extract(d) map f)
 
-  def _whenFinal[M[_]](f: A => M[_])(implicit P: Propagation[M, Ref], M: Functor[M]): M[Subscription[M]] =
+  def _whenFinal(f: A => M[_])(implicit M: Functor[M]): M[Subscription[M]] =
     whenFinal(a => M.map(f(a))(_ => ()))
 
-  def whenFinal_[M[_]](f: A => M[Unit])(implicit P: Propagation[M, Ref], M: Functor[M]): M[Unit] =
+  def whenFinal_(f: A => M[Unit])(implicit M: Functor[M]): M[Unit] =
     whenFinal(f).void
 
-  def whenFinal0[M[_]](f: D => M[Unit])(implicit P: Propagation[M, Ref]): M[Subscription[M]] =
+  def whenFinal0(f: D => M[Unit]): M[Subscription[M]] =
     P.observe(ref).threshold(d =>
       if(fin.isFinal(d)) Some(f(d))
       else None
     )
 
-  def _whenFinal0[M[_]](f: D => M[_])(implicit P: Propagation[M, Ref], M: Functor[M]): M[Subscription[M]] =
+  def _whenFinal0(f: D => M[_])(implicit M: Functor[M]): M[Subscription[M]] =
     whenFinal0(d => M.map(f(d))(_ => ()))
 
-  def whenFinal0_[M[_]](f: D => M[Unit])(implicit P: Propagation[M, Ref], M: Functor[M]): M[Unit] =
+  def whenFinal0_(f: D => M[Unit])(implicit M: Functor[M]): M[Unit] =
     whenFinal0(f).void
 
-  def asCont[M[_]](implicit P: Propagation[M, Ref]): IndexedContT[M, Subscription[M], Unit, A] =
+  def asCont: IndexedContT[M, Subscription[M], Unit, A] =
     IndexedContT { whenFinal(_) }
 
-  def asCont_[M[_]](implicit P: Propagation[M, Ref], M: Functor[M]): ContU[M, A] =
+  def asCont_(implicit M: Functor[M]): ContU[M, A] =
     ContU { whenFinal_(_) }
 }
 
-trait ToFinalRefOps {
-  implicit def toFinalRefOps[Ref[_], D](ref: Ref[D])(implicit dom: Dom[D], fin: Final[D]): FinalRefOps[Ref, D, dom.Update, dom.Delta, fin.Out] =
-    FinalRefOps[Ref, D, dom.Update, dom.Delta, fin.Out](ref)(dom, fin)
+trait ToFinalValOps {
+  implicit def toFinalValOps[M[_], Var[_], Val[_], D](ref: Val[D])(implicit dom: Dom[D], fin: Final[D], P: Propagation[M, Var, Val]): FinalValOps[M, Var, Val, D, dom.Update, dom.Delta, fin.Out] =
+    FinalValOps[M, Var, Val, D, dom.Update, dom.Delta, fin.Out](ref)(dom, fin, P)
 }
 
-final case class JoinRefOps[Ref[_], D, U, Δ](ref: Ref[D])(implicit dom: JoinDom.Aux[D, U, Δ]) {
+final case class JoinValOps[M[_], Var[_], Val[_], D, U, Δ](ref: Val[D])(implicit dom: JoinDom.Aux[D, U, Δ], P: Propagation[M, Var, Val]) {
 
-  def set[M[_], A](a: A)(implicit fin: Final.Aux[D, A], P: Propagation[M, Ref]): M[Unit] =
+  def ==>(target: Var[D])(implicit M: Functor[M]): M[Subscription[M]] = {
+    import P._
+    observe(ref).by(continually[M, D, Δ]((d: D) => P.update(target).by(dom.toJoinUpdate(d))))
+  }
+}
+
+trait ToJoinValOps {
+  implicit def toJoinValOps[M[_], Var[_], Val[_], D](ref: Val[D])(implicit dom: JoinDom[D], P: Propagation[M, Var, Val]): JoinValOps[M, Var, Val, D, dom.Update, dom.Delta] =
+    JoinValOps[M, Var, Val, D, dom.Update, dom.Delta](ref)(dom, P)
+}
+
+final case class JoinVarOps[M[_], Var[_], Val[_], D, U, Δ](ref: Var[D])(implicit dom: JoinDom.Aux[D, U, Δ], P: Propagation[M, Var, Val]) {
+
+  def set[A](a: A)(implicit fin: Final.Aux[D, A]): M[Unit] =
     P.update(ref).by(dom.toJoinUpdate(fin.embed(a)))
 
-  def ==>[M[_]](target: Ref[D])(implicit P: Propagation[M, Ref], M: Functor[M]): M[Subscription[M]] =
-    P.observe(ref).by(continually[M, D, Δ]((d: D) => P.update(target).by(dom.toJoinUpdate(d))))
+  def <==(src: Val[D])(implicit M: Functor[M]): M[Subscription[M]] = {
+    src ==> ref
+  }
 
-  def <==[M[_]](source: Ref[D])(implicit P: Propagation[M, Ref], M: Functor[M]): M[Subscription[M]] =
-    JoinRefOps(source) ==> ref
-
-  def <=>[M[_]: Apply](target: Ref[D])(implicit P: Propagation[M, Ref]): M[Subscription[M]] =
-    ((this ==> target) |@| (this <== target))(_ and _)
+  def <=>(target: Var[D])(implicit M: Apply[M]): M[Subscription[M]] = {
+    ((ref.asVal ==> target) |@| (this <== target.asVal)) (_ and _)
+  }
 }
 
-trait ToJoinRefOps {
-  implicit def toJoinRefOps[Ref[_], D](ref: Ref[D])(implicit dom: JoinDom[D]): JoinRefOps[Ref, D, dom.Update, dom.Delta] =
-    JoinRefOps[Ref, D, dom.Update, dom.Delta](ref)(dom)
+trait ToJoinVarOps {
+  implicit def toJoinVarOps[M[_], Var[_], Val[_], D](ref: Var[D])(implicit dom: JoinDom[D], P: Propagation[M, Var, Val]): JoinVarOps[M, Var, Val, D, dom.Update, dom.Delta] =
+    JoinVarOps[M, Var, Val, D, dom.Update, dom.Delta](ref)(dom, P)
 }
 
 final case class RelativelyComplementedRefOps[Ref[_], D, U, Δ](ref: Ref[D])(implicit dom: RelativelyComplementedDom.Aux[D, U, Δ]) {
   import RelativelyComplementedRefOps._
 
-  def exclude[M[_]](d: D)(implicit P: Propagation[M, Ref]): M[Unit] =
+  def exclude[M[_], Val[_]](d: D)(implicit P: Propagation[M, Ref, Val]): M[Unit] =
     excludeVal(ref, d)
 
-  def remove[M[_], A](a: A)(implicit fin: Final.Aux[D, A], P: Propagation[M, Ref]): M[Unit] =
+  def remove[M[_], Val[_], A](a: A)(implicit fin: Final.Aux[D, A], P: Propagation[M, Ref, Val]): M[Unit] =
     exclude(fin.embed(a))
 
-  def excludeThat[M[_]](that: Ref[D])(implicit fin: Final[D], P: Propagation[M, Ref], M: Functor[M]): M[Unit] =
-    excludeRef(ref, that)
+  def excludeThat[M[_], Val[_]](that: Ref[D])(implicit fin: Final[D], P: Propagation[M, Ref, Val], M: Functor[M]): M[Unit] =
+    excludeRef(ref, that.asVal)
 
-  def excludeFrom[M[_]](that: Ref[D])(implicit fin: Final[D], P: Propagation[M, Ref], M: Functor[M]): M[Unit] =
+  def excludeFrom[M[_], Var[_]](that: Var[D])(implicit fin: Final[D], P: Propagation[M, Var, Ref], M: Functor[M]): M[Unit] =
     excludeRef(that, ref)
 
   /** Ensure that the two cells resolve to different values. */
-  def =!=[M[_]](that: Ref[D])(implicit fin: Final[D], P: Propagation[M, Ref], M: Apply[M]): M[Unit] =
+  def =!=[M[_], Val[_]](that: Ref[D])(implicit fin: Final[D], P: Propagation[M, Ref, Val], M: Apply[M]): M[Unit] =
     makeDifferent(ref, that)
 
-  def isDifferentFrom[M[_]](that: Ref[D])(implicit
+  def isDifferentFrom[M[_], Val[_]](that: Ref[D])(implicit
     fin: Final[D],
-    P: BranchingPropagation[M, Ref],
+    P: BranchingPropagation[M, Ref, Val],
     M: Bind[M]
   ): M[Ref[Bool]] = {
     import P._
     for {
       res <- P.newVar[Bool]
-      _ <- res.whenFinal(r => if (r) ref =!= that else (ref <=> that).void)
-      _ <- ref.whenFinal0_(r1 => that.whenFinal0_(r2 => {
+      _ <- res.asVal.whenFinal(r => if (r) ref =!= that else (ref <=> that).void)
+      _ <- ref.asVal.whenFinal0_(r1 => that.asVal.whenFinal0_(r2 => {
         val r = dom.ljoin(r1, r2) match {
           case Unchanged() => false
           case Updated(x, _) => dom.isFailed(x)
@@ -115,14 +137,14 @@ final case class RelativelyComplementedRefOps[Ref[_], D, U, Δ](ref: Ref[D])(imp
 }
 
 object RelativelyComplementedRefOps {
-  def excludeVal[M[_], Ref[_], D](ref: Ref[D], d: D)(implicit dom: RelativelyComplementedDom[D], P: Propagation[M, Ref]): M[Unit] =
+  def excludeVal[M[_], Var[_], Val[_], D](ref: Var[D], d: D)(implicit dom: RelativelyComplementedDom[D], P: Propagation[M, Var, Val]): M[Unit] =
     P.update(ref).by(dom.toComplementUpdate(d))
 
-  def excludeRef[M[_], Ref[_], D](ref1: Ref[D], ref2: Ref[D])(implicit dom: RelativelyComplementedDom[D], fin: Final[D], P: Propagation[M, Ref], M: Functor[M]): M[Unit] =
+  def excludeRef[M[_], Var[_], Val[_], D](ref1: Var[D], ref2: Val[D])(implicit dom: RelativelyComplementedDom[D], fin: Final[D], P: Propagation[M, Var, Val], M: Functor[M]): M[Unit] =
     ref2.whenFinal0_(d => excludeVal(ref1, d))
 
-  def makeDifferent[M[_], Ref[_], D](ref1: Ref[D], ref2: Ref[D])(implicit dom: RelativelyComplementedDom[D], fin: Final[D], P: Propagation[M, Ref], M: Apply[M]): M[Unit] =
-    excludeRef(ref1, ref2) *> excludeRef(ref2, ref1)
+  def makeDifferent[M[_], Var[_], Val[_], D](ref1: Var[D], ref2: Var[D])(implicit dom: RelativelyComplementedDom[D], fin: Final[D], P: Propagation[M, Var, Val], M: Apply[M]): M[Unit] =
+    excludeRef(ref1, ref2.asVal) *> excludeRef(ref2, ref1.asVal)
 }
 
 trait ToRelativelyComplementedRefOps {
@@ -138,15 +160,15 @@ final case class RelativelyComplementedRefSeqOps[Ref[_], D, U, Δ](refs: Indexed
     }
   }
 
-  def allDifferent[M[_]](implicit
+  def allDifferent[M[_], Val[_]](implicit
     fin: Final[D],
-    P: BranchingPropagation[M, Ref],
+    P: BranchingPropagation[M, Ref, Val],
     M: Applicative[M]
   ): M[Unit] = {
     import P._
     val n = refs.size
     val T = Traverse[Iterable]
-    (T.traverse_(0 until n){ i => refs(i).whenFinal0(d =>
+    (T.traverse_(0 until n){ i => refs(i).asVal.whenFinal0(d =>
       (T.traverse_(0 until i){ j => refs(j).exclude(d) }) *>
       (T.traverse_(i + 1 until n){ j => refs(j).exclude(d) })
     ) })

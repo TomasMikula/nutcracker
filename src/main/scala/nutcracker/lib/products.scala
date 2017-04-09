@@ -1,6 +1,7 @@
 package nutcracker.lib
 
 import nutcracker.{Dom, Propagation, Subscription, SyncDom, Trigger}
+import nutcracker.ops._
 import nutcracker.rel.{Recipe, Relations}
 import nutcracker.rel.Rel.Rel3
 import nutcracker.util.{Choose, ContU, HOrderK, ∃}
@@ -25,19 +26,19 @@ object Tupled2 {
   private type L[A, B, Ref[_]] = Ref[A] :: Ref[B] :: Ref[(A, B)] :: HNil
   private type C[A, B, Ref[_]] = Ref[A] :: Ref[B]                :: HNil
 
-  def establish[A, B, Ref[_], K[_]](ra: Ref[A], rb: Ref[B])(implicit P: Propagation[K, Ref], R: Relations[K], O: HOrderK[Ref], K: Monad[K], da: SyncDom[A], db: SyncDom[B]): ContU[K, Ref[(A, B)]] = {
-    R.establish(Tupled2[A, B, Ref]).matching2(ra, rb).by(recipe).map(_.tail.tail.head)
+  def establish[A, B, Var[_], Val[_], K[_]](ra: Var[A], rb: Var[B])(implicit P: Propagation[K, Var, Val], R: Relations[K], O: HOrderK[Var], K: Monad[K], da: SyncDom[A], db: SyncDom[B]): ContU[K, Var[(A, B)]] = {
+    R.establish(Tupled2[A, B, Var]).matching2(ra, rb).by(recipe).map(_.tail.tail.head)
   }
 
-  def recipe[A, B, Ref[_], K[_]](implicit P: Propagation[K, Ref], K: Monad[K], da: SyncDom[A], db: SyncDom[B]): Recipe[L[A, B, Ref], C[A, B, Ref], K] =
-    new Recipe[L[A, B, Ref], C[A, B, Ref], K](_0 :: _1 :: Choose[L[A, B, Ref]]) {
+  def recipe[A, B, Var[_], Val[_], K[_]](implicit P: Propagation[K, Var, Val], K: Monad[K], da: SyncDom[A], db: SyncDom[B]): Recipe[L[A, B, Var], C[A, B, Var], K] =
+    new Recipe[L[A, B, Var], C[A, B, Var], K](_0 :: _1 :: Choose[L[A, B, Var]]) {
 
-      override def create(ingredients: C[A, B, Ref]): ContU[K, (L[A, B, Ref], Subscription[K])] = {
+      override def create(ingredients: C[A, B, Var]): ContU[K, (L[A, B, Var], Subscription[K])] = {
         implicit val dom = Dom.tuple2[A, B]
         val ra :: rb :: HNil = ingredients
 
-        P.observe(ra).byC[(Subscription[K], Ref[(A, B)])] { a =>
-          P.observe(rb).byM[Ref[(A, B)]](b =>
+        P.observe(ra.asVal).byC[(Subscription[K], Var[(A, B)])] { a =>
+          P.observe(rb.asVal).byM[Var[(A, B)]](b =>
             P.newCell((a, b)) map (rr => (Trigger.sleep(Trigger.continually((b, δb) => P.update(rr).by(\&/.That(db.toPatch(b, δb))))), rr))
           ).map({     case (sub1, rr) => (Trigger.sleep(Trigger.continually((a, δa) => P.update(rr).by(\&/.This(da.toPatch(a, δa))))), (sub1, rr)) })
         } map { case (sub2, (sub1, rr)) => (ra :: rb :: rr :: HNil, sub1 and sub2) }

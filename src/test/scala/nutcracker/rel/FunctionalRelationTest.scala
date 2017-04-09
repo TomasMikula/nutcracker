@@ -17,17 +17,17 @@ class FunctionalRelationTest extends FunSuite {
   type ContU[A] = ContT[Prg, Unit, A]
 
   test("blah") {
-    type L = Ref[Bool] :: Ref[Bool] :: Ref[(Bool, Bool)] :: HNil
+    type L = Var[Bool] :: Var[Bool] :: Var[(Bool, Bool)] :: HNil
 
     var initializedTimes = 0
     var insertedTimes = 0
-    val observed: mutable.Buffer[Ref[(Bool, Bool)]] = mutable.Buffer()
+    val observed: mutable.Buffer[Var[(Bool, Bool)]] = mutable.Buffer()
 
-    val paired = Tupled2[Bool, Bool, Ref]
+    val paired = Tupled2[Bool, Bool, Var]
 
-    def init(a: Ref[Bool], b: Ref[Bool]) =
+    def init(a: Var[Bool], b: Var[Bool]) =
       establish(paired).matching2(a, b)
-        .by(Tupled2.recipe[Bool, Bool, Ref, Prg].andThen(_ => (initializedTimes += 1).point[Prg]))
+        .by(Tupled2.recipe[Bool, Bool, Var, Val, Prg].andThen(_ => (initializedTimes += 1).point[Prg]))
 
     def observe(cps: ContU[L]): Prg[Unit] =
       cps(p => observed.append(p.tail.tail.head).point[Prg])

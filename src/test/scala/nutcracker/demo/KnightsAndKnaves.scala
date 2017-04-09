@@ -21,7 +21,7 @@ class KnightsAndKnaves extends FreeSpec {
   import tk.branchingApi.{propagation => _, _}
   import Promises._
 
-  val B = BoolOps[Prg, Ref]
+  val B = BoolOps[Prg, Var, Val]
 
   import B._
 

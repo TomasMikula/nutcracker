@@ -16,7 +16,7 @@ private[nutcracker] case class BranchStore[Ref[_], K[_]](
   def removeVar[D](ref: Ref[D]): BranchStore[Ref, K] =
     copy(unresolvedVars = unresolvedVars - ref)
 
-  def split(fetch: Ref ~> Id)(implicit K: Propagation[K, Ref]): Assessment[List[K[Unit]]] =
+  def split[Val[_]](fetch: Ref ~> Id)(implicit K: Propagation[K, Ref, Val]): Assessment[List[K[Unit]]] =
     if(unresolvedVars.isEmpty) Done
     else {
       def splitDomain[D](ref: Ref[D])(implicit ev: Splittable[D]): Option[List[K[Unit]]] = {

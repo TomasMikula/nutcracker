@@ -17,9 +17,10 @@ object PropBranchToolkit {
 
 object PropBranch extends PropagationBundle with BranchingBundle with PropBranchToolkit {
   val Prop = Propagation.module.stashable
-  val Branch = BranchingPropagation.module[Prop.Ref].stashable
+  val Branch = BranchingPropagation.module[Prop.Var, Prop.Val].stashable
 
-  type Ref[a] = Prop.Ref[a]
+  type Var[a] = Prop.Var[a]
+  type Val[a] = Prop.Val[a]
 
   type Lang[K[_], A] = (Prop.Lang  :++: Branch.Lang )#Out[K, A]
   type State[K[_]]   = (Prop.State :**: Branch.State)#Out[K]
@@ -28,10 +29,10 @@ object PropBranch extends PropagationBundle with BranchingBundle with PropBranch
   implicit def refShow = Prop.refShow
   implicit def prgMonad = FreeKT.freeKTMonad
 
-  implicit val propagationApi: Propagation[Prg, Ref] =
+  implicit val propagationApi: Propagation[Prg, Var, Val] =
     Prop.freePropagation[Lang]
 
-  implicit val branchingApi: BranchingPropagation[Prg, Ref] =
+  implicit val branchingApi: BranchingPropagation[Prg, Var, Val] =
     Branch.freeBranchingPropagation[Lang]
 
   import Prop.{stashRestore => sr1}
@@ -40,12 +41,14 @@ object PropBranch extends PropagationBundle with BranchingBundle with PropBranch
 
   val interpreter = (Prop.interpreter :&&: Branch.interpreter).freeInstance
   def interpret[A](p: Prg[A], s: State[Prg]): (State[Prg], A) = interpreter(p).run(s)
-  def fetch[K[_], A](ref: Ref[A], s: State[K]): A = Prop.fetch(ref, s._1)
+  def fetch[K[_], A](ref: Val[A], s: State[K]): A = Prop.fetch(ref, s._1)
   def empty[K[_]]: State[K] = Prop.empty[K] :*: Branch.empty[K]
 
-  def assess(s: State[Prg]): Assessment[List[Prg[Unit]]] =
-    if(Prop.isConsistent(s._1))
-      Branch.assess(s._2)(λ[Ref ~> Id](ref => Prop.fetch(ref, s._1)))
+  def assess(s: State[Prg]): Assessment[List[Prg[Unit]]] = {
+    import propagationApi._
+    if (Prop.isConsistent(s._1))
+      Branch.assess(s._2)(λ[Var ~> Id](ref => Prop.fetch(ref, s._1)))
     else
       Assessment.Failed
+  }
 }

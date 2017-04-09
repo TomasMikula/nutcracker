@@ -11,7 +11,8 @@ object PropRel extends PropagationBundle {
   val Prop = Propagation.module
   val RelMod = RelModule.instance
 
-  type Ref[a] = Prop.Ref[a]
+  type Var[a] = Prop.Var[a]
+  type Val[a] = Prop.Val[a]
 
   type Lang[K[_], A] = (Prop.Lang  :++: RelMod.Lang )#Out[K, A]
   type State[K[_]]   = (Prop.State :**: RelMod.State)#Out[K]
@@ -20,7 +21,7 @@ object PropRel extends PropagationBundle {
   implicit def refOrder = Prop.refOrder
   implicit def refShow = Prop.refShow
 
-  implicit val propagationApi: Propagation[Prg, Ref] =
+  implicit val propagationApi: Propagation[Prg, Var, Val] =
     Prop.freePropagation[Lang]
 
   implicit val relationsApi: Relations[Prg] =
@@ -29,7 +30,7 @@ object PropRel extends PropagationBundle {
   def empty[K[_]]: State[K] =
     Prop.empty[K] :*: RelMod.empty[K]
 
-  def fetch[K[_], A](ref: Ref[A], s: State[K]) =
+  def fetch[K[_], A](ref: Val[A], s: State[K]) =
     Prop.fetch(ref, s._1)
 
   def interpret[A](p: Prg[A], s: State[Prg]): (State[Prg], A) =
@@ -38,6 +39,6 @@ object PropRel extends PropagationBundle {
   val interpreter = (Prop.interpreter :&&: RelMod.interpreter).freeInstance
   def propStore: Lens[State[Prg], Prop.State[Prg]] = implicitly[Lens[State[Prg], Prop.State[Prg]]]
 
-  private def fetch: λ[A => Ref[Promise[A]]] ~> (State[Prg] => ?) =
-    λ[λ[A => Ref[Promise[A]]] ~> (State[Prg] => ?)](pa => s => Prop.fetchResult(propStore.get(s))(pa).get)
+  private def fetch: λ[A => Val[Promise[A]]] ~> (State[Prg] => ?) =
+    λ[λ[A => Val[Promise[A]]] ~> (State[Prg] => ?)](pa => s => Prop.fetchResult(propStore.get(s))(pa).get)
 }

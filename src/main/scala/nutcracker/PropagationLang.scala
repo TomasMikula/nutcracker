@@ -92,17 +92,19 @@ private[nutcracker] object PropagationLang {
     FreeK.injLiftF(exclUpdate[Ref, FreeK[F, ?], A, U, Δ](ref, cycle, u))
 
 
-  implicit def freePropagation[Ref[_], F[_[_], _]](implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): Propagation[FreeK[F, ?], Ref] =
+  implicit def freePropagation[Ref[_], F[_[_], _]](implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): Propagation[FreeK[F, ?], Ref, Ref] =
     new FreePropagation[Ref, F]
 }
 
 
-private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]) extends OnDemandPropagation[FreeK[F, ?], Ref] {
+private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]) extends OnDemandPropagation[FreeK[F, ?], Ref, Ref] {
   import PropagationLang._
   import SeqTrigger._
 
   type ExclRef[A] = Ref[A]
   type CellCycle[A] = LiveCycle[A]
+
+  override def readOnly[A](ref: Ref[A]): Ref[A] = ref
 
   def newCell[D](d: D)(implicit dom: Dom[D]): FreeK[F, Ref[D]] =
     newCellF[F, Ref, D](d)
