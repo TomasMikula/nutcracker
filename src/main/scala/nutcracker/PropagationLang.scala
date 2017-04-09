@@ -101,28 +101,27 @@ private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: Inje
   import PropagationLang._
   import SeqTrigger._
 
-  type ExclRef[A] = Ref[A]
-  type CellCycle[A] = LiveCycle[A]
+  type ExclRef[A] = (Ref[A], LiveCycle[A])
 
   override def readOnly[A](ref: Ref[A]): Ref[A] = ref
 
   def newCell[D](d: D)(implicit dom: Dom[D]): FreeK[F, Ref[D]] =
     newCellF[F, Ref, D](d)
 
-  def newAutoCell[A](setup: IndexedContT[FreeK[F, ?], Unit, (ExclRef[A], LiveCycle[A]), A])(implicit dom: Dom[A]): FreeK[F, Ref[A]] =
+  def newAutoCell[A](setup: IndexedContT[FreeK[F, ?], Unit, ExclRef[A], A])(implicit dom: Dom[A]): FreeK[F, Ref[A]] =
     newAutoCellF(setup)(supplyF(_)(_, _)(inj))
 
-  def addFinalizer[A](ref: ExclRef[A], cycle: CellCycle[A], value: Subscription[FreeK[F, ?]]): FreeK[F, Subscription[FreeK[F, ?]]] =
-    addFinalizerF(ref, cycle, value) map {
-      case Some(fid) => Subscription(removeFinalizerF(ref, cycle, fid))
+  def addFinalizer[A](ref: ExclRef[A], value: Subscription[FreeK[F, ?]]): FreeK[F, Subscription[FreeK[F, ?]]] =
+    addFinalizerF(ref._1, ref._2, value) map {
+      case Some(fid) => Subscription(removeFinalizerF(ref._1, ref._2, fid))
       case None      => Subscription()
     }
 
   def updateImpl[D, U, Δ[_, _]](ref: Ref[D])(u: U)(implicit dom: IDom.Aux[D, U, Δ]): FreeK[F, Unit] =
     updateF[F, Ref, D, U, Δ](ref)(u)
 
-  def update[A, U, Δ[_, _]](ref: ExclRef[A], cycle: CellCycle[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): FreeK[F, Unit] =
-    exclUpdateF[F, Ref, A, U, Δ](ref, cycle, u)
+  def update[A, U, Δ[_, _]](ref: ExclRef[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): FreeK[F, Unit] =
+    exclUpdateF[F, Ref, A, U, Δ](ref._1, ref._2, u)
 
   def observeImpl[D, U, Δ](ref: Ref[D])(f: D => Trigger[FreeK[F, ?], D, Δ])(implicit dom: Dom.Aux[D, U, Δ]): FreeK[F, Subscription[FreeK[F, ?]]] = {
     observeF[F, Ref, D, U, dom.IDelta](ref)(new SeqPreHandler[Token, FreeK[F, Unit], D, dom.IDelta] {
