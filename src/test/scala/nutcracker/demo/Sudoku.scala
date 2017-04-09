@@ -44,12 +44,12 @@ class Sudoku extends FunSuite {
     def segNumConstraint(seg: Seq[Cell], x: Int): Prg[Unit] = {
       for {
         xPos <- oneOf(seg: _*)
-        _ <- (seg map { cell => cell.asVal.observe.threshold(ys =>
+        _ <- (seg map { cell => cell.observe.threshold(ys =>
           if(!ys.contains(x)) Some(xPos.remove(cell))
           else if(ys.size == 1) Some(xPos.set(cell))
           else None
         )}).sequence_
-        _ <- xPos.asVal.whenFinal(cell => cell.set(x))
+        _ <- xPos.whenFinal(cell => cell.set(x))
       } yield ()
     }
 

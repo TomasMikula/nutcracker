@@ -77,7 +77,7 @@ object CellSet {
     */
   def forEach[F[_], Var[_], Val[_], A](set: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], F: Applicative[F]): IndexedContT[F, Subscription[F], Unit, Var[A]] = {
     import scalaz.syntax.traverse._
-    IndexedContT(f => P.observe(set.asVal).by(as => {
+    IndexedContT(f => set.observe.by(as => {
       val now = as.toList.traverse_(f)
       val onChange = Trigger.continually((as: CellSet[Var, A], delta: Added[Var, A]) => delta.value.toList.traverse_(f))
       Trigger.fireReload(now.as(Trigger.sleep(onChange)))
@@ -90,7 +90,7 @@ object CellSet {
   }
 
   def insert[F[_], Var[_], Val[_], A](ref: Var[A], into: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], dom: Dom[A], F: Functor[F]): F[Unit] =
-    P.observe(ref.asVal).by(a =>
+    ref.observe.by(a =>
       if(dom.isFailed(a)) Trigger.discard
       else Trigger.fireReload(P.update(into).by(Insert(Set(ref))) map { (_: Unit) => Trigger.sleep(Trigger.threshold1(a =>
         if(dom.isFailed(a)) Some(P.update(into).by(RemoveFailed(ref)))
@@ -102,7 +102,7 @@ object CellSet {
     add.iterator.traverse_(ra => insert(ra, into))
 
   def include[F[_], Var[_], Val[_], A](sub: Var[CellSet[Var, A]], sup: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], dom: Dom[A], F: Applicative[F]): F[Unit] =
-    P.observe(sub.asVal).by((sa: CellSet[Var, A]) => {
+    sub.observe.by((sa: CellSet[Var, A]) => {
       val now = insertAll(sa.value, sup)
       val onChange = Trigger.continually((sa: CellSet[Var, A], delta: Added[Var, A]) => insertAll(delta.value, sup))
       Trigger.fireReload(now.as(Trigger.sleep(onChange)))

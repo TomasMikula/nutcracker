@@ -34,7 +34,7 @@ object Promises {
       if (i < 0) {
         complete(pr, tail.toVector)
       } else {
-        cells(i).asVal.whenFinal_(a => go(pr, a :: tail, i - 1))
+        cells(i).whenFinal_(a => go(pr, a :: tail, i - 1))
       }
     }
 

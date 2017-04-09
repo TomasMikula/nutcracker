@@ -13,15 +13,15 @@ class BoolOps[M[_], Var[_], Val[_]](implicit P: BranchingPropagation[M, Var, Val
 
   def and(x: Var[Bool], y: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
     res <- newVar[Bool]
-    _ <- x.asVal._whenFinal({ r =>
+    _ <- x._whenFinal({ r =>
       if (r) y <=> res
       else res.set(false)
     })
-    _ <- y.asVal._whenFinal({ r =>
+    _ <- y._whenFinal({ r =>
       if (r) x <=> res
       else res.set(false)
     })
-    _ <- res.asVal._whenFinal({ r =>
+    _ <- res._whenFinal({ r =>
       if (r) x.set(true) >> y.set(true)
       else M.pure(())
     })
@@ -63,11 +63,11 @@ class BoolOps[M[_], Var[_], Val[_]](implicit P: BranchingPropagation[M, Var, Val
 
   def neg(x: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
     res <- newVar[Bool]
-    _ <- x.asVal.whenFinal({ r =>
+    _ <- x.whenFinal({ r =>
       if (r) res.set(false)
       else res.set(true)
     })
-    _ <- res.asVal.whenFinal({ r =>
+    _ <- res.whenFinal({ r =>
       if (r) x.set(false)
       else x.set(true)
     })
@@ -80,11 +80,11 @@ class BoolOps[M[_], Var[_], Val[_]](implicit P: BranchingPropagation[M, Var, Val
     x.set(false)
 
   def imp(x: Var[Bool], y: Var[Bool])(implicit M: Applicative[M]): M[Unit] = {
-    x.asVal.whenFinal({ r =>
+    x.whenFinal({ r =>
       if (r) y.set(true)
       else M.pure(())
     }) *>
-    y.asVal.whenFinal_({ r =>
+    y.whenFinal_({ r =>
       if (r) M.pure(())
       else x.set(false)
     })
@@ -102,15 +102,15 @@ class BoolOps[M[_], Var[_], Val[_]](implicit P: BranchingPropagation[M, Var, Val
   implicit class BoolRefOps(self: Var[Bool]) {
 
     def ===(that: Var[Bool])(implicit M: Apply[M]): M[Unit] = {
-      (self.asVal whenFinal_ { (x: Boolean) => that.set(x) }) *>
-      (that.asVal whenFinal_ { (x: Boolean) => self.set(x) })
+      (self whenFinal_ { (x: Boolean) => that.set(x) }) *>
+      (that whenFinal_ { (x: Boolean) => self.set(x) })
     }
 
     def =?=(that: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
       res <- newVar[Bool]
-      _ <- res.asVal  whenFinal { (x: Boolean) => if(x) (self === that) else (self =!= that) }
-      _ <- self.asVal whenFinal { (x: Boolean) => if(x) (res  === that) else (res  =!= that) }
-      _ <- that.asVal whenFinal { (x: Boolean) => if(x) (res  === self) else (res  =!= self) }
+      _ <- res  whenFinal { (x: Boolean) => if(x) (self === that) else (self =!= that) }
+      _ <- self whenFinal { (x: Boolean) => if(x) (res  === that) else (res  =!= that) }
+      _ <- that whenFinal { (x: Boolean) => if(x) (res  === self) else (res  =!= self) }
     } yield res
 
     def =??=(that: M[Var[Bool]])(implicit M: Monad[M]): M[Var[Bool]] =

@@ -1,7 +1,6 @@
 package nutcracker.lib
 
 import nutcracker.{Dom, Propagation, Subscription, SyncDom, Trigger}
-import nutcracker.ops._
 import nutcracker.rel.{Recipe, Relations}
 import nutcracker.rel.Rel.Rel3
 import nutcracker.util.{Choose, ContU, HOrderK, ∃}
@@ -32,14 +31,15 @@ object Tupled2 {
 
   def recipe[A, B, Var[_], Val[_], K[_]](implicit P: Propagation[K, Var, Val], K: Monad[K], da: SyncDom[A], db: SyncDom[B]): Recipe[L[A, B, Var], C[A, B, Var], K] =
     new Recipe[L[A, B, Var], C[A, B, Var], K](_0 :: _1 :: Choose[L[A, B, Var]]) {
+      import P._
 
       override def create(ingredients: C[A, B, Var]): ContU[K, (L[A, B, Var], Subscription[K])] = {
         implicit val dom = Dom.tuple2[A, B]
         val ra :: rb :: HNil = ingredients
 
-        P.observe(ra.asVal).byC[(Subscription[K], Var[(A, B)])] { a =>
-          P.observe(rb.asVal).byM[Var[(A, B)]](b =>
-            P.newCell((a, b)) map (rr => (Trigger.sleep(Trigger.continually((b, δb) => P.update(rr).by(\&/.That(db.toPatch(b, δb))))), rr))
+        observe(ra).byC[(Subscription[K], Var[(A, B)])] { a =>
+          observe(rb).byM[Var[(A, B)]](b =>
+            newCell((a, b)) map (rr => (Trigger.sleep(Trigger.continually((b, δb) => P.update(rr).by(\&/.That(db.toPatch(b, δb))))), rr))
           ).map({     case (sub1, rr) => (Trigger.sleep(Trigger.continually((a, δa) => P.update(rr).by(\&/.This(da.toPatch(a, δa))))), (sub1, rr)) })
         } map { case (sub2, (sub1, rr)) => (ra :: rb :: rr :: HNil, sub1 and sub2) }
       }

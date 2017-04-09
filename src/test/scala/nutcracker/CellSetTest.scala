@@ -1,6 +1,5 @@
 package nutcracker
 
-import nutcracker.ops._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import scala.collection.mutable
@@ -18,7 +17,7 @@ class CellSetTest extends FunSuite {
 
     val prg = for {
       res <- CellSet.init[Promise[Int]]()
-      _ <- P.observe(res.asVal).by(_ => Trigger.sleep(Trigger.continually((d, δ) => δ.value.foreach(r => observed += r).point[Prg])))
+      _ <- P.observe(res).by(_ => Trigger.sleep(Trigger.continually((d, δ) => δ.value.foreach(r => observed += r).point[Prg])))
       p1 <- P.newCell[Promise[Int]](Promise.Conflict)
       p2 <- Promises.promise[Int]()
       _ <- Promises.complete(p2, 42)
@@ -37,7 +36,7 @@ class CellSetTest extends FunSuite {
     val s2 = interpret(prg2, s)._1
 
     // check that p1 was auto-cleaned
-    val resSet = fetch(res.asVal, s2)
+    val resSet = fetch(res, s2)
     resSet.size should be (0)
   }
 

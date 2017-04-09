@@ -8,16 +8,19 @@ import nutcracker.util.ContU
 import scalaz.{Applicative, Apply, Bind, Functor, IndexedContT, Traverse}
 import scalaz.syntax.bind._
 
-final case class ValOps[Val[_], D, U, Δ](ref: Val[D])(implicit val dom: Dom.Aux[D, U, Δ]) {
-  def observe[M[_], Var[_]](implicit P: Propagation[M, Var, Val]) = P.observe(ref)
+final case class ValOps[Val[_], D](ref: Val[D]) extends AnyVal {
+  def observe[M[_], Var[_]](implicit P: Propagation[M, Var, Val], dom: Dom[D]) = P.observe(ref)
 
-  def peekC[M[_], Var[_]](implicit P: Propagation[M, Var, Val], M: Functor[M]): ContU[M, D] =
+  def peekC[M[_], Var[_]](implicit P: Propagation[M, Var, Val], dom: Dom[D], M: Functor[M]): ContU[M, D] =
     ContU(f => P.peek_(ref)(f))
 }
 
 trait ToValOps {
-  implicit def toValOps[Val[_], D](ref: Val[D])(implicit dom: Dom[D]): ValOps[Val, D, dom.Update, dom.Delta] =
-    ValOps[Val, D, dom.Update, dom.Delta](ref)(dom)
+  implicit def toValOps[M[_], Var[_], Val[_], D](ref: Val[D])(implicit P: Propagation[M, Var, Val]): ValOps[Val, D] =
+    ValOps[Val, D](ref)
+
+  implicit def toValOps1[M[_], Var[_], Val[_], D](ref: Var[D])(implicit P: Propagation[M, Var, Val]): ValOps[Val, D] =
+    ValOps(P.readOnly(ref))
 }
 
 final case class VarOps[Var[_], D](ref: Var[D]) extends AnyVal {
@@ -26,7 +29,7 @@ final case class VarOps[Var[_], D](ref: Var[D]) extends AnyVal {
 }
 
 trait ToVarOps {
-  implicit def toVarOps[Var[_], D](ref: Var[D]): VarOps[Var, D] =
+  implicit def toVarOps[M[_], Var[_], Val[_], D](ref: Var[D])(implicit P: Propagation[M, Var, Val]): VarOps[Var, D] =
     VarOps(ref)
 }
 
@@ -63,6 +66,9 @@ final case class FinalValOps[M[_], Var[_], Val[_], D, U, Δ, A](ref: Val[D])(imp
 trait ToFinalValOps {
   implicit def toFinalValOps[M[_], Var[_], Val[_], D](ref: Val[D])(implicit dom: Dom[D], fin: Final[D], P: Propagation[M, Var, Val]): FinalValOps[M, Var, Val, D, dom.Update, dom.Delta, fin.Out] =
     FinalValOps[M, Var, Val, D, dom.Update, dom.Delta, fin.Out](ref)(dom, fin, P)
+
+  implicit def toFinalValOps1[M[_], Var[_], Val[_], D](ref: Var[D])(implicit dom: Dom[D], fin: Final[D], P: Propagation[M, Var, Val]): FinalValOps[M, Var, Val, D, dom.Update, dom.Delta, fin.Out] =
+    FinalValOps[M, Var, Val, D, dom.Update, dom.Delta, fin.Out](P.readOnly(ref))(dom, fin, P)
 }
 
 final case class JoinValOps[M[_], Var[_], Val[_], D, U, Δ](ref: Val[D])(implicit dom: JoinDom.Aux[D, U, Δ], P: Propagation[M, Var, Val]) {
@@ -124,8 +130,8 @@ final case class RelativelyComplementedRefOps[Ref[_], D, U, Δ](ref: Ref[D])(imp
     import P._
     for {
       res <- P.newVar[Bool]
-      _ <- res.asVal.whenFinal(r => if (r) ref =!= that else (ref <=> that).void)
-      _ <- ref.asVal.whenFinal0_(r1 => that.asVal.whenFinal0_(r2 => {
+      _ <- res.whenFinal(r => if (r) ref =!= that else (ref <=> that).void)
+      _ <- ref.whenFinal0_(r1 => that.whenFinal0_(r2 => {
         val r = dom.ljoin(r1, r2) match {
           case Unchanged() => false
           case Updated(x, _) => dom.isFailed(x)
@@ -168,7 +174,7 @@ final case class RelativelyComplementedRefSeqOps[Ref[_], D, U, Δ](refs: Indexed
     import P._
     val n = refs.size
     val T = Traverse[Iterable]
-    (T.traverse_(0 until n){ i => refs(i).asVal.whenFinal0(d =>
+    (T.traverse_(0 until n){ i => refs(i).whenFinal0(d =>
       (T.traverse_(0 until i){ j => refs(j).exclude(d) }) *>
       (T.traverse_(i + 1 until n){ j => refs(j).exclude(d) })
     ) })
