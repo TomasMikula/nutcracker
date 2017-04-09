@@ -33,7 +33,7 @@ parallelExecution in Test := false // currently, ScalaProps does not support par
 
 libraryDependencies ++= Seq(
   "org.typelevel" %% "algebra" % "0.6.0",
-  "org.scalaz" %% "scalaz-core" % "7.3.0-M10",
+  "org.scalaz" %% "scalaz-core" % "7.3.0-M11",
   "com.chuusai" %% "shapeless" % "2.3.2",
   "com.github.scalaprops" %% "scalaprops" % "0.4.1",
 
