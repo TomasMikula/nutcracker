@@ -5,17 +5,12 @@ import nutcracker.DecSet._
 import nutcracker.ops._
 import nutcracker.util.ops._
 import org.scalatest.FunSuite
-
 import scalaz.std.anyVal._
+import scalaz.syntax.monad._
 
 class Sudoku extends FunSuite {
-  import PropBranch._
+  import PropBranchToolkit.instance._
   import Promises._
-
-  val P1 = Propagation[Prg, Var, Val]
-
-  import P1._
-
 
   type Cell = Var[DecSet[Int]]
 
@@ -49,7 +44,7 @@ class Sudoku extends FunSuite {
     def segNumConstraint(seg: Seq[Cell], x: Int): Prg[Unit] = {
       for {
         xPos <- oneOf(seg: _*)
-        _ <- (seg map { cell => observe(cell).threshold(ys =>
+        _ <- (seg map { cell => cell.asVal.observe.threshold(ys =>
           if(!ys.contains(x)) Some(xPos.remove(cell))
           else if(ys.size == 1) Some(xPos.set(cell))
           else None
@@ -136,7 +131,7 @@ class Sudoku extends FunSuite {
         }
 
         solution <- promiseResults(cells)
-      } yield solution
+      } yield solution.asVal
     }
 
     val solutions = problems map { solveDfsAll1(_) }

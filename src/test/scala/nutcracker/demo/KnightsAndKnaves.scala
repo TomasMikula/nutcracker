@@ -3,6 +3,7 @@ package nutcracker.demo
 import nutcracker.Promises
 import nutcracker.lib.bool.Bool._
 import nutcracker.lib.bool._
+import nutcracker.ops._
 import org.scalatest.FreeSpec
 import scalaz.std.anyVal._
 import scalaz.syntax.monad._
@@ -42,7 +43,7 @@ class KnightsAndKnaves extends FreeSpec {
       _ <- presume(c =??= neg(b))
 
       pr <- promiseResults(a, b, c)
-    } yield pr
+    } yield pr.asVal
 
     val solutions = solveDfs(problem).toStream.toList
 
@@ -62,14 +63,15 @@ class KnightsAndKnaves extends FreeSpec {
     // The visitor meets inhabitants A and B and asks
     // "Are there any knaves among you?"
     // A replies "Yes."
-    val problem = (for {
+    val problem = for {
       a <- newVar[Bool]
       b <- newVar[Bool]
 
       // a says (knave(a) ∨ knave(b))
       _ <- presume(a =??= (neg(a) || neg(b)))
 
-    } yield (a, b)) >>= { case (a, b) => promiseResults(a, b) }
+      pr <- promiseResults(a, b)
+    } yield pr.asVal
 
     val solutions = solveDfs(problem).toStream.toList
 
@@ -87,14 +89,15 @@ class KnightsAndKnaves extends FreeSpec {
   "Both knaves" - {
     // The visitor meets inhabitants A and B.
     // A says "We are both knaves."
-    val problem = (for {
+    val problem = for {
       a <- newVar[Bool]
       b <- newVar[Bool]
 
       // a says (knave(a) ∧ knave(b))
       _ <- presume(a =??= (neg(a) && neg(b)))
 
-    } yield (a, b)) >>= { case (a, b) => promiseResults(a, b) }
+      pr <- promiseResults(a, b)
+    } yield pr.asVal
 
     val solutions = solveDfs(problem).toStream.toList
 
@@ -114,7 +117,7 @@ class KnightsAndKnaves extends FreeSpec {
     // The visitor meets inhabitants A and B.
     // A says "We are the same kind."
     // B says "We are of different kinds."
-    val problem = (for {
+    val problem = for {
       a <- newVar[Bool]
       b <- newVar[Bool]
 
@@ -124,7 +127,8 @@ class KnightsAndKnaves extends FreeSpec {
       // b says (kind(a) ≠ kind(b)
       _ <- presume(b =??= negM(a =?= b))
 
-    } yield (a, b)) >>= { case (a, b) => promiseResults(a, b) }
+      pr <- promiseResults(a, b)
+    } yield pr.asVal
 
     val solutions = solveDfs(problem).toStream.toList
 

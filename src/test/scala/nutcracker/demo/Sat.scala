@@ -3,32 +3,28 @@ package nutcracker.demo
 import nutcracker._
 import nutcracker.lib.bool.Bool._
 import nutcracker.lib.bool._
-import nutcracker.util.FreeKT
+import nutcracker.ops._
 import nutcracker.util.ops.applicative._
 import org.scalatest.FunSpec
-
-import scalaz.Id._
-import scalaz.Monad
+import scalaz.Traverse
 import scalaz.std.anyVal._
 import scalaz.std.vector._
-import scalaz.syntax.traverse._
+import scalaz.syntax.monad._
 
 class Sat extends FunSpec {
-  import PropBranch._
-  import PropBranch.branchingApi.{propagation => _, _}
+  import PropBranchToolkit.instance._
+  import PropBranchToolkit.instance.branchingApi.{propagation => _, _}
   import Promises._
 
   val B = BoolOps[Prg, Var, Val]
   import B._
-
-  implicit val freeKMonad: Monad[FreeKT[Prop.Lang, Id, ?]] = FreeKT.freeKTMonad[Prop.Lang, Id]
 
 
   describe("A simple 3-SAT problem") {
 
     val problem = for {
       a <- newVar[Bool].replicate(4)
-      ā <- a.traverse(neg(_))
+      ā <- Traverse[Vector].traverse(a)(neg(_))
 
       _ <- atLeastOneTrue(a(0), a(1), a(2))
       _ <- atLeastOneTrue(ā(1), a(2), ā(3))
@@ -40,7 +36,7 @@ class Sat extends FunSpec {
       _ <- atLeastOneTrue(ā(0), a(1), ā(2))
 
       r <- promiseResults(a)
-    } yield r
+    } yield r.asVal
 
     val solutions = solveDfs(problem).toStream.toList
 

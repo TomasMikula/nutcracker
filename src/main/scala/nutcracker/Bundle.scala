@@ -1,6 +1,7 @@
 package nutcracker
 
 import nutcracker.util.{FreeK, HEqualK, ShowK}
+import scala.language.implicitConversions
 
 /** Bundle provides multiple APIs and is typically created by composing
   * multiple [[Module]]s.
@@ -36,6 +37,8 @@ trait RefToolkit extends Toolkit {
   implicit def refShow: ShowK[Var]
 
   def fetch[K[_], A](ref: Val[A], s: State[K]): A
+
+  implicit def readOnly[A](ref: Var[A]): Val[A]
 }
 
 trait StashToolkit extends Toolkit {

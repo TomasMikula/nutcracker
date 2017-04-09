@@ -4,11 +4,11 @@ import nutcracker._
 import nutcracker.ops._
 import nutcracker.algebraic.NonDecreasingMonoid
 import nutcracker.DecSet._
-import nutcracker.util.FreeKT
 import org.scalatest.FunSuite
 import scala.annotation.tailrec
 import scalaz.Id._
-import scalaz.{Equal, Monad, Ordering, StreamT}
+import scalaz.{Equal, Ordering, StreamT}
+import scalaz.syntax.monad._
 
 class PathSearch extends FunSuite {
 
@@ -18,16 +18,12 @@ class PathSearch extends FunSuite {
     def order(x: Int, y: Int): Ordering = Ordering.fromInt(x - y)
   }
 
-  val propBranchCost = new PropBranchCost[Int]
+  val propBranchCost = PropBranchCostToolkit.instance[Int]
   import propBranchCost._
   import Promises._
 
-  val solver = bfsSolver
-
   val C = CostApi[Prg]
   import C._
-
-  implicit val freeKMonad: Monad[Prg] = FreeKT.freeKTMonad[Lang, Id]
 
 
   type Vertex = Symbol
@@ -113,7 +109,7 @@ class PathSearch extends FunSuite {
 
     type Stream[A] = StreamT[Id, A]
 
-    val paths = solver.solutions(findPath('A, 'K)).toStream.toList
+    val paths = solveBfs(findPath('A, 'K)).toStream.toList
 
     assertResult(List(
       (path('A, 'B, 'D, 'H, 'K), 15),

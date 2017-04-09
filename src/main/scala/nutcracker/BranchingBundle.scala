@@ -1,7 +1,6 @@
 package nutcracker
 
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.ops._
 import scalaz.Id._
 import scalaz.{-\/, BindRec, Monad, MonadTell, StreamT, Writer, WriterT, \/, \/-}
 import scalaz.std.anyVal._
@@ -12,25 +11,23 @@ trait BranchingToolkit extends RefToolkit with StashToolkit {
   implicit val branchingApi: BranchingPropagation[Prg, Var, Val]
   implicit def stashRestore[K[_]]: StashRestore[State[K]]
 
-  import branchingApi._
-
   def assess(s: State[Prg]): Assessment[List[Prg[Unit]]]
 
   def solveDfs[A, B](p: Prg[A], f: (A, State[Prg]) => Option[B]): StreamT[Id, B] =
     solveDfsM0[Id, A, B](p, f)
 
-  def solveDfs[D](p: Prg[Var[D]])(implicit fin: Final[D]): StreamT[Id, fin.Out] =
+  def solveDfs[D](p: Prg[Val[D]])(implicit fin: Final[D]): StreamT[Id, fin.Out] =
     solveDfsM0[Id, D](p)
 
-  def solveDfsAll[D](p: Prg[Var[D]])(implicit fin: Final[D]): List[fin.Out] =
+  def solveDfsAll[D](p: Prg[Val[D]])(implicit fin: Final[D]): List[fin.Out] =
     toList(solveDfs(p))
 
   /** Like [[solveDfs[D]*]], but also outputs the number of times it had to backtrack. */
-  def solveDfs1[D](p: Prg[Var[D]])(implicit fin: Final[D]): StreamT[Writer[Int, ?], fin.Out] =
+  def solveDfs1[D](p: Prg[Val[D]])(implicit fin: Final[D]): StreamT[Writer[Int, ?], fin.Out] =
     solveDfsM[Writer[Int, ?], D](p)
 
   /** Like [[solveDfsAll]], but also returns the number of dead branches explored. */
-  def solveDfsAll1[D](p: Prg[Var[D]])(implicit fin: Final[D]): (List[fin.Out], Int) =
+  def solveDfsAll1[D](p: Prg[Val[D]])(implicit fin: Final[D]): (List[fin.Out], Int) =
     toList(solveDfs1(p)).run.swap
 
   private implicit val mt: MonadTell[Writer[Int, ?], Int] = WriterT.writerTMonadListen[Id, Int]
@@ -51,10 +48,10 @@ trait BranchingToolkit extends RefToolkit with StashToolkit {
   private def solveDfsM0[M[_], A, B](p: Prg[A], f: (A, State[Prg]) => Option[B])(implicit M0: BindRec[M], M1: Monad[M]): StreamT[M, B] =
     solveDfsM(p, f)(M0, fakeMonadTell(M1))
 
-  private def solveDfsM[M[_], D](p: Prg[Var[D]])(implicit fin: Final[D], M0: BindRec[M], M1: MonadTell[M, Int]): StreamT[M, fin.Out] =
-    solveDfsM[M, Var[D], fin.Out](p, (ref, s) => fin.extract(fetch(ref.asVal, s)))
+  private def solveDfsM[M[_], D](p: Prg[Val[D]])(implicit fin: Final[D], M0: BindRec[M], M1: MonadTell[M, Int]): StreamT[M, fin.Out] =
+    solveDfsM[M, Val[D], fin.Out](p, (ref, s) => fin.extract(fetch(ref, s)))
 
-  private def solveDfsM0[M[_], D](p: Prg[Var[D]])(implicit fin: Final[D], M0: BindRec[M], M1: Monad[M]): StreamT[M, fin.Out] =
+  private def solveDfsM0[M[_], D](p: Prg[Val[D]])(implicit fin: Final[D], M0: BindRec[M], M1: Monad[M]): StreamT[M, fin.Out] =
     solveDfsM(p)(fin, M0, fakeMonadTell(M1))
 
   private def fakeMonadTell[M[_]](M: Monad[M]): MonadTell[M, Int] = new MonadTell[M, Int] {

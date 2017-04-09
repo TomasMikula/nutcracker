@@ -1,7 +1,7 @@
 package nutcracker
 
 import nutcracker.util.CoproductK.:++:
-import nutcracker.util.{FreeKT}
+import nutcracker.util.FreeKT
 import nutcracker.util.KPair._
 import scala.language.existentials
 import scalaz.Id.Id
@@ -44,11 +44,9 @@ object PropBranch extends PropagationBundle with BranchingBundle with PropBranch
   def fetch[K[_], A](ref: Val[A], s: State[K]): A = Prop.fetch(ref, s._1)
   def empty[K[_]]: State[K] = Prop.empty[K] :*: Branch.empty[K]
 
-  def assess(s: State[Prg]): Assessment[List[Prg[Unit]]] = {
-    import propagationApi._
+  def assess(s: State[Prg]): Assessment[List[Prg[Unit]]] =
     if (Prop.isConsistent(s._1))
       Branch.assess(s._2)(λ[Var ~> Id](ref => Prop.fetch(ref, s._1)))
     else
       Assessment.Failed
-  }
 }
