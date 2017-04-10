@@ -4,26 +4,9 @@ import nutcracker.util.ContU
 import scalaz.{Bind, Functor, IndexedContT}
 import scalaz.syntax.bind._
 
-/** If we are allowed effects `M`, then `S` can be observed for changes to a (mutable) value of type `A`. */
-trait Src[M[_], S, A] {
-
-  def observeImpl[U, Δ](src: S)(f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]]
-
-  def observe(src: S)(implicit dom: Dom[A]): ObserveSyntaxHelper[dom.Update, dom.Delta] =
-    new ObserveSyntaxHelper[dom.Update, dom.Delta](src)(dom)
-
-  final class ObserveSyntaxHelper[U, Δ](src: S)(implicit dom: Dom.Aux[A, U, Δ]) {
-    def by(f: A => Trigger[M, A, Δ]): M[Subscription[M]] = observeImpl(src)(f)
-  }
-
-  final def source(src: S): Source[M, A] = new Source[M, A] {
-    def observeImpl[U, Δ](f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]] =
-      Src.this.observeImpl(src)(f)
-  }
-
-}
-
-/** Polymorphic [[Src]], isomorphic to `∀A. Src[M, F[A], A]`. */
+/** If we are allowed effects `M`, then `F[A]` can be observed
+  * for changes to a (mutable) value of type `A` (for any `A`).
+  */
 trait PSrc[M[_], F[_]] {
 
   def observeImpl[A, U, Δ](src: F[A])(f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]]
@@ -113,20 +96,6 @@ trait PSrc[M[_], F[_]] {
   }
 }
 
-/** Relative [[Src]]. Whenever `S` is a source of `A`,
-  * then `T` is a source of `B` (under the same effect `M`).
-  */
-trait RelSrc[S, A, T, B] {
-  def apply[M[_]](implicit S: Src[M, S, A]): Src[M, T, B]
-
-  def source(src: T): RelSource[S, A, B] = new RelSource[S, A, B] {
-    def apply[M[_]](implicit S: Src[M, S, A]): Source[M, B] = new Source[M, B] {
-      def observeImpl[U, Δ](f: B => Trigger[M, B, Δ])(implicit dom: Dom.Aux[B, U, Δ]): M[Subscription[M]] =
-        RelSrc.this.apply[M].observeImpl(src)(f)
-    }
-  }
-}
-
 /** Relative [[PSrc]]. Whenever `F` is a polymorphic source,
   * then `G` is also a polymorphic source (under the same effect `M`).
   */
@@ -135,7 +104,7 @@ trait RelPSrc[F[_], G[_]] {
 }
 
 /** OO style source, i.e. data + operations.
-  * Can be seen as a [[Src]] instance bundled with (i.e. partially applied to) the argument on which it operates.
+  * Can be seen as a `PSrc[M, F]` instance bundled with an `F[A]`, for some `F[_]`.
   */
 trait Source[M[_], A] {
   def observeImpl[U, Δ](f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]]
@@ -175,11 +144,6 @@ trait Source[M[_], A] {
         else None
       ))
   }
-}
-
-/** OO style relative source. */
-trait RelSource[S, A, B] {
-  def apply[M[_]](implicit S: Src[M, S, A]): Source[M, B]
 }
 
 /** OO style source relative to a polymorphic source. */
