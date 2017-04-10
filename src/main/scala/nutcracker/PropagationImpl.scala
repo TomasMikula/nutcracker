@@ -55,15 +55,12 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
                 val (s1, oo, ko) = s.addDomainObserver[dom.Domain, dom.Update, dom.IDelta](ref, f)(dom)
                 (Lst.maybe(ko), s1, oo)
               case NewCell(d, dom) =>
-                val (s1, ref: CellId[dom.Domain]) = s.addVariable(d)(dom)
+                val (s1, ref: CellId[dom.Domain]) = s.newCell(d)(dom)
                 (Lst.empty, s1, ref)
 
               case Hold(ref, f) =>
                 val (s1, oid, ko) = s.hold(ref)(f)
                 (Lst.maybe(ko), s1, oid)
-              case Supply(ref, cycle, value) =>
-                val (s1, ks) = s.supply(ref)(cycle, value)
-                (ks, s1, ())
               case r @ Resume(ref, token, trigger, dom) =>
                 val (s1, ks) = s.resume[dom.Domain, dom.Update, dom.IDelta, r.Arg](ref, token, trigger)(dom)
                 (ks, s1, ())
@@ -77,6 +74,9 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
 
               case ExclUpdate(ref, cycle, u, dom) =>
                 (Lst.empty, s.exclUpdate[dom.Domain, dom.Update, dom.IDelta](ref, cycle, u)(dom), ())
+              case Supply(ref, cycle, value) =>
+                val (s1, ks) = s.supply(ref)(cycle, value)
+                (ks, s1, ())
               case NewAutoCell(setup, supply, dom, ftor) =>
                 val (s1, ref: CellId[dom.Domain]) = s.newAutoCell(setup, supply)(dom, ftor)
                 (Lst.empty, s1, ref)
@@ -122,7 +122,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     def apply[D](cell: CellId[D]): D = fetch(cell)
   }
 
-  def addVariable[D](d: D)(implicit dom: IDom[D]): (PropagationStore[K], CellId[D]) = {
+  def newCell[D](d: D)(implicit dom: IDom[D]): (PropagationStore[K], CellId[D]) = {
     val ref = lastId.inc[D]
     val domains1 = domains.put(ref)(SimpleCell.init(d))
     val failedVars1 = if(dom.isFailed(d)) failedVars + ref else failedVars
@@ -145,7 +145,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     refs.map(ref => fetch(ref))
 
   def update[D, U, Δ[_, _]](ref: CellId[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] =
-    domains(ref).infer.update(u) match {
+    domains(ref).infer.unsafeAsSimple.update(u) match {
       case None => this
       case Some(cell) =>
         val failedVars1 = if(cell.getValue.fold(false)(dom.isFailed(_))) failedVars + ref else failedVars
@@ -155,7 +155,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     }
 
   def exclUpdate[D, U, Δ[_, _]](ref: CellId[D], cycle: LiveCycle[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] = {
-    domains(ref).infer.exclUpdate(cycle, u) match {
+    domains(ref).infer.unsafeAsAuto.exclUpdate(cycle, u) match {
       case None => this
       case Some(cell) =>
         val domains1 = domains.put(ref)(cell)
@@ -175,7 +175,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   }
 
   def supply[D](ref: CellId[D])(cycle: LiveCycle[D], value: D): (PropagationStore[K], Lst[K[Unit]]) = {
-    val (cell, ks) = domains(ref).supply(cycle, value)
+    val (cell, ks) = domains(ref).unsafeAsAuto.supply(cycle, value)
     (copy(domains = domains.put(ref)(cell)), ks)
   }
 
@@ -191,12 +191,12 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   }
 
   def addFinalizer[A](ref: CellId[A], cycle: LiveCycle[A], sub: Subscription[K]): (Lst[K[Unit]], PropagationStore[K], Option[FinalizerId]) = {
-    val (ks, cell, fid) = domains(ref).addFinalizer(cycle, sub)
+    val (ks, cell, fid) = domains(ref).unsafeAsAuto.addFinalizer(cycle, sub)
     (ks, copy(domains = domains.put(ref)(cell)), fid)
   }
 
   def removeFinalizer[A](ref: CellId[A], cycle: LiveCycle[A], fid: FinalizerId): PropagationStore[K] = {
-    val cell = domains(ref).removeFinalizer(cycle, fid)
+    val cell = domains(ref).unsafeAsAuto.removeFinalizer(cycle, fid)
     copy(domains = domains.put(ref)(cell))
   }
 
@@ -265,26 +265,19 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
   def infer(implicit dom: IDom[D]): Cell.Aux[K, D, dom.Update, dom.IDelta] =
     this.asInstanceOf[Cell.Aux[K, D, dom.Update, dom.IDelta]]
 
+  def unsafeAsSimple: SimpleCell.Aux[K, D, Update, Delta] = this.asInstanceOf[SimpleCell.Aux[K, D, Update, Delta]]
+  def unsafeAsAuto: OnDemandCell[K, D, Update, Delta] = this.asInstanceOf[OnDemandCell[K, D, Update, Delta]]
+
   def hasPendingObservers: Boolean
 
   def getValue: Option[Value]
-
-  def update(u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[Cell[K, D]]
-
-  def exclUpdate(cycle: LiveCycle[D], u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[Cell[K, D]]
 
   def observe(f: SeqPreHandler[Token, K[Unit], D, Delta]): (Cell[K, D], Option[ObserverId], Option[K[Unit]])
 
   def rmObserver(oid: ObserverId): (Cell[K, D], Lst[K[Unit]])
 
-  def addFinalizer(cycle: LiveCycle[D], sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId])
-
-  def removeFinalizer(cycle: LiveCycle[D], fid: FinalizerId): Cell[K, D]
-
   /** Making observer ID available both to the callback `f` and as part of the result, leaving the choice of how to consume it to the user. */
   def hold(f: (D, Token[D], ObserverId) => K[Unit]): (Cell[K, D], ObserverId, Option[K[Unit]])
-
-  def supply[D0 <: D](cycle: LiveCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]])
 
   def resume[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell[K, D], Lst[K[Unit]])
 
@@ -398,16 +391,6 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
 
       case Unchanged() => None
     }
-
-  // TODO: this method should not exist on SimpleCell
-  override def exclUpdate(cycle: LiveCycle[D], u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[Cell[K, D]] =
-    sys.error("exclUpdate only allowed on on-demand cells")
-
-  override def addFinalizer(cycle: LiveCycle[D], sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId]) =
-    sys.error("addFinalizer only allowed on on-demand cells")
-
-  override def removeFinalizer(cycle: LiveCycle[D], fid: FinalizerId): Cell[K, D] =
-    sys.error("removeFinalizer only allowed on on-demand cells")
 
   def observe(f: SeqPreHandler[Token, K[Unit], D, Delta]): (SimpleCell.Aux1[K, D, Update, Delta, Value], Option[ObserverId], Option[K[Unit]]) = {
     import SeqTrigger._
@@ -529,9 +512,6 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
 
     go(pendingObservers, idleObservers, blockedIdleObservers, Lst.empty, lastToken)
   }
-
-  def supply[D0 <: D](cycle: LiveCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]]) =
-    sys.error("operation valid only for OnDemandCells")
 }
 
 private[nutcracker] object SimpleCell {
@@ -576,8 +556,10 @@ private[nutcracker] sealed abstract class OnDemandCell[K[_], D, U, Δ[_, _]] ext
   type Update = U
   type Delta[D0, D1] = Δ[D0, D1]
 
-  final override def update(u: U)(implicit dom: IDom.Aux[D, U, Δ]): Option[Cell.Aux[K, D, U, Δ]] =
-    sys.error("Cannot update OnDemandCell")
+  def supply[D0 <: D](cycle: LiveCycle[D], value: D0): (Cell[K, D], Lst[K[Unit]])
+  def exclUpdate(cycle: LiveCycle[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): Option[Cell[K, D]]
+  def addFinalizer(cycle: LiveCycle[D], sub: Subscription[K]): (Lst[K[Unit]], Cell[K, D], Option[FinalizerId])
+  def removeFinalizer(cycle: LiveCycle[D], fid: FinalizerId): Cell[K, D]
 }
 
 private[nutcracker] case class InactiveCell[K[_], D, U, Δ[_, _]](
@@ -721,11 +703,11 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
     else this
 
   override def resume[D0 <: D](token: Token[D0], trigger: Trigger[D0]): (Cell.Aux[K, D, U, Δ], Lst[K[Unit]]) =
-  // must be resumption of an observer that has been unsubscribed already
+    // must be resumption of an observer that has been unsubscribed already
     (this, Lst.empty)
 
   override def triggerPendingObservers: (Cell[K, D], Lst[K[Unit]]) =
-  // there are no pending observers
+    // there are no pending observers
     (this, Lst.empty)
 
   override def rmObserver(oid: ObserverId): (Cell[K, D], Lst[K[Unit]]) = {
