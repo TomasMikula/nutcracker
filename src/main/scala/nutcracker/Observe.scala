@@ -4,18 +4,19 @@ import nutcracker.util.ContU
 import scalaz.{Bind, Functor, IndexedContT}
 import scalaz.syntax.bind._
 
-/** If we are allowed effects `M`, then `F[A]` can be observed
+/** If we are allowed effects `M`, then `Val[A]` can be observed
   * for changes to a (mutable) value of type `A` (for any `A`).
   */
-trait Observe[M[_], F[_]] {
+trait Observe[M[_]] {
+  type Val[_]
 
-  def observeImpl[A, U, Δ](src: F[A])(f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]]
-  def observeImplC[A, U, Δ, B](src: F[A])(f: A => ContU[M, (Trigger[M, A, Δ], B)])(implicit dom: Dom.Aux[A, U, Δ]): ContU[M, (Subscription[M], B)]
+  def observeImpl[A, U, Δ](src: Val[A])(f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]]
+  def observeImplC[A, U, Δ, B](src: Val[A])(f: A => ContU[M, (Trigger[M, A, Δ], B)])(implicit dom: Dom.Aux[A, U, Δ]): ContU[M, (Subscription[M], B)]
 
-  def observe[A](src: F[A])(implicit dom: Dom[A]): ObserveSyntaxHelper[A, dom.Update, dom.Delta] =
+  def observe[A](src: Val[A])(implicit dom: Dom[A]): ObserveSyntaxHelper[A, dom.Update, dom.Delta] =
     new ObserveSyntaxHelper[A, dom.Update, dom.Delta](src)(dom)
 
-  final class ObserveSyntaxHelper[A, U, Δ](src: F[A])(implicit dom: Dom.Aux[A, U, Δ]) {
+  final class ObserveSyntaxHelper[A, U, Δ](src: Val[A])(implicit dom: Dom.Aux[A, U, Δ]) {
     def by(f: A => Trigger[M, A, Δ]): M[Subscription[M]] = observeImpl(src)(f)
     def by_(f: A => Trigger[M, A, Δ])(implicit M: Functor[M]): M[Unit] = by(f).void
 
@@ -35,10 +36,10 @@ trait Observe[M[_], F[_]] {
     def untilRight_(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Unit] = untilRight(f).void
   }
 
-  def peek_[A](ref: F[A])(f: A => M[Unit])(implicit dom: Dom[A], M: Functor[M]): M[Unit] =
+  def peek_[A](ref: Val[A])(f: A => M[Unit])(implicit dom: Dom[A], M: Functor[M]): M[Unit] =
     observe(ref).by(d => Trigger.fire(f(d))).map((_: Subscription[M]) => ())
 
-  def alternate[A, B, L, R](ref1: F[A], ref2: F[B])(
+  def alternate[A, B, L, R](ref1: Val[A], ref2: Val[B])(
     f: (A, B) => Alternator,
     onStartLeft: () => M[L],
     onStartRight: () => M[R],
@@ -71,7 +72,7 @@ trait Observe[M[_], F[_]] {
     })
   }
 
-  def alternate0[A, B](ref1: F[A], ref2: F[B])(
+  def alternate0[A, B](ref1: Val[A], ref2: Val[B])(
     f: (A, B) => Alternator,
     onSwitchToLeft: M[Unit],
     onSwitchToRight: M[Unit],
@@ -90,17 +91,17 @@ trait Observe[M[_], F[_]] {
       (_ => onStop)
     )
 
-  def observable[A](src: F[A]): Observable[M, A] = new Observable[M, A] {
+  def observable[A](src: Val[A]): Observable[M, A] = new Observable[M, A] {
     def observeImpl[U, Δ](f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]] =
       Observe.this.observeImpl(src)(f)
   }
 }
 
-/** Relative [[Observe]]: whenever `Observe[M, F]` for some effect `M[_]`,
-  * then also `Observe[M, G]`, for the same effect `M`.
+/** Relative [[Observe]]: whenever `ObserveVal[M, F]` for some effect `M[_]`,
+  * then also `ObserveVal[M, G]`, for the same effect `M`.
   */
 trait RelObserve[F[_], G[_]] {
-  def apply[M[_]](implicit F: Observe[M, F]): Observe[M, G]
+  def apply[M[_]](implicit F: ObserveVal[M, F]): ObserveVal[M, G]
 }
 
 /** Can be observed for changes to a (mutable) value of type `A`, under effects `M`.
@@ -148,23 +149,23 @@ trait Observable[M[_], A] {
 
 /** Relative [[Observable]]: whenever `Observe[M, F]`, then this can be converted to `Observable[M, A]`. */
 trait RelObservable[F[_], A] {
-  def apply[M[_]](implicit F: Observe[M, F], M: Functor[M]): Observable[M, A]
+  def apply[M[_]](implicit F: ObserveVal[M, F], M: Functor[M]): Observable[M, A]
 
   def map[B](f: A => B)(implicit da: Dom[A], db: Dom[B]): MapSyntaxHelper[B, da.Update, da.Delta, db.Update, db.Delta] =
     new MapSyntaxHelper(f)(da, db)
 
   final class MapSyntaxHelper[B, UA, DA, UB, DB](f: A => B)(implicit da: Dom.Aux[A, UA, DA], db: Dom.Aux[B, UB, DB]) {
     def deltas(g: DA => DB): RelObservable[F, B] = new RelObservable[F, B] {
-      def apply[M[_]](implicit F: Observe[M, F], M: Functor[M]): Observable[M, B] = RelObservable.this.apply[M].map(f).deltas(g)
+      def apply[M[_]](implicit F: ObserveVal[M, F], M: Functor[M]): Observable[M, B] = RelObservable.this.apply[M].map(f).deltas(g)
     }
   }
 
-  def asCont[M[_]](implicit fin: Final[A], da: Dom[A], F: Observe[M, F], M: Functor[M]): IndexedContT[M, Subscription[M], Unit, fin.Out] =
+  def asCont[M[_]](implicit fin: Final[A], da: Dom[A], F: ObserveVal[M, F], M: Functor[M]): IndexedContT[M, Subscription[M], Unit, fin.Out] =
     apply[M].asCont
 }
 
 object RelObservable {
   def lift[F[_], A](fa: F[A]): RelObservable[F, A] = new RelObservable[F, A] {
-    def apply[M[_]](implicit F: Observe[M, F], M: Functor[M]): Observable[M, A] = F.observable(fa)
+    def apply[M[_]](implicit F: ObserveVal[M, F], M: Functor[M]): Observable[M, A] = F.observable(fa)
   }
 }

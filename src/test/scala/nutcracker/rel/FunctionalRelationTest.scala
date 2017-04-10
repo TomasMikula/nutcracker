@@ -11,7 +11,7 @@ import shapeless.{::, HNil}
 
 class FunctionalRelationTest extends FunSuite {
   import PropRel._
-  import PropRel.propagationApi._
+  import PropRel.propagationApi.{Val => _, _}
   import PropRel.relationsApi._
 
   type ContU[A] = ContT[Prg, Unit, A]

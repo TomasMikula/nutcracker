@@ -1,5 +1,6 @@
 package nutcracker
 
+import nutcracker.ops._
 import nutcracker.util.{FreeK, InjectK, Lst, Step, WriterState}
 import scalaz.Id.Id
 import scalaz.{Monad, ~>}
@@ -16,14 +17,13 @@ private[nutcracker] class BranchingModuleImpl[Var0[_], Val0[_]] extends Persiste
   ): BranchingPropagation[FreeK[F, ?], Var, Val] =
     new BranchingPropagation[FreeK[F, ?], Var, Val] {
       override val propagation: Propagation[FreeK[F, ?], Var, Val] = P
-      import P._
 
       def newVar[A](a: A)(implicit ev: Splittable[A]): FreeK[F, Var[A]] =
         if(ev.isUnresolved(a))
           for {
             ref <- propagation.newCell[A](a)
             _ <- BranchLang.trackF(ref)
-            _ <- propagation.observe(ref).threshold(a =>
+            _ <- ref.observe.threshold(a =>
               if(ev.isUnresolved(a)) None
               else Some(BranchLang.untrackF(ref))
             )
