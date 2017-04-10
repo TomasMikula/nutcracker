@@ -568,6 +568,7 @@ private[nutcracker] case class InactiveCell[K[_], D, U, Δ[_, _]](
   lastObserverId: ObserverId,
   lastToken: Token[_]
 ) extends OnDemandCell[K, D, U, Δ] {
+  type Value = Nothing
 
   override def getValue: Option[Value] = None
 
@@ -632,6 +633,8 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
   lastToken: Token[_]
 ) extends OnDemandCell[K, D, U, Δ] {
   import Cell._
+
+  type Value = Nothing
 
   require(preHandlers.nonEmpty || preHandlersM.nonEmpty)
 

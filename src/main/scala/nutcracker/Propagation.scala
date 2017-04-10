@@ -6,7 +6,7 @@ import scalaz.{Applicative, Functor, IndexedContT}
 import scalaz.syntax.functor._
 import shapeless.{::, HList, HNil}
 
-trait Propagation[M[_], Var[_], Val[_]] extends PSrc[M, Val] {
+trait Propagation[M[_], Var[_], Val[_]] extends Observe[M, Val] {
 
   implicit def readOnly[A](a: Var[A]): Val[A]
 

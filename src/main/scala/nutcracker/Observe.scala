@@ -7,7 +7,7 @@ import scalaz.syntax.bind._
 /** If we are allowed effects `M`, then `F[A]` can be observed
   * for changes to a (mutable) value of type `A` (for any `A`).
   */
-trait PSrc[M[_], F[_]] {
+trait Observe[M[_], F[_]] {
 
   def observeImpl[A, U, Δ](src: F[A])(f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]]
   def observeImplC[A, U, Δ, B](src: F[A])(f: A => ContU[M, (Trigger[M, A, Δ], B)])(implicit dom: Dom.Aux[A, U, Δ]): ContU[M, (Subscription[M], B)]
@@ -90,23 +90,23 @@ trait PSrc[M[_], F[_]] {
       (_ => onStop)
     )
 
-  def source[A](src: F[A]): Source[M, A] = new Source[M, A] {
+  def observable[A](src: F[A]): Observable[M, A] = new Observable[M, A] {
     def observeImpl[U, Δ](f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]] =
-      PSrc.this.observeImpl(src)(f)
+      Observe.this.observeImpl(src)(f)
   }
 }
 
-/** Relative [[PSrc]]. Whenever `F` is a polymorphic source,
-  * then `G` is also a polymorphic source (under the same effect `M`).
+/** Relative [[Observe]]: whenever `Observe[M, F]` for some effect `M[_]`,
+  * then also `Observe[M, G]`, for the same effect `M`.
   */
-trait RelPSrc[F[_], G[_]] {
-  def apply[M[_]](implicit F: PSrc[M, F]): PSrc[M, G]
+trait RelObserve[F[_], G[_]] {
+  def apply[M[_]](implicit F: Observe[M, F]): Observe[M, G]
 }
 
-/** OO style source, i.e. data + operations.
-  * Can be seen as a `PSrc[M, F]` instance bundled with an `F[A]`, for some `F[_]`.
+/** Can be observed for changes to a (mutable) value of type `A`, under effects `M`.
+  * Can be seen as an `F[A]` bundled with an instance of `Observe[M, F]`, for some `F[_]`.
   */
-trait Source[M[_], A] {
+trait Observable[M[_], A] {
   def observeImpl[U, Δ](f: A => Trigger[M, A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]]
 
   def observe(implicit dom: Dom[A]): ObserveSyntaxHelper[dom.Update, dom.Delta] =
@@ -120,10 +120,10 @@ trait Source[M[_], A] {
     new MapSyntaxHelper(f)(da, db)
 
   final class MapSyntaxHelper[B, UA, DA, UB, DB](f: A => B)(implicit da: Dom.Aux[A, UA, DA], db: Dom.Aux[B, UB, DB]) {
-    def deltas(g: DA => DB)(implicit M: Functor[M]): Source[M, B] = new Source[M, B] {
+    def deltas(g: DA => DB)(implicit M: Functor[M]): Observable[M, B] = new Observable[M, B] {
       def observeImpl[U, Δ](h: B => Trigger[M, B, Δ])(implicit dom: Dom.Aux[B, U, Δ]): M[Subscription[M]] = {
         val g1 = Dom.relateDeltas(db, dom).subst[DA => ?](g)
-        Source.this.observeImpl(a => h(f(a)).contramap(f, g1))
+        Observable.this.observeImpl(a => h(f(a)).contramap(f, g1))
       }
     }
   }
@@ -146,25 +146,25 @@ trait Source[M[_], A] {
   }
 }
 
-/** OO style source relative to a polymorphic source. */
-trait RelPSource[F[_], A] {
-  def apply[M[_]](implicit F: PSrc[M, F], M: Functor[M]): Source[M, A]
+/** Relative [[Observable]]: whenever `Observe[M, F]`, then this can be converted to `Observable[M, A]`. */
+trait RelObservable[F[_], A] {
+  def apply[M[_]](implicit F: Observe[M, F], M: Functor[M]): Observable[M, A]
 
   def map[B](f: A => B)(implicit da: Dom[A], db: Dom[B]): MapSyntaxHelper[B, da.Update, da.Delta, db.Update, db.Delta] =
     new MapSyntaxHelper(f)(da, db)
 
   final class MapSyntaxHelper[B, UA, DA, UB, DB](f: A => B)(implicit da: Dom.Aux[A, UA, DA], db: Dom.Aux[B, UB, DB]) {
-    def deltas(g: DA => DB): RelPSource[F, B] = new RelPSource[F, B] {
-      def apply[M[_]](implicit F: PSrc[M, F], M: Functor[M]): Source[M, B] = RelPSource.this.apply[M].map(f).deltas(g)
+    def deltas(g: DA => DB): RelObservable[F, B] = new RelObservable[F, B] {
+      def apply[M[_]](implicit F: Observe[M, F], M: Functor[M]): Observable[M, B] = RelObservable.this.apply[M].map(f).deltas(g)
     }
   }
 
-  def asCont[M[_]](implicit fin: Final[A], da: Dom[A], F: PSrc[M, F], M: Functor[M]): IndexedContT[M, Subscription[M], Unit, fin.Out] =
+  def asCont[M[_]](implicit fin: Final[A], da: Dom[A], F: Observe[M, F], M: Functor[M]): IndexedContT[M, Subscription[M], Unit, fin.Out] =
     apply[M].asCont
 }
 
-object RelPSource {
-  def lift[F[_], A](fa: F[A]): RelPSource[F, A] = new RelPSource[F, A] {
-    def apply[M[_]](implicit F: PSrc[M, F], M: Functor[M]): Source[M, A] = F.source(fa)
+object RelObservable {
+  def lift[F[_], A](fa: F[A]): RelObservable[F, A] = new RelObservable[F, A] {
+    def apply[M[_]](implicit F: Observe[M, F], M: Functor[M]): Observable[M, A] = F.observable(fa)
   }
 }
