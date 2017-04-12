@@ -400,6 +400,9 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
       case Sleep(h)  =>
         val (cell, oid) = addObserver(h)
         (cell, Some(oid), None)
+      case FireReload(k, h) =>
+        val (cell, oid) = addObserver(h)
+        (cell, Some(oid), Some(k))
       case Reconsider(cont) =>
         val (cell, token, oid) = block0
         (cell, Some(oid), Some(cont(token)))
@@ -448,21 +451,10 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
     trigger match {
       case Discard() => (copy(blockedIdleObservers = blockedIdleObservers - token, blockedPendingObservers = blockedPendingObservers - token), Lst.empty)
       case Fire(k)   => (copy(blockedIdleObservers = blockedIdleObservers - token, blockedPendingObservers = blockedPendingObservers - token), Lst.singleton(k))
-      case Sleep(handler)  =>
-        val cell = blockedIdleObservers.get(token) match {
-          case Some(obs) =>
-            assert(blockedPendingObservers.get(token).isEmpty)
-            val obs1 = obs.resume(handler)
-            SimpleCell[K, D, Update, Delta, Value](value)(obs1 :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, lastObserverId, lastToken)
-          case None => blockedPendingObservers.get(token) match {
-            case Some(obs) =>
-              val obs1 = obs.resume(handler)
-              SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, obs1 :: pendingObservers, blockedIdleObservers, blockedPendingObservers - token, lastObserverId, lastToken)
-            case None =>
-              sys.error(s"unrecognized token $token")
-          }
-        }
-        (cell, Lst.empty)
+      case Sleep(handler) =>
+        (resumeWithHandler(token, handler), Lst.empty)
+      case FireReload(k, handler) =>
+        (resumeWithHandler(token, handler), Lst.singleton(k))
       case Reconsider(f) =>
         val nextToken = lastToken.inc[D0]
         val k = f(nextToken)
@@ -487,6 +479,21 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
     }
   }
 
+  private def resumeWithHandler[D0 <: D](token: Token[D0], handler: Handler[D0]): SimpleCell.Aux1[K, D, Update, Delta, Value] =
+    blockedIdleObservers.get(token) match {
+      case Some(obs) =>
+        assert(blockedPendingObservers.get(token).isEmpty)
+        val obs1 = obs.resume(handler)
+        SimpleCell[K, D, Update, Delta, Value](value)(obs1 :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, lastObserverId, lastToken)
+      case None => blockedPendingObservers.get(token) match {
+        case Some(obs) =>
+          val obs1 = obs.resume(handler)
+          SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, obs1 :: pendingObservers, blockedIdleObservers, blockedPendingObservers - token, lastObserverId, lastToken)
+        case None =>
+          sys.error(s"unrecognized token $token")
+      }
+    }
+
   def triggerPendingObservers: (SimpleCell.Aux1[K, D, Update, Delta, Value], Lst[K[Unit]]) = {
     @tailrec def go(
       pending: List[PendingObserver[Value]],
@@ -503,6 +510,7 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
           case Discard() => go(tail, idleAcc, blockedIdleAcc, firedAcc, lastToken)
           case Fire(k) => go(tail, idleAcc, blockedIdleAcc, k :: firedAcc, lastToken)
           case Sleep(h) => go(tail, IdleObserver(po.id, h) :: idleAcc, blockedIdleAcc, firedAcc, lastToken)
+          case FireReload(k, h) => go(tail, IdleObserver(po.id, h) :: idleAcc, blockedIdleAcc, k :: firedAcc, lastToken)
           case Reconsider(f) =>
             val token = lastToken.inc[Value]
             val k = f(token)
@@ -669,6 +677,9 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
         case Discard() => // do nothing
         case Fire(k) => ks = k :: ks
         case Sleep(handler) => idleObservers = IdleObserver(id, handler) :: idleObservers
+        case FireReload(k, handler) =>
+          ks = k :: ks
+          idleObservers = IdleObserver(id, handler) :: idleObservers
         case Reconsider(cont) =>
           val tok = token.inc[D0]
           ks = cont(tok) :: ks

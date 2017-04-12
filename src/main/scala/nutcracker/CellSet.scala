@@ -80,7 +80,7 @@ object CellSet {
     IndexedContT(f => set.observe.by(as => {
       val now = as.toList.traverse_(f)
       val onChange = Trigger.continually((as: CellSet[Var, A], delta: Added[Var, A]) => delta.value.toList.traverse_(f))
-      Trigger.reconsider(now.as(Trigger.sleep(onChange)))
+      Trigger.fireReload(now, onChange)
     }))
   }
 
@@ -105,7 +105,7 @@ object CellSet {
     sub.observe.by((sa: CellSet[Var, A]) => {
       val now = insertAll(sa.value, sup)
       val onChange = Trigger.continually((sa: CellSet[Var, A], delta: Added[Var, A]) => insertAll(delta.value, sup))
-      Trigger.reconsider(now.as(Trigger.sleep(onChange)))
+      Trigger.fireReload(now, onChange)
     }).void
 
   def includeC[F[_], Var[_], Val[_], A](cps: ContU[F, Var[A]], ref: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], dom: Dom[A], F: Functor[F]): F[Unit] =
@@ -129,7 +129,7 @@ object CellSet {
       _ <- P.observe[CellSet[Var, A]](sref).by((sa: CellSet[Var, A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
         val onChange = Trigger.continually((sa: CellSet[Var, A], delta: Added[Var, A]) => delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res))))
-        Trigger.reconsider(now.as(Trigger.sleep(onChange)))
+        Trigger.fireReload(now, onChange)
       })
     } yield res
   }

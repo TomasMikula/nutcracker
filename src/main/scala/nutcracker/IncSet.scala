@@ -75,7 +75,7 @@ class IncSets[F[_], Var[_], Val[_]](implicit P: Propagation[F, Var, Val]) {
     IndexedContT(f => ref.observe.by(as => {
       val now = as.toList.traverse_(f)
       val onChange = Trigger.continually((as: IncSet[A], delta: Delta[A]) => delta.value.toList.traverse_(f))
-      Trigger.reconsider(now.as(Trigger.sleep(onChange)))
+      Trigger.fireReload(now, onChange)
     }))
   }
 
@@ -94,7 +94,7 @@ class IncSets[F[_], Var[_], Val[_]](implicit P: Propagation[F, Var, Val]) {
     sub.observe.by((sa: IncSet[A]) => {
       val now = insertAll(sa.value, sup)
       val onChange = Trigger.continually((sa: IncSet[A], delta: Delta[A]) => insertAll(delta.value, sup))
-      Trigger.reconsider(now.as(Trigger.sleep(onChange)))
+      Trigger.fireReload(now, onChange)
     }).void
 
   def includeC[A](cps: ContU[F, A], ref: Var[IncSet[A]]): F[Unit] =
@@ -122,7 +122,7 @@ class IncSets[F[_], Var[_], Val[_]](implicit P: Propagation[F, Var, Val]) {
       _ <- sref.observe.by((sa: IncSet[A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
         val onChange = Trigger.continually((sa: IncSet[A], delta: Delta[A]) => delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res))))
-        Trigger.reconsider(now.as(Trigger.sleep(onChange)))
+        Trigger.fireReload(now, onChange)
       })
     } yield res
   }

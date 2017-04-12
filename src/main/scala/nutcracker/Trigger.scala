@@ -10,6 +10,7 @@ sealed trait TriggerF[F[_], D, Δ, A] {
     case Discard() => Discard()
     case Fire(exec) => Fire(exec)
     case Sleep(next) => Sleep((d, δ) => f(next(d, δ)))
+    case FireReload(exec, next) => FireReload(exec, (d, δ) => f(next(d, δ)))
     case Reconsider(fa) => Reconsider(F.map(fa)(f))
   }
 
@@ -17,6 +18,7 @@ sealed trait TriggerF[F[_], D, Δ, A] {
     case Discard() => Discard()
     case Sleep(next) => Sleep((d0, δ0) => next(f(d0), g(δ0)))
     case Fire(exec) => Fire(exec)
+    case FireReload(exec, next) => FireReload(exec, (d0, δ0) => next(f(d0), g(δ0)))
     case Reconsider(cont) => Reconsider(cont)
   }
 }
@@ -26,6 +28,7 @@ object TriggerF {
   case class Discard[F[_], D, Δ, A]() extends TriggerF[F, D, Δ, A]
   case class Fire[F[_], D, Δ, A](exec: F[Unit]) extends TriggerF[F, D, Δ, A]
   case class Sleep[F[_], D, Δ, A](next: (D, Δ) => A) extends TriggerF[F, D, Δ, A]
+  case class FireReload[F[_], D, Δ, A](exec: F[Unit], next: (D, Δ) => A) extends TriggerF[F, D, Δ, A]
   case class Reconsider[F[_], D, Δ, A](cont: F[A]) extends TriggerF[F, D, Δ, A]
 }
 
@@ -42,6 +45,7 @@ object Trigger {
   def discard[F[_], D, Δ]: Trigger[F, D, Δ] = Trigger(Discard())
   def sleep[F[_], D, Δ](next: (D, Δ) => Trigger[F, D, Δ]): Trigger[F, D, Δ] = Trigger(Sleep(next))
   def fire[F[_], D, Δ](exec: F[Unit]): Trigger[F, D, Δ] = Trigger(Fire(exec))
+  def fireReload[F[_], D, Δ](exec: F[Unit], next: (D, Δ) => Trigger[F, D, Δ]): Trigger[F, D, Δ] = Trigger(FireReload(exec, next))
   def reconsider[F[_], D, Δ](cont: F[Trigger[F, D, Δ]]): Trigger[F, D, Δ] = Trigger(Reconsider(cont))
 
   def observerS[F[_]: Functor, D, Δ, S](s: S)(f: S => TriggerF[F, D, Δ, S]): Trigger[F, D, Δ] =
@@ -116,6 +120,7 @@ private[nutcracker] sealed trait SeqTrigger[Tok[_], K, D, Δ[_, _], D1] {
     case Discard() => Discard()
     case Sleep(h) => Sleep(h.map(f))
     case Fire(k) => Fire(f(k))
+    case FireReload(k, h) => FireReload(f(k), h.map(f))
     case Reconsider(cont) => Reconsider(cont andThen f)
   }
 }
@@ -127,6 +132,8 @@ private[nutcracker] object SeqTrigger {
   case class Sleep[Tok[_], K, D, Δ[_, _], D1](h: SeqHandler[Tok, K, D, Δ, D1]) extends SeqTrigger[Tok, K, D, Δ, D1]
 
   case class Fire[Tok[_], K, D, Δ[_, _], D1](cont: K) extends SeqTrigger[Tok, K, D, Δ, D1]
+
+  case class FireReload[Tok[_], K, D, Δ[_, _], D1](cont: K, h: SeqHandler[Tok, K, D, Δ, D1]) extends SeqTrigger[Tok, K, D, Δ, D1]
 
   case class Reconsider[Tok[_], K, D, Δ[_, _], D1](cont: Tok[D1] => K) extends SeqTrigger[Tok, K, D, Δ, D1]
 
