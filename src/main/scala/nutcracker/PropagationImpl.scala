@@ -400,7 +400,7 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
       case Sleep(h)  =>
         val (cell, oid) = addObserver(h)
         (cell, Some(oid), None)
-      case FireReload(cont) =>
+      case Reconsider(cont) =>
         val (cell, token, oid) = block0
         (cell, Some(oid), Some(cont(token)))
     }
@@ -463,7 +463,7 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
           }
         }
         (cell, Lst.empty)
-      case FireReload(f) =>
+      case Reconsider(f) =>
         val nextToken = lastToken.inc[D0]
         val k = f(nextToken)
         val cell = blockedIdleObservers.get(token) match {
@@ -503,7 +503,7 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
           case Discard() => go(tail, idleAcc, blockedIdleAcc, firedAcc, lastToken)
           case Fire(k) => go(tail, idleAcc, blockedIdleAcc, k :: firedAcc, lastToken)
           case Sleep(h) => go(tail, IdleObserver(po.id, h) :: idleAcc, blockedIdleAcc, firedAcc, lastToken)
-          case FireReload(f) =>
+          case Reconsider(f) =>
             val token = lastToken.inc[Value]
             val k = f(token)
             go(tail, idleAcc, blockedIdleAcc.put(token)(BlockedIdleObserver(po.id, Leibniz.refl[Value])), k :: firedAcc, token)
@@ -669,7 +669,7 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
         case Discard() => // do nothing
         case Fire(k) => ks = k :: ks
         case Sleep(handler) => idleObservers = IdleObserver(id, handler) :: idleObservers
-        case FireReload(cont) =>
+        case Reconsider(cont) =>
           val tok = token.inc[D0]
           ks = cont(tok) :: ks
           blockedIdleObservers = blockedIdleObservers.put(tok)(BlockedIdleObserver(id))

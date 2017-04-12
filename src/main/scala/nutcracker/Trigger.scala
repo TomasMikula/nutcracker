@@ -10,14 +10,14 @@ sealed trait TriggerF[F[_], D, Δ, A] {
     case Discard() => Discard()
     case Fire(exec) => Fire(exec)
     case Sleep(next) => Sleep((d, δ) => f(next(d, δ)))
-    case FireReload(fa) => FireReload(F.map(fa)(f))
+    case Reconsider(fa) => Reconsider(F.map(fa)(f))
   }
 
   def contramap[D0, Δ0](f: D0 => D, g: Δ0 => Δ): TriggerF[F, D0, Δ0, A] = this match {
     case Discard() => Discard()
     case Sleep(next) => Sleep((d0, δ0) => next(f(d0), g(δ0)))
     case Fire(exec) => Fire(exec)
-    case FireReload(cont) => FireReload(cont)
+    case Reconsider(cont) => Reconsider(cont)
   }
 }
 
@@ -26,7 +26,7 @@ object TriggerF {
   case class Discard[F[_], D, Δ, A]() extends TriggerF[F, D, Δ, A]
   case class Fire[F[_], D, Δ, A](exec: F[Unit]) extends TriggerF[F, D, Δ, A]
   case class Sleep[F[_], D, Δ, A](next: (D, Δ) => A) extends TriggerF[F, D, Δ, A]
-  case class FireReload[F[_], D, Δ, A](cont: F[A]) extends TriggerF[F, D, Δ, A]
+  case class Reconsider[F[_], D, Δ, A](cont: F[A]) extends TriggerF[F, D, Δ, A]
 }
 
 final case class Trigger[F[_], D, Δ](unfix: TriggerF[F, D, Δ, Trigger[F, D, Δ]]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-9600
@@ -42,7 +42,7 @@ object Trigger {
   def discard[F[_], D, Δ]: Trigger[F, D, Δ] = Trigger(Discard())
   def sleep[F[_], D, Δ](next: (D, Δ) => Trigger[F, D, Δ]): Trigger[F, D, Δ] = Trigger(Sleep(next))
   def fire[F[_], D, Δ](exec: F[Unit]): Trigger[F, D, Δ] = Trigger(Fire(exec))
-  def fireReload[F[_], D, Δ](cont: F[Trigger[F, D, Δ]]): Trigger[F, D, Δ] = Trigger(FireReload(cont))
+  def reconsider[F[_], D, Δ](cont: F[Trigger[F, D, Δ]]): Trigger[F, D, Δ] = Trigger(Reconsider(cont))
 
   def observerS[F[_]: Functor, D, Δ, S](s: S)(f: S => TriggerF[F, D, Δ, S]): Trigger[F, D, Δ] =
     Trigger(f(s) map (observerS(_)(f)))
@@ -87,24 +87,24 @@ object Trigger {
 
   def untilRight[F[_], D, Δ](f: D => Either[F[Unit], F[Unit]])(implicit F: Functor[F]): D => Trigger[F, D, Δ] =
     d => f(d) match {
-      case Left(k) => fireReload(k.as(sleep(untilRight((d, δ) => f(d)))))
+      case Left(k) => reconsider(k.as(sleep(untilRight((d, δ) => f(d)))))
       case Right(k) => fire(k)
     }
 
   def untilRight[F[_], D, Δ](f: (D, Δ) => Either[F[Unit], F[Unit]])(implicit F: Functor[F]): (D, Δ) => Trigger[F, D, Δ] =
     new ((D, Δ) => Trigger[F, D, Δ]) {
       def apply(d: D, δ: Δ): Trigger[F, D, Δ] = f(d, δ) match {
-        case Left(k) => fireReload(k.as(sleep(this)))
+        case Left(k) => reconsider(k.as(sleep(this)))
         case Right(k) => fire(k)
       }
     }
 
   def continually[F[_], D, Δ](f: D => F[Unit])(implicit F: Functor[F]): D => Trigger[F, D, Δ] =
-    d => fireReload(f(d).as(sleep(continually((d, δ) => f(d)))))
+    d => reconsider(f(d).as(sleep(continually((d, δ) => f(d)))))
 
   def continually[F[_], D, Δ](f: (D, Δ) => F[Unit])(implicit F: Functor[F]): (D, Δ) => Trigger[F, D, Δ] =
     new ((D, Δ) => Trigger[F, D, Δ]) {
-      def apply(d: D, δ: Δ): Trigger[F, D, Δ] = fireReload(f(d, δ).as(sleep(this)))
+      def apply(d: D, δ: Δ): Trigger[F, D, Δ] = reconsider(f(d, δ).as(sleep(this)))
     }
 }
 
@@ -116,7 +116,7 @@ private[nutcracker] sealed trait SeqTrigger[Tok[_], K, D, Δ[_, _], D1] {
     case Discard() => Discard()
     case Sleep(h) => Sleep(h.map(f))
     case Fire(k) => Fire(f(k))
-    case FireReload(cont) => FireReload(cont andThen f)
+    case Reconsider(cont) => Reconsider(cont andThen f)
   }
 }
 
@@ -128,7 +128,7 @@ private[nutcracker] object SeqTrigger {
 
   case class Fire[Tok[_], K, D, Δ[_, _], D1](cont: K) extends SeqTrigger[Tok, K, D, Δ, D1]
 
-  case class FireReload[Tok[_], K, D, Δ[_, _], D1](cont: Tok[D1] => K) extends SeqTrigger[Tok, K, D, Δ, D1]
+  case class Reconsider[Tok[_], K, D, Δ[_, _], D1](cont: Tok[D1] => K) extends SeqTrigger[Tok, K, D, Δ, D1]
 
 }
 

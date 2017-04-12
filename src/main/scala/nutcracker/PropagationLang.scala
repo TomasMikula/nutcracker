@@ -130,7 +130,7 @@ private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: Inje
           case TriggerF.Discard() => Discard()
           case TriggerF.Fire(k) => Fire(k)
           case TriggerF.Sleep(next) => Sleep[Token, FreeK[F, Unit], D, dom.IDelta, D0](seqHandler(ref, next))
-          case TriggerF.FireReload(cont) => FireReload[Token, FreeK[F, Unit], D, dom.IDelta, D0](
+          case TriggerF.Reconsider(cont) => Reconsider[Token, FreeK[F, Unit], D, dom.IDelta, D0](
             token => cont >>= (tr => resumeF[F, Ref, D, U, dom.IDelta, D0](ref, token, seqTrigger(ref, tr))))
         }
       }
@@ -161,7 +161,7 @@ private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: Inje
       case TriggerF.Discard() => Discard[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1]()
       case TriggerF.Fire(k) => Fire[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](k)
       case TriggerF.Sleep(next) => Sleep[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](seqHandler(ref, next))
-      case TriggerF.FireReload(cont) => FireReload[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](
+      case TriggerF.Reconsider(cont) => Reconsider[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](
         (token: Token[D1]) => cont >>= { tr =>
           resumeF[F, Ref, D, U, λ[(α, β) => Δ], D1](ref, token, seqTrigger(ref, tr))
         }
