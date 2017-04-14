@@ -74,8 +74,8 @@ class IncSets[F[_], Var[_], Val[_]](implicit P: Propagation[F, Var, Val]) {
     import scalaz.syntax.traverse._
     IndexedContT(f => ref.observe.by(as => {
       val now = as.toList.traverse_(f)
-      val onChange = Trigger.continually((as: IncSet[A], delta: Delta[A]) => delta.value.toList.traverse_(f))
-      Trigger.fireReload(now, onChange)
+      val onChange = P.continually((as: IncSet[A], delta: Delta[A]) => delta.value.toList.traverse_(f))
+      P.fireReload(now, onChange)
     }))
   }
 
@@ -93,8 +93,8 @@ class IncSets[F[_], Var[_], Val[_]](implicit P: Propagation[F, Var, Val]) {
   def include[A](sub: Var[IncSet[A]], sup: Var[IncSet[A]])(implicit F: Functor[F]): F[Unit] =
     sub.observe.by((sa: IncSet[A]) => {
       val now = insertAll(sa.value, sup)
-      val onChange = Trigger.continually((sa: IncSet[A], delta: Delta[A]) => insertAll(delta.value, sup))
-      Trigger.fireReload(now, onChange)
+      val onChange = P.continually((sa: IncSet[A], delta: Delta[A]) => insertAll(delta.value, sup))
+      P.fireReload(now, onChange)
     }).void
 
   def includeC[A](cps: ContU[F, A], ref: Var[IncSet[A]]): F[Unit] =
@@ -121,8 +121,8 @@ class IncSets[F[_], Var[_], Val[_]](implicit P: Propagation[F, Var, Val]) {
       res <- init[B]
       _ <- sref.observe.by((sa: IncSet[A]) => {
         val now = sa.toList.traverse_(f(_) >>= (refb => include(refb, res)))
-        val onChange = Trigger.continually((sa: IncSet[A], delta: Delta[A]) => delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res))))
-        Trigger.fireReload(now, onChange)
+        val onChange = P.continually((sa: IncSet[A], delta: Delta[A]) => delta.value.toList.traverse_(f(_) >>= (refb => include(refb, res))))
+        P.fireReload(now, onChange)
       })
     } yield res
   }

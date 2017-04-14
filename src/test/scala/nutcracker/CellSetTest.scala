@@ -17,7 +17,7 @@ class CellSetTest extends FunSuite {
 
     val prg = for {
       res <- CellSet.init[Promise[Int]]()
-      _ <- P.observe(res).by(_ => Trigger.sleep(Trigger.continually((d, δ) => δ.value.foreach(r => observed += r).point[Prg])))
+      _ <- P.observe(res).by(_ => P.sleep(P.continually((d, δ) => δ.value.foreach(r => observed += r).point[Prg])))
       p1 <- P.newCell[Promise[Int]](Promise.Conflict)
       p2 <- Promises.promise[Int]()
       _ <- Promises.complete(p2, 42)

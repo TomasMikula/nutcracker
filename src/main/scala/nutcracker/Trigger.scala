@@ -1,7 +1,6 @@
 package nutcracker
 
 import scalaz.Functor
-import scalaz.syntax.functor._
 
 sealed trait TriggerF[F[_], D, Δ, A] {
   import TriggerF._
@@ -32,86 +31,6 @@ object TriggerF {
   case class Reconsider[F[_], D, Δ, A](cont: F[A]) extends TriggerF[F, D, Δ, A]
 }
 
-final case class Trigger[F[_], D, Δ](unfix: TriggerF[F, D, Δ, Trigger[F, D, Δ]]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-9600
-
-  def contramap[D0, Δ0](f: D0 => D, g: Δ0 => Δ)(implicit F: Functor[F]): Trigger[F, D0, Δ0] =
-    Trigger(unfix.contramap(f, g).map(_.contramap(f, g)))
-
-}
-
-object Trigger {
-  import TriggerF._
-
-  def discard[F[_], D, Δ]: Trigger[F, D, Δ] = Trigger(Discard())
-  def sleep[F[_], D, Δ](next: (D, Δ) => Trigger[F, D, Δ]): Trigger[F, D, Δ] = Trigger(Sleep(next))
-  def fire[F[_], D, Δ](exec: F[Unit]): Trigger[F, D, Δ] = Trigger(Fire(exec))
-  def fireReload[F[_], D, Δ](exec: F[Unit], next: (D, Δ) => Trigger[F, D, Δ]): Trigger[F, D, Δ] = Trigger(FireReload(exec, next))
-  def reconsider[F[_], D, Δ](cont: F[Trigger[F, D, Δ]]): Trigger[F, D, Δ] = Trigger(Reconsider(cont))
-
-  def observerS[F[_]: Functor, D, Δ, S](s: S)(f: S => TriggerF[F, D, Δ, S]): Trigger[F, D, Δ] =
-    Trigger(f(s) map (observerS(_)(f)))
-
-  /** Keep trying `f` until it returns `Some`. Then fire the returned program. */
-  def threshold[F[_], D, Δ](f: D => Option[F[Unit]]): D => Trigger[F, D, Δ] =
-    d => f(d) match {
-      case None => sleep(threshold1(f))
-      case Some(k) => fire(k)
-    }
-
-  /** Keep trying `f` until it returns `Some`. Then fire the returned program. */
-  def threshold1[F[_], D, Δ](f: D => Option[F[Unit]]): (D, Δ) => Trigger[F, D, Δ] =
-    new ((D, Δ) => Trigger[F, D, Δ]) {
-      def apply(d: D, δ: Δ): Trigger[F, D, Δ] = f(d) match {
-        case None => sleep(this)
-        case Some(k) => fire(k)
-      }
-    }
-
-  /** Keep trying `f` until it returns `Some`. Then fire the returned program, if any. */
-  def thresholdOpt[F[_], D, Δ](f: D => Option[Option[F[Unit]]]): D => Trigger[F, D, Δ] =
-    d => f(d) match {
-      case None => sleep(thresholdOpt1(f))
-      case Some(ko) => ko match {
-        case Some(k) => fire(k)
-        case None => discard
-      }
-    }
-
-  /** Keep trying `f` until it returns `Some`. Then fire the returned program, if any. */
-  def thresholdOpt1[F[_], D, Δ](f: D => Option[Option[F[Unit]]]): (D, Δ) => Trigger[F, D, Δ] =
-    new ((D, Δ) => Trigger[F, D, Δ]) {
-      def apply(d: D, δ: Δ): Trigger[F, D, Δ] = f(d) match {
-        case None => sleep(this)
-        case Some(ko) => ko match {
-          case Some(k) => fire(k)
-          case None => discard
-        }
-      }
-    }
-
-  def untilRight[F[_], D, Δ](f: D => Either[F[Unit], F[Unit]])(implicit F: Functor[F]): D => Trigger[F, D, Δ] =
-    d => f(d) match {
-      case Left(k) => reconsider(k.as(sleep(untilRight((d, δ) => f(d)))))
-      case Right(k) => fire(k)
-    }
-
-  def untilRight[F[_], D, Δ](f: (D, Δ) => Either[F[Unit], F[Unit]])(implicit F: Functor[F]): (D, Δ) => Trigger[F, D, Δ] =
-    new ((D, Δ) => Trigger[F, D, Δ]) {
-      def apply(d: D, δ: Δ): Trigger[F, D, Δ] = f(d, δ) match {
-        case Left(k) => reconsider(k.as(sleep(this)))
-        case Right(k) => fire(k)
-      }
-    }
-
-  def continually[F[_], D, Δ](f: D => F[Unit])(implicit F: Functor[F]): D => Trigger[F, D, Δ] =
-    d => reconsider(f(d).as(sleep(continually((d, δ) => f(d)))))
-
-  def continually[F[_], D, Δ](f: (D, Δ) => F[Unit])(implicit F: Functor[F]): (D, Δ) => Trigger[F, D, Δ] =
-    new ((D, Δ) => Trigger[F, D, Δ]) {
-      def apply(d: D, δ: Δ): Trigger[F, D, Δ] = reconsider(f(d, δ).as(sleep(this)))
-    }
-}
-
 private[nutcracker] sealed trait SeqTrigger[Tok[_], K, D, Δ[_, _], D1] {
 
   import SeqTrigger._
@@ -121,8 +40,10 @@ private[nutcracker] sealed trait SeqTrigger[Tok[_], K, D, Δ[_, _], D1] {
     case Sleep(h) => Sleep(h.map(f))
     case Fire(k) => Fire(f(k))
     case FireReload(k, h) => FireReload(f(k), h.map(f))
-    case Reconsider(cont) => Reconsider(cont andThen f)
+    case Reconsider(cont) => Reconsider((ref, t) => f(cont(ref, t)))
   }
+
+  def specialize[D2 <: D1]: SeqTrigger[Tok, K, D, Δ, D2] = this.asInstanceOf[SeqTrigger[Tok, K, D, Δ, D2]]
 }
 
 private[nutcracker] object SeqTrigger {
@@ -135,18 +56,26 @@ private[nutcracker] object SeqTrigger {
 
   case class FireReload[Tok[_], K, D, Δ[_, _], D1](cont: K, h: SeqHandler[Tok, K, D, Δ, D1]) extends SeqTrigger[Tok, K, D, Δ, D1]
 
-  case class Reconsider[Tok[_], K, D, Δ[_, _], D1](cont: Tok[D1] => K) extends SeqTrigger[Tok, K, D, Δ, D1]
+  case class Reconsider[Tok[_], K, D, Δ[_, _], D1](cont: (CellId[D], Tok[D1]) => K) extends SeqTrigger[Tok, K, D, Δ, D1]
 
 }
 
-private[nutcracker] trait SeqHandler[Tok[_], K, D, Δ[_, _], D1] {
-  self =>
+private[nutcracker] trait SeqHandler[Tok[_], K, D, Δ[_, _], D1] { self =>
   def handle[D2 <: D](d2: D2, δ: Δ[D1, D2]): SeqTrigger[Tok, K, D, Δ, D2]
 
   def map[L](f: K => L): SeqHandler[Tok, L, D, Δ, D1] = new SeqHandler[Tok, L, D, Δ, D1] {
     def handle[D2 <: D](d2: D2, δ: Δ[D1, D2]): SeqTrigger[Tok, L, D, Δ, D2] =
       self.handle(d2, δ).map(f)
   }
+
+  def specialize[D2 <: D1]: SeqHandler[Tok, K, D, Δ, D2] = this.asInstanceOf[SeqHandler[Tok, K, D, Δ, D2]]
+}
+
+private[nutcracker] object SeqHandler {
+  def apply[Tok[_], K, D, Δ](h: (D, Δ) => SeqTrigger[Tok, K, D, λ[(α, β) => Δ], D]): SeqHandler[Tok, K, D, λ[(α, β) => Δ], D] =
+    new SeqHandler[Tok, K, D, λ[(α, β) => Δ], D] {
+      override def handle[D2 <: D](d2: D2, δ: Δ): SeqTrigger[Tok, K, D, λ[(α, β) => Δ], D2] = h(d2, δ).specialize[D2]
+    }
 }
 
 private[nutcracker] trait SeqPreHandler[Tok[_], K, D, Δ[_, _]] { self =>
@@ -155,5 +84,11 @@ private[nutcracker] trait SeqPreHandler[Tok[_], K, D, Δ[_, _]] { self =>
   def map[L](f: K => L): SeqPreHandler[Tok, L, D, Δ] = new SeqPreHandler[Tok, L, D, Δ] {
     def handle[D0 <: D](d: D0): SeqTrigger[Tok, L, D, Δ, D0] =
       self.handle(d).map(f)
+  }
+}
+
+private[nutcracker] object SeqPreHandler {
+  def apply[Tok[_], K, D, Δ[_, _]](h: D => SeqTrigger[Tok, K, D, Δ, D]): SeqPreHandler[Tok, K, D, Δ] = new SeqPreHandler[Tok, K, D, Δ] {
+    def handle[D0 <: D](d: D0): SeqTrigger[Tok, K, D, Δ, D0] = h(d).specialize[D0]
   }
 }

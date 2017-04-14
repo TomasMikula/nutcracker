@@ -3,7 +3,6 @@ package nutcracker
 import nutcracker.DecSet._
 import nutcracker.log._
 import nutcracker.ops._
-import nutcracker.Trigger._
 import org.scalatest.FunSuite
 import scalaz.syntax.monad._
 
@@ -16,7 +15,7 @@ class PropagationStoreTest extends FunSuite {
     val prg = for {
       ref <- oneOf(1, 2, 3, 4, 5)
       log <- newLog[Removed[Int]]()
-      _   <- P.observe(ref).by(_ => sleep(continually((s: DecSet[Int], d: Removed[Int]) => log.write(d))))
+      _   <- P.observe(ref).by(_ => P.sleep(P.continually((s: DecSet[Int], d: Removed[Int]) => log.write(d))))
       _   <- ref.exclude(DecSet(1, 2))
       _   <- ref.exclude(DecSet(4, 5))
     } yield log
@@ -30,7 +29,7 @@ class PropagationStoreTest extends FunSuite {
     val prg1 = for {
       ref <- oneOf(1, 2, 3, 4, 5)
       log <- newLog[Removed[Int]]()
-      _   <- P.observe(ref).by(_ => sleep(continually((s: DecSet[Int], d: Removed[Int]) => log.write(d))))
+      _   <- P.observe(ref).by(_ => P.sleep(P.continually((s: DecSet[Int], d: Removed[Int]) => log.write(d))))
       _   <- ref.exclude(DecSet(1, 2))
     } yield (ref, log)
 
@@ -49,7 +48,7 @@ class PropagationStoreTest extends FunSuite {
       ref <- oneOf(1, 2, 3, 4, 5)
       _   <- ref.exclude(DecSet(4, 5, 6, 7)) // should not be logged
       log <- newLog[Removed[Int]]()
-      _   <- P.observe(ref).by(_ => sleep(continually((s: DecSet[Int], d: Removed[Int]) => log.write(d))))
+      _   <- P.observe(ref).by(_ => P.sleep(P.continually((s: DecSet[Int], d: Removed[Int]) => log.write(d))))
       _   <- ref.exclude(DecSet(2, 3, 4, 5)) // only removal of {2, 3} should be logged
     } yield log
 

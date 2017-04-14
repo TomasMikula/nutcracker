@@ -1,15 +1,15 @@
 package nutcracker.ops
 
 import scala.language.implicitConversions
-import nutcracker.{BranchingPropagation, Dom, Final, JoinDom, Propagation, RelativelyComplementedDom, Subscription, Unchanged, Updated}
-import nutcracker.Trigger.continually
+import nutcracker.{BranchingPropagation, Dom, Final, JoinDom, ObserveSyntaxHelper, Propagation, RelativelyComplementedDom, Subscription, Unchanged, Updated}
 import nutcracker.lib.bool.Bool
 import nutcracker.util.ContU
 import scalaz.{Applicative, Apply, Bind, Functor, IndexedContT, Traverse}
 import scalaz.syntax.bind._
 
 final case class ValOps[Val[_], D](ref: Val[D]) extends AnyVal {
-  def observe[M[_], Var[_]](implicit P: Propagation[M, Var, Val], dom: Dom[D]) = P.observe(ref)
+  def observe[M[_], Var[_]](implicit P: Propagation[M, Var, Val], dom: Dom[D]): ObserveSyntaxHelper[M, D, dom.Update, dom.Delta, P.Trigger] =
+    P.observe(ref)
 
   def peekC[M[_], Var[_]](implicit P: Propagation[M, Var, Val], dom: Dom[D], M: Functor[M]): ContU[M, D] =
     ContU(f => P.peek_(ref)(f))
@@ -75,7 +75,7 @@ final case class JoinValOps[M[_], Var[_], Val[_], D, U, Δ](ref: Val[D])(implici
 
   def ==>(target: Var[D])(implicit M: Functor[M]): M[Subscription[M]] = {
     import P._
-    observe(ref).by(continually[M, D, Δ]((d: D) => P.update(target).by(dom.toJoinUpdate(d))))
+    observe(ref).by(continually[D, Δ]((d: D) => P.update(target).by(dom.toJoinUpdate(d))))
   }
 }
 

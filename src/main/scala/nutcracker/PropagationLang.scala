@@ -17,7 +17,9 @@ private[nutcracker] object PropagationLang {
   case class Observe[Ref[_], K[_], D, U, Δ[_, _]](ref: Ref[D], f: SeqPreHandler[Token, K[Unit], D, Δ], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Option[ObserverId]]
   case class Hold[Ref[_], K[_], D](ref: Ref[D], f: (D, Token[D], ObserverId) => K[Unit]) extends PropagationLang[Ref, K, ObserverId]
   case class Supply[Ref[_], K[_], D](ref: Ref[D], cycle: LiveCycle[D], value: D) extends PropagationLang[Ref, K, Unit]
-  case class Resume[Ref[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[Ref, K, Unit] {
+  case class Resume[Ref[_], K[_], D, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0]) extends PropagationLang[Ref, K, Unit] {
+    type Domain = D
+    type Delta[a, b] = Δ[a, b]
     type Arg = D0
   }
   case class RmObserver[Ref[_], K[_], D](ref: Ref[D], oid: ObserverId) extends PropagationLang[Ref, K, Unit]
@@ -39,8 +41,8 @@ private[nutcracker] object PropagationLang {
     Hold[Ref, K, D](ref, f)
   def supply[Ref[_], K[_], D](ref: Ref[D])(cycle: LiveCycle[D], value: D): PropagationLang[Ref, K, Unit] =
     Supply(ref, cycle, value)
-  def resume[Ref[_], K[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ]): PropagationLang[Ref, K, Unit] =
-    Resume[Ref, K, D, U, Δ, D0](ref, token, trigger, dom)
+  def resume[Ref[_], K[_], D, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0]): PropagationLang[Ref, K, Unit] =
+    Resume[Ref, K, D, Δ, D0](ref, token, trigger)
   def rmObserver[Ref[_], K[_], D](ref: Ref[D], oid: ObserverId): PropagationLang[Ref, K, Unit] =
     RmObserver(ref, oid)
   def selTrigger[Ref[_], K[_], L <: HList](sel: Sel[Ref, L])(f: L => (Option[K[Unit]], Boolean)): PropagationLang[Ref, K, Unit] =
@@ -73,8 +75,8 @@ private[nutcracker] object PropagationLang {
   def supplyF[F[_[_], _], Ref[_], D](ref: Ref[D])(cycle: LiveCycle[D], value: D)(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(supply[Ref, FreeK[F, ?], D](ref)(cycle, value))
 
-  def resumeF[F[_[_], _], Ref[_], D, U, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, FreeK[F, Unit], D, Δ, D0])(implicit dom: IDom.Aux[D, U, Δ], inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
-    FreeK.injLiftF(resume[Ref, FreeK[F, ?], D, U, Δ, D0](ref, token, trigger))
+  def resumeF[F[_[_], _], Ref[_], D, Δ[_, _], D0 <: D](ref: Ref[D], token: Token[D0], trigger: SeqTrigger[Token, FreeK[F, Unit], D, Δ, D0])(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
+    FreeK.injLiftF(resume[Ref, FreeK[F, ?], D, Δ, D0](ref, token, trigger))
 
   def rmObserverF[F[_[_], _], Ref[_], D](ref: Ref[D], oid: ObserverId)(implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): FreeK[F, Unit] =
     FreeK.injLiftF(rmObserver[Ref, FreeK[F, ?], D](ref, oid))
@@ -92,23 +94,23 @@ private[nutcracker] object PropagationLang {
     FreeK.injLiftF(exclUpdate[Ref, FreeK[F, ?], A, U, Δ](ref, cycle, u))
 
 
-  implicit def freePropagation[Ref[_], F[_[_], _]](implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]): Propagation[FreeK[F, ?], Ref, Ref] =
-    new FreePropagation[Ref, F]
+  implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[PropagationLang[CellId, ?[_], ?], F]): Propagation[FreeK[F, ?], CellId, CellId] =
+    new FreePropagation[F]
 }
 
 
-private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: InjectK[PropagationLang[Ref, ?[_], ?], F]) extends OnDemandPropagation[FreeK[F, ?], Ref, Ref] {
+private[nutcracker] class FreePropagation[F[_[_], _]](implicit inj: InjectK[PropagationLang[CellId, ?[_], ?], F]) extends OnDemandPropagation[FreeK[F, ?], CellId, CellId] {
   import PropagationLang._
-  import SeqTrigger._
 
-  type ExclRef[A] = (Ref[A], LiveCycle[A])
+  type Trigger[A, Δ] = SeqTrigger[Token, FreeK[F, Unit], A, λ[(α, β) => Δ], A]
+  type ExclRef[A] = (CellId[A], LiveCycle[A])
 
-  override def readOnly[A](ref: Ref[A]): Ref[A] = ref
+  override def readOnly[A](ref: CellId[A]): CellId[A] = ref
 
-  def newCell[D](d: D)(implicit dom: Dom[D]): FreeK[F, Ref[D]] =
-    newCellF[F, Ref, D](d)
+  def newCell[D](d: D)(implicit dom: Dom[D]): FreeK[F, CellId[D]] =
+    newCellF[F, CellId, D](d)
 
-  def newAutoCell[A](setup: IndexedContT[FreeK[F, ?], Unit, ExclRef[A], A])(implicit dom: Dom[A]): FreeK[F, Ref[A]] =
+  def newAutoCell[A](setup: IndexedContT[FreeK[F, ?], Unit, ExclRef[A], A])(implicit dom: Dom[A]): FreeK[F, CellId[A]] =
     newAutoCellF(setup)(supplyF(_)(_, _)(inj))
 
   def addFinalizer[A](ref: ExclRef[A], value: Subscription[FreeK[F, ?]]): FreeK[F, Subscription[FreeK[F, ?]]] =
@@ -117,56 +119,38 @@ private[nutcracker] class FreePropagation[Ref[_], F[_[_], _]](implicit inj: Inje
       case None      => Subscription()
     }
 
-  def updateImpl[D, U, Δ[_, _]](ref: Ref[D])(u: U)(implicit dom: IDom.Aux[D, U, Δ]): FreeK[F, Unit] =
-    updateF[F, Ref, D, U, Δ](ref)(u)
+  def updateImpl[D, U, Δ[_, _]](ref: CellId[D])(u: U)(implicit dom: IDom.Aux[D, U, Δ]): FreeK[F, Unit] =
+    updateF[F, CellId, D, U, Δ](ref)(u)
 
   def update[A, U, Δ[_, _]](ref: ExclRef[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): FreeK[F, Unit] =
-    exclUpdateF[F, Ref, A, U, Δ](ref._1, ref._2, u)
+    exclUpdateF[F, CellId, A, U, Δ](ref._1, ref._2, u)
 
-  def observeImpl[D, U, Δ](ref: Ref[D])(f: D => Trigger[FreeK[F, ?], D, Δ])(implicit dom: Dom.Aux[D, U, Δ]): FreeK[F, Subscription[FreeK[F, ?]]] = {
-    observeF[F, Ref, D, U, dom.IDelta](ref)(new SeqPreHandler[Token, FreeK[F, Unit], D, dom.IDelta] {
-      def handle[D0 <: D](d: D0): SeqTrigger[Token, FreeK[F, Unit], D, dom.IDelta, D0] = {
-        f(d).unfix match {
-          case TriggerF.Discard() => Discard()
-          case TriggerF.Fire(k) => Fire(k)
-          case TriggerF.Sleep(next) => Sleep[Token, FreeK[F, Unit], D, dom.IDelta, D0](seqHandler(ref, next))
-          case TriggerF.FireReload(k, next) => FireReload[Token, FreeK[F, Unit], D, dom.IDelta, D0](k, seqHandler(ref, next))
-          case TriggerF.Reconsider(cont) => Reconsider[Token, FreeK[F, Unit], D, dom.IDelta, D0](
-            token => cont >>= (tr => resumeF[F, Ref, D, U, dom.IDelta, D0](ref, token, seqTrigger(ref, tr))))
-        }
-      }
-    }).map(_.fold(Subscription[FreeK[F, ?]]())(subscription(ref, _)))
+  def observeImpl[D, U, Δ](ref: CellId[D])(f: D => Trigger[D, Δ])(implicit dom: Dom.Aux[D, U, Δ]): FreeK[F, Subscription[FreeK[F, ?]]] = {
+    observeF[F, CellId, D, U, dom.IDelta](ref)(SeqPreHandler[Token, FreeK[F, Unit], D, dom.IDelta](f))
+      .map(_.fold(Subscription[FreeK[F, ?]]())(subscription(ref, _)))
   }
 
-  override def observeImplC[A, U, Δ, B](src: Ref[A])(f: A => ContU[FreeK[F, ?], (Trigger[FreeK[F, ?], A, Δ], B)])(implicit dom: Dom.Aux[A, U, Δ]): ContU[FreeK[F, ?], (Subscription[FreeK[F, ?]], B)] = {
+  def observeImplC[A, U, Δ, B](src: CellId[A])(f: A => ContU[FreeK[F, ?], (Trigger[A, Δ], B)])(implicit dom: Dom.Aux[A, U, Δ]): ContU[FreeK[F, ?], (Subscription[FreeK[F, ?]], B)] = {
     IndexedContT((k: ((Subscription[FreeK[F, ?]], B)) => FreeK[F, Unit]) =>
-      holdF[F, Ref, A](src)((a: A, t: Token[A], oid: ObserverId) =>
-        f(a).run({ case (tr, b) => resumeF[F, Ref, A, U, dom.IDelta, A](src, t, seqTrigger(src, tr)) >> k((subscription(src, oid), b)) })
+      holdF[F, CellId, A](src)((a: A, t: Token[A], oid: ObserverId) =>
+        f(a).run({ case (tr, b) => resumeF[F, CellId, A, dom.IDelta, A](src, t, tr) >> k((subscription(src, oid), b)) })
       ).void)
   }
 
-  def selTrigger[L <: HList](sel: Sel[Ref, L])(f: L => (Option[FreeK[F, Unit]], Boolean)): FreeK[F, Unit] =
-    FreeK.injLiftF(PropagationLang.selTrigger[Ref, FreeK[F, ?], L](sel)(f))
+  def selTrigger[L <: HList](sel: Sel[CellId, L])(f: L => (Option[FreeK[F, Unit]], Boolean)): FreeK[F, Unit] =
+    FreeK.injLiftF(PropagationLang.selTrigger[CellId, FreeK[F, ?], L](sel)(f))
 
-  private def subscription[D](ref: Ref[D], oid: ObserverId): Subscription[FreeK[F, ?]] =
+  private def subscription[D](ref: CellId[D], oid: ObserverId): Subscription[FreeK[F, ?]] =
     Subscription(rmObserverF(ref, oid))
 
-  private def seqHandler[D, U, Δ, D1](ref: Ref[D], f: (D, Δ) => Trigger[FreeK[F, ?], D, Δ])(implicit dom: Dom.Aux[D, U, Δ]): SeqHandler[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1] =
-    new SeqHandler[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1] {
-      def handle[D2 <: D](d2: D2, δ: Δ): SeqTrigger[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D2] =
-        seqTrigger(ref, f(d2, δ))
-    }
-
-  private def seqTrigger[D, U, Δ, D1 <: D](ref: Ref[D], trigger: Trigger[FreeK[F, ?], D, Δ])(implicit dom: Dom.Aux[D, U, Δ]): SeqTrigger[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1] =
-    trigger.unfix match {
-      case TriggerF.Discard() => Discard[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1]()
-      case TriggerF.Fire(k) => Fire[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](k)
-      case TriggerF.Sleep(next) => Sleep[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](seqHandler(ref, next))
-      case TriggerF.FireReload(k, next) => FireReload[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](k, seqHandler(ref, next))
-      case TriggerF.Reconsider(cont) => Reconsider[Token, FreeK[F, Unit], D, λ[(α, β) => Δ], D1](
-        (token: Token[D1]) => cont >>= { tr =>
-          resumeF[F, Ref, D, U, λ[(α, β) => Δ], D1](ref, token, seqTrigger(ref, tr))
-        }
-      )
-    }
+  override def discard[A, Δ]: Trigger[A, Δ] =
+    SeqTrigger.Discard[Token, FreeK[F, Unit], A, λ[(α, β) => Δ], A]()
+  override def fire[A, Δ](action: FreeK[F, Unit]): Trigger[A, Δ] =
+    SeqTrigger.Fire[Token, FreeK[F, Unit], A, λ[(α, β) => Δ], A](action)
+  override def sleep[A, Δ](next: (A, Δ) => Trigger[A, Δ]): Trigger[A, Δ] =
+    SeqTrigger.Sleep[Token, FreeK[F, Unit], A, λ[(α, β) => Δ], A](SeqHandler(next))
+  override def fireReload[A, Δ](action: FreeK[F, Unit], next: (A, Δ) => Trigger[A, Δ]): Trigger[A, Δ] =
+    SeqTrigger.FireReload[Token, FreeK[F, Unit], A, λ[(α, β) => Δ], A](action, SeqHandler(next))
+  override def reconsider[A, Δ](action: FreeK[F, Trigger[A, Δ]]): Trigger[A, Δ] =
+    SeqTrigger.Reconsider[Token, FreeK[F, Unit], A, λ[(α, β) => Δ], A]((ref: Val[A], tok: Token[A]) => action >>= (tr => resumeF[F, CellId, A, λ[(α, β) => Δ], A](ref, tok, tr)))
 }

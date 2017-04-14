@@ -1,6 +1,6 @@
 package nutcracker.lib
 
-import nutcracker.{Dom, Propagation, Subscription, SyncDom, Trigger}
+import nutcracker.{Dom, Propagation, Subscription, SyncDom}
 import nutcracker.rel.{Recipe, Relations}
 import nutcracker.rel.Rel.Rel3
 import nutcracker.util.{Choose, ContU, HOrderK, ∃}
@@ -39,8 +39,8 @@ object Tupled2 {
 
         observe(ra).byC[(Subscription[K], Var[(A, B)])] { a =>
           observe(rb).byM[Var[(A, B)]](b =>
-            newCell((a, b)) map (rr => (Trigger.sleep(Trigger.continually((b, δb) => P.update(rr).by(\&/.That(db.toPatch(b, δb))))), rr))
-          ).map({     case (sub1, rr) => (Trigger.sleep(Trigger.continually((a, δa) => P.update(rr).by(\&/.This(da.toPatch(a, δa))))), (sub1, rr)) })
+            newCell((a, b)) map (rr => (P.sleep(P.continually((b, δb) => P.update(rr).by(\&/.That(db.toPatch(b, δb))))), rr))
+          ).map({     case (sub1, rr) => (P.sleep(P.continually((a, δa) => P.update(rr).by(\&/.This(da.toPatch(a, δa))))), (sub1, rr)) })
         } map { case (sub2, (sub1, rr)) => (ra :: rb :: rr :: HNil, sub1 and sub2) }
       }
 
