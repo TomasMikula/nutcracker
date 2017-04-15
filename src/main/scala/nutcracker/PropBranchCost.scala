@@ -28,8 +28,10 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   type Lang[K[_], A] = (Prop.Lang  :+: Branch.Lang  :++: Cost.Lang )#Out[K, A]
   type State[K[_]]   = (Prop.State :*: Branch.State :**: Cost.State)#Out[K]
 
-  implicit def refEquality = Prop.refEquality
-  implicit def refShow = Prop.refShow
+  implicit def varEquality = Prop.varEquality
+  implicit def varShow = Prop.varShow
+  implicit def valEquality = Prop.valEquality
+  implicit def valShow = Prop.valShow
 
   implicit val propagationApi: Propagation[Prg, Var, Val] =
     Prop.freePropagation[Lang]

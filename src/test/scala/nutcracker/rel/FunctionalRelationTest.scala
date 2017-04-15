@@ -11,21 +11,21 @@ import shapeless.{::, HNil}
 
 class FunctionalRelationTest extends FunSuite {
   import PropRel._
-  import PropRel.propagationApi.{Val => _, _}
+  import PropRel.propagationApi.{Val => _, readOnly =>_, _}
   import PropRel.relationsApi._
 
   type ContU[A] = ContT[Prg, Unit, A]
 
   test("blah") {
-    type L = Var[Bool] :: Var[Bool] :: Var[(Bool, Bool)] :: HNil
+    type L = Val[Bool] :: Val[Bool] :: Val[(Bool, Bool)] :: HNil
 
     var initializedTimes = 0
     var insertedTimes = 0
-    val observed: mutable.Buffer[Var[(Bool, Bool)]] = mutable.Buffer()
+    val observed: mutable.Buffer[Val[(Bool, Bool)]] = mutable.Buffer()
 
-    val paired = Tupled2[Bool, Bool, Var]
+    val paired = Tupled2[Bool, Bool, Val]
 
-    def init(a: Var[Bool], b: Var[Bool]) =
+    def init(a: Val[Bool], b: Val[Bool]) =
       establish(paired).matching2(a, b)
         .by(Tupled2.recipe[Bool, Bool, Var, Val, Prg].andThen(_ => (initializedTimes += 1).point[Prg]))
 

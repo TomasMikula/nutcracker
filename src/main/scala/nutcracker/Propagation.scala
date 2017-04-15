@@ -78,5 +78,16 @@ trait OnDemandPropagation[M[_], Var[_], Val[_]] extends Propagation[M, Var, Val]
     */
   def addFinalizer[A](ref: ExclRef[A], value: Subscription[M]): M[Subscription[M]]
 
-  def update[A, U, Δ[_, _]](ref: ExclRef[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): M[Unit]
+  def exclUpdateImpl[A, U, Δ[_, _]](ref: ExclRef[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): M[Unit]
+
+  def exclUpdate[D](ref: ExclRef[D])(implicit dom: Dom[D]): ExclUpdateSyntaxHelper[D, dom.Update, dom.Delta] =
+    new ExclUpdateSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
+
+  final class ExclUpdateSyntaxHelper[D, U, Δ](ref: ExclRef[D])(implicit dom: Dom.Aux[D, U, Δ]) {
+    def by(u: U): M[Unit] = exclUpdateImpl[D, U, λ[(α, β) => Δ]](ref, u)
+  }
+}
+
+object OnDemandPropagation {
+  val module: PersistentOnDemandPropagationModule = PropagationImpl
 }

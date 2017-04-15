@@ -94,7 +94,7 @@ private[nutcracker] object PropagationLang {
     FreeK.injLiftF(exclUpdate[Ref, FreeK[F, ?], A, U, Δ](ref, cycle, u))
 
 
-  implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[PropagationLang[CellId, ?[_], ?], F]): Propagation[FreeK[F, ?], CellId, CellId] =
+  implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[PropagationLang[CellId, ?[_], ?], F]): OnDemandPropagation[FreeK[F, ?], CellId, CellId] =
     new FreePropagation[F]
 }
 
@@ -122,7 +122,7 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit inj: InjectK[Prop
   def updateImpl[D, U, Δ[_, _]](ref: CellId[D])(u: U)(implicit dom: IDom.Aux[D, U, Δ]): FreeK[F, Unit] =
     updateF[F, CellId, D, U, Δ](ref)(u)
 
-  def update[A, U, Δ[_, _]](ref: ExclRef[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): FreeK[F, Unit] =
+  def exclUpdateImpl[A, U, Δ[_, _]](ref: ExclRef[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): FreeK[F, Unit] =
     exclUpdateF[F, CellId, A, U, Δ](ref._1, ref._2, u)
 
   def observeImpl[D, U, Δ](ref: CellId[D])(f: D => Trigger[D, Δ])(implicit dom: Dom.Aux[D, U, Δ]): FreeK[F, Subscription[FreeK[F, ?]]] = {

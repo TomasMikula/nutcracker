@@ -36,8 +36,10 @@ trait RefToolkit extends Toolkit {
   type Var[_]
   type Val[_]
 
-  implicit def refEquality: HEqualK[Var]
-  implicit def refShow: ShowK[Var]
+  implicit def varEquality: HEqualK[Var]
+  implicit def varShow: ShowK[Var]
+  implicit def valEquality: HEqualK[Val]
+  implicit def valShow: ShowK[Val]
 
   implicit def readOnly[A](ref: Var[A]): Val[A]
 

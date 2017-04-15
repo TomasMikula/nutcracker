@@ -7,14 +7,14 @@ import nutcracker.util.KPair._
 import scalaz.{Lens, Monad}
 import scalaz.Id.Id
 
-trait PropRelToolkit extends PropagationToolkit with RelToolkit
+trait PropRelToolkit extends OnDemandPropagationToolkit with RelToolkit
 
 object PropRelToolkit {
   val instance: PropRelToolkit = PropRel
 }
 
 object PropRel extends PropagationBundle with PropRelToolkit {
-  val Prop = Propagation.module
+  val Prop = OnDemandPropagation.module
   val RelMod = RelModule.instance
 
   type Var[a] = Prop.Var[a]
@@ -23,12 +23,16 @@ object PropRel extends PropagationBundle with PropRelToolkit {
   type Lang[K[_], A] = (Prop.Lang  :++: RelMod.Lang )#Out[K, A]
   type State[K[_]]   = (Prop.State :**: RelMod.State)#Out[K]
 
-  implicit def refEquality = Prop.refEquality
-  implicit def refOrder = Prop.refOrder
-  implicit def refShow = Prop.refShow
+  implicit def varEquality = Prop.varEquality
+  implicit def varOrder = Prop.varOrder
+  implicit def varShow = Prop.varShow
+  implicit def valEquality = Prop.valEquality
+  implicit def valOrder = Prop.valOrder
+  implicit def valShow = Prop.valShow
+
   implicit def prgMonad: Monad[Prg] = FreeKT.freeKTMonad[Lang, Id]
 
-  implicit val propagationApi: Propagation[Prg, Var, Val] =
+  implicit val propagationApi: OnDemandPropagation[Prg, Var, Val] =
     Prop.freePropagation[Lang]
 
   implicit val relationsApi: Relations[Prg] =

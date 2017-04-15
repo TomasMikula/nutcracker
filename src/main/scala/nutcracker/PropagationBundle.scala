@@ -9,3 +9,7 @@ trait PropagationToolkit extends RefToolkit {
 
   override implicit def readOnly[A](ref: Var[A]): Val[A] = propagationApi.readOnly(ref)
 }
+
+trait OnDemandPropagationToolkit extends PropagationToolkit {
+  override implicit val propagationApi: OnDemandPropagation[Prg, Var, Val]
+}

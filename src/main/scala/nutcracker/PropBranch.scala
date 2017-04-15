@@ -23,8 +23,11 @@ object PropBranch extends PropagationBundle with BranchingBundle with PropBranch
   type Lang[K[_], A] = (Prop.Lang  :++: Branch.Lang )#Out[K, A]
   type State[K[_]]   = (Prop.State :**: Branch.State)#Out[K]
 
-  implicit def refEquality = Prop.refEquality
-  implicit def refShow = Prop.refShow
+  implicit def varEquality = Prop.varEquality
+  implicit def varShow = Prop.varShow
+  implicit def valEquality = Prop.valEquality
+  implicit def valShow = Prop.valShow
+
   implicit def prgMonad = FreeKT.freeKTMonad
 
   implicit val propagationApi: Propagation[Prg, Var, Val] =

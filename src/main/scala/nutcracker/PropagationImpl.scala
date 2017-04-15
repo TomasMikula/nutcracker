@@ -11,17 +11,21 @@ import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import shapeless.{HList, Nat, Sized}
 
-private[nutcracker] object PropagationImpl extends PersistentPropagationModule with PropagationBundle { self =>
+private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with PropagationBundle { self =>
   type Var[A] = CellId[A]
   type Val[A] = CellId[A]
   type Lang[K[_], A] = PropagationLang[Var, K, A]
   type State[K[_]] = PropagationStore[K]
 
-  implicit val refEquality: HEqualK[Var] = CellId.equalKInstance
-  implicit def refOrder: HOrderK[Var] = CellId.orderKInstance
-  implicit def refShow: ShowK[Var] = CellId.showKInstance
+  implicit val varEquality: HEqualK[Var] = CellId.equalKInstance
+  implicit def varOrder: HOrderK[Var] = CellId.orderKInstance
+  implicit def varShow: ShowK[Var] = CellId.showKInstance
+  implicit val valEquality: HEqualK[Var] = CellId.equalKInstance
+  implicit def valOrder: HOrderK[Var] = CellId.orderKInstance
+  implicit def valShow: ShowK[Var] = CellId.showKInstance
+
   implicit def prgMonad: Monad[FreeK[Lang, ?]] = FreeKT.freeKTMonad[Lang, Id]
-  implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Var, Val] =
+  implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): OnDemandPropagation[FreeK[F, ?], Var, Val] =
     PropagationLang.freePropagation[F]
 
   val propagationApi: Propagation[Prg, Var, Val] =
@@ -102,8 +106,8 @@ private[nutcracker] object PropagationImpl extends PersistentPropagationModule w
   def isConsistent[K[_]](s: PropagationStore[K]): Boolean =
     s.failedVars.isEmpty
 
-  def stashable: StashPropagationModule { type Var[A] = self.Var[A]; type Val[A] = self.Val[A]; type Lang[K[_], A] = self.Lang[K, A] } =
-    new PropagationListModule[self.Var, self.Val, self.Lang, self.State](this)
+  def stashable: StashOnDemandPropagationModule { type Var[A] = self.Var[A]; type Val[A] = self.Val[A]; type Lang[K[_], A] = self.Lang[K, A] } =
+    new OnDemandPropagationListModule[self.Var, self.Val, self.Lang, self.State](this)
 }
 
 
