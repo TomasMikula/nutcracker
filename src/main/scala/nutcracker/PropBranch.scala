@@ -24,8 +24,10 @@ object PropBranch extends PropagationBundle with BranchingBundle with PropBranch
   type State[K[_]]   = (Prop.State :**: Branch.State)#Out[K]
 
   implicit def varEquality = Prop.varEquality
+  implicit def varOrder = Prop.varOrder
   implicit def varShow = Prop.varShow
   implicit def valEquality = Prop.valEquality
+  implicit def valOrder = Prop.valOrder
   implicit def valShow = Prop.valShow
 
   implicit def prgMonad = FreeKT.freeKTMonad

@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.util.{FreeK, HEqualK, ShowK}
+import nutcracker.util.{FreeK, HEqualK, HOrderK, ShowK}
 import scala.language.implicitConversions
 import scalaz.Monad
 
@@ -37,8 +37,10 @@ trait RefToolkit extends Toolkit {
   type Val[_]
 
   implicit def varEquality: HEqualK[Var]
+  implicit def varOrder: HOrderK[Var]
   implicit def varShow: ShowK[Var]
   implicit def valEquality: HEqualK[Val]
+  implicit def valOrder: HOrderK[Val]
   implicit def valShow: ShowK[Val]
 
   implicit def readOnly[A](ref: Var[A]): Val[A]
