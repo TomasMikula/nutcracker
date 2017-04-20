@@ -23,10 +23,8 @@ object PropRel extends PropagationBundle with PropRelToolkit {
   type Lang[K[_], A] = (Prop.Lang  :++: RelMod.Lang )#Out[K, A]
   type State[K[_]]   = (Prop.State :**: RelMod.State)#Out[K]
 
-  implicit def varEquality = Prop.varEquality
   implicit def varOrder = Prop.varOrder
   implicit def varShow = Prop.varShow
-  implicit def valEquality = Prop.valEquality
   implicit def valOrder = Prop.valOrder
   implicit def valShow = Prop.valShow
 

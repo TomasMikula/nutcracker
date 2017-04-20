@@ -1,15 +1,13 @@
 package nutcracker
 
-import nutcracker.util.{FreeK, HEqualK, HOrderK, InjectK, ShowK, StateInterpreter}
+import nutcracker.util.{FreeK, HOrderK, InjectK, ShowK, StateInterpreter}
 
 trait PropagationModule extends Module {
   type Var[_]
   type Val[_]
 
-  implicit def varEquality: HEqualK[Var]
   implicit def varOrder: HOrderK[Var]
   implicit def varShow: ShowK[Var]
-  implicit def valEquality: HEqualK[Val]
   implicit def valOrder: HOrderK[Val]
   implicit def valShow: ShowK[Val]
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], Var, Val]
@@ -43,10 +41,8 @@ extends ListModule[Lang0, State0](base) with StashPropagationModule {
   type Var[A] = Var0[A]
   type Val[A] = Val0[A]
 
-  implicit def varEquality: HEqualK[Var] = base.varEquality
   implicit def varOrder: HOrderK[Var] = base.varOrder
   implicit def varShow: ShowK[Var] = base.varShow
-  implicit def valEquality: HEqualK[Val] = base.valEquality
   implicit def valOrder: HOrderK[Val] = base.valOrder
   implicit def valShow: ShowK[Val] = base.valShow
 

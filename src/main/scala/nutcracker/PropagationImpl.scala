@@ -17,10 +17,8 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
   type Lang[K[_], A] = PropagationLang[Var, K, A]
   type State[K[_]] = PropagationStore[K]
 
-  implicit val varEquality: HEqualK[Var] = CellId.equalKInstance
   implicit def varOrder: HOrderK[Var] = CellId.orderKInstance
   implicit def varShow: ShowK[Var] = CellId.showKInstance
-  implicit val valEquality: HEqualK[Var] = CellId.equalKInstance
   implicit def valOrder: HOrderK[Var] = CellId.orderKInstance
   implicit def valShow: ShowK[Var] = CellId.showKInstance
 
@@ -878,7 +876,7 @@ private[nutcracker] object CellId {
   }
 
   implicit val orderKInstance: HOrderK[CellId] = new HOrderK[CellId] {
-    override def hOrder[A, B](fa: CellId[A], fb: CellId[B]): Ordering =
+    override def hOrderK[A, B](fa: CellId[A], fb: CellId[B]): Ordering =
       if(fa.domainId < fb.domainId) Ordering.LT
       else if(fa.domainId == fb.domainId) Ordering.EQ
       else Ordering.GT
