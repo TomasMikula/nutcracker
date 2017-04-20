@@ -23,7 +23,7 @@ final case class IsEqual[Ptr1[_], Ptr2[_]] private (private val unwrap: Free[IsE
       case (γ, fx) => fx match {
         case Pair(p1, p2, f) =>
           val p1_eq = γ.getOrElse(p1)(INil())
-          if(p1_eq.find(ep2 => eq2.hEqual(ep2.value, p2)).isDefined) M1.point(\/-(((), true)))
+          if(p1_eq.find(ep2 => eq2.hEqualK(ep2.value, p2)).isDefined) M1.point(\/-(((), true)))
           else deref1(p1) >>= (x => M1.map(deref2(p2))(y => -\/((γ.put(p1)(Exists(p2) :: p1_eq), f(x, y).unwrap, identity))))
       }
     }))(_._2)

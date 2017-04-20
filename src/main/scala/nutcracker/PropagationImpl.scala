@@ -874,7 +874,7 @@ private[nutcracker] object CellId {
   }
 
   implicit val equalKInstance: HEqualK[CellId] = new HEqualK[CellId] {
-    def hEqual[A, B](f1: CellId[A], f2: CellId[B]): Boolean = f1.domainId == f2.domainId
+    def hEqualK[A, B](f1: CellId[A], f2: CellId[B]): Boolean = f1.domainId == f2.domainId
   }
 
   implicit val orderKInstance: HOrderK[CellId] = new HOrderK[CellId] {

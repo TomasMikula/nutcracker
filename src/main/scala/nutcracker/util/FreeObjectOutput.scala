@@ -101,9 +101,9 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
 
     val step = (s1: S1) =>
       λ[Ptr ~> λ[α => (S1, S2 => (S2, Decoration[R])) \/ (S2, R)]](pa => {
-        if(s1.exists(E.hEqual(_, pa))) \/-((Lst.singleton(pa), showReference(pa)))
+        if(s1.exists(E.hEqualK(_, pa))) \/-((Lst.singleton(pa), showReference(pa)))
         else -\/((pa :: s1, s2 => {
-          val s21 = s2.filterNot(E.hEqual(_, pa))
+          val s21 = s2.filterNot(E.hEqualK(_, pa))
           val dec = if(s21.size < s2.size) decorateReferenced(pa) else decorateUnreferenced(pa)
           (s21, dec)
         }))
@@ -175,7 +175,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
 
     val step = (s: S) =>
       λ[Ptr ~> λ[α => (S, Decoration[R]) \/ R]](pa => {
-        if(s.exists(E.hEqual(_, pa))) \/-(showReference(pa))
+        if(s.exists(E.hEqualK(_, pa))) \/-(showReference(pa))
         else -\/((pa :: s, decorateContent(pa)))
       })
 
