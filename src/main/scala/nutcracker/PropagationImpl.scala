@@ -239,7 +239,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   def uncons: Option[(PropagationStore[K], Lst[K[Unit]])] =
     if(dirtyDomains.nonEmpty) {
       val ref0 = dirtyDomains.head
-      val ref: CellId.Aux[ref0.Domain, ref0.Update, ref0.Delta] = ref0.aux
+      val ref: CellId[ref0.Domain] = ref0.aux
       val dirtySels = dirtySelections union getSelsForCell(ref)
       val (cell, ks) = domains(ref).triggerPendingObservers(ref)
       Some((copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains.tail, dirtySelections = dirtySels), ks))
@@ -839,37 +839,17 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
     finalizers.valuesIterator.foldLeft(Lst.empty[K[Unit]])((ks, sub) => sub.unsubscribe ++ ks)
 }
 
-private[nutcracker] sealed abstract class CellId[D] private(val domainId: Long) {
+private[nutcracker] final case class CellId[D] private(domainId: Long) extends AnyVal {
   type Domain = D
-  type Update
-  type Delta[_, _]
 
-  /** Infer `Update` and `Delta` types. Relies on global uniqueness
-    * of `Dom[D]` instances.
-    */
-  def infer(implicit dom: IDom[D]): CellId.Aux[D, dom.Update, dom.IDelta] =
-    this.asInstanceOf[CellId.Aux[D, dom.Update, dom.IDelta]]
-
-  def aux: CellId.Aux[Domain, Update, Delta] = this
+  def aux: CellId[Domain] = this
 
   def inc[B](implicit dom: IDom[B]): CellId[B] =
-    CellId[B, dom.Update, dom.IDelta](domainId + 1)
+    CellId[B](domainId + 1)
 }
 
 private[nutcracker] object CellId {
-  type Aux[D, U, Δ[_, _]] = CellId[D] { type Update = U; type Delta[D1, D2] = Δ[D1, D2] }
-
-  val zero: CellId[Nothing] = CellId[Nothing, Nothing, Nothing](0)
-
-  private[CellId] def apply[D, U, Δ[_, _]](domainId: Long): CellId.Aux[D, U, Δ] =
-    new CellId[D](domainId) {
-      type Update = U
-      type Delta[D1, D2] = Δ[D1, D2]
-    }
-
-  implicit def equalInstance[D]: Equal[CellId[D]] = new Equal[CellId[D]] {
-    def equal(r1: CellId[D], r2: CellId[D]): Boolean = r1.domainId == r2.domainId
-  }
+  val zero: CellId[Nothing] = CellId[Nothing](0)
 
   implicit val equalKInstance: HEqualK[CellId] = new HEqualK[CellId] {
     def hEqualK[A, B](f1: CellId[A], f2: CellId[B]): Boolean = f1.domainId == f2.domainId
