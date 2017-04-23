@@ -166,7 +166,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     }
   }
 
-  def addDomainObserver[D, U, Δ[_, _]](ref: CellId[D], f: SeqPreHandler[Token, K[Unit], D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Option[ObserverId], Option[K[Unit]]) = {
+  def addDomainObserver[D, U, Δ[_, _]](ref: CellId[D], f: SeqPreHandler[Token, K, D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Option[ObserverId], Option[K[Unit]]) = {
     val (cell, oid, ko) = domains(ref).infer.observe(ref, f)
     (copy(domains = domains.put(ref)(cell)), oid, ko)
   }
@@ -181,7 +181,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     (copy(domains = domains.put(ref)(cell)), ks)
   }
 
-  def resume[D, Δ[_, _], D0 <: D](ref: CellId[D], token: Token[D0], trigger: SeqTrigger[Token, K[Unit], D, Δ, D0]): (PropagationStore[K], Lst[K[Unit]]) = {
+  def resume[D, Δ[_, _], D0 <: D](ref: CellId[D], token: Token[D0], trigger: SeqTrigger[Token, K, D, Δ, D0]): (PropagationStore[K], Lst[K[Unit]]) = {
     val (cell, ks) = domains(ref).asInstanceOf[Cell.AuxD[K, D, Δ]].resume(ref, token, trigger)
     val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
     (copy(domains = domains.put(ref)(cell), dirtyDomains = dirtyDomains1), ks)
@@ -256,8 +256,8 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
   type Delta[_, _]
   type Value <: D
 
-  type Handler[D1] = SeqHandler[Token, K[Unit], D, Delta, D1]
-  type Trigger[D1] = SeqTrigger[Token, K[Unit], D, Delta, D1]
+  type Handler[D1] = SeqHandler[Token, K, D, Delta, D1]
+  type Trigger[D1] = SeqTrigger[Token, K, D, Delta, D1]
 
   type IdleObserver[Val] = Cell.IdleObserver[K, D, Delta, Val]
   type PendingObserver[Val] = Cell.PendingObserver[K, D, Delta, Val]
@@ -274,7 +274,7 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
 
   def getValue: Option[Value]
 
-  def observe(self: CellId[D], f: SeqPreHandler[Token, K[Unit], D, Delta]): (Cell[K, D], Option[ObserverId], Option[K[Unit]])
+  def observe(self: CellId[D], f: SeqPreHandler[Token, K, D, Delta]): (Cell[K, D], Option[ObserverId], Option[K[Unit]])
 
   def rmObserver(oid: ObserverId): (Cell[K, D], Lst[K[Unit]])
 
@@ -290,14 +290,14 @@ private[nutcracker] object Cell {
   type AuxD[K[_], D, Δ[_, _]] = Cell[K, D] { type Delta[D1, D2] = Δ[D1, D2] }
   type Aux[K[_], D, U, Δ[_, _]] = Cell[K, D] { type Update = U; type Delta[D1, D2] = Δ[D1, D2] }
 
-  final case class IdleObserver[K[_], D, Δ[_, _], Val](id: ObserverId, handler: SeqHandler[Token, K[Unit], D, Δ, Val]) {
+  final case class IdleObserver[K[_], D, Δ[_, _], Val](id: ObserverId, handler: SeqHandler[Token, K, D, Δ, Val]) {
     def addDelta[Val1](δ: Δ[Val, Val1]): PendingObserver.Aux[K, D, Δ, Val, Val1] =
       PendingObserver[K, D, Δ, Val, Val1](id, δ, handler)
   }
   sealed abstract class PendingObserver[K[_], D, Δ[_, _], Val](val id: ObserverId) {
     type D0
     val delta: Δ[D0, Val]
-    val handler: SeqHandler[Token, K[Unit], D, Δ, D0]
+    val handler: SeqHandler[Token, K, D, Δ, D0]
 
     def addDelta[Val1, U](δ: Δ[Val, Val1])(implicit dom: IDom.Aux[D, U, Δ]): PendingObserver.Aux[K, D, Δ, D0, Val1] =
       PendingObserver[K, D, Δ, D0, Val1](id, dom.composeDeltas(δ, delta), handler)
@@ -305,18 +305,18 @@ private[nutcracker] object Cell {
   object PendingObserver {
     type Aux[K[_], D, Δ[_, _], From, Val] = PendingObserver[K, D, Δ, Val] { type D0 = From }
 
-    def apply[K[_], D, Δ[_, _], From, Val](id: ObserverId, delta: Δ[From, Val], handler: SeqHandler[Token, K[Unit], D, Δ, From]): Aux[K, D, Δ, From, Val] =
+    def apply[K[_], D, Δ[_, _], From, Val](id: ObserverId, delta: Δ[From, Val], handler: SeqHandler[Token, K, D, Δ, From]): Aux[K, D, Δ, From, Val] =
       new PendingObserver0(id, delta, handler)
 
-    private final class PendingObserver0[K[_], D, Δ[_, _], From, Val](id: ObserverId, val delta: Δ[From, Val], val handler: SeqHandler[Token, K[Unit], D, Δ, From]) extends PendingObserver[K, D, Δ, Val](id) {
+    private final class PendingObserver0[K[_], D, Δ[_, _], From, Val](id: ObserverId, val delta: Δ[From, Val], val handler: SeqHandler[Token, K, D, Δ, From]) extends PendingObserver[K, D, Δ, Val](id) {
       type D0 = From
     }
   }
   final case class BlockedIdleObserver[D, Δ[_, _], Val, D0](id: ObserverId, ev: Val === D0) {
     def addDelta[Val1](δ: Δ[Val, Val1]): BlockedPendingObserver[D, Δ, Val1, D0] =
       BlockedPendingObserver(id, ev.subst[Δ[?, Val1]](δ))
-    def resume[K[_]](handler: SeqHandler[Token, K[Unit], D, Δ, D0]): IdleObserver[K, D, Δ, Val] =
-      IdleObserver(id, ev.flip.subst[SeqHandler[Token, K[Unit], D, Δ, ?]](handler))
+    def resume[K[_]](handler: SeqHandler[Token, K, D, Δ, D0]): IdleObserver[K, D, Δ, Val] =
+      IdleObserver(id, ev.flip.subst[SeqHandler[Token, K, D, Δ, ?]](handler))
   }
   object BlockedIdleObserver {
     def apply[D, Δ[_, _], D0](id: ObserverId): BlockedIdleObserver[D, Δ, D0, D0] = BlockedIdleObserver(id, Leibniz.refl[D0])
@@ -324,7 +324,7 @@ private[nutcracker] object Cell {
   final case class BlockedPendingObserver[D, Δ[_, _], Val, D0](id: ObserverId, delta: Δ[D0, Val]) {
     def addDelta[Val1, U](δ: Δ[Val, Val1])(implicit dom: IDom.Aux[D, U, Δ]): BlockedPendingObserver[D, Δ, Val1, D0] =
       BlockedPendingObserver(id, dom.composeDeltas(δ, delta))
-    def resume[K[_]](handler: SeqHandler[Token, K[Unit], D, Δ, D0]): PendingObserver.Aux[K, D, Δ, D0, Val] =
+    def resume[K[_]](handler: SeqHandler[Token, K, D, Δ, D0]): PendingObserver.Aux[K, D, Δ, D0, Val] =
       PendingObserver(id, delta, handler)
   }
 
@@ -395,7 +395,7 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
       case Unchanged() => None
     }
 
-  def observe(self: CellId[D], f: SeqPreHandler[Token, K[Unit], D, Delta]): (SimpleCell.Aux1[K, D, Update, Delta, Value], Option[ObserverId], Option[K[Unit]]) = {
+  def observe(self: CellId[D], f: SeqPreHandler[Token, K, D, Delta]): (SimpleCell.Aux1[K, D, Update, Delta, Value], Option[ObserverId], Option[K[Unit]]) = {
     import SeqTrigger._
     f.handle(value) match {
       case Discard() => (this.aux1, None, None)
@@ -585,7 +585,7 @@ private[nutcracker] case class InactiveCell[K[_], D, U, Δ[_, _]](
 
   override def hasPendingObservers: Boolean = false
 
-  override def observe(self: CellId[D], f: SeqPreHandler[Token, K[Unit], D, Delta]): (Cell[K, D], Option[ObserverId], Option[K[Unit]]) = {
+  override def observe(self: CellId[D], f: SeqPreHandler[Token, K, D, Delta]): (Cell[K, D], Option[ObserverId], Option[K[Unit]]) = {
     val newCycle = cycle.inc
     val obsId = lastObserverId.inc
     val cell = InitializingCell[K, D, U, Δ](setup, newCycle, List((obsId, f)), List(), obsId, lastToken)
@@ -638,7 +638,7 @@ private[nutcracker] object InactiveCell {
 private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
   setup: LiveCycle[D] => K[Unit],
   cycle: LiveCycle[D],
-  preHandlers: List[(ObserverId, SeqPreHandler[Token, K[Unit], D, Δ])],
+  preHandlers: List[(ObserverId, SeqPreHandler[Token, K, D, Δ])],
   preHandlersM: List[(ObserverId, (D, Token[D], ObserverId) => K[Unit])],
   lastObserverId: ObserverId,
   lastToken: Token[_]
@@ -655,7 +655,7 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
 
   override def hasPendingObservers: Boolean = false
 
-  override def observe(self: CellId[D], f: SeqPreHandler[Token, K[Unit], D, Δ]): (Cell[K, D], Option[ObserverId], Option[K[Unit]]) = {
+  override def observe(self: CellId[D], f: SeqPreHandler[Token, K, D, Δ]): (Cell[K, D], Option[ObserverId], Option[K[Unit]]) = {
     val obsId = lastObserverId.inc
     val cell = copy[K, D, U, Δ](preHandlers = (obsId, f) :: preHandlers, lastObserverId = obsId)
     (cell, Some(obsId), None)
@@ -776,7 +776,7 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
 
   override def hasPendingObservers: Boolean = impl.hasPendingObservers
 
-  override def observe(self: CellId[D], f: SeqPreHandler[Token, K[Unit], D, Δ]): (Cell[K, D], Option[ObserverId], Option[K[Unit]]) = {
+  override def observe(self: CellId[D], f: SeqPreHandler[Token, K, D, Δ]): (Cell[K, D], Option[ObserverId], Option[K[Unit]]) = {
     val (cell, oid, ko) = impl.observe(self, f)
     (copy(impl = cell), oid, ko)
   }
