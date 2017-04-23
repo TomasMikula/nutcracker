@@ -14,7 +14,7 @@ import shapeless.{HList, Nat, Sized}
 private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with PropagationBundle { self =>
   type Var[A] = CellId[A]
   type Val[A] = CellId[A]
-  type Lang[K[_], A] = PropagationLang[Var, K, A]
+  type Lang[K[_], A] = PropagationLang[K, A]
   type State[K[_]] = PropagationStore[K]
 
   implicit def varOrder: HOrderK[Var] = CellId.orderKInstance
@@ -44,12 +44,12 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
     interpreter.freeInstance.apply(p).run(s)
 
   val interpreter: StateInterpreter[Lang, State] =
-    new StateInterpreter[PropagationLang[Var, ?[_], ?], PropagationStore] {
+    new StateInterpreter[PropagationLang, PropagationStore] {
 
-      def step: Step[PropagationLang[Var, ?[_], ?], PropagationStore] =
-        new Step[PropagationLang[Var, ?[_], ?], PropagationStore] {
+      def step: Step[PropagationLang, PropagationStore] =
+        new Step[PropagationLang, PropagationStore] {
           import PropagationLang._
-          override def apply[K[_]: Monad, A](p: PropagationLang[Var, K, A]): WriterState[Lst[K[Unit]], PropagationStore[K], A] = WriterState(s =>
+          override def apply[K[_]: Monad, A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], PropagationStore[K], A] = WriterState(s =>
             p match {
               case Update(ref, u, dom) =>
                 (Lst.empty, s.update[dom.Domain, dom.Update, dom.IDelta](ref, u)(dom), ())
