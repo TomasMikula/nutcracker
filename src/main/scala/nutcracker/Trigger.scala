@@ -1,6 +1,6 @@
 package nutcracker
 
-import scalaz.{Functor, ~>}
+import scalaz.Functor
 
 sealed trait TriggerF[F[_], D, Δ, A] {
   import TriggerF._
@@ -32,17 +32,6 @@ object TriggerF {
 }
 
 private[nutcracker] sealed trait SeqTrigger[Tok[_], K[_], D, Δ[_, _], D1] {
-
-  import SeqTrigger._
-
-  def map[L[_]](f: K ~> L): SeqTrigger[Tok, L, D, Δ, D1] = this match {
-    case Discard() => Discard()
-    case Sleep(h) => Sleep(h.map(f))
-    case Fire(k) => Fire(f(k))
-    case FireReload(k, h) => FireReload(f(k), h.map(f))
-    case Reconsider(cont) => Reconsider((ref, t) => f(cont(ref, t)))
-  }
-
   def specialize[D2 <: D1]: SeqTrigger[Tok, K, D, Δ, D2] = this.asInstanceOf[SeqTrigger[Tok, K, D, Δ, D2]]
 }
 
@@ -63,11 +52,6 @@ private[nutcracker] object SeqTrigger {
 private[nutcracker] trait SeqHandler[Tok[_], K[_], D, Δ[_, _], D1] { self =>
   def handle[D2 <: D](d2: D2, δ: Δ[D1, D2]): SeqTrigger[Tok, K, D, Δ, D2]
 
-  def map[L[_]](f: K ~> L): SeqHandler[Tok, L, D, Δ, D1] = new SeqHandler[Tok, L, D, Δ, D1] {
-    def handle[D2 <: D](d2: D2, δ: Δ[D1, D2]): SeqTrigger[Tok, L, D, Δ, D2] =
-      self.handle(d2, δ).map(f)
-  }
-
   def specialize[D2 <: D1]: SeqHandler[Tok, K, D, Δ, D2] = this.asInstanceOf[SeqHandler[Tok, K, D, Δ, D2]]
 }
 
@@ -80,11 +64,6 @@ private[nutcracker] object SeqHandler {
 
 private[nutcracker] trait SeqPreHandler[Tok[_], K[_], D, Δ[_, _]] { self =>
   def handle[D0 <: D](d: D0): SeqTrigger[Tok, K, D, Δ, D0]
-
-  def map[L[_]](f: K ~> L): SeqPreHandler[Tok, L, D, Δ] = new SeqPreHandler[Tok, L, D, Δ] {
-    def handle[D0 <: D](d: D0): SeqTrigger[Tok, L, D, Δ, D0] =
-      self.handle(d).map(f)
-  }
 }
 
 private[nutcracker] object SeqPreHandler {
