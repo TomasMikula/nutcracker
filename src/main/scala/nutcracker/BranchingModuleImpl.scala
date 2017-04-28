@@ -22,7 +22,7 @@ private[nutcracker] class BranchingModuleImpl[Var0[_], Val0[_]] extends Persiste
         if(ev.isUnresolved(a))
           for {
             ref <- propagation.newCell[A](a)
-            _ <- BranchLang.trackF(ref)
+            _ <- BranchLang.trackF(ref)(ev, i[FreeK[F, ?]])
             _ <- ref.observe.threshold(a =>
               if(ev.isUnresolved(a)) None
               else Some(BranchLang.untrackF(ref))
