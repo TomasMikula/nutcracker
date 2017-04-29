@@ -73,7 +73,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
       } yield pr)
 
     it("should follow that a < e") {
-      val (s, promise) = interpret(problem, tk.empty[Prg])
+      val (s, promise) = interpret(problem, tk.empty)
       fetchResult(promise, s) should be (Some(()))
     }
   }

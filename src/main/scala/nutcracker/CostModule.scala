@@ -7,8 +7,8 @@ import scalaz.NonEmptyList
 trait CostModule[C] extends Module {
   implicit def freeCost[F[_[_], _]](implicit i: InjectK[Lang, F]): CostApi.Aux[FreeK[F, ?], C]
 
-  def interpreter: Step[Lang, State]
-  def getCost[K[_]](s: State[K]): C
+  def interpreter: Step[Lang, StateK]
+  def getCost[K[_]](s: StateK[K]): C
 }
 
 object CostModule {
@@ -22,7 +22,7 @@ trait PersistentCostModule[C] extends CostModule[C] with PersistentStateModule {
 object PersistentCostModule {
   type Aux[C, Lang0[_[_], _], State0[_[_]]] = PersistentCostModule[C] {
     type Lang[K[_], A] = Lang0[K, A]
-    type State[K[_]] = State0[K]
+    type StateK[K[_]] = State0[K]
   }
 }
 
@@ -30,5 +30,5 @@ class CostListModule[C, Lang[_[_], _], State0[_[_]]](base: PersistentCostModule.
 extends ListModule[Lang, State0](base) with CostModule[C] {
   def freeCost[F[_[_], _]](implicit i: InjectK[Lang, F]) = base.freeCost[F]
   def getCost[K[_]](s: NonEmptyList[State0[K]]) = base.getCost(s.head)
-  def interpreter: Step[Lang, State] = base.interpreter.inHead
+  def interpreter: Step[Lang, StateK] = base.interpreter.inHead
 }

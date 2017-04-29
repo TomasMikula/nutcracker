@@ -22,17 +22,17 @@ trait CostToolkit[C] extends Toolkit {
   implicit def costMonoid: NonDecreasingMonoid[C]
   implicit val costApi: CostApi.Aux[Prg, C]
 
-  def getCost(s: State[Prg]): C
+  def getCost(s: State): C
 
-  def assess(s: State[Prg]): Assessment[List[Prg[Unit]]]
+  def assess(s: State): Assessment[List[Prg[Unit]]]
 
-  def solveBfs[A, B](p: Prg[A], f: (A, State[Prg]) => Option[B]): StreamT[Id, (B, C)] =
+  def solveBfs[A, B](p: Prg[A], f: (A, State) => Option[B]): StreamT[Id, (B, C)] =
     solveBfsM[Id, A, B](p, f)
 
-  def solveBfsM[M[_], A, B](p: Prg[A], f: (A, State[Prg]) => Option[B])(implicit M0: BindRec[M], M1: Monad[M]): StreamT[M, (B, C)] = {
-    val (s, a) = interpret(p, empty[Prg])
+  def solveBfsM[M[_], A, B](p: Prg[A], f: (A, State) => Option[B])(implicit M0: BindRec[M], M1: Monad[M]): StreamT[M, (B, C)] = {
+    val (s, a) = interpret(p, empty)
 
-    new BFSSolver[Prg[Unit], State[Prg], M, C, B](
+    new BFSSolver[Prg[Unit], State, M, C, B](
       (pu, s) => M1.point(interpret(pu, s)._1),
       s => assess(s) match {
         case Incomplete(bs) => -\/(bs)

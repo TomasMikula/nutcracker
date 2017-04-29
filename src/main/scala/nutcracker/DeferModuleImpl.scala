@@ -8,7 +8,7 @@ import scalaz.std.option._
 
 private[nutcracker] class DeferModuleImpl[D](implicit D: NonDecreasingMonoid[D] with OrderPreservingMonoid[D]) extends PersistentDeferModule[D] { self =>
   type Lang[K[_], A] = DeferLang[D, K, A]
-  type State[K[_]] = DeferStore[D, K]
+  type StateK[K[_]] = DeferStore[D, K]
 
   implicit def freeDeferApi[F[_[_], _]](implicit i: InjectK[Lang, F]): Defer[FreeK[F, ?], D] =
     new Defer[FreeK[F, ?], D] {
@@ -16,12 +16,12 @@ private[nutcracker] class DeferModuleImpl[D](implicit D: NonDecreasingMonoid[D] 
         FreeK.injLiftF(DeferLang.defer[D, FreeK[F, ?]](delay, k))
     }
 
-  def empty[K[_]] = DeferStore.empty[D, K]
+  def emptyK[K[_]] = DeferStore.empty[D, K]
 
-  def interpreter: StateInterpreter[Lang, State] = DeferStore.interpreter[D]
+  def interpreter: StateInterpreter[Lang, StateK] = DeferStore.interpreter[D]
 
   def stashable: StashDeferModule[D] { type Lang[K[_], A] = self.Lang[K, A] } =
-    new DeferListModule[D, Lang, State](this)
+    new DeferListModule[D, Lang, StateK](this)
 }
 
 private[nutcracker] final case class DeferStore[D, K[_]] private (

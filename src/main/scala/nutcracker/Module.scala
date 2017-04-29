@@ -31,40 +31,52 @@ trait Module {
 
   /** State that the interpreter operates on.
     *
-    * @tparam K Some states need store programs or program-producing functions.
+    * @tparam K Some states need to store programs or program-producing functions.
     *           This type parameter allows the state to talk about the type of
     *           programs.
     *           It will be instantiated into `FreeK[F, ?]`, where `F[_[_], _]`
     *           is a superset of the instruction set [[Lang]] (i.e. there is an
     *           injection from [[Lang]] to `F`).
     */
-  type State[K[_]]
+  type StateK[K[_]]
 
-  def empty[K[_]]: State[K]
+  def emptyK[K[_]]: StateK[K]
+}
+
+object Module {
+  type AuxL[Lang0[_[_], _]] = Module {
+    type Lang[K[_], A] = Lang0[K, A]
+  }
+
+  type Aux[Lang0[_[_], _], State0[_[_]]] = AuxL[Lang0] {
+    type StateK[K[_]] = State0[K]
+  }
 }
 
 trait StashModule extends Module {
-  implicit def stashRestore[K[_]]: StashRestore[State[K]]
+  implicit def stashRestore[K[_]]: StashRestore[StateK[K]]
+}
+
+object StashModule {
+  type AuxL[Lang[_[_], _]] = Module.AuxL[Lang] with StashModule
+  type Aux[Lang[_[_], _], State[_[_]]] = Module.Aux[Lang, State] with StashModule
 }
 
 trait PersistentStateModule extends Module { self =>
-  def stashable: StashModule { type Lang[K[_], A] = self.Lang[K, A] }
+  def stashable: StashModule.AuxL[self.Lang]
 }
 
 object PersistentStateModule {
-  type Aux[Lang0[_[_], _], State0[_[_]]] = PersistentStateModule {
-    type Lang[K[_], A] = Lang0[K, A]
-    type State[K[_]] = State0[K]
-  }
+  type Aux[Lang0[_[_], _], State0[_[_]]] = Module.Aux[Lang0, State0] with PersistentStateModule
 }
 
 class ListModule[Lang0[_[_], _], State0[_[_]]](base: PersistentStateModule.Aux[Lang0, State0]) extends StashModule {
   type Lang[K[_], A] = Lang0[K, A]
-  type State[K[_]] = NonEmptyList[State0[K]]
+  type StateK[K[_]] = NonEmptyList[State0[K]]
 
-  override def empty[K[_]] =
-    NonEmptyList(base.empty[K])
+  override def emptyK[K[_]] =
+    NonEmptyList(base.emptyK[K])
 
-  override implicit def stashRestore[K[_]]: StashRestore[State[K]] =
+  override implicit def stashRestore[K[_]]: StashRestore[StateK[K]] =
     StashRestore.nelInstance[State0[K]]
 }

@@ -15,18 +15,19 @@ object PropBranchToolkit {
 
 object PropBranch extends PropagationBundle with BranchingBundle with PropBranchToolkit {
   val Prop = Propagation.module.stashable
-  val Branch = BranchingPropagation.module[Prop.Var, Prop.Val].stashable
 
-  type Var[a] = Prop.Var[a]
-  type Val[a] = Prop.Val[a]
+  type VarK[K[_], A] = Prop.VarK[K, A]
+  type ValK[K[_], A] = Prop.ValK[K, A]
+
+  val Branch = BranchingPropagation.module[VarK, ValK].stashable
 
   type Lang[K[_], A] = (Prop.Lang  :++: Branch.Lang )#Out[K, A]
-  type State[K[_]]   = (Prop.State :**: Branch.State)#Out[K]
+  type StateK[K[_]]  = (Prop.StateK :**: Branch.StateK)#Out[K]
 
-  implicit def varOrder = Prop.varOrder
-  implicit def varShow = Prop.varShow
-  implicit def valOrder = Prop.valOrder
-  implicit def valShow = Prop.valShow
+  def varOrderK[K[_]] = Prop.varOrderK
+  def varShowK[K[_]] = Prop.varShowK
+  def valOrderK[K[_]] = Prop.valOrderK
+  def valShowK[K[_]] = Prop.valShowK
 
   implicit def prgMonad = FreeKT.freeKTMonad
 
@@ -38,16 +39,16 @@ object PropBranch extends PropagationBundle with BranchingBundle with PropBranch
 
   import Prop.{stashRestore => sr1}
   import Branch.{stashRestore => sr2}
-  def stashRestore[K[_]]: StashRestore[State[K]] = StashRestore.kPairInstance
+  def stashRestoreK[K[_]]: StashRestore[StateK[K]] = StashRestore.kPairInstance
 
   val interpreter = (Prop.interpreter :&&: Branch.interpreter).freeInstance
-  def interpret[A](p: Prg[A], s: State[Prg]): (State[Prg], A) = interpreter(p).run(s)
-  def fetch[K[_], A](ref: Val[A], s: State[K]): A = Prop.fetch(ref, s._1)
-  def empty[K[_]]: State[K] = Prop.empty[K] :*: Branch.empty[K]
+  def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p).run(s)
+  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): A = Prop.fetchK(ref, s._1)
+  def emptyK[K[_]]: StateK[K] = Prop.emptyK[K] :*: Branch.emptyK[K]
 
-  def assess(s: State[Prg]): Assessment[List[Prg[Unit]]] =
+  def assess(s: State): Assessment[List[Prg[Unit]]] =
     if (Prop.isConsistent(s._1))
-      Branch.assess(s._2)(λ[Var ~> Id](ref => Prop.fetch(ref, s._1)))
+      Branch.assess(s._2)(λ[Var ~> Id](ref => Prop.fetchK(ref, s._1)))
     else
       Assessment.Failed
 }

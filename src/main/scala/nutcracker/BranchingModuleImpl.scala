@@ -5,45 +5,49 @@ import nutcracker.util.{FreeK, InjectK, Lst, Step, WriterState}
 import scalaz.Id.Id
 import scalaz.{Monad, ~>}
 
-private[nutcracker] class BranchingModuleImpl[Var0[_], Val0[_]] extends PersistentBranchingModule {
-  type Var[A] = Var0[A]
-  type Val[A] = Val0[A]
-  type Lang[K[_], A] = BranchLang[Var, K, A]
-  type State[K[_]] = BranchStore[Var, K]
+private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] extends PersistentBranchingModule {
+  type VarK[K[_], A] = Var0[K, A]
+  type ValK[K[_], A] = Val0[K, A]
+  type Lang[K[_], A] = BranchLang[Var0[K, ?], K, A]
+  type StateK[K[_]] = BranchStore[Var0[K, ?], K]
 
   implicit def freeBranchingPropagation[F[_[_], _]](implicit
     i: InjectK[Lang, F],
-    P: Propagation[FreeK[F, ?], Var, Val]
-  ): BranchingPropagation[FreeK[F, ?], Var, Val] =
-    new BranchingPropagation[FreeK[F, ?], Var, Val] {
-      override val propagation: Propagation[FreeK[F, ?], Var, Val] = P
+    P: Propagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]]
+  ): BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] =
+    new BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] {
+      override val propagation: Propagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] = P
 
-      def newVar[A](a: A)(implicit ev: Splittable[A]): FreeK[F, Var[A]] =
+      def newVar[A](a: A)(implicit ev: Splittable[A]): FreeK[F, VarK[FreeK[F, ?], A]] =
         if(ev.isUnresolved(a))
           for {
             ref <- propagation.newCell[A](a)
-            _ <- BranchLang.trackF(ref)(ev, i[FreeK[F, ?]])
+            _ <- BranchLang.trackF[VarK[FreeK[F, ?], ?], F, A](ref)(ev, i[FreeK[F, ?]])
             _ <- ref.observe.threshold(a =>
               if(ev.isUnresolved(a)) None
-              else Some(BranchLang.untrackF(ref))
+              else Some(BranchLang.untrackF[VarK[FreeK[F, ?], ?], F, A](ref)(i[FreeK[F, ?]]))
             )
           } yield ref
         else
           propagation.newCell[A](a)
     }
 
-  def empty[K[_]]: State[K] = BranchStore()
+  def emptyK[K[_]]: StateK[K] = BranchStore()
 
-  def interpreter: Step[Lang, State] = new Step[Lang, State] {
+  def interpreter: Step[Lang, StateK] = new Step[Lang, StateK] {
     import BranchLang._
-    def apply[K[_]: Monad, A](f: BranchLang[Var, K, A]): WriterState[Lst[K[Unit]], State[K], A] = f match {
+
+    def apply[K[_]: Monad, A](f: BranchLang[VarK[K, ?], K, A]): WriterState[Lst[K[Unit]], StateK[K], A] =
+      go[VarK[K, ?], K, A](f)
+
+    private def go[Ref[_], K[_]: Monad, A](f: BranchLang[Ref, K, A]): WriterState[Lst[K[Unit]], BranchStore[Ref, K], A] = f match {
       case Track(ref, ev) => WriterState(s => (Lst.empty, s.addVar(ref, ev), ()))
       case Untrack(ref) => WriterState(s => (Lst.empty, s.removeVar(ref), ()))
     }
   }
 
-  def assess[K[_]](s: State[K])(fetch: Var ~> Id)(implicit K: Propagation[K, Var, Val]): Assessment[List[K[Unit]]] =
+  def assess[K[_]](s: StateK[K])(fetch: VarK[K, ?] ~> Id)(implicit K: Propagation[K, VarK[K, ?], ValK[K, ?]]): Assessment[List[K[Unit]]] =
     s.split(fetch)
 
-  def stashable = new BranchingListModule[Var, Val, Lang, State](this)
+  def stashable = new BranchingListModule[VarK, ValK, Lang, StateK](this)
 }

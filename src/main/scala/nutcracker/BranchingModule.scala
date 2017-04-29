@@ -5,50 +5,54 @@ import scalaz.Id.Id
 import scalaz.~>
 
 trait BranchingModule extends Module {
-  type Var[A]
-  type Val[A]
+  type VarK[K[_], A]
+  type ValK[K[_], A]
   type Lang[K[_], A]
-  type State[K[_]]
+  type StateK[K[_]]
 
   implicit def freeBranchingPropagation[F[_[_], _]](implicit
     i: InjectK[Lang, F],
-    P: Propagation[FreeK[F, ?], Var, Val]
-  ): BranchingPropagation[FreeK[F, ?], Var, Val]
+    P: Propagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]]
+  ): BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]]
 
-  def empty[K[_]]: State[K]
-  def interpreter: Step[Lang, State]
-  def assess[K[_]](s: State[K])(fetch: Var ~> Id)(implicit K: Propagation[K, Var, Val]): Assessment[List[K[Unit]]]
+  def emptyK[K[_]]: StateK[K]
+  def interpreter: Step[Lang, StateK]
+  def assess[K[_]](s: StateK[K])(fetch: VarK[K, ?] ~> Id)(implicit K: Propagation[K, VarK[K, ?], ValK[K, ?]]): Assessment[List[K[Unit]]]
+}
+
+object BranchingModule {
+  type AuxL[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _]] = BranchingModule {
+    type VarK[K[_], A] = Var0[K, A]
+    type ValK[K[_], A] = Val0[K, A]
+    type Lang[K[_], A] = Lang0[K, A]
+  }
+
+  type Aux[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _], State0[_[_]]] = AuxL[Var0, Val0, Lang0] {
+    type StateK[K[_]] = State0[K]
+  }
 }
 
 trait PersistentBranchingModule extends BranchingModule with PersistentStateModule { self =>
-  override def stashable: BranchingModule with StashModule {
-    type Var[A] = self.Var[A]
-    type Val[A] = self.Val[A]
-    type Lang[K[_], A] = self.Lang[K, A]
-  }
+  override def stashable: BranchingModule.AuxL[self.VarK, self.ValK, self.Lang] with StashModule
 }
 
 object PersistentBranchingModule {
-  type Aux[Var0[_], Val0[_], Lang0[_[_], _], State0[_[_]]] = PersistentBranchingModule {
-    type Var[A] = Var0[A]
-    type Val[A] = Val0[A]
-    type Lang[K[_], A] = Lang0[K, A]
-    type State[K[_]] = State0[K]
-  }
+  type Aux[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _], State0[_[_]]] =
+    BranchingModule.Aux[Var0, Val0, Lang0, State0] with PersistentBranchingModule
 }
 
-class BranchingListModule[Var0[_], Val0[_], Lang[_[_], _], State[_[_]]](base: PersistentBranchingModule.Aux[Var0, Val0, Lang, State])
+class BranchingListModule[Var0[_[_], _], Val0[_[_], _], Lang[_[_], _], State[_[_]]](base: PersistentBranchingModule.Aux[Var0, Val0, Lang, State])
 extends ListModule[Lang, State](base) with BranchingModule {
-  type Var[A] = Var0[A]
-  type Val[A] = Val0[A]
+  type VarK[K[_], A] = Var0[K, A]
+  type ValK[K[_], A] = Val0[K, A]
 
-  def freeBranchingPropagation[F[_[_], _]](implicit
+  override def freeBranchingPropagation[F[_[_], _]](implicit
     i: InjectK[Lang, F],
-    P: Propagation[FreeK[F, ?], Var, Val]
-  ): BranchingPropagation[FreeK[F, ?], Var, Val] =
-    base.freeBranchingPropagation[F]
+    P: Propagation[FreeK[F, ?], Var0[FreeK[F, ?], ?], Val0[FreeK[F, ?], ?]]
+  ): BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] =
+    base.freeBranchingPropagation[F](i, P)
 
-  def interpreter: Step[Lang, State] = base.interpreter.inHead
-  def assess[K[_]](s: State[K])(fetch: Var ~> Id)(implicit K: Propagation[K, Var, Val]): Assessment[List[K[Unit]]] =
+  override def interpreter: Step[Lang, StateK] = base.interpreter.inHead
+  override def assess[K[_]](s: StateK[K])(fetch: VarK[K, ?] ~> Id)(implicit K: Propagation[K, VarK[K, ?], ValK[K, ?]]): Assessment[List[K[Unit]]] =
     base.assess[K](s.head)(fetch)
 }

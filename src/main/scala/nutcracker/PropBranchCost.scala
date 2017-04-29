@@ -16,22 +16,22 @@ object PropBranchCostToolkit {
 
 final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBranchCostToolkit[C] with PropagationBundle with BranchingBundle {
   val Prop = Propagation.module.stashable
-  val Branch = BranchingPropagation.module[Prop.Var, Prop.Val].stashable
+  val Branch = BranchingPropagation.module[Prop.VarK, Prop.ValK].stashable
   val Cost: CostModule[C] with StashModule = CostModule.instance[C].stashable
 
   override def prgMonad: Monad[Prg] = Monad[Prg]
   override def costMonoid: NonDecreasingMonoid[C] = C
 
-  type Var[a] = Prop.Var[a]
-  type Val[a] = Prop.Val[a]
+  type VarK[K[_], A] = Prop.VarK[K, A]
+  type ValK[K[_], A] = Prop.ValK[K, A]
 
-  type Lang[K[_], A] = (Prop.Lang  :+: Branch.Lang  :++: Cost.Lang )#Out[K, A]
-  type State[K[_]]   = (Prop.State :*: Branch.State :**: Cost.State)#Out[K]
+  type Lang[K[_], A] = (Prop.Lang   :+: Branch.Lang   :++: Cost.Lang  )#Out[K, A]
+  type StateK[K[_]]  = (Prop.StateK :*: Branch.StateK :**: Cost.StateK)#Out[K]
 
-  implicit def varOrder = Prop.varOrder
-  implicit def varShow = Prop.varShow
-  implicit def valOrder = Prop.valOrder
-  implicit def valShow = Prop.valShow
+  implicit def varOrderK[K[_]] = Prop.varOrderK
+  implicit def varShowK[K[_]] = Prop.varShowK
+  implicit def valOrderK[K[_]] = Prop.valOrderK
+  implicit def valShowK[K[_]] = Prop.valShowK
 
   implicit val propagationApi: Propagation[Prg, Var, Val] =
     Prop.freePropagation[Lang]
@@ -51,23 +51,23 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   import Prop.{stashRestore => sr1}
   import Branch.{stashRestore => sr2}
   import Cost.{stashRestore => sr3}
-  def stashRestore[K[_]]: StashRestore[State[K]] = StashRestore.kPairInstance
+  def stashRestoreK[K[_]]: StashRestore[StateK[K]] = StashRestore.kPairInstance
 
-  def empty[K[_]]: State[K] =
-    Prop.empty[K] :*: Branch.empty[K] :*: Cost.empty[K]
+  def emptyK[K[_]]: StateK[K] =
+    Prop.emptyK[K] :*: Branch.emptyK[K] :*: Cost.emptyK[K]
 
-  def fetch[K[_], A](ref: Val[A], s: State[K]): A =
-    Prop.fetch(ref, s._1)
+  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): A =
+    Prop.fetchK(ref, s._1)
 
   val interpreter = (Prop.interpreter :&: Branch.interpreter :&&: Cost.interpreter).freeInstance
-  def interpret[A](p: Prg[A], s: State[Prg]): (State[Prg], A) = interpreter(p).run(s)
+  def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p).run(s)
 
-  def assess(s: State[Prg]): Assessment[List[Prg[Unit]]] =
+  def assess(s: State): Assessment[List[Prg[Unit]]] =
     if (Prop.isConsistent(s._1))
-      Branch.assess(s._2._1)(λ[Var ~> Id](ref => Prop.fetch(ref, s._1)))
+      Branch.assess(s._2._1)(λ[Var ~> Id](ref => Prop.fetchK(ref, s._1)))
     else
       Assessment.Failed
 
-  def getCost(s: State[Prg]): C = Cost.getCost(s._2._2)
+  def getCost(s: State): C = Cost.getCost(s._2._2)
 }
 

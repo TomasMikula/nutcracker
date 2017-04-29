@@ -12,24 +12,24 @@ import scalaz.syntax.monad._
 import shapeless.{HList, Nat, Sized}
 
 private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with PropagationBundle { self =>
-  type Var[A] = CellId[A]
-  type Val[A] = CellId[A]
+  type VarK[K[_], A] = CellId[A]
+  type ValK[K[_], A] = CellId[A]
   type Lang[K[_], A] = PropagationLang[K, A]
-  type State[K[_]] = PropagationStore[K]
+  type StateK[K[_]] = PropagationStore[K]
 
-  implicit def varOrder: HOrderK[Var] = CellId.orderKInstance
-  implicit def varShow: ShowK[Var] = CellId.showKInstance
-  implicit def valOrder: HOrderK[Var] = CellId.orderKInstance
-  implicit def valShow: ShowK[Var] = CellId.showKInstance
+  override def varOrderK[K[_]]: HOrderK[VarK[K, ?]] = CellId.orderKInstance
+  override def varShowK[K[_]]: ShowK[VarK[K, ?]] = CellId.showKInstance
+  override def valOrderK[K[_]]: HOrderK[VarK[K, ?]] = CellId.orderKInstance
+  override def valShowK[K[_]]: ShowK[VarK[K, ?]] = CellId.showKInstance
 
-  implicit def prgMonad: Monad[FreeK[Lang, ?]] = FreeKT.freeKTMonad[Lang, Id]
-  implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): OnDemandPropagation[FreeK[F, ?], Var, Val] =
+  override implicit def prgMonad: Monad[FreeK[Lang, ?]] = FreeKT.freeKTMonad[Lang, Id]
+  override implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): OnDemandPropagation[FreeK[F, ?], Var, Val] =
     PropagationLang.freePropagation[F]
 
-  val propagationApi: Propagation[Prg, Var, Val] =
+  override val propagationApi: Propagation[Prg, Var, Val] =
     PropagationLang.freePropagation[Lang]
 
-  def empty[K[_]]: PropagationStore[K] =
+  override def emptyK[K[_]]: PropagationStore[K] =
     PropagationStore[K](
       lastId = CellId.zero,
       domains = KMap[CellId, Cell[K, ?]](),
@@ -40,10 +40,10 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
       dirtySelections = Set()
     )
 
-  def interpret[A](p: Prg[A], s: PropagationStore[Prg]): (PropagationStore[Prg], A) =
+  override def interpret[A](p: Prg[A], s: PropagationStore[Prg]): (PropagationStore[Prg], A) =
     interpreter.freeInstance.apply(p).run(s)
 
-  val interpreter: StateInterpreter[Lang, State] =
+  override val interpreter: StateInterpreter[Lang, StateK] =
     new StateInterpreter[PropagationLang, PropagationStore] {
 
       def step: Step[PropagationLang, PropagationStore] =
@@ -98,14 +98,14 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
         })
     }
 
-  def fetch[K[_], D](ref: Var[D], s: State[K]): D =
+  override def fetchK[K[_], D](ref: Var[D], s: StateK[K]): D =
     s.fetch(ref)
 
-  def isConsistent[K[_]](s: PropagationStore[K]): Boolean =
+  override def isConsistent[K[_]](s: PropagationStore[K]): Boolean =
     s.failedVars.isEmpty
 
-  def stashable: StashOnDemandPropagationModule { type Var[A] = self.Var[A]; type Val[A] = self.Val[A]; type Lang[K[_], A] = self.Lang[K, A] } =
-    new OnDemandPropagationListModule[self.Var, self.Val, self.Lang, self.State](this)
+  override def stashable: StashOnDemandPropagationModule.AuxL[self.VarK, self.ValK, self.Lang] =
+    new OnDemandPropagationListModule[self.VarK, self.ValK, self.Lang, self.StateK](this)
 }
 
 

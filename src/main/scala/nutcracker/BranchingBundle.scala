@@ -9,11 +9,11 @@ trait BranchingBundle extends RefBundle with StashBundle with BranchingToolkit
 
 trait BranchingToolkit extends RefToolkit with StashToolkit {
   implicit val branchingApi: BranchingPropagation[Prg, Var, Val]
-  implicit def stashRestore[K[_]]: StashRestore[State[K]]
+  implicit def stashRestore: StashRestore[State]
 
-  def assess(s: State[Prg]): Assessment[List[Prg[Unit]]]
+  def assess(s: State): Assessment[List[Prg[Unit]]]
 
-  def solveDfs[A, B](p: Prg[A], f: (A, State[Prg]) => Option[B]): StreamT[Id, B] =
+  def solveDfs[A, B](p: Prg[A], f: (A, State) => Option[B]): StreamT[Id, B] =
     solveDfsM0[Id, A, B](p, f)
 
   def solveDfs[D](p: Prg[Val[D]])(implicit fin: Final[D]): StreamT[Id, fin.Out] =
@@ -32,10 +32,10 @@ trait BranchingToolkit extends RefToolkit with StashToolkit {
 
   private implicit val mt: MonadTell[Writer[Int, ?], Int] = WriterT.writerTMonadListen[Id, Int]
 
-  private def solveDfsM[M[_], A, B](p: Prg[A], f: (A, State[Prg]) => Option[B])(implicit M0: BindRec[M], M1: MonadTell[M, Int]): StreamT[M, B] = {
-    val (s, a) = interpret(p, empty[Prg])
+  private def solveDfsM[M[_], A, B](p: Prg[A], f: (A, State) => Option[B])(implicit M0: BindRec[M], M1: MonadTell[M, Int]): StreamT[M, B] = {
+    val (s, a) = interpret(p, empty)
 
-    new DFSSolver[Prg[Unit], State[Prg], M, B](
+    new DFSSolver[Prg[Unit], State, M, B](
       (pu, s) => M1.point(interpret(pu, s)._1),
       s => assess(s) match {
         case Incomplete(bs) => -\/(bs)
@@ -45,7 +45,7 @@ trait BranchingToolkit extends RefToolkit with StashToolkit {
     ).solutions(s)
   }
 
-  private def solveDfsM0[M[_], A, B](p: Prg[A], f: (A, State[Prg]) => Option[B])(implicit M0: BindRec[M], M1: Monad[M]): StreamT[M, B] =
+  private def solveDfsM0[M[_], A, B](p: Prg[A], f: (A, State) => Option[B])(implicit M0: BindRec[M], M1: Monad[M]): StreamT[M, B] =
     solveDfsM(p, f)(M0, fakeMonadTell(M1))
 
   private def solveDfsM[M[_], D](p: Prg[Val[D]])(implicit fin: Final[D], M0: BindRec[M], M1: MonadTell[M, Int]): StreamT[M, fin.Out] =
