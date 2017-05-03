@@ -1,8 +1,8 @@
 package nutcracker.rel
 
 import nutcracker.PropRel
-import nutcracker.lib.Tupled2
-import nutcracker.lib.bool.Bool
+import nutcracker.data.Tupled2
+import nutcracker.data.bool.Bool
 import org.scalatest.FunSuite
 import scala.collection.mutable
 import scalaz.{ContT, NonEmptyList}

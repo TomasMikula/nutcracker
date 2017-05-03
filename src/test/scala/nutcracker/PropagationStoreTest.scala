@@ -1,7 +1,8 @@
 package nutcracker
 
-import nutcracker.DecSet._
-import nutcracker.log._
+import nutcracker.data.{DecSet, Promise}
+import nutcracker.data.DecSet._
+import nutcracker.data.listLog._
 import nutcracker.ops._
 import nutcracker.util.Lst
 import org.scalatest.FunSuite

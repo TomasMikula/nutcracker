@@ -1,9 +1,10 @@
-package nutcracker
+package nutcracker.data
 
 import nutcracker.BranchingPropagation._
 import nutcracker.ops._
-import scalaz.{Bind, Cont}
+import nutcracker.{BranchingPropagation, Final, RelativelyComplementedDom, Splittable, SplittableJoinDom, TerminalDom, UpdateResult}
 import scalaz.syntax.bind._
+import scalaz.{Bind, Cont}
 
 /** Decreasing set.
   * A wrapper for `Set` where a _monotonic_ update is one that removes

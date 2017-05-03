@@ -14,7 +14,7 @@ class SimpleForwardInference extends FunSpec with Matchers {
   import PropRelToolkit.{instance => tk}
   import tk._
   import relationsApi._
-  import Promises._
+  import nutcracker.data.Promises._
 
 
   // Define some relations.

@@ -1,5 +1,6 @@
 package nutcracker
 
+import nutcracker.data.{CellSet, Promise, Promises}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import scala.collection.mutable

@@ -3,7 +3,8 @@ package nutcracker.demo
 import nutcracker._
 import nutcracker.ops._
 import nutcracker.algebraic.NonDecreasingMonoid
-import nutcracker.DecSet._
+import nutcracker.data.DecSet._
+import nutcracker.data.Promise
 import org.scalatest.FunSuite
 import scala.annotation.tailrec
 import scalaz.Id._
@@ -20,7 +21,7 @@ class PathSearch extends FunSuite {
 
   val propBranchCost = PropBranchCostToolkit.instance[Int]
   import propBranchCost._
-  import Promises._
+  import nutcracker.data.Promises._
 
   val C = CostApi[Prg]
   import C._

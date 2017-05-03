@@ -2,7 +2,7 @@ package nutcracker.ops
 
 import scala.language.implicitConversions
 import nutcracker.{BranchingPropagation, Dom, Final, JoinDom, ObserveSyntaxHelper, Propagation, RelativelyComplementedDom, Subscription, Unchanged, Updated}
-import nutcracker.lib.bool.Bool
+import nutcracker.data.bool.Bool
 import nutcracker.util.ContU
 import scalaz.{Applicative, Apply, Bind, Functor, IndexedContT, Traverse}
 import scalaz.syntax.bind._

@@ -1,9 +1,10 @@
-package nutcracker
+package nutcracker.data
 
 import nutcracker.ops._
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput, Uninhabited}
-import scalaz.{Bind, ContT, Functor, Monad, Show}
+import nutcracker.{Final, Propagation, RDom, UpdateResult}
 import scalaz.Id.Id
+import scalaz.{Bind, ContT, Functor, Monad, Show}
 
 /** Marker wrapper meaning that any two distinct values of type `Discrete[A]`
   * should be treated as incomparable. As a consequence, a value of type

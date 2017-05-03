@@ -1,10 +1,8 @@
-package nutcracker.instances
+package nutcracker.data
 
 import nutcracker.JoinDom
 
-object anyVal extends AnyValInstances
-
-trait AnyValInstances {
+object intMax {
 
   /** Max semilattice for `Int` */
   implicit val intDom: JoinDom[Int] = new JoinDom.Template[Int] {

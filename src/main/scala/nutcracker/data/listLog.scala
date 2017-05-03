@@ -1,6 +1,6 @@
-package nutcracker
+package nutcracker.data
 
-import scala.language.higherKinds
+import nutcracker.{Dom, Propagation, UpdateResult}
 import scala.language.implicitConversions
 
 /** Convenience methods to work with a list as a prepend-only log.
@@ -11,7 +11,7 @@ import scala.language.implicitConversions
   * as is required by [[Dom.update]], so don't base any business
   * logic on it.
   */
-object log {
+object listLog {
 
   type Log[A] = List[A]
 

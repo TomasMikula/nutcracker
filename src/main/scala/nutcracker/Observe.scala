@@ -81,6 +81,14 @@ trait Observe[M[_]] extends Observers[M] { self =>
   }
 }
 
+sealed trait Alternator
+
+object Alternator {
+  case object Left extends Alternator
+  case object Right extends Alternator
+  case object Stop extends Alternator
+}
+
 /** Relative [[Observe]]: whenever `ObserveVal[M, F]` for some effect `M[_]`,
   * then also `ObserveVal[M, G]`, for the same effect `M`.
   */

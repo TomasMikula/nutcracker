@@ -1,8 +1,8 @@
 package nutcracker.demo
 
-import nutcracker.Promises
-import nutcracker.lib.bool.Bool._
-import nutcracker.lib.bool._
+import nutcracker.data.Promises
+import nutcracker.data.bool.Bool._
+import nutcracker.data.bool._
 import nutcracker.ops._
 import org.scalatest.FreeSpec
 import scalaz.std.anyVal._

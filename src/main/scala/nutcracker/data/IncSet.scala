@@ -1,10 +1,11 @@
-package nutcracker
+package nutcracker.data
 
 import nutcracker.ops._
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
-import scalaz.{Applicative, Bind, Functor, IndexedContT, Monad}
+import nutcracker.{Dom, Propagation, Subscription, UpdateResult}
 import scalaz.std.list._
 import scalaz.syntax.bind._
+import scalaz.{Applicative, Bind, Functor, IndexedContT, Monad}
 
 /** Increasing set.
   * A wrapper for `Set` where a _monotonic_ update is one that adds

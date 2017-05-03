@@ -1,8 +1,8 @@
-package nutcracker.lib.bool
+package nutcracker.data.bool
 
 import scala.language.higherKinds
 import nutcracker.BranchingPropagation
-import nutcracker.lib.bool.Bool._
+import nutcracker.data.bool.Bool._
 import nutcracker.ops._
 
 import scalaz.{Applicative, Apply, Bind, Monad}

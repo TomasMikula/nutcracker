@@ -1,7 +1,10 @@
-package nutcracker
+package nutcracker.data
+
+import nutcracker.{Dom, Propagation, TerminalDom, UpdateResult}
 
 /** Represents a discrete (non-refinable) value that can be revoked.
   * Is isomorphic to `Closeable[Discrete[A]]`.
+  *
   * @see [[Discrete]], [[Closeable]]
   */
 sealed trait Revocable[+A]

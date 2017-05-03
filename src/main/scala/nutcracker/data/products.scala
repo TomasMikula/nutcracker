@@ -1,4 +1,4 @@
-package nutcracker.lib
+package nutcracker.data
 
 import nutcracker.{Dom, OnDemandPropagation, Subscription, SyncDom}
 import nutcracker.rel.{Recipe, Relations}

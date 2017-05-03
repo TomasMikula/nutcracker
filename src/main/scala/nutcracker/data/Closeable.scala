@@ -1,4 +1,6 @@
-package nutcracker
+package nutcracker.data
+
+import nutcracker.{Dom, TerminalDom, UpdateResult}
 
 /**
   * Represents a refinable value that in addition can be artificially revoked ("closed").

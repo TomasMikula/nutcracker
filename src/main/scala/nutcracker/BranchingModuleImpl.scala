@@ -40,6 +40,7 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
     def apply[K[_]: Monad, A](f: BranchLang[VarK[K, ?], K, A]): WriterState[Lst[K[Unit]], StateK[K], A] =
       go[VarK[K, ?], K, A](f)
 
+    // https://github.com/scala/bug/issues/10292
     private def go[Ref[_], K[_]: Monad, A](f: BranchLang[Ref, K, A]): WriterState[Lst[K[Unit]], BranchStore[Ref, K], A] = f match {
       case Track(ref, ev) => WriterState(s => (Lst.empty, s.addVar(ref, ev), ()))
       case Untrack(ref) => WriterState(s => (Lst.empty, s.removeVar(ref), ()))

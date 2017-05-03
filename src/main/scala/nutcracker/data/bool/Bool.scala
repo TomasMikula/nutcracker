@@ -1,4 +1,4 @@
-package nutcracker.lib.bool
+package nutcracker.data.bool
 
 import nutcracker.{Final, RelativelyComplementedDom, SplittableDomWithBottom, TerminalDom, UpdateResult}
 

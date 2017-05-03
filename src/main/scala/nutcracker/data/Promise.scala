@@ -1,6 +1,7 @@
-package nutcracker
+package nutcracker.data
 
 import nutcracker.util.{DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
+import nutcracker.{Final, JoinDom}
 import scalaz.Equal
 import scalaz.syntax.equal._
 

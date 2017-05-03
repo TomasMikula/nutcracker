@@ -1,10 +1,11 @@
-package nutcracker
+package nutcracker.data
 
 import nutcracker.ops._
-import scalaz.{Apply, Bind, Cont, Equal}
+import nutcracker.{Dom, Final, Propagation}
 import scalaz.std.tuple._
 import scalaz.std.vector._
 import scalaz.syntax.bind._
+import scalaz.{Apply, Bind, Cont, Equal}
 
 /**
   * Convenience methods to work with promises.

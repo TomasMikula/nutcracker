@@ -1,11 +1,12 @@
-package nutcracker
+package nutcracker.data
 
 import nutcracker.ops._
-import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
 import nutcracker.util.ops.iterator._
-import scalaz.{Applicative, Bind, Functor, IndexedContT, Monad}
+import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
+import nutcracker.{Dom, Propagation, Subscription, UpdateResult}
 import scalaz.std.list._
 import scalaz.syntax.bind._
+import scalaz.{Applicative, Bind, Functor, IndexedContT, Monad}
 
 /** Similar to [[IncSet]] but specialized for domain references.
   * Failed domains might be removed from this set automatically without emitting any delta.
