@@ -50,6 +50,6 @@ trait CostRefToolkit[C] extends CostToolkit[C] with RefToolkit {
     solveBfsM[Id, D](p)
 
   private def solveBfsM[M[_], D](p: Prg[Val[D]])(implicit fin: Final[D], M0: BindRec[M], M1: Monad[M]): StreamT[M, (fin.Out, C)] =
-    solveBfsM[M, Val[D], fin.Out](p, (ref, s) => fin.extract(fetch(ref, s)))
+    solveBfsM[M, Val[D], fin.Out](p, (ref, s) => fetchResult(ref, s))
 
 }

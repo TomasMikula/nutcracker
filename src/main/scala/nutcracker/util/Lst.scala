@@ -2,7 +2,7 @@ package nutcracker.util
 
 import scala.annotation.tailrec
 import scala.collection.mutable.Buffer
-import scalaz.{Foldable, Monoid, PlusEmpty}
+import scalaz.{Applicative, Monoid, PlusEmpty, Traverse}
 
 /** Linked list with O(1) cons, snoc and concatenation
   * and amortized O(1) uncons.
@@ -195,14 +195,17 @@ object Lst {
     def plus[A](a: Lst[F[A]], b: => Lst[F[A]]): Lst[F[A]] = a ++ b
   }
 
-  implicit val foldable: Foldable[Lst] = new Foldable[Lst] {
-    def foldMap[A, B](fa: Lst[A])(f: A => B)(implicit F: Monoid[B]): B =
+  implicit val traverse: Traverse[Lst] = new Traverse[Lst] {
+    def traverseImpl[G[_], A, B](fa: Lst[A])(f: A => G[B])(implicit G: Applicative[G]): G[Lst[B]] =
+      fa.foldRight(G.point(Lst.empty[B]))((a, gbs) => G.apply2(f(a), gbs)(_ :: _))
+
+    override def foldMap[A, B](fa: Lst[A])(f: A => B)(implicit F: Monoid[B]): B =
       fa.foldLeft(F.zero)((b, a) => F.append(b, f(a)))
 
     override def foldLeft[A, B](fa: Lst[A], z: B)(f: (B, A) => B): B =
       fa.foldLeft(z)(f)
 
-    def foldRight[A, B](fa: Lst[A], z: => B)(f: (A, => B) => B): B =
+    override  def foldRight[A, B](fa: Lst[A], z: => B)(f: (A, => B) => B): B =
       fa.foldRight(z)((a, b) => f(a, b))
   }
 }

@@ -49,7 +49,7 @@ trait BranchingToolkit extends RefToolkit with StashToolkit {
     solveDfsM(p, f)(M0, fakeMonadTell(M1))
 
   private def solveDfsM[M[_], D](p: Prg[Val[D]])(implicit fin: Final[D], M0: BindRec[M], M1: MonadTell[M, Int]): StreamT[M, fin.Out] =
-    solveDfsM[M, Val[D], fin.Out](p, (ref, s) => fin.extract(fetch(ref, s)))
+    solveDfsM[M, Val[D], fin.Out](p, (ref, s) => fetchResult(ref, s))
 
   private def solveDfsM0[M[_], D](p: Prg[Val[D]])(implicit fin: Final[D], M0: BindRec[M], M1: Monad[M]): StreamT[M, fin.Out] =
     solveDfsM(p)(fin, M0, fakeMonadTell(M1))

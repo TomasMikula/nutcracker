@@ -37,7 +37,7 @@ object Tupled2 {
         implicit val dom = Dom.tuple2[A, B]
         val ra :: rb :: HNil = ingredients
 
-        newAutoCell(IndexedContT((f: ((A, B)) => K[ExclRef[(A, B)]]) =>
+        newAutoCellC(IndexedContT((f: ((A, B)) => K[ExclRef[(A, B)]]) =>
           observe(ra).byC[(Subscription[K], ExclRef[(A, B)])](a =>
             observe(rb).byM[ExclRef[(A, B)]](b =>
               f((a, b)) map (rr => (P.sleep(P.continually((b, δb) => P.exclUpdate(rr).by(\&/.That(db.toPatch(b, δb))))), rr))

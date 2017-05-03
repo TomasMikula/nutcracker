@@ -13,3 +13,9 @@ trait PropagationToolkit extends RefToolkit {
 trait OnDemandPropagationToolkit extends PropagationToolkit {
   override implicit val propagationApi: OnDemandPropagation[Prg, Var, Val]
 }
+
+object OnDemandPropagationToolkit {
+  val instance: OnDemandPropagationToolkit = PropagationImpl
+}
+
+trait OnDemandPropagationBundle extends PropagationBundle with OnDemandPropagationToolkit

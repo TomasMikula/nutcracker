@@ -56,7 +56,10 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   def emptyK[K[_]]: StateK[K] =
     Prop.emptyK[K] :*: Branch.emptyK[K] :*: Cost.emptyK[K]
 
-  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): A =
+  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] =
+    Prop.fetchK(ref, s._1)
+
+  def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A =
     Prop.fetchK(ref, s._1)
 
   val interpreter = (Prop.interpreter :&: Branch.interpreter :&&: Cost.interpreter).freeInstance

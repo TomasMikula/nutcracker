@@ -17,7 +17,7 @@ trait Propagation[M[_], Var[_], Val0[_]] extends Observe[M] {
 
   def updateImpl[D, U, Δ[_, _]](ref: Var[D])(u: U)(implicit dom: IDom.Aux[D, U, Δ]): M[Unit]
 
-  def selTrigger[L <: HList](sel: Sel[Var, L])(f: L => (Option[M[Unit]], Boolean)): M[Unit]
+  def selTrigger[L <: HList](sel: Sel[Val, L])(f: L => (Option[M[Unit]], Boolean)): M[Unit]
 
 
   def newCell[D](implicit dom: DomWithBottom[D]): M[Var[D]] =
@@ -36,16 +36,16 @@ trait Propagation[M[_], Var[_], Val0[_]] extends Observe[M] {
   def cells[D](d: D, n: Int)(implicit dom: Dom[D], M: Applicative[M]): M[Vector[Var[D]]] =
     newCell(d).replicate(n)
 
-  def selTrigger2[D1, D2](ref1: Var[D1], ref2: Var[D2])(f: (D1, D2) => (Option[M[Unit]], Boolean)): M[Unit] =
+  def selTrigger2[D1, D2](ref1: Val[D1], ref2: Val[D2])(f: (D1, D2) => (Option[M[Unit]], Boolean)): M[Unit] =
     selTrigger[D1 :: D2 :: HNil](Sel(ref1, ref2))((l: D1 :: D2 :: HNil) => f(l.head, l.tail.head))
 
-  def selThreshold2[D1, D2](ref1: Var[D1], ref2: Var[D2])(f: (D1, D2) => Option[M[Unit]]): M[Unit] =
+  def selThreshold2[D1, D2](ref1: Val[D1], ref2: Val[D2])(f: (D1, D2) => Option[M[Unit]]): M[Unit] =
     selTrigger2[D1, D2](ref1, ref2)((d1, d2) => f(d1, d2) match {
       case None => (None, true)
       case Some(mu) => (Some(mu), false)
     })
 
-  def _selThreshold2[D1, D2](ref1: Var[D1], ref2: Var[D2])(f: (D1, D2) => Option[M[_]])(implicit M: Functor[M]): M[Unit] =
+  def _selThreshold2[D1, D2](ref1: Val[D1], ref2: Val[D2])(f: (D1, D2) => Option[M[_]])(implicit M: Functor[M]): M[Unit] =
     selThreshold2(ref1, ref2)((d1, d2) => f(d1, d2).map(_.void))
 }
 
@@ -66,7 +66,10 @@ trait OnDemandPropagation[M[_], Var[_], Val[_]] extends Propagation[M, Var, Val]
     * cleanup routines (finalizers) that will be executed when all observers
     * leave. Typically, such finalizers will stop observing other cells.
     */
-  def newAutoCell[A](setup: IndexedContT[M, Unit, ExclRef[A], A])(implicit dom: Dom[A]): M[Val[A]]
+  def newAutoCellC[A](setup: IndexedContT[M, Unit, ExclRef[A], A])(implicit dom: Dom[A]): M[Val[A]]
+
+  def newAutoCell[A](setup: (A => M[ExclRef[A]]) => M[Unit])(implicit dom: Dom[A]): M[Val[A]] =
+    newAutoCellC[A](IndexedContT(setup))
 
   /** Register a cleanup routine to execute at the end of the cell-cycle,
     * i.e. when all of cell's observers unregister.

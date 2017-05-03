@@ -32,7 +32,23 @@ object TriggerF {
 }
 
 private[nutcracker] sealed trait SeqTrigger[Tok[_], K[_], D, Δ[_, _], D1] {
+  import SeqTrigger._
+
   def specialize[D2 <: D1]: SeqTrigger[Tok, K, D, Δ, D2] = this.asInstanceOf[SeqTrigger[Tok, K, D, Δ, D2]]
+
+  def fold[B](
+    caseDiscard: => B,
+    caseSleep: SeqHandler[Tok, K, D, Δ, D1] => B,
+    caseFire: K[Unit] => B,
+    caseFireReload: (K[Unit], SeqHandler[Tok, K, D, Δ, D1]) => B,
+    caseReconsider: (Tok[D1] => K[Unit]) => B
+  ): B = this match {
+    case Discard() => caseDiscard
+    case Sleep(h) => caseSleep(h)
+    case Fire(k) => caseFire(k)
+    case FireReload(k, h) => caseFireReload(k, h)
+    case Reconsider(f) => caseReconsider(f)
+  }
 }
 
 private[nutcracker] object SeqTrigger {
@@ -45,7 +61,7 @@ private[nutcracker] object SeqTrigger {
 
   case class FireReload[Tok[_], K[_], D, Δ[_, _], D1](cont: K[Unit], h: SeqHandler[Tok, K, D, Δ, D1]) extends SeqTrigger[Tok, K, D, Δ, D1]
 
-  case class Reconsider[Tok[_], K[_], D, Δ[_, _], D1](cont: (CellId[D], Tok[D1]) => K[Unit]) extends SeqTrigger[Tok, K, D, Δ, D1]
+  case class Reconsider[Tok[_], K[_], D, Δ[_, _], D1](cont: Tok[D1] => K[Unit]) extends SeqTrigger[Tok, K, D, Δ, D1]
 
 }
 

@@ -2,7 +2,7 @@ package nutcracker
 
 import nutcracker.util.{FreeK, HOrderK, ShowK}
 import scala.language.implicitConversions
-import scalaz.Monad
+import scalaz.{Foldable, Monad}
 
 /** Bundle provides multiple APIs and is typically created by composing
   * multiple [[Module]]s.
@@ -38,9 +38,11 @@ trait RefBundle extends Bundle with RefToolkit {
   implicit def valOrder: HOrderK[Val] = valOrderK[Prg]
   implicit def valShow:  ShowK[Val]   = valShowK[Prg]
 
-  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): A
+  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A]
+  def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A
 
-  override def fetch[A](ref: Val[A], s: State): A = fetchK(ref, s)
+  override def fetch[A](ref: Val[A], s: State): Option[A] = fetchK(ref, s)
+  override def fetch[A](ref: Var[A], s: State): A = fetchK(ref, s)
 }
 
 trait StashBundle extends Bundle with StashToolkit {
@@ -60,6 +62,9 @@ trait Toolkit {
 
   def interpret0[A](p: Prg[A]): (State, A) =
     interpret(p, empty)
+
+  def interpretAll[F[_]](ps: F[Prg[Unit]], s: State)(implicit F: Foldable[F]): State =
+    F.foldLeft(ps, s)((s, p) => interpret(p, s)._1)
 }
 
 trait RefToolkit extends Toolkit {
@@ -73,10 +78,11 @@ trait RefToolkit extends Toolkit {
 
   implicit def readOnly[A](ref: Var[A]): Val[A]
 
-  def fetch[A](ref: Val[A], s: State): A
+  def fetch[A](ref: Val[A], s: State): Option[A]
+  def fetch[A](ref: Var[A], s: State): A
 
   def fetchResult[A](ref: Val[A], s: State)(implicit fin: Final[A]): Option[fin.Out] =
-    fin.extract(fetch(ref, s))
+    fetch(ref, s).flatMap(fin.extract(_))
 }
 
 trait StashToolkit extends Toolkit {

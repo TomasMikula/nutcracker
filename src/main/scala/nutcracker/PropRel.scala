@@ -39,7 +39,10 @@ object PropRel extends PropagationBundle with PropRelToolkit {
   def emptyK[K[_]]: StateK[K] =
     Prop.emptyK[K] :*: RelMod.emptyK[K]
 
-  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): A =
+  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] =
+    Prop.fetchK(ref, s._1)
+
+  def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A =
     Prop.fetchK(ref, s._1)
 
   def interpret[A](p: Prg[A], s: State): (State, A) =

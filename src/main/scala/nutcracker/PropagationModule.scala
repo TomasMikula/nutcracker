@@ -14,7 +14,8 @@ trait PropagationModule extends Module {
 
   def interpreter: StateInterpreter[Lang, StateK]
   def isConsistent[K[_]](s: StateK[K]): Boolean
-  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): A
+  def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A
+  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A]
 }
 
 object PropagationModule {
@@ -56,7 +57,8 @@ extends ListModule[Lang0, State0](base) with StashPropagationModule {
 
   def interpreter: StateInterpreter[Lang, StateK] = base.interpreter.inHead
   def isConsistent[K[_]](s: StateK[K]): Boolean = base.isConsistent[K](s.head)
-  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): A = base.fetchK[K, A](ref, s.head)
+  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] = base.fetchK[K, A](ref, s.head)
+  def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A = base.fetchK[K, A](ref, s.head)
 }
 
 trait OnDemandPropagationModule extends PropagationModule {

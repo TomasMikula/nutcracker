@@ -8,7 +8,9 @@ import nutcracker.ops._
 import scalaz.{Applicative, Apply, Bind, Monad}
 import scalaz.syntax.bind._
 
-class BoolOps[M[_], Var[_], Val[_]](implicit P: BranchingPropagation[M, Var, Val]) {
+class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Val]) {
+  import BP._
+  val P = BP.propagation
   import P._
 
   def and(x: Var[Bool], y: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
@@ -40,7 +42,7 @@ class BoolOps[M[_], Var[_], Val[_]](implicit P: BranchingPropagation[M, Var, Val
           // the result is equal to the remaining one
           x(j) <=> res
         } else {
-          P.propagation._selThreshold2(x(i), x(j))((di, dj) => {
+          _selThreshold2(x(i), x(j))((di, dj) => {
             if (di == MustBeTrue || dj == MustBeTrue) {
               // found a variable set to true,
               // thus the result must be true

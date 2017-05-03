@@ -43,7 +43,8 @@ object PropBranch extends PropagationBundle with BranchingBundle with PropBranch
 
   val interpreter = (Prop.interpreter :&&: Branch.interpreter).freeInstance
   def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p).run(s)
-  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): A = Prop.fetchK(ref, s._1)
+  def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] = Prop.fetchK(ref, s._1)
+  def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A         = Prop.fetchK(ref, s._1)
   def emptyK[K[_]]: StateK[K] = Prop.emptyK[K] :*: Branch.emptyK[K]
 
   def assess(s: State): Assessment[List[Prg[Unit]]] =

@@ -1,8 +1,6 @@
 package nutcracker
 
-import nutcracker.Promise.Empty
 import nutcracker.util.{DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
-
 import scalaz.Equal
 import scalaz.syntax.equal._
 
@@ -17,8 +15,12 @@ import scalaz.syntax.equal._
   * @see [[Discrete]]
   */
 sealed trait Promise[+A] {
+  import Promise.{Conflict, Empty}
+
   def isEmpty: Boolean = this == Empty
   def nonEmpty: Boolean = this != Empty
+  def isCompleted: Boolean = !(isEmpty || isConflict)
+  def isConflict: Boolean = this == Conflict
 }
 
 object Promise {
@@ -29,6 +31,7 @@ object Promise {
 
   type Update[A] = Promise[A]
   type Delta[A] = Unit
+  type IDelta[A, D1, D2] = Delta[A]
 
   def empty[A]: Promise[A] = Empty
   def completed[A](a: A): Promise[A] = Completed(a)
