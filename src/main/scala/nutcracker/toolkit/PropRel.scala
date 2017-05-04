@@ -14,7 +14,7 @@ object PropRelToolkit {
   val instance: PropRelToolkit = PropRel
 }
 
-object PropRel extends PropagationBundle with PropRelToolkit {
+object PropRel extends FreePropagationToolkit with PropRelToolkit {
   val Prop = OnDemandPropagation.module
   val RelMod = RelModule.instance
 

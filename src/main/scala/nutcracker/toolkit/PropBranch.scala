@@ -14,7 +14,7 @@ object PropBranchToolkit {
   val instance: PropBranchToolkit = PropBranch
 }
 
-object PropBranch extends PropagationBundle with BranchingBundle with PropBranchToolkit {
+object PropBranch extends FreePropagationToolkit with FreeBranchingToolkit with PropBranchToolkit {
   val Prop = Propagation.module.stashable
 
   type VarK[K[_], A] = Prop.VarK[K, A]

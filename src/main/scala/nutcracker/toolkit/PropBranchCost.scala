@@ -15,7 +15,7 @@ object PropBranchCostToolkit {
   def instance[C: NonDecreasingMonoid]: PropBranchCostToolkit[C] = new PropBranchCost
 }
 
-final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBranchCostToolkit[C] with PropagationBundle with BranchingBundle {
+final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBranchCostToolkit[C] with FreePropagationToolkit with FreeBranchingToolkit {
   val Prop = Propagation.module.stashable
   val Branch = BranchingPropagation.module[Prop.VarK, Prop.ValK].stashable
   val Cost: CostModule[C] with StashModule = CostModule.instance[C].stashable

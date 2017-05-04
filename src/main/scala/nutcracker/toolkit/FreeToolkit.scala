@@ -2,12 +2,12 @@ package nutcracker.toolkit
 
 import nutcracker.util.{FreeK, HOrderK, ShowK}
 
-/** Bundle provides multiple APIs and is typically created by composing
-  * multiple [[Module]]s.
+/** A [[Toolkit]] whose representation of a program ([[Toolkit.Prg]]) is
+  * a free monad over some algebra ([[FreeToolkit.Lang]]).
   *
-  * It implements [[Toolkit]] with [[Toolkit#Prg]] being a free monad.
+  * [[FreeToolkit]] is typically created by composing multiple [[Module]]s.
   */
-trait Bundle extends Toolkit {
+trait FreeToolkit extends Toolkit {
   type Lang[K[_], A]
   type StateK[K[_]]
 
@@ -19,7 +19,7 @@ trait Bundle extends Toolkit {
   override def empty: State = emptyK[Prg]
 }
 
-trait RefBundle extends Bundle with RefToolkit {
+trait FreeRefToolkit extends FreeToolkit with RefToolkit {
   type VarK[K[_], A]
   type ValK[K[_], A]
 
@@ -43,7 +43,7 @@ trait RefBundle extends Bundle with RefToolkit {
   override def fetch[A](ref: Var[A], s: State): A = fetchK(ref, s)
 }
 
-trait StashBundle extends Bundle with StashToolkit {
+trait FreeStashToolkit extends FreeToolkit with StashToolkit {
   def stashRestoreK[K[_]]: StashRestore[StateK[K]]
 
   override def stashRestore: StashRestore[State] = stashRestoreK[Prg]

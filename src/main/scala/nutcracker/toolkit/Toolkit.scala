@@ -12,7 +12,7 @@ import scalaz.{Foldable, Monad}
   * The unifying feature across all provided APIs is that programs written
   * against those APIs can be represented by a type [[Toolkit.Prg]],
   * which is at least a monad. Such programs can be interpreted
-  * ([[Toolkit.interpret*]]) as state transitions on [[Toolkit.State]].
+  * ([[Toolkit.interpret[A]*]]) as state transitions on [[Toolkit.State]].
   */
 trait Toolkit {
   type Prg[_]

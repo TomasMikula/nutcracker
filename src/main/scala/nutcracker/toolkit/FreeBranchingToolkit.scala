@@ -6,7 +6,7 @@ import scalaz.Id._
 import scalaz.std.anyVal._
 import scalaz.{-\/, BindRec, Monad, MonadTell, StreamT, Writer, WriterT, \/, \/-}
 
-trait BranchingBundle extends RefBundle with StashBundle with BranchingToolkit
+trait FreeBranchingToolkit extends FreeRefToolkit with FreeStashToolkit with BranchingToolkit
 
 trait BranchingToolkit extends RefToolkit with StashToolkit {
   implicit val branchingApi: BranchingPropagation[Prg, Var, Val]

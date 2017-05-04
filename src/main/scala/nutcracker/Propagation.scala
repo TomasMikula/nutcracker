@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.toolkit.{PersistentOnDemandPropagationModule, PersistentPropagationModule, PropagationBundle, PropagationImpl}
+import nutcracker.toolkit.{PersistentOnDemandPropagationModule, PersistentPropagationModule, FreePropagationToolkit, PropagationImpl}
 import nutcracker.util.ops.applicative._
 import scala.language.implicitConversions
 import scalaz.{Applicative, Functor, IndexedContT}
@@ -54,7 +54,7 @@ object Propagation {
   def apply[M[_], Ref[_], Val[_]](implicit M: Propagation[M, Ref, Val]): Propagation[M, Ref, Val] = M
 
   val module: PersistentPropagationModule = PropagationImpl
-  val bundle: PropagationBundle = PropagationImpl
+  val bundle: FreePropagationToolkit = PropagationImpl
 }
 
 trait OnDemandPropagation[M[_], Var[_], Val[_]] extends Propagation[M, Var, Val] {

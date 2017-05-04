@@ -3,7 +3,7 @@ package nutcracker.toolkit
 import nutcracker.{OnDemandPropagation, Propagation}
 import scala.language.implicitConversions
 
-trait PropagationBundle extends RefBundle with PropagationToolkit
+trait FreePropagationToolkit extends FreeRefToolkit with PropagationToolkit
 
 trait PropagationToolkit extends RefToolkit {
   implicit val propagationApi: Propagation[Prg, Var, Val]
@@ -19,4 +19,4 @@ object OnDemandPropagationToolkit {
   val instance: OnDemandPropagationToolkit = PropagationImpl
 }
 
-trait OnDemandPropagationBundle extends PropagationBundle with OnDemandPropagationToolkit
+trait FreeOnDemandPropagationToolkit extends FreePropagationToolkit with OnDemandPropagationToolkit

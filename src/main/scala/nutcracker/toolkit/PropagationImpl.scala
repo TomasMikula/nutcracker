@@ -9,7 +9,7 @@ import scalaz.syntax.equal._
 import scalaz.{-\/, Equal, Monad, Ordering, Show, StateT, \/-}
 import shapeless.{HList, Nat, Sized}
 
-private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with OnDemandPropagationBundle { self =>
+private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with FreeOnDemandPropagationToolkit { self =>
   type VarK[K[_], A] = SimpleCellId[K, A]
   type ValK[K[_], A] = CellId[K, A]
   type Lang[K[_], A] = PropagationLang[K, A]
