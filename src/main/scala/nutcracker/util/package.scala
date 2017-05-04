@@ -96,12 +96,6 @@ package object util {
     def liftF[F[_[_], _], A](a: F[FreeK[F, ?], A]): FreeK[F, A] =
       FreeKT.liftF[F, Id, A](a)
 
-    def injLiftF[F[_[_], _], G[_[_], _], A](
-      a: F[FreeK[G, ?], A])(implicit
-      inj: InjectK[F, G]
-    ): FreeK[G, A] =
-      liftF(inj(a))
-
     def sequence[F[_[_], _], C[_]: Traverse, A](ps: C[FreeK[F, A]]): FreeK[F, C[A]] =
       Traverse[C].sequence[FreeKT[F, Id, ?], A](ps)(FreeKT.freeKTMonad[F, Id])
 

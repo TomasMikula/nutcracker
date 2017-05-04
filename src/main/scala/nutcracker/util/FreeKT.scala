@@ -1,7 +1,6 @@
 package nutcracker.util
 
 import nutcracker.util.free.FreeT
-import scala.language.higherKinds
 import scalaz.{Applicative, BindRec, Functor, Monad, MonadPartialOrder, ~>}
 
 final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M, A]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-7685
@@ -69,13 +68,6 @@ object FreeKT {
 
   def liftF[F[_[_], _], M[_], A](a: F[FreeKT[F, M, ?], A])(implicit M: Applicative[M]): FreeKT[F, M, A] =
     FreeKT(FreeT.liftF[F[FreeKT[F, M, ?], ?], M, A](a))
-
-  def injLiftF[F[_[_], _], G[_[_], _], M[_], A](
-    a: F[FreeKT[G, M, ?], A])(implicit
-    M: Applicative[M],
-    inj: InjectK[F, G]
-  ): FreeKT[G, M, A] =
-    liftF(inj(a))
 
   implicit def freeKTMonad[F[_[_], _], M[_]](implicit M: Applicative[M]): Monad[FreeKT[F, M, ?]] =
     new Monad[FreeKT[F, M, ?]] {

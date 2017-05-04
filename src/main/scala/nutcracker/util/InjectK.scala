@@ -1,6 +1,5 @@
 package nutcracker.util
 
-import scala.language.implicitConversions
 import scalaz.{-\/, \/-}
 
 trait InjectK[F[_[_], _], H[_[_], _]] extends (F ≈~> H) { self =>
@@ -20,9 +19,11 @@ trait InjectK[F[_[_], _], H[_[_], _]] extends (F ≈~> H) { self =>
   }
 }
 
-object InjectK extends InjectK0 {
+object InjectK extends InjectKInstances0 {
   def apply[F[_[_], _], H[_[_], _]](implicit inj: InjectK[F, H]): InjectK[F, H] = inj
+}
 
+trait InjectKInstances0 extends InjectKInstances1 {
   implicit def reflexiveInject[F[_[_], _]]: InjectK[F, F] =
     new InjectK[F, F] {
       def inj[K[_], A](fa: F[K, A]): F[K, A] = fa
@@ -37,12 +38,9 @@ object InjectK extends InjectK0 {
     new InjectK[F, CoproductK[H, G, ?[_], ?]] {
       def inj[K[_], A](fa: F[K, A]): CoproductK[H, G, K , A] = CoproductK(\/-(I.inj(fa)))
     }
-
-  implicit def lift[F[_[_], _], G[_[_], _], K[_], A](f: F[K, A])(implicit inj: InjectK[F, G]): G[K, A] =
-    inj.inj(f)
 }
 
-trait InjectK0 {
+trait InjectKInstances1 {
   implicit def injectCoproduct[F[_[_], _], G[_[_], _], H[_[_], _]](implicit
     injF: InjectK[F, H],
     injG: InjectK[G, H]

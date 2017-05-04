@@ -32,10 +32,10 @@ private[nutcracker] class CostModuleImpl[C](implicit C: Monoid[C]) extends Persi
       type C = C0
 
       def cost(c: C): FreeK[F, Unit] =
-        FreeK.injLiftF(CostLang.cost[C, FreeK[F, ?]](c))
+        FreeK.liftF(i(CostLang.cost[C, FreeK[F, ?]](c)))
 
       def getCost: FreeK[F, C] =
-        FreeK.injLiftF(CostLang.getCost[C, FreeK[F, ?]]())
+        FreeK.liftF(i(CostLang.getCost[C, FreeK[F, ?]]()))
     }
   }
 }

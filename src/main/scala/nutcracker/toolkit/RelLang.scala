@@ -27,10 +27,10 @@ private[toolkit] object RelLang {
   implicit def relationsInstance[F[_[_], _]](implicit inj: InjectK[RelLang, F]): Relations[FreeK[F, ?]] =
     new Relations[FreeK[F, ?]] {
       def relateImpl[L <: HList, OrderL <: HList](rel: Rel[L], values: L)(implicit m: Mapped.Aux[L, Order, OrderL], os: SummonHList[OrderL]): FreeK[F, Unit] =
-        FreeK.injLiftF(RelLang.relate[FreeK[F, ?], L, OrderL](rel, values)(m, os))
+        FreeK.liftF(inj(RelLang.relate[FreeK[F, ?], L, OrderL](rel, values)(m, os)))
 
       def onPatternMatch[V <: HList](p: Pattern[V], a: Assignment[V])(h: V => FreeK[F, Unit]): FreeK[F, Unit] =
-        FreeK.injLiftF(RelLang.onPatternMatch[FreeK[F, ?], V](p, a)(h))
+        FreeK.liftF(inj(RelLang.onPatternMatch[FreeK[F, ?], V](p, a)(h)))
 
 
       def establishImpl[L <: HList, C <: HList, OrderL <: HList](rel: Rel[L], values: C, recipe: Recipe[L, C, FreeK[F, ?]])(implicit L: MappedListBuilder[L], m: Mapped.Aux[rel.Projection, Order, OrderL], os: SummonHList[OrderL]): ContU[FreeK[F, ?], L] = {
@@ -38,10 +38,10 @@ private[toolkit] object RelLang {
         val someC_ev = Mapped.pure[C, Option](values)
         val ass: Assignment[L] = Assignment[L].from(recipe.choose.lift[Option](noneL_ev._2, someC_ev._2).set(noneL_ev._1, someC_ev._1))(noneL_ev._2)
         val supply: RelToken[L] => FreeK[F, Unit] = tok => recipe.create(values).flatMap(l => this.supply(rel, tok, l))
-        ContU(f => FreeK.injLiftF(RelLang.execWith(rel, ass, supply, f)(m, os.get)))
+        ContU(f => FreeK.liftF(inj(RelLang.execWith(rel, ass, supply, f)(m, os.get))))
       }
 
       private def supply[L <: HList](rel: Rel[L], t: RelToken[L], l: L): FreeK[F, Unit] =
-        FreeK.injLiftF(RelLang.supply[FreeK[F, ?], L](rel, t, l))
+        FreeK.liftF(inj(RelLang.supply[FreeK[F, ?], L](rel, t, l)))
     }
 }

@@ -13,7 +13,7 @@ private[nutcracker] class DeferModuleImpl[D](implicit D: NonDecreasingMonoid[D] 
   implicit def freeDeferApi[F[_[_], _]](implicit i: InjectK[Lang, F]): Defer[FreeK[F, ?], D] =
     new Defer[FreeK[F, ?], D] {
       def defer(delay: D, k: FreeK[F, Unit]): FreeK[F, Unit] =
-        FreeK.injLiftF(DeferLang.defer[D, FreeK[F, ?]](delay, k))
+        FreeK.liftF(i(DeferLang.defer[D, FreeK[F, ?]](delay, k)))
     }
 
   def emptyK[K[_]] = DeferStore.empty[D, K]
