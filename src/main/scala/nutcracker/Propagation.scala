@@ -1,6 +1,5 @@
 package nutcracker
 
-import nutcracker.toolkit.{PersistentOnDemandPropagationModule, PersistentPropagationModule, FreePropagationToolkit, PropagationImpl}
 import nutcracker.util.ops.applicative._
 import scala.language.implicitConversions
 import scalaz.{Applicative, Functor, IndexedContT}
@@ -52,9 +51,6 @@ trait Propagation[M[_], Var[_], Val0[_]] extends Observe[M] {
 
 object Propagation {
   def apply[M[_], Ref[_], Val[_]](implicit M: Propagation[M, Ref, Val]): Propagation[M, Ref, Val] = M
-
-  val module: PersistentPropagationModule = PropagationImpl
-  val bundle: FreePropagationToolkit = PropagationImpl
 }
 
 trait OnDemandPropagation[M[_], Var[_], Val[_]] extends Propagation[M, Var, Val] {
@@ -90,8 +86,4 @@ trait OnDemandPropagation[M[_], Var[_], Val[_]] extends Propagation[M, Var, Val]
   final class ExclUpdateSyntaxHelper[D, U, Δ](ref: ExclRef[D])(implicit dom: Dom.Aux[D, U, Δ]) {
     def by(u: U): M[Unit] = exclUpdateImpl[D, U, λ[(α, β) => Δ]](ref, u)
   }
-}
-
-object OnDemandPropagation {
-  val module: PersistentOnDemandPropagationModule = PropagationImpl
 }

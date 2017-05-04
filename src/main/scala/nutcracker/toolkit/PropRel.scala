@@ -15,7 +15,7 @@ object PropRelToolkit {
 }
 
 object PropRel extends FreePropagationToolkit with PropRelToolkit {
-  val Prop = OnDemandPropagation.module
+  val Prop = OnDemandPropagationModule.instance
   val RelMod = RelModule.instance
 
   type VarK[K[_], A] = Prop.VarK[K, A]

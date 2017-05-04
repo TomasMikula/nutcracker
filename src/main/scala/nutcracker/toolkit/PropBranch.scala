@@ -15,12 +15,12 @@ object PropBranchToolkit {
 }
 
 object PropBranch extends FreePropagationToolkit with FreeBranchingToolkit with PropBranchToolkit {
-  val Prop = Propagation.module.stashable
+  val Prop = PersistentPropagationModule.instance.stashable
 
   type VarK[K[_], A] = Prop.VarK[K, A]
   type ValK[K[_], A] = Prop.ValK[K, A]
 
-  val Branch = BranchingPropagation.module[VarK, ValK].stashable
+  val Branch = PersistentBranchingModule.instance[VarK, ValK].stashable
 
   type Lang[K[_], A] = (Prop.Lang  :++: Branch.Lang )#Out[K, A]
   type StateK[K[_]]  = (Prop.StateK :**: Branch.StateK)#Out[K]

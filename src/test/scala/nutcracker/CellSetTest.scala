@@ -1,6 +1,7 @@
 package nutcracker
 
 import nutcracker.data.{CellSet, Promise, Promises}
+import nutcracker.toolkit.PropagationToolkit
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import scala.collection.mutable
@@ -8,7 +9,7 @@ import scalaz.std.anyVal._
 import scalaz.syntax.monad._
 
 class CellSetTest extends FunSuite {
-  val Prop = Propagation.bundle
+  val Prop = PropagationToolkit.instance
   import Prop._
 
   val P = Prop.propagationApi

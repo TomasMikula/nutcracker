@@ -6,8 +6,6 @@ import scalaz.Id._
 import scalaz.std.anyVal._
 import scalaz.{-\/, BindRec, Monad, MonadTell, StreamT, Writer, WriterT, \/, \/-}
 
-trait FreeBranchingToolkit extends FreeRefToolkit with FreeStashToolkit with BranchingToolkit
-
 trait BranchingToolkit extends RefToolkit with StashToolkit {
   implicit val branchingApi: BranchingPropagation[Prg, Var, Val]
   implicit def stashRestore: StashRestore[State]
@@ -64,3 +62,5 @@ trait BranchingToolkit extends RefToolkit with StashToolkit {
   private def toList[M[_], A](s: StreamT[M, A])(implicit M0: BindRec[M]): M[List[A]] =
     s.foldLeftRec(List[A]())((as, a) => a :: as)
 }
+
+trait FreeBranchingToolkit extends FreeRefToolkit with FreeStashToolkit with BranchingToolkit

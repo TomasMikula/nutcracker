@@ -28,6 +28,8 @@ object PropagationModule {
   type Aux[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _], State0[_[_]]] = AuxL[Var0, Val0, Lang0] {
     type StateK[K[_]] = State0[K]
   }
+
+  val instance: PropagationModule = PropagationImpl
 }
 
 trait PersistentPropagationModule extends PropagationModule with PersistentStateModule { self =>
@@ -36,6 +38,8 @@ trait PersistentPropagationModule extends PropagationModule with PersistentState
 
 object PersistentPropagationModule {
   type Aux[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _], State0[_[_]]] = PropagationModule.Aux[Var0, Val0, Lang0, State0] with PersistentStateModule
+
+  val instance: PersistentPropagationModule = PropagationImpl
 }
 
 trait StashPropagationModule extends PropagationModule with StashModule
@@ -68,6 +72,8 @@ trait OnDemandPropagationModule extends PropagationModule {
 
 object OnDemandPropagationModule {
   type AuxL[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _]] = PropagationModule.AuxL[Var0, Val0, Lang0] with OnDemandPropagationModule
+
+  val instance: OnDemandPropagationModule = PropagationImpl
 }
 
 trait PersistentOnDemandPropagationModule extends OnDemandPropagationModule with PersistentPropagationModule { self =>
@@ -76,6 +82,8 @@ trait PersistentOnDemandPropagationModule extends OnDemandPropagationModule with
 
 object PersistentOnDemandPropagationModule {
   type Aux[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _], State0[_[_]]] = PersistentOnDemandPropagationModule with PersistentPropagationModule.Aux[Var0, Val0, Lang0, State0]
+
+  val instance: PersistentOnDemandPropagationModule = PropagationImpl
 }
 
 trait StashOnDemandPropagationModule extends OnDemandPropagationModule with StashPropagationModule

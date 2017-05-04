@@ -1,6 +1,5 @@
 package nutcracker
 
-import nutcracker.toolkit.{BranchingModuleImpl, PersistentBranchingModule}
 import nutcracker.util.ops.applicative._
 import scalaz.Applicative
 
@@ -17,9 +16,6 @@ trait BranchingPropagation[M[_], Var[_], Val[_]] {
 }
 
 object BranchingPropagation {
-
-  def module[Var0[_[_], _], Val0[_[_], _]]: PersistentBranchingModule { type VarK[K[_], A] = Var0[K, A]; type ValK[K[_], A] = Val0[K, A] } =
-    new BranchingModuleImpl[Var0, Val0]
 
   implicit def toPropagation[M[_], Var[_], Val[_]](implicit bp: BranchingPropagation[M, Var, Val]): Propagation[M, Var, Val] =
     bp.propagation

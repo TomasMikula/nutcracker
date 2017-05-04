@@ -40,6 +40,9 @@ trait PersistentBranchingModule extends BranchingModule with PersistentStateModu
 object PersistentBranchingModule {
   type Aux[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _], State0[_[_]]] =
     BranchingModule.Aux[Var0, Val0, Lang0, State0] with PersistentBranchingModule
+
+  def instance[Var0[_[_], _], Val0[_[_], _]]: PersistentBranchingModule { type VarK[K[_], A] = Var0[K, A]; type ValK[K[_], A] = Val0[K, A] } =
+    new BranchingModuleImpl[Var0, Val0]
 }
 
 class BranchingListModule[Var0[_[_], _], Val0[_[_], _], Lang[_[_], _], State[_[_]]](base: PersistentBranchingModule.Aux[Var0, Val0, Lang, State])
