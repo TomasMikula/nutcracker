@@ -1,6 +1,6 @@
-package nutcracker.algebraic.laws
+package nutcracker.util.algebraic.laws
 
-import nutcracker.algebraic.OrderPreservingSemigroup
+import nutcracker.util.algebraic.OrderPreservingSemigroup
 import scalaprops.{Check, Gen, Properties}
 import scalaprops.Property.forAll
 import scalaz.std.string._

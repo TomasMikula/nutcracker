@@ -1,7 +1,7 @@
 package nutcracker
 
 import scala.language.existentials
-import nutcracker.algebraic.NonDecreasingMonoid
+import nutcracker.util.algebraic.NonDecreasingMonoid
 import nutcracker.util.CoproductK._
 import nutcracker.util.InjectK
 import nutcracker.util.KPair._

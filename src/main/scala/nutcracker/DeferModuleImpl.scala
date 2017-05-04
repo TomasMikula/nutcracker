@@ -1,7 +1,7 @@
 package nutcracker
 
 import nutcracker.DeferLang.Delay
-import nutcracker.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
+import nutcracker.util.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
 import nutcracker.util.{FreeK, InjectK, Lst, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
 import scalaz.{Heap, Monad, Order, StateT}
 import scalaz.std.option._

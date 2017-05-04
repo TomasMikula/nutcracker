@@ -1,4 +1,4 @@
-package nutcracker.algebraic
+package nutcracker.util.algebraic
 
 import scalaz.syntax.order.ToOrderOps
 import scalaz.syntax.semigroup.ToSemigroupOps

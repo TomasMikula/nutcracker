@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
+import nutcracker.util.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
 import nutcracker.util.{FreeK, InjectK, StateInterpreter}
 
 trait DeferModule[D] extends Module {

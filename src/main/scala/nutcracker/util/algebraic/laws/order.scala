@@ -1,4 +1,4 @@
-package nutcracker.algebraic.laws
+package nutcracker.util.algebraic.laws
 
 import scalaprops.{Check, Gen, Properties}
 import scalaprops.Property.forAll

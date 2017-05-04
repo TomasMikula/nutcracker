@@ -1,6 +1,6 @@
-package nutcracker.algebraic.laws
+package nutcracker.util.algebraic.laws
 
-import nutcracker.algebraic.OrderPreservingMonoid
+import nutcracker.util.algebraic.OrderPreservingMonoid
 import scalaprops.{Gen, Properties}
 import scalaz.std.string._
 

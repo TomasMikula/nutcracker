@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.algebraic.NonDecreasingMonoid
+import nutcracker.util.algebraic.NonDecreasingMonoid
 import scalaz._
 import scalaz.std.list._
 import scalaz.syntax.monad._

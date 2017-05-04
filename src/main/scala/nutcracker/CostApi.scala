@@ -1,7 +1,7 @@
 package nutcracker
 
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
-import nutcracker.algebraic.NonDecreasingMonoid
+import nutcracker.util.algebraic.NonDecreasingMonoid
 import scalaz.{-\/, BindRec, Monad, StreamT, \/, \/-}
 import scalaz.Id._
 
