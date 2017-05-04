@@ -1,5 +1,6 @@
-package nutcracker
+package nutcracker.data
 
+import nutcracker.{Dom, DomWithBottom, UpdateResult}
 import scalaz.\&/.{Both, That, This}
 import scalaz.{-\/, \&/, \/, \/-}
 
