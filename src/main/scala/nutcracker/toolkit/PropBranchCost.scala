@@ -4,7 +4,7 @@ import nutcracker.util.CoproductK._
 import nutcracker.util.InjectK
 import nutcracker.util.KPair._
 import nutcracker.util.algebraic.NonDecreasingMonoid
-import nutcracker.{Assessment, BranchingPropagation, CostApi, CostRefToolkit, Propagation}
+import nutcracker.{Assessment, BranchingPropagation, CostApi, Propagation}
 import scala.language.existentials
 import scalaz.Id._
 import scalaz.{Monad, ~>}
