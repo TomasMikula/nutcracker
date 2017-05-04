@@ -1,4 +1,4 @@
-package nutcracker
+package nutcracker.toolkit
 
 import scalaz.NonEmptyList
 
@@ -6,7 +6,7 @@ import scalaz.NonEmptyList
   *  - _API._ Client code is written against an (MTL-style) API.
   *      What API a module provides is module-specific. For example,
   *      [[PropagationModule]] [[PropagationModule#freePropagation provides]]
-  *      the [[Propagation]] API.
+  *      the [[nutcracker.Propagation]] API.
   *  - _Instruction set._ Low-level instructions which are able to express all
   *      of the API operations. We define _program_ as the free monad over
   *      (a superset of) the instruction set. We consider a variation of free

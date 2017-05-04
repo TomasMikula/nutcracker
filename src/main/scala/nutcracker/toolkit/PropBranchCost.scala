@@ -1,10 +1,11 @@
-package nutcracker
+package nutcracker.toolkit
 
-import scala.language.existentials
-import nutcracker.util.algebraic.NonDecreasingMonoid
 import nutcracker.util.CoproductK._
 import nutcracker.util.InjectK
 import nutcracker.util.KPair._
+import nutcracker.util.algebraic.NonDecreasingMonoid
+import nutcracker.{Assessment, BranchingPropagation, CostApi, CostRefToolkit, Propagation}
+import scala.language.existentials
 import scalaz.Id._
 import scalaz.{Monad, ~>}
 
@@ -48,9 +49,9 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
     Cost.freeCost[Lang]
   }
 
-  import Prop.{stashRestore => sr1}
   import Branch.{stashRestore => sr2}
   import Cost.{stashRestore => sr3}
+  import Prop.{stashRestore => sr1}
   def stashRestoreK[K[_]]: StashRestore[StateK[K]] = StashRestore.kPairInstance
 
   def emptyK[K[_]]: StateK[K] =

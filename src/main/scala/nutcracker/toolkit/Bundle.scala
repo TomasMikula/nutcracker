@@ -1,5 +1,6 @@
-package nutcracker
+package nutcracker.toolkit
 
+import nutcracker.Final
 import nutcracker.util.{FreeK, HOrderK, ShowK}
 import scala.language.implicitConversions
 import scalaz.{Foldable, Monad}

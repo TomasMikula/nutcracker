@@ -1,5 +1,6 @@
 package nutcracker
 
+import nutcracker.toolkit.{BranchingModuleImpl, PersistentBranchingModule}
 import nutcracker.util.ops.applicative._
 import scalaz.Applicative
 

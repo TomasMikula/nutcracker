@@ -1,5 +1,6 @@
-package nutcracker
+package nutcracker.toolkit
 
+import nutcracker.{OnDemandPropagation, Propagation}
 import scala.language.implicitConversions
 
 trait PropagationBundle extends RefBundle with PropagationToolkit

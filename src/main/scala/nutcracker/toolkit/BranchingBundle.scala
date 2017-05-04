@@ -1,9 +1,10 @@
-package nutcracker
+package nutcracker.toolkit
 
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
+import nutcracker.{Assessment, BranchingPropagation, Final}
 import scalaz.Id._
-import scalaz.{-\/, BindRec, Monad, MonadTell, StreamT, Writer, WriterT, \/, \/-}
 import scalaz.std.anyVal._
+import scalaz.{-\/, BindRec, Monad, MonadTell, StreamT, Writer, WriterT, \/, \/-}
 
 trait BranchingBundle extends RefBundle with StashBundle with BranchingToolkit
 

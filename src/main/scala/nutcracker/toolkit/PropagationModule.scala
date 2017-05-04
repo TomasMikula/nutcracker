@@ -1,6 +1,7 @@
-package nutcracker
+package nutcracker.toolkit
 
 import nutcracker.util.{FreeK, HOrderK, InjectK, ShowK, StateInterpreter}
+import nutcracker.{OnDemandPropagation, Propagation}
 
 trait PropagationModule extends Module {
   type VarK[K[_], A]

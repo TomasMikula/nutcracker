@@ -1,4 +1,4 @@
-package nutcracker
+package nutcracker.toolkit
 
 import nutcracker.util.algebraic.NonDecreasingMonoid
 import scalaz._

@@ -1,11 +1,11 @@
-package nutcracker
+package nutcracker.toolkit
 
-import nutcracker.SeqTrigger.{Discard, Fire, FireReload, Reconsider, Sleep}
 import nutcracker.util.{KMap, Lst, ∃}
+import nutcracker.{IDom, SeqHandler, SeqPreHandler, SeqTrigger, Subscription}
 import scala.annotation.tailrec
 import scalaz.Leibniz.===
-import scalaz.{Equal, Leibniz, \/, ~>}
 import scalaz.syntax.equal._
+import scalaz.{Equal, Leibniz, \/, ~>}
 
 
 private[nutcracker] sealed abstract class Cell[K[_], D] {
@@ -89,7 +89,8 @@ private[nutcracker] object Cell {
 }
 
 private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
-  import nutcracker.Cell._
+  import nutcracker.{Unchanged, Updated}
+  import Cell._
 
   val value: Value
 

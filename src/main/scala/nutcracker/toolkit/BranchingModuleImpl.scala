@@ -1,7 +1,8 @@
-package nutcracker
+package nutcracker.toolkit
 
 import nutcracker.ops._
 import nutcracker.util.{FreeK, InjectK, Lst, Step, WriterState}
+import nutcracker.{Assessment, BranchingPropagation, Propagation, Splittable}
 import scalaz.Id.Id
 import scalaz.{Monad, ~>}
 

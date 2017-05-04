@@ -1,5 +1,6 @@
-package nutcracker
+package nutcracker.toolkit
 
+import nutcracker.CostApi
 import nutcracker.util.{FreeK, InjectK, Lst, Step, WriterState}
 import scalaz.{Monad, Monoid}
 

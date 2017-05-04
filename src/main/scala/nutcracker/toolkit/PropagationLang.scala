@@ -1,8 +1,9 @@
-package nutcracker
+package nutcracker.toolkit
 
 import nutcracker.util.{ContU, FreeK, InjectK}
+import nutcracker.{Dom, IDom, OnDemandPropagation, Sel, SeqHandler, SeqPreHandler, SeqTrigger, Subscription}
 import scalaz.{-\/, IndexedContT, \/, \/-}
-import scalaz.syntax.monad._
+import scalaz.syntax.functor._
 import shapeless.HList
 
 private[nutcracker] sealed trait PropagationLang[K[_], A]

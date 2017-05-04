@@ -1,13 +1,12 @@
-package nutcracker.rel
+package nutcracker.toolkit
 
-import scala.language.existentials
+import nutcracker.rel.{Assignment, OrientedPattern, PartiallyAssignedOrientedPattern, PartiallyAssignedPattern, Pattern, Rel, RelChoice}
 import nutcracker.util.{KMapB, Lst, Mapped, TransformedIndex}
+import scala.language.existentials
 import scalaz.Order
 import shapeless.HList
 
-import RelDB._
-
-private[rel] case class RelDB[K[_]] private (
+private[toolkit] case class RelDB[K[_]] private (
   private val tables: KMapB[Rel, λ[`L <: HList` => RelTable[K, L]], HList],
   private val patternTriggers: Map[PartiallyAssignedPattern[_], List[_ => K[Unit]]],
   private val relToPatterns: TransformedIndex[Rel[_ <: HList], PartiallyAssignedPattern[_ <: HList], PartiallyAssignedOrientedPattern[_ <: HList, _ <: HList]]
@@ -37,7 +36,7 @@ private[rel] case class RelDB[K[_]] private (
     (addTrigger(PartiallyAssignedPattern(p, ass), h), ks)
   }
 
-  def execWith[L <: HList, OS <: HList](rel: Rel[L], ass: Assignment[L])(supply: Token[L] => K[Unit])(exec: L => K[Unit])(implicit m: Mapped.Aux[L, Order, OS], orders: OS): (RelDB[K], Option[K[Unit]]) = {
+  def execWith[L <: HList, OS <: HList](rel: Rel[L], ass: Assignment[L])(supply: RelToken[L] => K[Unit])(exec: L => K[Unit])(implicit m: Mapped.Aux[L, Order, OS], orders: OS): (RelDB[K], Option[K[Unit]]) = {
     val (tbl, k) = table(rel).execWith(ass)(supply)(exec)
     tbl match {
       case Some(tbl) => (replaceTable(rel)(tbl), k)
@@ -45,7 +44,7 @@ private[rel] case class RelDB[K[_]] private (
     }
   }
 
-  def supply[L <: HList](rel: Rel[L], t: Token[L], row: L): (RelDB[K], Lst[K[Unit]]) = {
+  def supply[L <: HList](rel: Rel[L], t: RelToken[L], row: L): (RelDB[K], Lst[K[Unit]]) = {
     val ks1 = collectTriggers(rel, row) // trigger patterns matching the new row
     val (tbl, ks2) = table0(rel).get.supply(t, row)
     (replaceTable(rel)(tbl), ks1 ::: ks2)
@@ -131,15 +130,7 @@ private[rel] case class RelDB[K[_]] private (
     )
 }
 
-private[rel] object RelDB {
-
-  private[rel] case class PartiallyAssignedPattern[V <: HList](pattern: Pattern[V], assignment: Assignment[V]) {
-    def orient[L <: HList](rel: Rel[L]): PartiallyAssignedOrientedPattern[V, L] =
-      PartiallyAssignedOrientedPattern(pattern.orient(rel), assignment)
-  }
-  private[rel] case class PartiallyAssignedOrientedPattern[V <: HList, L <: HList](pattern: OrientedPattern[V, L], assignment: Assignment[V]) {
-    def unorient: PartiallyAssignedPattern[V] = PartiallyAssignedPattern(pattern.pattern, assignment)
-  }
+private[toolkit] object RelDB {
 
   def empty[K[_]]: RelDB[K] = RelDB(
     KMapB[Rel, λ[`L <: HList` => RelTable[K, L]], HList](),

@@ -1,5 +1,6 @@
-package nutcracker
+package nutcracker.toolkit
 
+import nutcracker.Defer
 import nutcracker.util.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
 import nutcracker.util.{FreeK, InjectK, StateInterpreter}
 

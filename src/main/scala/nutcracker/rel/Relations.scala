@@ -1,7 +1,5 @@
 package nutcracker.rel
 
-import scala.language.higherKinds
-import nutcracker.rel.RelDB.PartiallyAssignedPattern
 import nutcracker.util.{ContU, Mapped, MappedListBuilder, SummonHList}
 import scalaz.{Bind, Order}
 import scalaz.syntax.bind._

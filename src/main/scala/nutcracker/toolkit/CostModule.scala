@@ -1,5 +1,6 @@
-package nutcracker
+package nutcracker.toolkit
 
+import nutcracker.CostApi
 import nutcracker.util.algebraic.NonDecreasingMonoid
 import nutcracker.util.{FreeK, InjectK, Step}
 import scalaz.NonEmptyList

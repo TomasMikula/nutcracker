@@ -1,6 +1,5 @@
 package nutcracker.demo
 
-import nutcracker._
 import nutcracker.data.DecSet
 import nutcracker.data.DecSet._
 import nutcracker.ops._
@@ -10,7 +9,7 @@ import scalaz.std.anyVal._
 import scalaz.syntax.monad._
 
 class Sudoku extends FunSuite {
-  import PropBranchToolkit.instance._
+  import nutcracker.toolkit.PropBranchToolkit.instance._
   import nutcracker.data.Promises._
 
   type Cell = Var[DecSet[Int]]

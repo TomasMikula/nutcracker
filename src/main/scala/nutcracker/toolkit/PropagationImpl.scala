@@ -1,12 +1,12 @@
-package nutcracker
+package nutcracker.toolkit
 
 import nutcracker.util.{FreeK, FreeKT, HOrderK, Index, InjectK, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
+import nutcracker.{IDom, OnDemandPropagation, Sel, SeqPreHandler, SeqTrigger, Subscription}
 import scala.language.existentials
-import scalaz.{-\/, Equal, Monad, Ordering, Show, StateT, \/-}
 import scalaz.Id.Id
 import scalaz.std.option._
 import scalaz.syntax.equal._
-import scalaz.syntax.monad._
+import scalaz.{-\/, Equal, Monad, Ordering, Show, StateT, \/-}
 import shapeless.{HList, Nat, Sized}
 
 private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with OnDemandPropagationBundle { self =>

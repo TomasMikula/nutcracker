@@ -1,8 +1,8 @@
-package nutcracker
+package nutcracker.toolkit
 
 import scala.language.higherKinds
-import scalaz.{-\/, BindRec, MonadTell, StreamT, \/, \/-}
 import scalaz.syntax.monad._
+import scalaz.{-\/, BindRec, MonadTell, StreamT, \/, \/-}
 
 class DFSSolver[Prg, S, M[_], A](
   interpret: (Prg, S) => M[S],

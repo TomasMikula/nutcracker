@@ -1,6 +1,7 @@
-package nutcracker
+package nutcracker.toolkit
 
 import nutcracker.util.{FreeK, InjectK, Step}
+import nutcracker.{Assessment, BranchingPropagation, Propagation}
 import scalaz.Id.Id
 import scalaz.~>
 

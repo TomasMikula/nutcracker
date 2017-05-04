@@ -1,6 +1,6 @@
-package nutcracker.rel
+package nutcracker.toolkit
 
-import nutcracker.Toolkit
+import nutcracker.rel.Relations
 
 trait RelToolkit extends Toolkit {
   implicit val relationsApi: Relations[Prg]

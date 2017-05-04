@@ -4,6 +4,7 @@ import nutcracker.data.{DecSet, Promise}
 import nutcracker.data.DecSet._
 import nutcracker.data.listLog._
 import nutcracker.ops._
+import nutcracker.toolkit.{CellCycle, FinalizerId, ObserverId, PropagationStore, Token}
 import nutcracker.util.Lst
 import org.scalatest.FunSuite
 import scala.annotation.tailrec
@@ -12,7 +13,7 @@ import scalaz.std.anyVal._
 import scalaz.syntax.monad._
 
 class PropagationTest extends FunSuite {
-  import PropBranchToolkit.instance._
+  import nutcracker.toolkit.PropBranchToolkit.instance._
 
   val P = propagationApi
 
@@ -202,7 +203,7 @@ class PropagationStoreTest extends FunSuite {
 }
 
 class OnDemandPropagationTest extends FunSuite {
-  import OnDemandPropagationToolkit.instance._
+  import nutcracker.toolkit.OnDemandPropagationToolkit.instance._
 
   private val P = propagationApi
 

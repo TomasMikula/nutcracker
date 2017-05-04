@@ -1,6 +1,5 @@
 package nutcracker.demo
 
-import nutcracker._
 import nutcracker.data.bool.Bool._
 import nutcracker.data.bool._
 import nutcracker.ops._
@@ -12,8 +11,8 @@ import scalaz.std.vector._
 import scalaz.syntax.monad._
 
 class Sat extends FunSpec {
-  import PropBranchToolkit.instance._
-  import PropBranchToolkit.instance.branchingApi.{propagation => _, _}
+  import nutcracker.toolkit.PropBranchToolkit.instance._
+  import nutcracker.toolkit.PropBranchToolkit.instance.branchingApi.{propagation => _, _}
   import nutcracker.data.Promises._
 
   val B = BoolOps[Prg, Var, Val]

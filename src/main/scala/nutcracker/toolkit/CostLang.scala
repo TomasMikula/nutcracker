@@ -1,4 +1,4 @@
-package nutcracker
+package nutcracker.toolkit
 
 import scala.language.higherKinds
 import scalaz.Leibniz

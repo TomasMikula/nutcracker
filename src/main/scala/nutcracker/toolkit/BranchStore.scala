@@ -1,9 +1,9 @@
-package nutcracker
+package nutcracker.toolkit
 
 import nutcracker.Assessment.{Done, Incomplete, Stuck}
 import nutcracker.Splittable._
 import nutcracker.util.KMap
-
+import nutcracker.{Assessment, Propagation, Splittable}
 import scalaz.Id.Id
 import scalaz.~>
 

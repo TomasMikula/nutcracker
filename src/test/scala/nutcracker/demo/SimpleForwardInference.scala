@@ -1,6 +1,5 @@
 package nutcracker.demo
 
-import nutcracker._
 import nutcracker.rel.Pattern
 import nutcracker.rel.Rel.Rel2
 import org.scalatest.{FunSpec, Matchers}
@@ -11,7 +10,7 @@ import scalaz.syntax.monad._
 import shapeless.{::, HNil}
 
 class SimpleForwardInference extends FunSpec with Matchers {
-  import PropRelToolkit.{instance => tk}
+  import nutcracker.toolkit.PropRelToolkit.{instance => tk}
   import tk._
   import relationsApi._
   import nutcracker.data.Promises._

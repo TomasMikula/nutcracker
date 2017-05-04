@@ -1,7 +1,6 @@
 package nutcracker.rel
 
 import nutcracker.rel.Pattern.Orientation
-import nutcracker.rel.RelDB.PartiallyAssignedPattern
 import nutcracker.util.{ValuedPointers, Pointers}
 import shapeless.ops.hlist.Length
 import shapeless.ops.nat.ToInt
@@ -168,4 +167,13 @@ object OrientedPattern {
     }
   }
 
+}
+
+case class PartiallyAssignedPattern[V <: HList](pattern: Pattern[V], assignment: Assignment[V]) {
+  def orient[L <: HList](rel: Rel[L]): PartiallyAssignedOrientedPattern[V, L] =
+    PartiallyAssignedOrientedPattern(pattern.orient(rel), assignment)
+}
+
+case class PartiallyAssignedOrientedPattern[V <: HList, L <: HList](pattern: OrientedPattern[V, L], assignment: Assignment[V]) {
+  def unorient: PartiallyAssignedPattern[V] = PartiallyAssignedPattern(pattern.pattern, assignment)
 }

@@ -1,5 +1,6 @@
 package nutcracker
 
+import nutcracker.toolkit.{PersistentOnDemandPropagationModule, PersistentPropagationModule, PropagationBundle, PropagationImpl}
 import nutcracker.util.ops.applicative._
 import scala.language.implicitConversions
 import scalaz.{Applicative, Functor, IndexedContT}

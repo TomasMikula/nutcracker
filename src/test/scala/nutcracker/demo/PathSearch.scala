@@ -5,6 +5,7 @@ import nutcracker.ops._
 import nutcracker.util.algebraic.NonDecreasingMonoid
 import nutcracker.data.DecSet._
 import nutcracker.data.Promise
+import nutcracker.toolkit.PropBranchCostToolkit
 import org.scalatest.FunSuite
 import scala.annotation.tailrec
 import scalaz.Id._

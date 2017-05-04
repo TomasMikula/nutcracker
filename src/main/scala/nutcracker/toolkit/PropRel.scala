@@ -1,11 +1,12 @@
-package nutcracker
+package nutcracker.toolkit
 
-import nutcracker.rel.{RelModule, RelToolkit, Relations}
-import nutcracker.util.FreeKT
+import nutcracker.OnDemandPropagation
+import nutcracker.rel.Relations
 import nutcracker.util.CoproductK._
+import nutcracker.util.FreeKT
 import nutcracker.util.KPair._
-import scalaz.Monad
 import scalaz.Id.Id
+import scalaz.Monad
 
 trait PropRelToolkit extends OnDemandPropagationToolkit with RelToolkit
 

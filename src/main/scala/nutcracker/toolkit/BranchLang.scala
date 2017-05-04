@@ -1,5 +1,6 @@
-package nutcracker
+package nutcracker.toolkit
 
+import nutcracker.Splittable
 import nutcracker.util.{FreeK, Inject}
 
 sealed abstract class BranchLang[Ref[_], K[_], A]

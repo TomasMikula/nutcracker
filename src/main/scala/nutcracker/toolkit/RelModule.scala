@@ -1,6 +1,6 @@
-package nutcracker.rel
+package nutcracker.toolkit
 
-import nutcracker.{ListModule, Module, PersistentStateModule, StashModule}
+import nutcracker.rel.Relations
 import nutcracker.util.{FreeK, InjectK, Lst, Step, WriterState}
 import scalaz.Monad
 
@@ -26,7 +26,7 @@ object PersistentRelModule {
 
 trait StashRelModule extends RelModule with StashModule
 
-private[rel] object RelModuleImpl extends PersistentRelModule {
+private[toolkit] object RelModuleImpl extends PersistentRelModule {
   type Lang[K[_], A] = RelLang[K, A]
   type StateK[K[_]] = RelDB[K]
 
@@ -48,7 +48,7 @@ private[rel] object RelModuleImpl extends PersistentRelModule {
   def stashable = new RelListModule[Lang, StateK](this)
 }
 
-private[rel] class RelListModule[Lang[_[_], _], State0[_[_]]](base: PersistentRelModule.Aux[Lang, State0]) extends ListModule[Lang, State0](base) with StashRelModule {
+private[toolkit] class RelListModule[Lang[_[_], _], State0[_[_]]](base: PersistentRelModule.Aux[Lang, State0]) extends ListModule[Lang, State0](base) with StashRelModule {
   def freeRelations[F[_[_], _]](implicit i: InjectK[Lang, F]) = base.freeRelations[F]
   def interpreter: Step[Lang, StateK] = base.interpreter.inHead
 }

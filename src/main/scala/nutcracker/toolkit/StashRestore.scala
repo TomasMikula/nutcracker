@@ -1,4 +1,4 @@
-package nutcracker
+package nutcracker.toolkit
 
 import nutcracker.util.KPair
 import scalaz.NonEmptyList

@@ -1,8 +1,9 @@
-package nutcracker
+package nutcracker.toolkit
 
 import nutcracker.util.CoproductK.:++:
 import nutcracker.util.FreeKT
 import nutcracker.util.KPair._
+import nutcracker.{Assessment, BranchingPropagation, Propagation}
 import scala.language.existentials
 import scalaz.Id.Id
 import scalaz.~>
@@ -37,8 +38,8 @@ object PropBranch extends PropagationBundle with BranchingBundle with PropBranch
   implicit val branchingApi: BranchingPropagation[Prg, Var, Val] =
     Branch.freeBranchingPropagation[Lang]
 
-  import Prop.{stashRestore => sr1}
   import Branch.{stashRestore => sr2}
+  import Prop.{stashRestore => sr1}
   def stashRestoreK[K[_]]: StashRestore[StateK[K]] = StashRestore.kPairInstance
 
   val interpreter = (Prop.interpreter :&&: Branch.interpreter).freeInstance
