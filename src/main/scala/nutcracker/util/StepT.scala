@@ -52,14 +52,26 @@ abstract class StepT[M[_], F[_[_], _], S[_[_]]] { self =>
     }
   }
 
-  def ::[G[_[_], _]](that: StepT[M, G, S]): StepT[M, CoproductK[G, F, ?[_], ?], S] =
-    new StepT[M, CoproductK[G, F, ?[_], ?], S] {
-      def apply[K[_]: Monad, A](ca: CoproductK[G, F, K, A]): WriterStateT[M, Lst[K[Unit]], S[K], A] =
+  def :+:[G[_[_], _]](that: StepT[M, G, S]): StepT[M, CoproductK[G, F, ?[_], ?], S] = {
+    type H[K[_], A] = CoproductK[G, F, K, A]
+
+    new StepT[M, H, S] {
+      def apply[K[_] : Monad, A](ca: H[K, A]): WriterStateT[M, Lst[K[Unit]], S[K], A] =
         WriterStateT(s => ca.run.fold(that(_), self(_))(s))
     }
+  }
+
+  def :+:[G[_[_], _]](that: StateInterpreterT[M, G, S]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] = {
+    type H[K[_], A] = CoproductK[G, F, K, A]
+
+    new StateInterpreterT[M, H, S] {
+      def step: StepT[M, H, S] = that.step :+: self
+      def uncons: Uncons[S] = that.uncons
+    }
+  }
 
   def :>>:[G[_[_], _]](ig: G ≈>> M)(implicit M: Monad[M]): StepT[M, CoproductK[G, F, ?[_], ?], S] =
-    StepT.lift[M, G, S](ig) :: self
+    StepT.lift[M, G, S](ig) :+: self
 
 
   def inHead(implicit M: Functor[M]): StepT[M, F, λ[K[_] => Nel[S[K]]]] = new StepT[M, F, λ[K[_] => Nel[S[K]]]] {

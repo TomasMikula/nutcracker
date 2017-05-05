@@ -40,10 +40,20 @@ trait StateInterpreterT[M[_], F[_[_], _], S[_[_]]] { self =>
     }
   }
 
-  final def ::[G[_[_], _]](that: StateInterpreterT[M, G, S]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] = {
+  final def :+:[G[_[_], _]](that: StateInterpreterT[M, G, S]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] = {
     type H[K[_], A] = CoproductK[G, F, K, A]
+
     new StateInterpreterT[M, H, S] {
-      def step: StepT[M, H, S] = that.step :: self.step
+      def step: StepT[M, H, S] = that.step :+: self.step
+      def uncons: Uncons[S] = that.uncons orElse self.uncons
+    }
+  }
+
+  final def :+:[G[_[_], _]](that: StepT[M, G, S]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] = {
+    type H[K[_], A] = CoproductK[G, F, K, A]
+
+    new StateInterpreterT[M, H, S] {
+      def step: StepT[M, H, S] = that :+: self.step
       def uncons: Uncons[S] = self.uncons
     }
   }
