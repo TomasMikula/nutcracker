@@ -80,7 +80,6 @@ trait StateInterpreterT[M[_], F[_[_], _], S[_[_]]] { self =>
 }
 
 object StateInterpreterT {
-  import scala.language.implicitConversions  
 
   def freeInstance[M[_], F[_[_], _], S[_[_]]](
     step: StepT[M, F, S],
@@ -123,40 +122,4 @@ object StateInterpreterT {
       def apply[A](fa: FreeK[F, A]): StateT[M, S[FreeK[F, ?]], A] = StateT(runUntilClean(fa))
     }
   }
-
-  final case class Ops[M[_], F[_[_], _], S[_[_]]](self: StateInterpreterT[M, F, S]) extends AnyVal {
-
-    def :&:[G[_[_], _], T[_[_]]](
-      that: StepT[M, G, T]
-    )(implicit
-      M: Functor[M]
-    ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], (T :**: S)#Out] = {
-      type H[K[_], A] = CoproductK[G, F, K, A]
-      type U[K[_]] = KPair[T, S, K]
-
-      new StateInterpreterT[M, H, U] {
-        def step: StepT[M, H, U] = that :&: self.step
-        def uncons: Uncons[U] =
-          self.uncons.zoomOut[U]
-      }
-    }
-
-    def :&:[G[_[_], _], T[_[_]]](that: StateInterpreterT[M, G, T])(implicit M: Functor[M]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], (T :**: S)#Out] = {
-      type H[K[_], A] = CoproductK[G, F, K, A]
-      type U[K[_]] = KPair[T, S, K]
-
-      new StateInterpreterT[M, H, U] {
-        def step: StepT[M, H, U] = that.step :&: self.step
-
-        def uncons: Uncons[U] = {
-          val uncons1 = that.uncons.zoomOut[U]
-          val uncons2 = self.uncons.zoomOut[U]
-          uncons1 orElse uncons2
-        }
-      }
-    }
-  }
-
-  implicit def toOps[M[_], F[_[_], _], S[_[_]]](i: StateInterpreterT[M, F, S]): Ops[M, F, S] =
-    Ops(i)
 }

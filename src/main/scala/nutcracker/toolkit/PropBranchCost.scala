@@ -63,7 +63,7 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A =
     Prop.fetchK(ref, s._1)
 
-  val interpreter = (Prop.interpreter :&: Branch.interpreter :&&: Cost.interpreter).freeInstance
+  val interpreter = (Prop.interpreter :&&: Branch.interpreter :&&: Cost.interpreter).freeInstance
   def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p).run(s)
 
   def assess(s: State): Assessment[List[Prg[Unit]]] =

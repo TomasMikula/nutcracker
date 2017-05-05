@@ -69,50 +69,10 @@ abstract class StepT[M[_], F[_[_], _], S[_[_]]] { self =>
 }
 
 object StepT {
-  import scala.language.implicitConversions
 
   def lift[M[_]: Monad, F[_[_], _], S[_[_]]](fm: F ≈>> M): StepT[M, F, S] =
     new StepT[M, F, S] {
       override def apply[K[_]: Monad, A](f: F[K, A]): WriterStateT[M, Lst[K[Unit]], S[K], A] =
         WriterStateT.monadTrans[Lst[K[Unit]], S[K]].liftM(fm(f))
     }
-
-  final case class StepTOps[M[_], F[_[_], _], S[_[_]]](self: StepT[M, F, S]) extends AnyVal {
-
-    def :&:[G[_[_], _], T[_[_]]](
-      that: StepT[M, G, T]
-    )(implicit
-      M: Functor[M]
-    ): StepT[M, CoproductK[G, F, ?[_], ?], (T :**: S)#Out] = {
-      type H[K[_], A] = CoproductK[G, F, K, A]
-      type U[K[_]] = KPair[T, S, K]
-
-      new StepT[M, H, U] {
-        override def apply[K[_]: Monad, A](h: H[K, A]): WriterStateT[M, Lst[K[Unit]], U[K], A] =
-          h.run match {
-            case -\/(g) => that(g).zoomOut
-            case \/-(f) => self(f).zoomOut
-          }
-      }
-    }
-
-    def :&:[G[_[_], _], T[_[_]]](
-      ig: StateInterpreterT[M, G, T]
-    )(implicit
-      M: Functor[M]
-    ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], (T :**: S)#Out] = {
-      type H[K[_], A] = CoproductK[G, F, K, A]
-      type U[K[_]] = KPair[T, S, K]
-
-      new StateInterpreterT[M, H, U] {
-        def step: StepT[M, H, U] = ig.step :&: self
-        def uncons: Uncons[U] =
-          ig.uncons.zoomOut[U]
-      }
-    }
-
-  }
-
-  implicit def toOps[M[_], F[_[_], _], S[_[_]]](self: StepT[M, F, S]): StepTOps[M, F, S] =
-    StepTOps(self)
 }

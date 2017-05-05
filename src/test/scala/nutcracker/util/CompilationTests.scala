@@ -28,14 +28,14 @@ object CompilationTests {
     val barIntr: StateInterpreter[BarL, BarS] = ???
     val bazIntr: StateInterpreter[BazL, BazS] = ???
 
-    fooStep :&: barStep :&&: bazStep
-    fooStep :&: barStep :&&: bazIntr
-    fooStep :&: barIntr :&&: bazStep
-    fooStep :&: barIntr :&&: bazIntr
-    fooIntr :&: barStep :&&: bazStep
-    fooIntr :&: barStep :&&: bazIntr
-    fooIntr :&: barIntr :&&: bazStep
-    fooIntr :&: barIntr :&&: bazIntr
+    fooStep :&&: barStep :&&: bazStep
+    fooStep :&&: barStep :&&: bazIntr
+    fooStep :&&: barIntr :&&: bazStep
+    fooStep :&&: barIntr :&&: bazIntr
+    fooIntr :&&: barStep :&&: bazStep
+    fooIntr :&&: barStep :&&: bazIntr
+    fooIntr :&&: barIntr :&&: bazStep
+    fooIntr :&&: barIntr :&&: bazIntr
 
     trait QuuxL[X, K[_], A]
     trait QuuxS[X, K[_]]
@@ -49,14 +49,14 @@ object CompilationTests {
     val quxStep: Step[QuxL, QuxS] = ???
     val quxIntr: StateInterpreter[QuxL, QuxS] = ???
 
-    fooStep :&: barStep :&&: quxStep
-    fooStep :&: barStep :&&: quxIntr
-    fooStep :&: barIntr :&&: quxStep
-    fooStep :&: barIntr :&&: quxIntr
-    fooIntr :&: barStep :&&: quxStep
-    fooIntr :&: barStep :&&: quxIntr
-    fooIntr :&: barIntr :&&: quxStep
-    fooIntr :&: barIntr :&&: quxIntr
+    fooStep :&&: barStep :&&: quxStep
+    fooStep :&&: barStep :&&: quxIntr
+    fooStep :&&: barIntr :&&: quxStep
+    fooStep :&&: barIntr :&&: quxIntr
+    fooIntr :&&: barStep :&&: quxStep
+    fooIntr :&&: barStep :&&: quxIntr
+    fooIntr :&&: barIntr :&&: quxStep
+    fooIntr :&&: barIntr :&&: quxIntr
 
     implicitly[InjectK[FooL, FooBarQuxL]]
     implicitly[InjectK[BarL, FooBarQuxL]]
