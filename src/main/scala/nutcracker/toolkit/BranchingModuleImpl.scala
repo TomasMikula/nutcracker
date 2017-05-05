@@ -1,10 +1,10 @@
 package nutcracker.toolkit
 
 import nutcracker.ops._
-import nutcracker.util.{FreeK, InjectK, Lst, Step, WriterState}
+import nutcracker.util.{FreeK, InjectK, LensK, Lst, Step, WriterState}
 import nutcracker.{Assessment, BranchingPropagation, Propagation, Splittable}
 import scalaz.Id.Id
-import scalaz.{Monad, ~>}
+import scalaz.{Functor, Monad, ~>}
 
 private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] extends PersistentBranchingModule {
   type VarK[K[_], A] = Var0[K, A]
@@ -35,11 +35,11 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
 
   def emptyK[K[_]]: StateK[K] = BranchStore()
 
-  def interpreter: Step[Lang, StateK] = new Step[Lang, StateK] {
+  def interpreter[S[_[_]]](implicit lens: LensK[S, StateK]): Step[Lang, S] = new Step[Lang, S] {
     import BranchLang._
 
-    def apply[K[_]: Monad, A](f: BranchLang[VarK[K, ?], K, A]): WriterState[Lst[K[Unit]], StateK[K], A] =
-      go[VarK[K, ?], K, A](f)
+    def apply[K[_]: Monad, A](f: BranchLang[VarK[K, ?], K, A]): WriterState[Lst[K[Unit]], S[K], A] =
+      go[VarK[K, ?], K, A](f).zoomOut[S[K]](lens[K], Functor[Id])
 
     // https://github.com/scala/bug/issues/10292
     private def go[Ref[_], K[_]: Monad, A](f: BranchLang[Ref, K, A]): WriterState[Lst[K[Unit]], BranchStore[Ref, K], A] = f match {

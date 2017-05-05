@@ -1,8 +1,8 @@
 package nutcracker
 
-import scala.language.higherKinds
 import scalaz.Id.Id
-import scalaz.{Applicative, Bind, ContT, Monad, Traverse, |>=|}
+import scalaz.{Applicative, Bind, ContT, Lens, Monad, NonEmptyList, Store, Traverse, |>=|}
+import scalaz.NonEmptyList.nel
 import scalaz.syntax.monad._
 
 package object util {
@@ -74,6 +74,27 @@ package object util {
   type StateInterpreter[F[_[_], _], S[_[_]]]  = StateInterpreterT[Id, F, S]
 
   type Step[F[_[_], _], S[_[_]]] = StepT[Id, F, S]
+
+  type LensK[S[_[_]], A[_[_]]] = `Forall{(* -> *) -> *}`[λ[X[_] => Lens[S[X], A[X]]]]
+  object LensK {
+    private val idLensK: LensK[Any, Any] = new LensK[Any, Any] {
+      private val idLens: Lens[Any, Any] = Lens(Store(identity, _))
+      override def compute[K[_]]: Lens[Any, Any] = idLens
+    }
+
+    def id[S[_[_]]]: LensK[S, S] =
+      idLensK.asInstanceOf[LensK[S, S]]
+
+    def compose[S[_[_]], T[_[_]], U[_[_]]](tu: LensK[T, U], st: LensK[S, T]): LensK[S, U] =
+      new LensK[S, U] {
+        def compute[K[_]]: Lens[S[K], U[K]] = tu[K].compose(st[K])
+      }
+
+    def inHead[S[_[_]]]: LensK[λ[K[_] => NonEmptyList[S[K]]], S] =
+      new LensK[λ[K[_] => NonEmptyList[S[K]]], S] {
+        def compute[K[_]]: Lens[NonEmptyList[S[K]], S[K]] = Lens(ss => Store(s => nel(s, ss.tail), ss.head))
+      }
+  }
 
   /** Free monad for type constructors of kind `F[_[_], _]`,
     * where `F`'s first type parameter is recursively set to FreeK[F, ?].

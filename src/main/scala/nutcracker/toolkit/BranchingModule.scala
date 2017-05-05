@@ -1,6 +1,6 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{FreeK, InjectK, Step}
+import nutcracker.util.{FreeK, InjectK, LensK, Step}
 import nutcracker.{Assessment, BranchingPropagation, Propagation}
 import scalaz.Id.Id
 import scalaz.~>
@@ -17,7 +17,7 @@ trait BranchingModule extends Module {
   ): BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]]
 
   def emptyK[K[_]]: StateK[K]
-  def interpreter: Step[Lang, StateK]
+  def interpreter[S[_[_]]](implicit lens: LensK[S, StateK]): Step[Lang, S]
   def assess[K[_]](s: StateK[K])(fetch: VarK[K, ?] ~> Id)(implicit K: Propagation[K, VarK[K, ?], ValK[K, ?]]): Assessment[List[K[Unit]]]
 }
 
@@ -45,8 +45,8 @@ object PersistentBranchingModule {
     new BranchingModuleImpl[Var0, Val0]
 }
 
-class BranchingListModule[Var0[_[_], _], Val0[_[_], _], Lang[_[_], _], State[_[_]]](base: PersistentBranchingModule.Aux[Var0, Val0, Lang, State])
-extends ListModule[Lang, State](base) with BranchingModule {
+class BranchingListModule[Var0[_[_], _], Val0[_[_], _], Lang[_[_], _], State0[_[_]]](base: PersistentBranchingModule.Aux[Var0, Val0, Lang, State0])
+extends ListModule[Lang, State0](base) with BranchingModule {
   type VarK[K[_], A] = Var0[K, A]
   type ValK[K[_], A] = Val0[K, A]
 
@@ -56,7 +56,9 @@ extends ListModule[Lang, State](base) with BranchingModule {
   ): BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] =
     base.freeBranchingPropagation[F](i, P)
 
-  override def interpreter: Step[Lang, StateK] = base.interpreter.inHead
+  override def interpreter[S[_[_]]](implicit lens: LensK[S, StateK]): Step[Lang, S] =
+    base.interpreter[S](LensK.compose[S, StateK, State0](LensK.inHead[State0], lens))
+
   override def assess[K[_]](s: StateK[K])(fetch: VarK[K, ?] ~> Id)(implicit K: Propagation[K, VarK[K, ?], ValK[K, ?]]): Assessment[List[K[Unit]]] =
     base.assess[K](s.head)(fetch)
 }

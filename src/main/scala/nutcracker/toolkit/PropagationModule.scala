@@ -1,6 +1,6 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{FreeK, HOrderK, InjectK, ShowK, StateInterpreter}
+import nutcracker.util.{FreeK, HOrderK, InjectK, LensK, ShowK, StateInterpreter}
 import nutcracker.{OnDemandPropagation, Propagation}
 
 trait PropagationModule extends Module {
@@ -13,7 +13,7 @@ trait PropagationModule extends Module {
   implicit def valShowK[K[_]]: ShowK[ValK[K, ?]]
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]]
 
-  def interpreter: StateInterpreter[Lang, StateK]
+  def interpreter[S[_[_]]](implicit lens: LensK[S, StateK]): StateInterpreter[Lang, S]
   def isConsistent[K[_]](s: StateK[K]): Boolean
   def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A
   def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A]
@@ -60,7 +60,9 @@ extends ListModule[Lang0, State0](base) with StashPropagationModule {
 
   implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): Propagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] = base.freePropagation
 
-  def interpreter: StateInterpreter[Lang, StateK] = base.interpreter.inHead
+  def interpreter[S[_[_]]](implicit lens: LensK[S, StateK]): StateInterpreter[Lang, S] =
+    base.interpreter[S](LensK.compose[S, StateK, State0](LensK.inHead[State0], lens))
+
   def isConsistent[K[_]](s: StateK[K]): Boolean = base.isConsistent[K](s.head)
   def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] = base.fetchK[K, A](ref, s.head)
   def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A = base.fetchK[K, A](ref, s.head)

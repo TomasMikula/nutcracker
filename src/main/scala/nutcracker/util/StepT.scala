@@ -1,9 +1,8 @@
 package nutcracker.util
 
 import scala.language.higherKinds
-import scalaz.{-\/, Functor, Monad, NonEmptyList => Nel, \/-, ~>}
+import scalaz.{Functor, Monad, NonEmptyList => Nel, ~>}
 import scalaz.syntax.functor._
-import nutcracker.util.KPair._
 
 abstract class StepT[M[_], F[_[_], _], S[_[_]]] { self =>
 
@@ -18,37 +17,6 @@ abstract class StepT[M[_], F[_[_], _], S[_[_]]] { self =>
     def apply[K[_]: Monad, A](f: F[K, A]): WriterStateT[N, Lst[K[Unit]], S[K], A] = {
       val ws = self(f)
       WriterStateT(s => mn(ws(s)))
-    }
-  }
-
-  final def :&&:[G[_[_], _], T[_[_]]](
-    that: StepT[M, G, T]
-  )(implicit
-    M: Functor[M]
-  ): StepT[M, CoproductK[G, F, ?[_], ?], (T :**: S)#Out] = {
-    type H[K[_], A] = CoproductK[G, F, K, A]
-    type U[K[_]] = (T :**: S)#Out[K]
-    new StepT[M, H, U] {
-      override def apply[K[_]: Monad, A](h: H[K, A]): WriterStateT[M, Lst[K[Unit]], U[K], A] =
-        h.run match {
-          case -\/(g) => that(g).zoomOut
-          case \/-(f) => self(f).zoomOut
-        }
-    }
-  }
-
-  final def :&&:[G[_[_], _], T[_[_]]](
-    ig: StateInterpreterT[M, G, T]
-  )(implicit
-    M: Functor[M]
-  ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], (T :**: S)#Out] = {
-    type H[K[_], A] = CoproductK[G, F, K, A]
-    type U[K[_]] = (T :**: S)#Out[K]
-
-    new StateInterpreterT[M, H, U] {
-      def step: StepT[M, H, U] = ig.step :&&: self
-      def uncons: Uncons[U] =
-        ig.uncons.zoomOut[U]
     }
   }
 

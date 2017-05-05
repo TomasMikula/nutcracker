@@ -20,22 +20,22 @@ object CompilationTests {
     type FooBarBazL[K[_], A] = (FooL :+: BarL :++: BazL)#Out[K, A]
     type FooBarBazS[K[_]]    = (FooS :*: BarS :**: BazS)#Out[K]
 
-    val fooStep: Step[FooL, FooS] = ???
-    val barStep: Step[BarL, BarS] = ???
-    val bazStep: Step[BazL, BazS] = ???
+    def fooStep[S[_[_]]](implicit lens: LensK[S, FooS]): Step[FooL, S] = ???
+    def barStep[S[_[_]]](implicit lens: LensK[S, BarS]): Step[BarL, S] = ???
+    def bazStep[S[_[_]]](implicit lens: LensK[S, BazS]): Step[BazL, S] = ???
 
-    val fooIntr: StateInterpreter[FooL, FooS] = ???
-    val barIntr: StateInterpreter[BarL, BarS] = ???
-    val bazIntr: StateInterpreter[BazL, BazS] = ???
+    def fooIntr[S[_[_]]](implicit lens: LensK[S, FooS]): StateInterpreter[FooL, S] = ???
+    def barIntr[S[_[_]]](implicit lens: LensK[S, BarS]): StateInterpreter[BarL, S] = ???
+    def bazIntr[S[_[_]]](implicit lens: LensK[S, BazS]): StateInterpreter[BazL, S] = ???
 
-    fooStep :&&: barStep :&&: bazStep
-    fooStep :&&: barStep :&&: bazIntr
-    fooStep :&&: barIntr :&&: bazStep
-    fooStep :&&: barIntr :&&: bazIntr
-    fooIntr :&&: barStep :&&: bazStep
-    fooIntr :&&: barStep :&&: bazIntr
-    fooIntr :&&: barIntr :&&: bazStep
-    fooIntr :&&: barIntr :&&: bazIntr
+    fooStep[FooBarBazS] :+: barStep[FooBarBazS] :+: bazStep[FooBarBazS]
+    fooStep[FooBarBazS] :+: barStep[FooBarBazS] :+: bazIntr[FooBarBazS]
+    fooStep[FooBarBazS] :+: barIntr[FooBarBazS] :+: bazStep[FooBarBazS]
+    fooStep[FooBarBazS] :+: barIntr[FooBarBazS] :+: bazIntr[FooBarBazS]
+    fooIntr[FooBarBazS] :+: barStep[FooBarBazS] :+: bazStep[FooBarBazS]
+    fooIntr[FooBarBazS] :+: barStep[FooBarBazS] :+: bazIntr[FooBarBazS]
+    fooIntr[FooBarBazS] :+: barIntr[FooBarBazS] :+: bazStep[FooBarBazS]
+    fooIntr[FooBarBazS] :+: barIntr[FooBarBazS] :+: bazIntr[FooBarBazS]
 
     trait QuuxL[X, K[_], A]
     trait QuuxS[X, K[_]]
@@ -46,17 +46,17 @@ object CompilationTests {
     type FooBarQuxL[K[_], A] = (FooL :+: BarL :++: QuxL)#Out[K, A]
     type FooBarQuxS[K[_]]    = (FooS :*: BarS :**: QuxS)#Out[K]
 
-    val quxStep: Step[QuxL, QuxS] = ???
-    val quxIntr: StateInterpreter[QuxL, QuxS] = ???
+    def quxStep[S[_[_]]](implicit lens: LensK[S, QuxS]): Step[QuxL, S] = ???
+    def quxIntr[S[_[_]]](implicit lens: LensK[S, QuxS]): StateInterpreter[QuxL, S] = ???
 
-    fooStep :&&: barStep :&&: quxStep
-    fooStep :&&: barStep :&&: quxIntr
-    fooStep :&&: barIntr :&&: quxStep
-    fooStep :&&: barIntr :&&: quxIntr
-    fooIntr :&&: barStep :&&: quxStep
-    fooIntr :&&: barStep :&&: quxIntr
-    fooIntr :&&: barIntr :&&: quxStep
-    fooIntr :&&: barIntr :&&: quxIntr
+    fooStep[FooBarQuxS] :+: barStep[FooBarQuxS] :+: quxStep[FooBarQuxS]
+    fooStep[FooBarQuxS] :+: barStep[FooBarQuxS] :+: quxIntr[FooBarQuxS]
+    fooStep[FooBarQuxS] :+: barIntr[FooBarQuxS] :+: quxStep[FooBarQuxS]
+    fooStep[FooBarQuxS] :+: barIntr[FooBarQuxS] :+: quxIntr[FooBarQuxS]
+    fooIntr[FooBarQuxS] :+: barStep[FooBarQuxS] :+: quxStep[FooBarQuxS]
+    fooIntr[FooBarQuxS] :+: barStep[FooBarQuxS] :+: quxIntr[FooBarQuxS]
+    fooIntr[FooBarQuxS] :+: barIntr[FooBarQuxS] :+: quxStep[FooBarQuxS]
+    fooIntr[FooBarQuxS] :+: barIntr[FooBarQuxS] :+: quxIntr[FooBarQuxS]
 
     implicitly[InjectK[FooL, FooBarQuxL]]
     implicitly[InjectK[BarL, FooBarQuxL]]

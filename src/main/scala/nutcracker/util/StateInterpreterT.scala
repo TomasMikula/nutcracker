@@ -6,39 +6,10 @@ import scalaz.Id._
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
-import nutcracker.util.KPair._
 
 trait StateInterpreterT[M[_], F[_[_], _], S[_[_]]] { self =>
   def step: StepT[M, F, S]
   def uncons: Uncons[S]
-
-  final def :&&:[G[_[_], _], T[_[_]]](that: StateInterpreterT[M, G, T])(implicit M: Functor[M]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], (T :**: S)#Out] = {
-    type H[K[_], A] = CoproductK[G, F, K, A]
-    type U[K[_]] = (T :**: S)#Out[K]
-
-    new StateInterpreterT[M, H, U] {
-      def step: StepT[M, H, U] = that.step :&&: self.step
-
-      def uncons: Uncons[U] = {
-        val uncons1 = that.uncons.zoomOut[U]
-        val uncons2 = self.uncons.zoomOut[U]
-        uncons1 orElse uncons2
-      }
-    }
-  }
-
-  final def :&&:[G[_[_], _], T[_[_]]](
-    i2: StepT[M, G, T]
-  )(implicit
-    M: Functor[M]
-  ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], (T :**: S)#Out] = {
-    type H[K[_], A] = CoproductK[G, F, K, A]
-    type U[K[_]] = (T :**: S)#Out[K]
-    new StateInterpreterT[M, H, U] {
-      def step: StepT[M, H, U] = i2 :&&: self.step
-      def uncons: Uncons[U] = self.uncons.zoomOut[U]
-    }
-  }
 
   final def :+:[G[_[_], _]](that: StateInterpreterT[M, G, S]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] = {
     type H[K[_], A] = CoproductK[G, F, K, A]

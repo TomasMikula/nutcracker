@@ -49,5 +49,5 @@ object PropRel extends FreePropagationToolkit with PropRelToolkit {
   def interpret[A](p: Prg[A], s: State): (State, A) =
     interpreter(p).run(s)
 
-  val interpreter = (Prop.interpreter :&&: RelMod.interpreter).freeInstance
+  val interpreter = (Prop.interpreter[StateK] :+: RelMod.interpreter[StateK]).freeInstance
 }
