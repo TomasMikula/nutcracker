@@ -1,6 +1,6 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{FreeK, InjectK, LensK, Step}
+import nutcracker.util.{FreeK, Inject, LensK, Step}
 import nutcracker.{Assessment, BranchingPropagation, Propagation}
 import scalaz.Id.Id
 import scalaz.~>
@@ -12,7 +12,7 @@ trait BranchingModule extends Module {
   type StateK[K[_]]
 
   implicit def freeBranchingPropagation[F[_[_], _]](implicit
-    i: InjectK[Lang, F],
+    i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]],
     P: Propagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]]
   ): BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]]
 
@@ -51,7 +51,7 @@ extends ListModule[Lang, State0](base) with BranchingModule {
   type ValK[K[_], A] = Val0[K, A]
 
   override def freeBranchingPropagation[F[_[_], _]](implicit
-    i: InjectK[Lang, F],
+    i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]],
     P: Propagation[FreeK[F, ?], Var0[FreeK[F, ?], ?], Val0[FreeK[F, ?], ?]]
   ): BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] =
     base.freeBranchingPropagation[F](i, P)

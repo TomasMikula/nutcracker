@@ -1,7 +1,7 @@
 package nutcracker.toolkit
 
 import nutcracker.ops._
-import nutcracker.util.{FreeK, InjectK, LensK, Lst, Step, WriterState}
+import nutcracker.util.{FreeK, Inject, LensK, Lst, Step, WriterState}
 import nutcracker.{Assessment, BranchingPropagation, Propagation, Splittable}
 import scalaz.Id.Id
 import scalaz.{Functor, Monad, ~>}
@@ -13,7 +13,7 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
   type StateK[K[_]] = BranchStore[Var0[K, ?], K]
 
   implicit def freeBranchingPropagation[F[_[_], _]](implicit
-    i: InjectK[Lang, F],
+    i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]],
     P: Propagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]]
   ): BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] =
     new BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] {
@@ -23,10 +23,10 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
         if(ev.isUnresolved(a))
           for {
             ref <- propagation.newCell[A](a)
-            _ <- BranchLang.trackF[VarK[FreeK[F, ?], ?], F, A](ref)(ev, i[FreeK[F, ?]])
+            _ <- BranchLang.trackF[VarK[FreeK[F, ?], ?], F, A](ref)
             _ <- ref.observe.threshold(a =>
               if(ev.isUnresolved(a)) None
-              else Some(BranchLang.untrackF[VarK[FreeK[F, ?], ?], F, A](ref)(i[FreeK[F, ?]]))
+              else Some(BranchLang.untrackF[VarK[FreeK[F, ?], ?], F, A](ref))
             )
           } yield ref
         else

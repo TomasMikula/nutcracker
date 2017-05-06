@@ -1,7 +1,7 @@
 package nutcracker.toolkit
 
 import nutcracker.rel.{Assignment, Pattern, Recipe, Rel, Relations}
-import nutcracker.util.{ContU, FreeK, InjectK, Mapped, MappedListBuilder, SummonHList}
+import nutcracker.util.{ContU, FreeK, Inject, Mapped, MappedListBuilder, SummonHList}
 import scalaz.Order
 import scalaz.std.option._
 import shapeless.HList
@@ -24,7 +24,7 @@ private[toolkit] object RelLang {
   def supply[K[_], L <: HList](rel: Rel[L], token: RelToken[L], value: L): RelLang[K, Unit] = Supply(rel, token, value)
 
 
-  implicit def relationsInstance[F[_[_], _]](implicit inj: InjectK[RelLang, F]): Relations[FreeK[F, ?]] =
+  implicit def relationsInstance[F[_[_], _]](implicit inj: Inject[RelLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): Relations[FreeK[F, ?]] =
     new Relations[FreeK[F, ?]] {
       def relateImpl[L <: HList, OrderL <: HList](rel: Rel[L], values: L)(implicit m: Mapped.Aux[L, Order, OrderL], os: SummonHList[OrderL]): FreeK[F, Unit] =
         FreeK.liftF(inj(RelLang.relate[FreeK[F, ?], L, OrderL](rel, values)(m, os)))

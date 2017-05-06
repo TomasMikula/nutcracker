@@ -42,7 +42,7 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
 
   implicit val costApi: CostApi.Aux[Prg, C] = {
     // Not sure why scalac is not able to find this itself.
-    // Try removing after https://issues.scala-lang.org/browse/SI-10213 is resolved
+    // Try removing after https://github.com/scala/bug/issues/10213 is resolved
     implicit val injC: InjectK[Cost.Lang, Lang] =
       InjectK.injectRight[Cost.Lang, (Branch.Lang  :++: Cost.Lang )#Out, Prop.Lang](InjectK.injectRight[Cost.Lang, Cost.Lang, Branch.Lang])
 

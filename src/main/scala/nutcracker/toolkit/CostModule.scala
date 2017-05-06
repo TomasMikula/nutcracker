@@ -2,10 +2,10 @@ package nutcracker.toolkit
 
 import nutcracker.CostApi
 import nutcracker.util.algebraic.NonDecreasingMonoid
-import nutcracker.util.{FreeK, InjectK, LensK, Step}
+import nutcracker.util.{FreeK, Inject, LensK, Step}
 
 trait CostModule[C] extends Module {
-  implicit def freeCost[F[_[_], _]](implicit i: InjectK[Lang, F]): CostApi.Aux[FreeK[F, ?], C]
+  implicit def freeCost[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): CostApi.Aux[FreeK[F, ?], C]
 
   def interpreter[S[_[_]]](implicit lens: LensK[S, StateK]): Step[Lang, S]
 
@@ -29,7 +29,7 @@ object PersistentCostModule {
 
 class CostListModule[C, Lang[_[_], _], State0[_[_]]](base: PersistentCostModule.Aux[C, Lang, State0])
 extends ListModule[Lang, State0](base) with CostModule[C] {
-  def freeCost[F[_[_], _]](implicit i: InjectK[Lang, F]) = base.freeCost[F]
+  def freeCost[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]) = base.freeCost[F]
 
   def interpreter[S[_[_]]](implicit lens: LensK[S, StateK]): Step[Lang, S] =
     base.interpreter[S](LensK.compose[S, StateK, State0](LensK.inHead[State0], lens))

@@ -2,10 +2,10 @@ package nutcracker.toolkit
 
 import nutcracker.Defer
 import nutcracker.util.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
-import nutcracker.util.{FreeK, InjectK, StateInterpreter}
+import nutcracker.util.{FreeK, Inject, StateInterpreter}
 
 trait DeferModule[D] extends Module {
-  implicit def freeDeferApi[F[_[_], _]](implicit i: InjectK[Lang, F]): Defer[FreeK[F, ?], D]
+  implicit def freeDeferApi[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): Defer[FreeK[F, ?], D]
 
   def interpreter: StateInterpreter[Lang, StateK]
 }
@@ -29,7 +29,7 @@ object PersistentDeferModule {
 trait StashDeferModule[D] extends DeferModule[D] with StashModule
 
 class DeferListModule[D, Lang[_[_], _], State0[_[_]]](base: PersistentDeferModule.Aux[D, Lang, State0]) extends ListModule[Lang, State0](base) with StashDeferModule[D] {
-  def freeDeferApi[F[_[_], _]](implicit i: InjectK[Lang, F]) = base.freeDeferApi[F]
+  def freeDeferApi[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]) = base.freeDeferApi[F]
 
   def interpreter: StateInterpreter[Lang, StateK] = base.interpreter.inHead
 }

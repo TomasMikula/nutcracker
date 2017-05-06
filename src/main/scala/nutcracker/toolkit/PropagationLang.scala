@@ -1,6 +1,6 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{ContU, FreeK, InjectK}
+import nutcracker.util.{ContU, FreeK, Inject}
 import nutcracker.{Dom, IDom, OnDemandPropagation, Sel, SeqHandler, SeqPreHandler, SeqTrigger, Subscription}
 import scalaz.{-\/, IndexedContT, \/, \/-}
 import scalaz.syntax.functor._
@@ -78,60 +78,60 @@ private[nutcracker] object PropagationLang {
 
   // constructors injected into free programs
 
-  def newCellF[F[_[_], _], D](d: D)(implicit dom: Dom[D], inj: InjectK[PropagationLang, F]): FreeK[F, SimpleCellId[FreeK[F, ?], D]] =
+  def newCellF[F[_[_], _], D](d: D)(implicit dom: Dom[D], inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, SimpleCellId[FreeK[F, ?], D]] =
     FreeK.liftF(inj(newCell[FreeK[F, ?], D](d)))
 
-  def updateF[F[_[_], _], D, U, Δ[_, _]](ref: SimpleCellId[FreeK[F, ?], D])(u: U)(implicit dom: IDom.Aux[D, U, Δ], inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+  def updateF[F[_[_], _], D, U, Δ[_, _]](ref: SimpleCellId[FreeK[F, ?], D])(u: U)(implicit dom: IDom.Aux[D, U, Δ], inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Unit] =
     FreeK.liftF(inj(update[FreeK[F, ?], D, U, Δ](ref)(u)))
 
-  def observeF[F[_[_], _], D, U, Δ[_, _]](ref: SimpleCellId[FreeK[F, ?], D])(f: SeqPreHandler[TokF[F, D, ?], FreeK[F, ?], D, Δ])(implicit dom: IDom.Aux[D, U, Δ], inj: InjectK[PropagationLang, F]): FreeK[F, Option[ObserverId]] =
+  def observeF[F[_[_], _], D, U, Δ[_, _]](ref: SimpleCellId[FreeK[F, ?], D])(f: SeqPreHandler[TokF[F, D, ?], FreeK[F, ?], D, Δ])(implicit dom: IDom.Aux[D, U, Δ], inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Option[ObserverId]] =
     FreeK.liftF(inj(observe[FreeK[F, ?], D, U, Δ](ref)(f)))
 
-  def observeAutoF[F[_[_], _], D, U, Δ[_, _]](ref: AutoCellId[FreeK[F, ?], D])(f: SeqPreHandler[TokF[F, D, ?], FreeK[F, ?], D, Δ])(implicit dom: IDom.Aux[D, U, Δ], inj: InjectK[PropagationLang, F]): FreeK[F, Option[(CellCycle[D], ObserverId)]] =
+  def observeAutoF[F[_[_], _], D, U, Δ[_, _]](ref: AutoCellId[FreeK[F, ?], D])(f: SeqPreHandler[TokF[F, D, ?], FreeK[F, ?], D, Δ])(implicit dom: IDom.Aux[D, U, Δ], inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Option[(CellCycle[D], ObserverId)]] =
     FreeK.liftF(inj(observeAuto[FreeK[F, ?], D, U, Δ](ref)(f)))
 
   /** Making observer ID available both to the callback `f` and as part of the result, leaving the choice of how to consume it to the user. */
-  def holdF[F[_[_], _], D](ref: SimpleCellId[FreeK[F, ?], D])(f: (D, Token[D], ObserverId) => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, ObserverId] =
+  def holdF[F[_[_], _], D](ref: SimpleCellId[FreeK[F, ?], D])(f: (D, Token[D], ObserverId) => FreeK[F, Unit])(implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, ObserverId] =
     FreeK.liftF(inj(hold[FreeK[F, ?], D](ref)(f)))
 
   /** Making observer ID available both to the callback `f` and as part of the result, leaving the choice of how to consume it to the user. */
-  def holdAutoF[F[_[_], _], D](ref: AutoCellId[FreeK[F, ?], D])(f: (D, CellCycle[D], Token[D], ObserverId) => FreeK[F, Unit])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, ObserverId] =
+  def holdAutoF[F[_[_], _], D](ref: AutoCellId[FreeK[F, ?], D])(f: (D, CellCycle[D], Token[D], ObserverId) => FreeK[F, Unit])(implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, ObserverId] =
     FreeK.liftF(inj(holdAuto[FreeK[F, ?], D](ref)(f)))
 
-  def supplyF[F[_[_], _], D](ref: AutoCellId[FreeK[F, ?], D])(cycle: CellCycle[D], value: D)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+  def supplyF[F[_[_], _], D](ref: AutoCellId[FreeK[F, ?], D])(cycle: CellCycle[D], value: D)(implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Unit] =
     FreeK.liftF(inj(supply[FreeK[F, ?], D](ref)(cycle, value)))
 
-  def resumeF[F[_[_], _], D, Δ[_, _], D0 <: D](ref: SimpleCellId[FreeK[F, ?], D], token: Token[D0], trigger: SeqTrigger[TokF[F, D, ?], FreeK[F, ?], D, Δ, D0])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+  def resumeF[F[_[_], _], D, Δ[_, _], D0 <: D](ref: SimpleCellId[FreeK[F, ?], D], token: Token[D0], trigger: SeqTrigger[TokF[F, D, ?], FreeK[F, ?], D, Δ, D0])(implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Unit] =
     FreeK.liftF(inj(resume[FreeK[F, ?], D, Δ, D0](ref, token, trigger)))
 
-  def resumeAutoF[F[_[_], _], D, Δ[_, _], D0 <: D](ref: AutoCellId[FreeK[F, ?], D], cycle: CellCycle[D], token: Token[D0], trigger: SeqTrigger[TokF[F, D, ?], FreeK[F, ?], D, Δ, D0])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+  def resumeAutoF[F[_[_], _], D, Δ[_, _], D0 <: D](ref: AutoCellId[FreeK[F, ?], D], cycle: CellCycle[D], token: Token[D0], trigger: SeqTrigger[TokF[F, D, ?], FreeK[F, ?], D, Δ, D0])(implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Unit] =
     FreeK.liftF(inj(resumeAuto[FreeK[F, ?], D, Δ, D0](ref, cycle, token, trigger)))
 
-  def rmObserverF[F[_[_], _], D](ref: SimpleCellId[FreeK[F, ?], D], oid: ObserverId)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+  def rmObserverF[F[_[_], _], D](ref: SimpleCellId[FreeK[F, ?], D], oid: ObserverId)(implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Unit] =
     FreeK.liftF(inj(rmObserver[FreeK[F, ?], D](ref, oid)))
 
-  def rmAutoObserverF[F[_[_], _], D](ref: AutoCellId[FreeK[F, ?], D], cycle: CellCycle[D], oid: ObserverId)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+  def rmAutoObserverF[F[_[_], _], D](ref: AutoCellId[FreeK[F, ?], D], cycle: CellCycle[D], oid: ObserverId)(implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Unit] =
     FreeK.liftF(inj(rmAutoObserver[FreeK[F, ?], D](ref, cycle, oid)))
 
-  def newAutoCellF[F[_[_], _], A](setup: (AutoCellId[FreeK[F, ?], A], CellCycle[A]) => FreeK[F, Unit])(implicit dom: Dom[A], inj: InjectK[PropagationLang, F]): FreeK[F, CellId[FreeK[F, ?], A]] =
+  def newAutoCellF[F[_[_], _], A](setup: (AutoCellId[FreeK[F, ?], A], CellCycle[A]) => FreeK[F, Unit])(implicit dom: Dom[A], inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, CellId[FreeK[F, ?], A]] =
     FreeK.liftF(inj(newAutoCell[FreeK[F, ?], A](setup)))
 
-  def addFinalizerF[F[_[_], _], A](ref: AutoCellId[FreeK[F, ?], A], cycle: CellCycle[A], value: Subscription[FreeK[F, ?]])(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Option[FinalizerId]] =
+  def addFinalizerF[F[_[_], _], A](ref: AutoCellId[FreeK[F, ?], A], cycle: CellCycle[A], value: Subscription[FreeK[F, ?]])(implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Option[FinalizerId]] =
     FreeK.liftF(inj(addFinalizer[FreeK[F, ?], A](ref, cycle, value)))
 
-  def removeFinalizerF[F[_[_], _], A](ref: AutoCellId[FreeK[F, ?], A], cycle: CellCycle[A], id: FinalizerId)(implicit inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+  def removeFinalizerF[F[_[_], _], A](ref: AutoCellId[FreeK[F, ?], A], cycle: CellCycle[A], id: FinalizerId)(implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Unit] =
     FreeK.liftF(inj(removeFinalizer[FreeK[F, ?], A](ref, cycle, id)))
 
-  def exclUpdateF[F[_[_], _], A, U, Δ[_, _]](ref: AutoCellId[FreeK[F, ?], A], cycle: CellCycle[A], u: U)(implicit dom: IDom.Aux[A, U, Δ], inj: InjectK[PropagationLang, F]): FreeK[F, Unit] =
+  def exclUpdateF[F[_[_], _], A, U, Δ[_, _]](ref: AutoCellId[FreeK[F, ?], A], cycle: CellCycle[A], u: U)(implicit dom: IDom.Aux[A, U, Δ], inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Unit] =
     FreeK.liftF(inj(exclUpdate[FreeK[F, ?], A, U, Δ](ref, cycle, u)))
 
 
-  implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[PropagationLang, F]): OnDemandPropagation[FreeK[F, ?], SimpleCellId[FreeK[F, ?], ?], CellId[FreeK[F, ?], ?]] =
+  implicit def freePropagation[F[_[_], _]](implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): OnDemandPropagation[FreeK[F, ?], SimpleCellId[FreeK[F, ?], ?], CellId[FreeK[F, ?], ?]] =
     new FreePropagation[F]
 }
 
 
-private[nutcracker] class FreePropagation[F[_[_], _]](implicit inj: InjectK[PropagationLang, F]) extends OnDemandPropagation[FreeK[F, ?], SimpleCellId[FreeK[F, ?], ?], CellId[FreeK[F, ?], ?]] {
+private[nutcracker] class FreePropagation[F[_[_], _]](implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]) extends OnDemandPropagation[FreeK[F, ?], SimpleCellId[FreeK[F, ?], ?], CellId[FreeK[F, ?], ?]] {
   import PropagationLang._
 
   type K[A] = FreeK[F, A]
@@ -148,7 +148,7 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit inj: InjectK[Prop
     newCellF[F, D](d)
 
   def newAutoCellC[A](setup: IndexedContT[FreeK[F, ?], Unit, ExclRef[A], A])(implicit dom: Dom[A]): FreeK[F, CellId[K, A]] = {
-    val setup1 = (r: AutoCellId[K, A], c: CellCycle[A]) => setup.run(a => supplyF(r)(c, a)(inj).as((r, c)))
+    val setup1 = (r: AutoCellId[K, A], c: CellCycle[A]) => setup.run(a => supplyF(r)(c, a).as((r, c)))
     newAutoCellF(setup1)
   }
 

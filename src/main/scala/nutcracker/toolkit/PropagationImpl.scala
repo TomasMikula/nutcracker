@@ -1,6 +1,6 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{FreeK, FreeKT, HOrderK, Index, InjectK, KMap, KMapB, LensK, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
+import nutcracker.util.{FreeK, FreeKT, HOrderK, Index, Inject, KMap, KMapB, LensK, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
 import nutcracker.{IDom, OnDemandPropagation, Sel, SeqPreHandler, SeqTrigger, Subscription}
 import scala.language.existentials
 import scalaz.Id.Id
@@ -21,7 +21,7 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
   override def valShowK[K[_]]: ShowK[ValK[K, ?]] = CellId.showKInstance
 
   override implicit def prgMonad: Monad[FreeK[Lang, ?]] = FreeKT.freeKTMonad[Lang, Id]
-  override implicit def freePropagation[F[_[_], _]](implicit inj: InjectK[Lang, F]): OnDemandPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] =
+  override implicit def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): OnDemandPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] =
     PropagationLang.freePropagation[F]
 
   override val propagationApi: OnDemandPropagation[Prg, Var, Val] =

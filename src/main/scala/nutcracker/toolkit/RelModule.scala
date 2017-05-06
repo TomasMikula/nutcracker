@@ -1,13 +1,13 @@
 package nutcracker.toolkit
 
 import nutcracker.rel.Relations
-import nutcracker.util.{FreeK, InjectK, LensK, Lst, Step, WriterState}
+import nutcracker.util.{FreeK, Inject, LensK, Lst, Step, WriterState}
 import scalaz.{Functor, Monad}
 import scalaz.Id._
 
 trait RelModule extends Module {
   def interpreter[S[_[_]]](implicit lens: LensK[S, StateK]): Step[Lang, S]
-  def freeRelations[F[_[_], _]](implicit i: InjectK[Lang, F]): Relations[FreeK[F, ?]]
+  def freeRelations[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): Relations[FreeK[F, ?]]
 }
 
 object RelModule {
@@ -33,8 +33,8 @@ private[toolkit] object RelModuleImpl extends PersistentRelModule {
 
   def emptyK[K[_]]: StateK[K] = RelDB.empty[K]
 
-  override def freeRelations[F[_[_], _]](implicit i: InjectK[RelLang, F]): Relations[FreeK[F, ?]] =
-    RelLang.relationsInstance
+  override def freeRelations[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): Relations[FreeK[F, ?]] =
+    RelLang.relationsInstance[F]
 
   def interpreter[S[_[_]]](implicit lens: LensK[S, RelDB]): Step[RelLang, S] = new Step[RelLang, S] {
     import RelLang._
@@ -53,7 +53,7 @@ private[toolkit] object RelModuleImpl extends PersistentRelModule {
 }
 
 private[toolkit] class RelListModule[Lang[_[_], _], State0[_[_]]](base: PersistentRelModule.Aux[Lang, State0]) extends ListModule[Lang, State0](base) with StashRelModule {
-  def freeRelations[F[_[_], _]](implicit i: InjectK[Lang, F]) = base.freeRelations[F]
+  def freeRelations[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]) = base.freeRelations[F]
 
   def interpreter[S[_[_]]](implicit lens: LensK[S, StateK]): Step[Lang, S] =
     base.interpreter[S](LensK.compose[S, StateK, State0](LensK.inHead[State0], lens))

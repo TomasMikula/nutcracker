@@ -1,7 +1,7 @@
 package nutcracker.toolkit
 
 import nutcracker.CostApi
-import nutcracker.util.{FreeK, InjectK, LensK, Lst, Step, WriterState}
+import nutcracker.util.{FreeK, Inject, LensK, Lst, Step, WriterState}
 import scalaz.{Functor, Monad, Monoid}
 import scalaz.Id.Id
 
@@ -28,7 +28,7 @@ private[nutcracker] class CostModuleImpl[C](implicit C: Monoid[C]) extends Persi
       }
   }
 
-  implicit def freeCost[F[_[_], _]](implicit i: InjectK[Lang, F]): CostApi.Aux[FreeK[F, ?], C] = {
+  implicit def freeCost[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): CostApi.Aux[FreeK[F, ?], C] = {
     type C0 = C
     new CostApi[FreeK[F, ?]] {
       type C = C0

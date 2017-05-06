@@ -2,7 +2,7 @@ package nutcracker.toolkit
 
 import nutcracker.Defer
 import nutcracker.util.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
-import nutcracker.util.{FreeK, InjectK, Lst, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
+import nutcracker.util.{FreeK, Inject, Lst, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
 import scalaz.std.option._
 import scalaz.{Heap, Monad, Order, StateT}
 
@@ -10,7 +10,7 @@ private[nutcracker] class DeferModuleImpl[D](implicit D: NonDecreasingMonoid[D] 
   type Lang[K[_], A] = DeferLang[D, K, A]
   type StateK[K[_]] = DeferStore[D, K]
 
-  implicit def freeDeferApi[F[_[_], _]](implicit i: InjectK[Lang, F]): Defer[FreeK[F, ?], D] =
+  implicit def freeDeferApi[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): Defer[FreeK[F, ?], D] =
     new Defer[FreeK[F, ?], D] {
       def defer(delay: D, k: FreeK[F, Unit]): FreeK[F, Unit] =
         FreeK.liftF(i(DeferLang.defer[D, FreeK[F, ?]](delay, k)))
