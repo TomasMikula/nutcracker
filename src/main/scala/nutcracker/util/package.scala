@@ -71,9 +71,9 @@ package object util {
       WriterStateT[Id, W, S, A](run)
   }
 
-  type StateInterpreter[F[_[_], _], S[_[_]]]  = StateInterpreterT[Id, F, S]
+  type StateInterpreter[K[_], F[_], S]  = StateInterpreterT[Id, K, F, S]
 
-  type Step[F[_[_], _], S[_[_]]] = StepT[Id, F, S]
+  type Step[K[_], F[_], S] = StepT[Id, K, F, S]
 
   type LensK[S[_[_]], A[_[_]]] = `Forall{(* -> *) -> *}`[λ[X[_] => Lens[S[X], A[X]]]]
   object LensK {
@@ -122,7 +122,6 @@ package object util {
 
     def traverse[F[_[_], _], C[_]: Traverse, A, B](ps: C[A])(f: A => FreeK[F, B]): FreeK[F, C[B]] =
       Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)(FreeKT.freeKTMonad[F, Id])
-
   }
 
   type Desc[Ptr[_]] = FreeObjectOutput[String, Ptr, Unit]

@@ -2,9 +2,8 @@ package nutcracker.toolkit
 
 import nutcracker.Defer
 import nutcracker.util.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
-import nutcracker.util.{FreeK, Inject, Lst, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
-import scalaz.std.option._
-import scalaz.{Heap, Monad, Order, StateT}
+import nutcracker.util.{FreeK, Inject, Lst, StateInterpreter, Step, Uncons, WriterState}
+import scalaz.{Heap, Lens, Order}
 
 private[nutcracker] class DeferModuleImpl[D](implicit D: NonDecreasingMonoid[D] with OrderPreservingMonoid[D]) extends PersistentDeferModule[D] { self =>
   type Lang[K[_], A] = DeferLang[D, K, A]
@@ -18,7 +17,8 @@ private[nutcracker] class DeferModuleImpl[D](implicit D: NonDecreasingMonoid[D] 
 
   def emptyK[K[_]] = DeferStore.empty[D, K]
 
-  def interpreter: StateInterpreter[Lang, StateK] = DeferStore.interpreter[D]
+  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] =
+    DeferStore.interpreter[D, K, S]
 
   def stashable: StashDeferModule[D] { type Lang[K[_], A] = self.Lang[K, A] } =
     new DeferListModule[D, Lang, StateK](this)
@@ -46,20 +46,17 @@ private[nutcracker] object DeferStore {
   def empty[D, K[_]](implicit D: NonDecreasingMonoid[D] with OrderPreservingMonoid[D]): DeferStore[D, K] =
     DeferStore(D.zero, Heap.Empty[(D, K[Unit])])
 
-  def interpreter[D]: StateInterpreter[DeferLang[D, ?[_], ?], DeferStore[D, ?[_]]] =
-    new StateInterpreter[DeferLang[D, ?[_], ?], DeferStore[D, ?[_]]] {
+  def interpreter[D, K[_], S](implicit lens: Lens[S, DeferStore[D, K]]): StateInterpreter[K, DeferLang[D, K, ?], S] =
+    new StateInterpreter[K, DeferLang[D, K, ?], S] {
       import DeferLang._
 
-      def step: Step[DeferLang[D, ?[_], ?], DeferStore[D, ?[_]]] = new Step[DeferLang[D, ?[_], ?], DeferStore[D, ?[_]]] {
-        def apply[K[_]: Monad, A](f: DeferLang[D, K, A]): WriterState[Lst[K[Unit]], DeferStore[D, K], A] =
+      def step: Step[K, DeferLang[D, K, ?], S] = new Step[K, DeferLang[D, K, ?], S] {
+        def apply[A](f: DeferLang[D, K, A]): WriterState[Lst[K[Unit]], S, A] =
           WriterState(s => f match {
-            case Delay(d, k) => (Lst.empty, s.add(d, k), ())
+            case Delay(d, k) => (Lst.empty, lens.mod(_.add(d, k), s), ())
           })
       }
 
-      def uncons: Uncons[DeferStore[D, ?[_]]] = Uncons(new `Forall{(* -> *) -> *}`[λ[K[_] => StateT[Option, DeferStore[D, K], Lst[K[Unit]]]]] {
-        protected def compute[K[_]]: StateT[Option, DeferStore[D, K], Lst[K[Unit]]] =
-          StateT(_.uncons)
-      })
+      def uncons: Uncons[K, S] = Uncons[K, DeferStore[D, K]](_.uncons).zoomOut[S]
     }
 }

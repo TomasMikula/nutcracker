@@ -1,8 +1,8 @@
 package nutcracker.util.free
 
 import scala.annotation.tailrec
-import scala.language.higherKinds
 import scalaz.{-\/, Applicative, ApplicativePlus, BindRec, Foldable, Monad, MonadPlus, MonadTrans, Monoid, Plus, Traverse, \/, \/-, ~>}
+import scalaz.Id.Id
 import scalaz.syntax.monadPlus._
 
 final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A]) extends AnyVal {
@@ -58,6 +58,9 @@ final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A
 
   def plus(that: FreeT[F, M, A])(implicit M0: Plus[M], M1: BindRec[M], M2: Applicative[M]): FreeT[F, M, A] =
     FreeT.rollM(M0.plus(this.flattenM, that.flattenM))
+
+  def toFree(implicit ev: FreeBind[(M :++: F)#Out, A] =:= FreeBind[(Id :++: F)#Out, A]): Free[F, A] =
+    Free(ev(unwrap))
 
   /** Flatten all `M`s occuring prior to the first `F`
     * and map the rest of the computation inside it. */

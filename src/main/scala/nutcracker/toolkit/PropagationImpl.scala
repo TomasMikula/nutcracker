@@ -1,12 +1,11 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{FreeK, FreeKT, HOrderK, Index, Inject, KMap, KMapB, LensK, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState, `Forall{(* -> *) -> *}`}
+import nutcracker.util.{FreeK, FreeKT, HOrderK, Index, Inject, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState}
 import nutcracker.{IDom, OnDemandPropagation, Sel, SeqPreHandler, SeqTrigger, Subscription}
 import scala.language.existentials
 import scalaz.Id.Id
-import scalaz.std.option._
 import scalaz.syntax.equal._
-import scalaz.{-\/, Equal, Functor, Monad, Ordering, Show, StateT, \/-}
+import scalaz.{-\/, Equal, Lens, Monad, Ordering, Show, \/-}
 import shapeless.{HList, Nat, Sized}
 
 private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with FreeOnDemandPropagationToolkit { self =>
@@ -31,19 +30,19 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
     PropagationStore.empty[K]
 
   override def interpret[A](p: Prg[A], s: PropagationStore[Prg]): (PropagationStore[Prg], A) =
-    interpreter(LensK.id).freeInstance.apply(p).run(s)
+    interpreter(Lens.lensId[State]).freeInstance(_.run.toFree).apply(p.run.toFree).run(s)
 
-  override def interpreter[S[_[_]]](implicit lens: LensK[S, StateK]): StateInterpreter[Lang, S] =
-    new StateInterpreter[PropagationLang, S] {
+  override def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] =
+    new StateInterpreter[K, Lang[K, ?], S] {
 
-      def step: Step[PropagationLang, S] =
-        new Step[PropagationLang, S] {
+      def step: Step[K, Lang[K, ?], S] =
+        new Step[K, Lang[K, ?], S] {
           import PropagationLang._
 
-          override def apply[K[_]: Monad, A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], S[K], A] =
-            go[K, A](p).zoomOut[S[K]](lens[K], Functor[Id])
+          override def apply[A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], S, A] =
+            go(p).zoomOut[S]
 
-          private def go[K[_]: Monad, A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], PropagationStore[K], A] = WriterState(s =>
+          private def go[A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], PropagationStore[K], A] = WriterState(s =>
             p match {
               case Update(ref, u, dom) =>
                 (Lst.empty, s.update[dom.Domain, dom.Update, dom.IDelta](ref, u)(dom), ())
@@ -95,11 +94,7 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
           )
         }
 
-      def uncons: Uncons[S] = Uncons[S](
-        new `Forall{(* -> *) -> *}`[λ[K[_] => StateT[Option, S[K], Lst[K[Unit]]]]] {
-          override def compute[K[_]]: StateT[Option, S[K], Lst[K[Unit]]] =
-            StateT[Option, PropagationStore[K], Lst[K[Unit]]](_.uncons).zoom(lens[K])
-        })
+      def uncons: Uncons[K, S] = Uncons[K, StateK[K]](_.uncons).zoomOut[S]
     }
 
   override def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] =

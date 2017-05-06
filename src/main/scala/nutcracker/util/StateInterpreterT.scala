@@ -1,106 +1,100 @@
 package nutcracker.util
 
-import scala.language.higherKinds
-import scalaz.{BindRec, Functor, Lens, Monad, NonEmptyList => Nel, StateT, Store, \/, ~>}
+import nutcracker.util.free.Free
+import scalaz.{BindRec, Coproduct, Functor, Lens, Monad, StateT, Store, \/, ~>, NonEmptyList => Nel}
 import scalaz.Id._
-import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 
-trait StateInterpreterT[M[_], F[_[_], _], S[_[_]]] { self =>
-  def step: StepT[M, F, S]
-  def uncons: Uncons[S]
+trait StateInterpreterT[M[_], K[_], F[_], S] { self =>
+  def step: StepT[M, K, F, S]
+  def uncons: Uncons[K, S]
 
-  final def :+:[G[_[_], _]](that: StateInterpreterT[M, G, S]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] = {
-    type H[K[_], A] = CoproductK[G, F, K, A]
+  final def :+:[G[_]](that: StateInterpreterT[M, K, G, S]): StateInterpreterT[M, K, Coproduct[G, F, ?], S] = {
+    type H[A] = Coproduct[G, F, A]
 
-    new StateInterpreterT[M, H, S] {
-      def step: StepT[M, H, S] = that.step :+: self.step
-      def uncons: Uncons[S] = that.uncons orElse self.uncons
+    new StateInterpreterT[M, K, H, S] {
+      def step: StepT[M, K, H, S] = that.step :+: self.step
+      def uncons: Uncons[K, S] = that.uncons orElse self.uncons
     }
   }
 
-  final def :+:[G[_[_], _]](that: StepT[M, G, S]): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] = {
-    type H[K[_], A] = CoproductK[G, F, K, A]
+  final def :+:[G[_]](that: StepT[M, K, G, S]): StateInterpreterT[M, K, Coproduct[G, F, ?], S] = {
+    type H[A] = Coproduct[G, F, A]
 
-    new StateInterpreterT[M, H, S] {
-      def step: StepT[M, H, S] = that :+: self.step
-      def uncons: Uncons[S] = self.uncons
+    new StateInterpreterT[M, K, H, S] {
+      def step: StepT[M, K, H, S] = that :+: self.step
+      def uncons: Uncons[K, S] = self.uncons
     }
   }
 
-  final def :>>:[G[_[_], _]](
-    ig: G ≈>> M
+  final def :>>:[G[_]](
+    ig: G ~> M
   )(implicit
     M: Monad[M]
-  ): StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] =
-    new StateInterpreterT[M, CoproductK[G, F, ?[_], ?], S] {
+  ): StateInterpreterT[M, K, Coproduct[G, F, ?], S] =
+    new StateInterpreterT[M, K, Coproduct[G, F, ?], S] {
       def step = ig :>>: self.step
       def uncons = self.uncons
     }
 
-  def hoist[N[_]](mn: M ~> N)(implicit M: Monad[M], N: Monad[N]): StateInterpreterT[N, F, S] =
-    new StateInterpreterT[N, F, S] {
-      def step: StepT[N, F, S] = self.step.hoist(mn)
-      def uncons: Uncons[S] = self.uncons
+  def hoist[N[_]](mn: M ~> N)(implicit M: Monad[M], N: Monad[N]): StateInterpreterT[N, K, F, S] =
+    new StateInterpreterT[N, K, F, S] {
+      def step: StepT[N, K, F, S] = self.step.hoist(mn)
+      def uncons: Uncons[K, S] = self.uncons
     }
 
-  def hoistId[N[_]](implicit N: Monad[N], ev: this.type <:< StateInterpreterT[Id, F, S]): StateInterpreterT[N, F, S] =
+  def hoistId[N[_]](implicit N: Monad[N], ev: this.type <:< StateInterpreterT[Id, K, F, S]): StateInterpreterT[N, K, F, S] =
     ev(this).hoist(idToM[N])
 
-  def freeInstance(implicit M0: Monad[M], M1: BindRec[M]): FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?] =
-    StateInterpreterT.freeInstance(step, uncons)
+  def freeInstance(f: K[Unit] => Free[F, Unit])(implicit M0: Monad[M], M1: BindRec[M]): Free[F, ?] ~> StateT[M, S, ?] =
+    StateInterpreterT.freeInstance(step, uncons)(f)
 
-  def inHead(implicit M: Functor[M]): StateInterpreterT[M, F, λ[K[_] => Nel[S[K]]]] = new StateInterpreterT[M, F, λ[K[_] => Nel[S[K]]]] {
+  def inHead(implicit M: Functor[M]): StateInterpreterT[M, K, F, Nel[S]] = new StateInterpreterT[M, K, F, Nel[S]] {
     val step = self.step.inHead
 
-    val uncons = self.uncons.zoomOut[λ[K[_] => Nel[S[K]]]](new `Forall{(* -> *) -> *}`[λ[K[_] => Lens[Nel[S[K]], S[K]]]] {
-      def compute[K[_]] = Lens[Nel[S[K]], S[K]](l => Store(s => Nel.nel(s, l.tail), l.head))
-    })
+    val uncons = self.uncons.zoomOut[Nel[S]](Lens[Nel[S], S](l => Store(s => Nel.nel(s, l.tail), l.head)))
   }
 }
 
 object StateInterpreterT {
 
-  def freeInstance[M[_], F[_[_], _], S[_[_]]](
-    step: StepT[M, F, S],
-    uncons: Uncons[S]
+  def freeInstance[M[_], K[_], F[_], S](
+    step: StepT[M, K, F, S],
+    uncons: Uncons[K, S]
+  )(
+    f: K[Unit] => Free[F, Unit]
   )(implicit
     M0: Monad[M],
     M1: BindRec[M]
-  ): FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?] = {
-    type FF[A] = FreeK[F, A] // https://issues.scala-lang.org/browse/SI-10238
-    val step1 = step.papply[FF]
-    val uncons1 = uncons[FreeK[F, ?]]
+  ): Free[F, ?] ~> StateT[M, S, ?] = {
 
-    def runUntilClean[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] = {
+    def runUntilClean[A](p: Free[F, A])(s: S): M[(S, A)] = {
       M0.bind(runToCompletion(p)(s)){ case (s1, a) => M0.map(runUntilClean1(s1)) {(_, a)} }
     }
 
-    def runUntilClean1(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] =
-      M1.tailrecM(s)(s => uncons1(s) match {
+    def runUntilClean1(s: S): M[S] =
+      M1.tailrecM(s)(s => uncons(s) match {
         case None => s.right.point[M]
         case Some((s1, ku)) => M0.map(runToCompletionU(ku)(s1)){ _.left }
       })
 
-    def runToCompletion[A](p: FreeK[F, A])(s: S[FreeK[F, ?]]): M[(S[FreeK[F, ?]], A)] =
-      M0.bind(p.foldMapN(step1).apply(s)) {
+    def runToCompletion[A](p: Free[F, A])(s: S): M[(S, A)] =
+      M0.bind(p.foldMap(step).apply(s)) {
         case (ku, s1, a) => M0.map(runToCompletionU(ku)(s1)) { (_, a) }
       }
 
-    def runToCompletionU(ps: Lst[FreeK[F, Unit]])(s: S[FreeK[F, ?]]): M[S[FreeK[F, ?]]] = {
-      def go(a: (Lst[FreeK[F, Unit]], S[FreeK[F, ?]])): M[(Lst[FreeK[F, Unit]], S[FreeK[F, ?]]) \/ S[FreeK[F, ?]]] = {
+    def runToCompletionU(ps: Lst[K[Unit]])(s: S): M[S] = {
+      def go(a: (Lst[K[Unit]], S)): M[(Lst[K[Unit]], S) \/ S] = {
         val (l, s) = a
         l.uncons match {
           case None => s.right.point[M]
-          case Some((k, ks)) => M0.map(k.foldMapN(step1).apply(s)) { case (ks1, s1, ()) => (ks1 ++ ks, s1).left }
+          case Some((k, ks)) => M0.map(f(k).foldMap(step).apply(s)) { case (ks1, s1, ()) => (ks1 ++ ks, s1).left }
         }
       }
       M1.tailrecM((ps, s))(go)
     }
 
-    new (FreeK[F, ?] ~> StateT[M, S[FreeK[F, ?]], ?]) {
-      def apply[A](fa: FreeK[F, A]): StateT[M, S[FreeK[F, ?]], A] = StateT(runUntilClean(fa))
-    }
+    λ[Free[F, ?] ~> StateT[M, S, ?]](fa => StateT(runUntilClean(fa)))
   }
 }

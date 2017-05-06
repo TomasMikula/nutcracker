@@ -1,22 +1,13 @@
 package nutcracker.util
 
-import scala.language.higherKinds
-import scalaz.{Lens, StateT}
-import scalaz.std.option._
+import scalaz.Lens
 
-final case class Uncons[S[_[_]]](run: `Forall{(* -> *) -> *}`[λ[K[_] => StateT[Option, S[K], Lst[K[Unit]]]]]) extends AnyVal { self =>
-  def apply[K[_]] = run[K]
+final case class Uncons[K[_], S](run: S => Option[(S, Lst[K[Unit]])]) extends AnyVal { self =>
+  def apply(s: S): Option[(S, Lst[K[Unit]])] = run(s)
 
-  def zoomOut[T[_[_]]](implicit f: `Forall{(* -> *) -> *}`[λ[K[_] => Lens[T[K], S[K]]]]): Uncons[T] = {
-    type StS[K[_]] = StateT[Option, S[K], Lst[K[Unit]]]
-    type StT[K[_]] = StateT[Option, T[K], Lst[K[Unit]]]
-    Uncons[T](run.transform[StT](new (StS ≈> StT) {
-      def apply[K[_]](sts: StS[K]): StT[K] = sts.zoom(f[K])
-    }))
-  }
+  def zoomOut[T](implicit f: Lens[T, S]): Uncons[K, T] =
+    Uncons[K, T](t => self(f.get(t)).map({ case (s, ks) => (f.set(t, s), ks) }))
 
-  def orElse(that: Uncons[S]): Uncons[S] = Uncons[S](new `Forall{(* -> *) -> *}`[λ[K[_] => StateT[Option, S[K], Lst[K[Unit]]]]] {
-    override def compute[K[_]]: StateT[Option, S[K], Lst[K[Unit]]] =
-      StateT(s => self[K](s).orElse(that[K](s)))
-  })
+  def orElse(that: Uncons[K, S]): Uncons[K, S] =
+    Uncons[K, S](s => self(s).orElse(that(s)))
 }

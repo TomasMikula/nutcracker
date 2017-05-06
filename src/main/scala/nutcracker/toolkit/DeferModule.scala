@@ -3,11 +3,12 @@ package nutcracker.toolkit
 import nutcracker.Defer
 import nutcracker.util.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
 import nutcracker.util.{FreeK, Inject, StateInterpreter}
+import scalaz.Lens
 
 trait DeferModule[D] extends Module {
   implicit def freeDeferApi[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): Defer[FreeK[F, ?], D]
 
-  def interpreter: StateInterpreter[Lang, StateK]
+  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S]
 }
 
 object DeferModule {
@@ -31,5 +32,6 @@ trait StashDeferModule[D] extends DeferModule[D] with StashModule
 class DeferListModule[D, Lang[_[_], _], State0[_[_]]](base: PersistentDeferModule.Aux[D, Lang, State0]) extends ListModule[Lang, State0](base) with StashDeferModule[D] {
   def freeDeferApi[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]) = base.freeDeferApi[F]
 
-  def interpreter: StateInterpreter[Lang, StateK] = base.interpreter.inHead
+  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] =
+    base.interpreter[K, S](Lens.nelHeadLens[State0[K]].compose(lens))
 }

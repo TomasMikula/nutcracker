@@ -1,6 +1,5 @@
 package nutcracker.util
 
-import scala.language.higherKinds
 import scalaz.Lens
 
 object CompilationTests {
@@ -17,25 +16,27 @@ object CompilationTests {
     trait BarS[K[_]]
     trait BazS[K[_]]
 
-    type FooBarBazL[K[_], A] = (FooL :+: BarL :++: BazL)#Out[K, A]
+    type FooBarBazL[K[_], A] = (FooL :+: BarL :++: BazL)#Out1[K, A]
     type FooBarBazS[K[_]]    = (FooS :*: BarS :**: BazS)#Out[K]
 
-    def fooStep[S[_[_]]](implicit lens: LensK[S, FooS]): Step[FooL, S] = ???
-    def barStep[S[_[_]]](implicit lens: LensK[S, BarS]): Step[BarL, S] = ???
-    def bazStep[S[_[_]]](implicit lens: LensK[S, BazS]): Step[BazL, S] = ???
+    def fooStep[K[_], S](implicit lens: Lens[S, FooS[K]]): Step[K, FooL[K, ?], S] = ???
+    def barStep[K[_], S](implicit lens: Lens[S, BarS[K]]): Step[K, BarL[K, ?], S] = ???
+    def bazStep[K[_], S](implicit lens: Lens[S, BazS[K]]): Step[K, BazL[K, ?], S] = ???
 
-    def fooIntr[S[_[_]]](implicit lens: LensK[S, FooS]): StateInterpreter[FooL, S] = ???
-    def barIntr[S[_[_]]](implicit lens: LensK[S, BarS]): StateInterpreter[BarL, S] = ???
-    def bazIntr[S[_[_]]](implicit lens: LensK[S, BazS]): StateInterpreter[BazL, S] = ???
+    def fooIntr[K[_], S](implicit lens: Lens[S, FooS[K]]): StateInterpreter[K, FooL[K, ?], S] = ???
+    def barIntr[K[_], S](implicit lens: Lens[S, BarS[K]]): StateInterpreter[K, BarL[K, ?], S] = ???
+    def bazIntr[K[_], S](implicit lens: Lens[S, BazS[K]]): StateInterpreter[K, BazL[K, ?], S] = ???
 
-    fooStep[FooBarBazS] :+: barStep[FooBarBazS] :+: bazStep[FooBarBazS]
-    fooStep[FooBarBazS] :+: barStep[FooBarBazS] :+: bazIntr[FooBarBazS]
-    fooStep[FooBarBazS] :+: barIntr[FooBarBazS] :+: bazStep[FooBarBazS]
-    fooStep[FooBarBazS] :+: barIntr[FooBarBazS] :+: bazIntr[FooBarBazS]
-    fooIntr[FooBarBazS] :+: barStep[FooBarBazS] :+: bazStep[FooBarBazS]
-    fooIntr[FooBarBazS] :+: barStep[FooBarBazS] :+: bazIntr[FooBarBazS]
-    fooIntr[FooBarBazS] :+: barIntr[FooBarBazS] :+: bazStep[FooBarBazS]
-    fooIntr[FooBarBazS] :+: barIntr[FooBarBazS] :+: bazIntr[FooBarBazS]
+    type Prg1[A] = FreeK[FooBarBazL, A]
+
+    fooStep[Prg1, FooBarBazS[Prg1]] :+: barStep[Prg1, FooBarBazS[Prg1]] :+: bazStep[Prg1, FooBarBazS[Prg1]]
+    fooStep[Prg1, FooBarBazS[Prg1]] :+: barStep[Prg1, FooBarBazS[Prg1]] :+: bazIntr[Prg1, FooBarBazS[Prg1]]
+    fooStep[Prg1, FooBarBazS[Prg1]] :+: barIntr[Prg1, FooBarBazS[Prg1]] :+: bazStep[Prg1, FooBarBazS[Prg1]]
+    fooStep[Prg1, FooBarBazS[Prg1]] :+: barIntr[Prg1, FooBarBazS[Prg1]] :+: bazIntr[Prg1, FooBarBazS[Prg1]]
+    fooIntr[Prg1, FooBarBazS[Prg1]] :+: barStep[Prg1, FooBarBazS[Prg1]] :+: bazStep[Prg1, FooBarBazS[Prg1]]
+    fooIntr[Prg1, FooBarBazS[Prg1]] :+: barStep[Prg1, FooBarBazS[Prg1]] :+: bazIntr[Prg1, FooBarBazS[Prg1]]
+    fooIntr[Prg1, FooBarBazS[Prg1]] :+: barIntr[Prg1, FooBarBazS[Prg1]] :+: bazStep[Prg1, FooBarBazS[Prg1]]
+    fooIntr[Prg1, FooBarBazS[Prg1]] :+: barIntr[Prg1, FooBarBazS[Prg1]] :+: bazIntr[Prg1, FooBarBazS[Prg1]]
 
     trait QuuxL[X, K[_], A]
     trait QuuxS[X, K[_]]
@@ -43,32 +44,34 @@ object CompilationTests {
     type QuxL[K[_], A] = QuuxL[Int, K, A]
     type QuxS[K[_]]    = QuuxS[Int, K]
 
-    type FooBarQuxL[K[_], A] = (FooL :+: BarL :++: QuxL)#Out[K, A]
+    type FooBarQuxL[K[_], A] = (FooL :+: BarL :++: QuxL)#Out1[K, A]
     type FooBarQuxS[K[_]]    = (FooS :*: BarS :**: QuxS)#Out[K]
 
-    def quxStep[S[_[_]]](implicit lens: LensK[S, QuxS]): Step[QuxL, S] = ???
-    def quxIntr[S[_[_]]](implicit lens: LensK[S, QuxS]): StateInterpreter[QuxL, S] = ???
+    type Prg2[A] = FreeK[FooBarQuxL, A]
 
-    fooStep[FooBarQuxS] :+: barStep[FooBarQuxS] :+: quxStep[FooBarQuxS]
-    fooStep[FooBarQuxS] :+: barStep[FooBarQuxS] :+: quxIntr[FooBarQuxS]
-    fooStep[FooBarQuxS] :+: barIntr[FooBarQuxS] :+: quxStep[FooBarQuxS]
-    fooStep[FooBarQuxS] :+: barIntr[FooBarQuxS] :+: quxIntr[FooBarQuxS]
-    fooIntr[FooBarQuxS] :+: barStep[FooBarQuxS] :+: quxStep[FooBarQuxS]
-    fooIntr[FooBarQuxS] :+: barStep[FooBarQuxS] :+: quxIntr[FooBarQuxS]
-    fooIntr[FooBarQuxS] :+: barIntr[FooBarQuxS] :+: quxStep[FooBarQuxS]
-    fooIntr[FooBarQuxS] :+: barIntr[FooBarQuxS] :+: quxIntr[FooBarQuxS]
+    def quxStep[K[_], S](implicit lens: Lens[S, QuxS[K]]): Step[K, QuxL[K, ?], S] = ???
+    def quxIntr[K[_], S](implicit lens: Lens[S, QuxS[K]]): StateInterpreter[K, QuxL[K, ?], S] = ???
 
-    implicitly[InjectK[FooL, FooBarQuxL]]
-    implicitly[InjectK[BarL, FooBarQuxL]]
-    implicitly[InjectK[QuxL, FooBarQuxL]]
+    fooStep[Prg2, FooBarQuxS[Prg2]] :+: barStep[Prg2, FooBarQuxS[Prg2]] :+: quxStep[Prg2, FooBarQuxS[Prg2]]
+    fooStep[Prg2, FooBarQuxS[Prg2]] :+: barStep[Prg2, FooBarQuxS[Prg2]] :+: quxIntr[Prg2, FooBarQuxS[Prg2]]
+    fooStep[Prg2, FooBarQuxS[Prg2]] :+: barIntr[Prg2, FooBarQuxS[Prg2]] :+: quxStep[Prg2, FooBarQuxS[Prg2]]
+    fooStep[Prg2, FooBarQuxS[Prg2]] :+: barIntr[Prg2, FooBarQuxS[Prg2]] :+: quxIntr[Prg2, FooBarQuxS[Prg2]]
+    fooIntr[Prg2, FooBarQuxS[Prg2]] :+: barStep[Prg2, FooBarQuxS[Prg2]] :+: quxStep[Prg2, FooBarQuxS[Prg2]]
+    fooIntr[Prg2, FooBarQuxS[Prg2]] :+: barStep[Prg2, FooBarQuxS[Prg2]] :+: quxIntr[Prg2, FooBarQuxS[Prg2]]
+    fooIntr[Prg2, FooBarQuxS[Prg2]] :+: barIntr[Prg2, FooBarQuxS[Prg2]] :+: quxStep[Prg2, FooBarQuxS[Prg2]]
+    fooIntr[Prg2, FooBarQuxS[Prg2]] :+: barIntr[Prg2, FooBarQuxS[Prg2]] :+: quxIntr[Prg2, FooBarQuxS[Prg2]]
+
+    implicitly[Inject[FooL[Prg2, ?], FooBarQuxL[Prg2, ?]]]
+    implicitly[Inject[BarL[Prg2, ?], FooBarQuxL[Prg2, ?]]]
+    implicitly[Inject[QuxL[Prg2, ?], FooBarQuxL[Prg2, ?]]]
 
     implicitly[Lens[FooBarQuxS[List], FooS[List]]]
     implicitly[Lens[FooBarQuxS[List], BarS[List]]]
     implicitly[Lens[FooBarQuxS[List], QuxS[List]]]
 
-    implicitly[`Forall{(* -> *) -> *}`[λ[K[_] => Lens[FooBarQuxS[K], FooS[K]]]]]
-    implicitly[`Forall{(* -> *) -> *}`[λ[K[_] => Lens[FooBarQuxS[K], BarS[K]]]]]
-    implicitly[`Forall{(* -> *) -> *}`[λ[K[_] => Lens[FooBarQuxS[K], QuxS[K]]]]]
+    implicitly[LensK[FooBarQuxS, FooS]]
+    implicitly[LensK[FooBarQuxS, BarS]]
+    implicitly[LensK[FooBarQuxS, QuxS]]
 
     ()
   }

@@ -22,7 +22,7 @@ object PropBranch extends FreePropagationToolkit with FreeBranchingToolkit with 
 
   val Branch = PersistentBranchingModule.instance[VarK, ValK].stashable
 
-  type Lang[K[_], A] = (Prop.Lang  :++: Branch.Lang )#Out[K, A]
+  type Lang[K[_], A] = (Prop.Lang   :++: Branch.Lang  )#Out1[K, A]
   type StateK[K[_]]  = (Prop.StateK :**: Branch.StateK)#Out[K]
 
   def varOrderK[K[_]] = Prop.varOrderK
@@ -42,8 +42,8 @@ object PropBranch extends FreePropagationToolkit with FreeBranchingToolkit with 
   import Prop.{stashRestore => sr1}
   def stashRestoreK[K[_]]: StashRestore[StateK[K]] = StashRestore.kPairInstance
 
-  val interpreter = (Prop.interpreter[StateK] :+: Branch.interpreter[StateK]).freeInstance
-  def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p).run(s)
+  val interpreter = (Prop.interpreter[Prg, State] :+: Branch.interpreter[Prg, State]).freeInstance(_.run.toFree)
+  def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p.run.toFree).run(s)
   def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] = Prop.fetchK(ref, s._1)
   def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A         = Prop.fetchK(ref, s._1)
   def emptyK[K[_]]: StateK[K] = Prop.emptyK[K] :*: Branch.emptyK[K]

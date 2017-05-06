@@ -1,7 +1,6 @@
 package nutcracker.toolkit
 
 import nutcracker.util.CoproductK._
-import nutcracker.util.InjectK
 import nutcracker.util.KPair._
 import nutcracker.util.algebraic.NonDecreasingMonoid
 import nutcracker.{Assessment, BranchingPropagation, CostApi, Propagation}
@@ -26,7 +25,7 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   type VarK[K[_], A] = Prop.VarK[K, A]
   type ValK[K[_], A] = Prop.ValK[K, A]
 
-  type Lang[K[_], A] = (Prop.Lang   :+: Branch.Lang   :++: Cost.Lang  )#Out[K, A]
+  type Lang[K[_], A] = (Prop.Lang   :+: Branch.Lang   :++: Cost.Lang  )#Out1[K, A]
   type StateK[K[_]]  = (Prop.StateK :*: Branch.StateK :**: Cost.StateK)#Out[K]
 
   implicit def varOrderK[K[_]] = Prop.varOrderK
@@ -40,14 +39,8 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   implicit val branchingApi: BranchingPropagation[Prg, Var, Val] =
     Branch.freeBranchingPropagation[Lang]
 
-  implicit val costApi: CostApi.Aux[Prg, C] = {
-    // Not sure why scalac is not able to find this itself.
-    // Try removing after https://github.com/scala/bug/issues/10213 is resolved
-    implicit val injC: InjectK[Cost.Lang, Lang] =
-      InjectK.injectRight[Cost.Lang, (Branch.Lang  :++: Cost.Lang )#Out, Prop.Lang](InjectK.injectRight[Cost.Lang, Cost.Lang, Branch.Lang])
-
+  implicit val costApi: CostApi.Aux[Prg, C] =
     Cost.freeCost[Lang]
-  }
 
   import Branch.{stashRestore => sr2}
   import Cost.{stashRestore => sr3}
@@ -63,8 +56,8 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A =
     Prop.fetchK(ref, s._1)
 
-  val interpreter = (Prop.interpreter[StateK] :+: Branch.interpreter[StateK] :+: Cost.interpreter[StateK]).freeInstance
-  def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p).run(s)
+  val interpreter = (Prop.interpreter[Prg, State] :+: Branch.interpreter[Prg, State] :+: Cost.interpreter[Prg, State]).freeInstance(_.run.toFree)
+  def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p.run.toFree).run(s)
 
   def assess(s: State): Assessment[List[Prg[Unit]]] =
     if (Prop.isConsistent(s._1))

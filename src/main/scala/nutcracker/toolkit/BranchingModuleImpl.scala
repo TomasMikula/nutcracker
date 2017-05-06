@@ -1,10 +1,10 @@
 package nutcracker.toolkit
 
 import nutcracker.ops._
-import nutcracker.util.{FreeK, Inject, LensK, Lst, Step, WriterState}
+import nutcracker.util.{FreeK, Inject, Lst, Step, WriterState}
 import nutcracker.{Assessment, BranchingPropagation, Propagation, Splittable}
 import scalaz.Id.Id
-import scalaz.{Functor, Monad, ~>}
+import scalaz.{Lens, ~>}
 
 private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] extends PersistentBranchingModule {
   type VarK[K[_], A] = Var0[K, A]
@@ -35,14 +35,14 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
 
   def emptyK[K[_]]: StateK[K] = BranchStore()
 
-  def interpreter[S[_[_]]](implicit lens: LensK[S, StateK]): Step[Lang, S] = new Step[Lang, S] {
+  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): Step[K, Lang[K, ?], S] = new Step[K, Lang[K, ?], S] {
     import BranchLang._
 
-    def apply[K[_]: Monad, A](f: BranchLang[VarK[K, ?], K, A]): WriterState[Lst[K[Unit]], S[K], A] =
-      go[VarK[K, ?], K, A](f).zoomOut[S[K]](lens[K], Functor[Id])
+    def apply[A](f: BranchLang[VarK[K, ?], K, A]): WriterState[Lst[K[Unit]], S, A] =
+      go[VarK[K, ?], A](f).zoomOut[S]
 
     // https://github.com/scala/bug/issues/10292
-    private def go[Ref[_], K[_]: Monad, A](f: BranchLang[Ref, K, A]): WriterState[Lst[K[Unit]], BranchStore[Ref, K], A] = f match {
+    private def go[Ref[_], A](f: BranchLang[Ref, K, A]): WriterState[Lst[K[Unit]], BranchStore[Ref, K], A] = f match {
       case Track(ref, ev) => WriterState(s => (Lst.empty, s.addVar(ref, ev), ()))
       case Untrack(ref) => WriterState(s => (Lst.empty, s.removeVar(ref), ()))
     }

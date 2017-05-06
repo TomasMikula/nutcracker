@@ -1,7 +1,7 @@
 package nutcracker.util
 
 import scala.language.higherKinds
-import scalaz.{-\/, \/, \/-, ~>}
+import scalaz.{-\/, Coproduct, \/, \/-, ~>}
 
 final case class CoproductK[F[_[_], _], G[_[_], _], K[_], A](run: F[K, A] \/ G[K, A]) extends AnyVal
 
@@ -9,14 +9,17 @@ object CoproductK {
 
   sealed trait Builder {
     type Out[_[_], _]
+    type Out1[_[_], _]
   }
 
   sealed trait :++:[F[_[_], _], G[_[_], _]] extends Builder {
     type Out[K[_], A] = CoproductK[F, G, K, A]
+    type Out1[K[_], A] = Coproduct[F[K, ?], G[K, ?], A]
   }
 
   sealed trait :+:[F[_[_], _], B <: Builder] extends Builder {
     type Out[K[_], A] = CoproductK[F, B#Out, K, A]
+    type Out1[K[_], A] = Coproduct[F[K, ?], B#Out1[K, ?], A]
   }
 
   def leftc[F[_[_], _], G[_[_], _], K[_], A](fa: F[K, A]): CoproductK[F, G, K, A] =

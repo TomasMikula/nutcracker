@@ -1,9 +1,8 @@
 package nutcracker.toolkit
 
 import nutcracker.CostApi
-import nutcracker.util.{FreeK, Inject, LensK, Lst, Step, WriterState}
-import scalaz.{Functor, Monad, Monoid}
-import scalaz.Id.Id
+import nutcracker.util.{FreeK, Inject, Lst, Step, WriterState}
+import scalaz.{Lens, Monoid}
 
 private[nutcracker] class CostModuleImpl[C](implicit C: Monoid[C]) extends PersistentCostModule[C] {
   import CostLang._
@@ -17,11 +16,11 @@ private[nutcracker] class CostModuleImpl[C](implicit C: Monoid[C]) extends Persi
 
   def stashable = new CostListModule[C, Lang, StateK](this)
 
-  def interpreter[S[_[_]]](implicit lens: LensK[S, StateK]): Step[Lang, S] = new Step[Lang, S] {
-    override def apply[K[_]: Monad, A](f: CostLang[C, K, A]): WriterState[Lst[K[Unit]], S[K], A] =
-      go[K, A](f).zoomOut(lens[K], Functor[Id])
+  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): Step[K, Lang[K, ?], S] = new Step[K, Lang[K, ?], S] {
+    override def apply[A](f: CostLang[C, K, A]): WriterState[Lst[K[Unit]], S, A] =
+      go(f).zoomOut
 
-    private def go[K[_]: Monad, A](f: CostLang[C, K, A]): WriterState[Lst[K[Unit]], StateK[K], A] =
+    private def go[A](f: CostLang[C, K, A]): WriterState[Lst[K[Unit]], StateK[K], A] =
       f match {
         case Cost(c1) => WriterState(c0 => (Lst.empty, C.append(c0, c1), ()))
         case GetCost(ev) => WriterState(c0 => (Lst.empty, c0, ev(c0)))

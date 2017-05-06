@@ -21,7 +21,7 @@ object PropRel extends FreePropagationToolkit with PropRelToolkit {
   type VarK[K[_], A] = Prop.VarK[K, A]
   type ValK[K[_], A] = Prop.ValK[K, A]
 
-  type Lang[K[_], A] = (Prop.Lang  :++: RelMod.Lang )#Out[K, A]
+  type Lang[K[_], A] = (Prop.Lang   :++: RelMod.Lang  )#Out1[K, A]
   type StateK[K[_]]  = (Prop.StateK :**: RelMod.StateK)#Out[K]
 
   implicit def varOrderK[K[_]] = Prop.varOrderK
@@ -47,7 +47,7 @@ object PropRel extends FreePropagationToolkit with PropRelToolkit {
     Prop.fetchK(ref, s._1)
 
   def interpret[A](p: Prg[A], s: State): (State, A) =
-    interpreter(p).run(s)
+    interpreter(p.run.toFree).run(s)
 
-  val interpreter = (Prop.interpreter[StateK] :+: RelMod.interpreter[StateK]).freeInstance
+  val interpreter = (Prop.interpreter[Prg, StateK[Prg]] :+: RelMod.interpreter[Prg, StateK[Prg]]).freeInstance(_.run.toFree)
 }
