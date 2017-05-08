@@ -1,7 +1,7 @@
 package nutcracker.util
 
 import nutcracker.util.free.Free
-import scalaz.{BindRec, Coproduct, Functor, Lens, Monad, StateT, Store, \/, ~>, NonEmptyList => Nel}
+import scalaz.{BindRec, Coproduct, Functor, Lens, Monad, StateT, Store, ~>, NonEmptyList => Nel}
 import scalaz.Id._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
@@ -69,6 +69,9 @@ object StateInterpreterT {
     M1: BindRec[M]
   ): Free[F, ?] ~> StateT[M, S, ?] = {
 
+    val split: Lst[K[Unit]] => Option[(WriterStateT[M, Lst[K[Unit]], S, Unit], Lst[K[Unit]])] =
+      _.uncons map { case (k, ks) => (f(k).foldMap(step), ks) }
+
     def runUntilClean[A](p: Free[F, A])(s: S): M[(S, A)] = {
       M0.bind(runToCompletion(p)(s)){ case (s1, a) => M0.map(runUntilClean1(s1)) {(_, a)} }
     }
@@ -76,24 +79,11 @@ object StateInterpreterT {
     def runUntilClean1(s: S): M[S] =
       M1.tailrecM(s)(s => uncons(s) match {
         case None => s.right.point[M]
-        case Some((s1, ku)) => M0.map(runToCompletionU(ku)(s1)){ _.left }
+        case Some((s1, ku)) => M0.map(WriterStateT.unfold(ku, split)(s1))(_.left)
       })
 
     def runToCompletion[A](p: Free[F, A])(s: S): M[(S, A)] =
-      M0.bind(p.foldMap(step).apply(s)) {
-        case (ku, s1, a) => M0.map(runToCompletionU(ku)(s1)) { (_, a) }
-      }
-
-    def runToCompletionU(ps: Lst[K[Unit]])(s: S): M[S] = {
-      def go(a: (Lst[K[Unit]], S)): M[(Lst[K[Unit]], S) \/ S] = {
-        val (l, s) = a
-        l.uncons match {
-          case None => s.right.point[M]
-          case Some((k, ks)) => M0.map(f(k).foldMap(step).apply(s)) { case (ks1, s1, ()) => (ks1 ++ ks, s1).left }
-        }
-      }
-      M1.tailrecM((ps, s))(go)
-    }
+      p.foldMap(step).runRec(s)(split)
 
     λ[Free[F, ?] ~> StateT[M, S, ?]](fa => StateT(runUntilClean(fa)))
   }

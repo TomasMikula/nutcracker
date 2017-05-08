@@ -1,9 +1,10 @@
 package nutcracker.util
 
-import scala.language.higherKinds
-import scalaz.{-\/, BindRec, Functor, Lens, Monad, MonadTrans, Monoid, \/, \/-}
+import scalaz.{-\/, Applicative, BindRec, Functor, Lens, Monad, MonadTrans, Monoid, \/, \/-}
 
 final case class WriterStateT[F[_], W, S, A](run: S => F[(W, S, A)]) extends AnyVal {
+  import WriterStateT._
+
   def apply(s: S): F[(W, S, A)] = run(s)
 
   def map[B](f: A => B)(implicit F: Functor[F]): WriterStateT[F, W, S, B] =
@@ -16,11 +17,27 @@ final case class WriterStateT[F[_], W, S, A](run: S => F[(W, S, A)]) extends Any
       }
     })
 
+  def runRec(s: S)(f: W => Option[(WriterStateT[F, W, S, Unit], W)])(implicit F0: BindRec[F], F1: Applicative[F], W: Monoid[W]): F[(S, A)] = {
+    F0.bind(run(s)) { case (w, s, a) => F0.map(unfold(w, f)(s))((_, a)) }
+  }
+
   def zoomOut[T](implicit l: Lens[T, S], F: Functor[F]): WriterStateT[F, W, T, A] =
     WriterStateT(t => F.map(run(l.get(t))) { case (w, s, a) => (w, l.set(t, s), a) })
 }
 
 object WriterStateT {
+  def unfold[F[_], W, S](w: W, f: W => Option[(WriterStateT[F, W, S, Unit], W)])(s: S)(implicit F0: BindRec[F], F1: Applicative[F], W: Monoid[W]): F[S] = {
+    def go(ws: (W, S)): F[(W, S) \/ S] = {
+      val (w, s) = ws
+      f(w) match {
+        case Some((prg, w)) => F0.map(prg.run(s)) { case (w1, s, _) => -\/((W.append(w1, w), s)) }
+        case None => F1.point(\/-(s))
+      }
+    }
+
+    F0.tailrecM((w, s))(go)
+  }
+
   implicit def monad[F[_], W, S](implicit F: Monad[F], W: Monoid[W]): Monad[WriterStateT[F, W, S, ?]] =
     new Monad[WriterStateT[F, W, S, ?]] {
       override def point[A](a: => A): WriterStateT[F, W, S, A] =
