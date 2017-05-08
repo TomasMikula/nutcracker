@@ -18,12 +18,9 @@ private[nutcracker] class CostModuleImpl[C](implicit C: Monoid[C]) extends Persi
 
   def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): Step[K, Lang[K, ?], S] = new Step[K, Lang[K, ?], S] {
     override def apply[A](f: CostLang[C, K, A]): WriterState[Lst[K[Unit]], S, A] =
-      go(f).zoomOut
-
-    private def go[A](f: CostLang[C, K, A]): WriterState[Lst[K[Unit]], StateK[K], A] =
       f match {
-        case Cost(c1) => WriterState(c0 => (Lst.empty, C.append(c0, c1), ()))
-        case GetCost(ev) => WriterState(c0 => (Lst.empty, c0, ev(c0)))
+        case Cost(c1) => WriterState(s => (Lst.empty, lens.mod(C.append(_, c1), s), ()))
+        case GetCost(ev) => WriterState(s => (Lst.empty, s, ev(lens.get(s))))
       }
   }
 

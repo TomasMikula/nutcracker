@@ -2,6 +2,7 @@ package nutcracker.toolkit
 
 import nutcracker.rel.Relations
 import nutcracker.util.{FreeK, Inject, Lst, Step, WriterState}
+import nutcracker.util.ops._
 import scalaz.Lens
 
 trait RelModule extends Module {
@@ -38,14 +39,15 @@ private[toolkit] object RelModuleImpl extends PersistentRelModule {
   def interpreter[K[_], S](implicit lens: Lens[S, RelDB[K]]): Step[K, RelLang[K, ?], S] = new Step[K, RelLang[K, ?], S] {
     import RelLang._
 
-    override def apply[A](f: RelLang[K, A]): WriterState[Lst[K[Unit]], S, A] =
-      go[A](f).zoomOut[S]
-
-    private def go[A](f: RelLang[K, A]): WriterState[Lst[K[Unit]], RelDB[K], A] = f match {
-      case r @ Relate(rel, values) => WriterState(db => db.insert(rel, values)(r.ordersWitness, r.orders) match { case (db1, ks) => (ks, db1, ()) })
-      case OnPatternMatch(p, a, h) => WriterState(db => db.addOnPatternMatch(p, a)(h) match { case (db1, ks) => (ks, db1, ()) })
-      case ExecWith(rel, ass, supp, exec, m, os) => WriterState(db => db.execWith(rel, ass)(supp)(exec)(m, os) match { case (db1, ko) => (Lst.maybe(ko), db1, ()) })
-      case Supply(rel, token, value) => WriterState(db => db.supply(rel, token, value) match { case (db1, ks) => (ks, db1, ()) })
+    override def apply[A](f: RelLang[K, A]): WriterState[Lst[K[Unit]], S, A] = f match {
+      case r @ Relate(rel, values) =>
+        WriterState(s => lens.get(s).insert(rel, values)(r.ordersWitness, r.orders) match { case (db1, ks) => (ks, s set db1, ()) })
+      case OnPatternMatch(p, a, h) =>
+        WriterState(s => lens.get(s).addOnPatternMatch(p, a)(h) match { case (db1, ks) => (ks, s set db1, ()) })
+      case ExecWith(rel, ass, supp, exec, m, os) =>
+        WriterState(s => lens.get(s).execWith(rel, ass)(supp)(exec)(m, os) match { case (db1, ko) => (Lst.maybe(ko), s set db1, ()) })
+      case Supply(rel, token, value) =>
+        WriterState(s => lens.get(s).supply(rel, token, value) match { case (db1, ks) => (ks, s set db1, ()) })
     }
   }
 

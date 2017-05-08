@@ -1,7 +1,8 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{FreeK, FreeKT, HOrderK, Index, Inject, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState}
 import nutcracker.{IDom, OnDemandPropagation, Sel, SeqPreHandler, SeqTrigger, Subscription}
+import nutcracker.util.{FreeK, FreeKT, HOrderK, Index, Inject, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState}
+import nutcracker.util.ops._
 import scala.language.existentials
 import scalaz.Id.Id
 import scalaz.syntax.equal._
@@ -35,64 +36,64 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
   override def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] =
     new StateInterpreter[K, Lang[K, ?], S] {
 
-      def step: Step[K, Lang[K, ?], S] =
-        new Step[K, Lang[K, ?], S] {
-          import PropagationLang._
+      def step: Step[K, Lang[K, ?], S] = new Step[K, Lang[K, ?], S] {
+        import PropagationLang._
 
-          override def apply[A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], S, A] =
-            go(p).zoomOut[S]
+        override def apply[A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], S, A] = WriterState(s0 => {
+          val s = lens.get(s0)
+          p match {
+            case Update(ref, u, dom) =>
+              (Lst.empty, s0 set s.update[dom.Domain, dom.Update, dom.IDelta](ref, u)(dom), ())
+            case Observe(ref, f, dom) =>
+              val (ks, s1, oid) = s.observe[dom.Domain, dom.Update, dom.IDelta](ref, f)(dom)
+              (ks, s0 set s1, oid)
+            case ObserveAuto(ref, f, dom) =>
+              val (ks, s1, oid) = s.observe[dom.Domain, dom.Update, dom.IDelta](ref, f)(dom)
+              (ks, s0 set s1, oid)
+            case NewCell(d, dom) =>
+              val (s1, ref) = s.newCell(d)(dom) // linter:ignore UndesirableTypeInference
+              (Lst.empty, s0 set s1, ref)
 
-          private def go[A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], PropagationStore[K], A] = WriterState(s =>
-            p match {
-              case Update(ref, u, dom) =>
-                (Lst.empty, s.update[dom.Domain, dom.Update, dom.IDelta](ref, u)(dom), ())
-              case Observe(ref, f, dom) =>
-                s.observe[dom.Domain, dom.Update, dom.IDelta](ref, f)(dom)
-              case ObserveAuto(ref, f, dom) =>
-                s.observe[dom.Domain, dom.Update, dom.IDelta](ref, f)(dom)
-              case NewCell(d, dom) =>
-                val (s1, ref) = s.newCell(d)(dom) // linter:ignore UndesirableTypeInference
-                (Lst.empty, s1, ref)
+            case Hold(ref, f) =>
+              val (s1, oid, ks) = s.hold(ref)(f)
+              (ks, s0 set s1, oid)
+            case HoldAuto(ref, f) =>
+              val (s1, cycle, oid, ks) = s.hold(ref)(f) // linter:ignore UndesirableTypeInference
+              (ks, s0 set s1, oid)
+            case res @ Resume(ref, token, trigger) =>
+              val (s1, ks) = s.resume[res.Domain, res.Delta, res.Arg](ref, token, trigger)
+              (ks, s0 set s1, ())
+            case res @ ResumeAuto(ref, cycle, token, trigger) =>
+              val (s1, ks) = s.resume[res.Domain, res.Delta, res.Arg](ref, cycle, token, trigger)
+              (ks, s0 set s1, ())
+            case RmObserver(ref, oid) =>
+              val (s1, ks) = s.rmObserver(ref, oid)
+              (ks, s0 set s1, ())
+            case RmAutoObserver(ref, cycle, oid) =>
+              val (s1, ks) = s.rmObserver(ref, cycle, oid)
+              (ks, s0 set s1, ())
 
-              case Hold(ref, f) =>
-                val (s1, oid, ks) = s.hold(ref)(f)
-                (ks, s1, oid)
-              case HoldAuto(ref, f) =>
-                val (s1, cycle, oid, ks) = s.hold(ref)(f) // linter:ignore UndesirableTypeInference
-                (ks, s1, oid)
-              case res @ Resume(ref, token, trigger) =>
-                val (s1, ks) = s.resume[res.Domain, res.Delta, res.Arg](ref, token, trigger)
-                (ks, s1, ())
-              case res @ ResumeAuto(ref, cycle, token, trigger) =>
-                val (s1, ks) = s.resume[res.Domain, res.Delta, res.Arg](ref, cycle, token, trigger)
-                (ks, s1, ())
-              case RmObserver(ref, oid) =>
-                val (s1, ks) = s.rmObserver(ref, oid)
-                (ks, s1, ())
-              case RmAutoObserver(ref, cycle, oid) =>
-                val (s1, ks) = s.rmObserver(ref, cycle, oid)
-                (ks, s1, ())
+            case SelTrigger(sel, f) =>
+              val (s1, ok) = s.addSelTrigger(sel, f)
+              (Lst.maybe(ok), s0 set s1, ())
 
-              case SelTrigger(sel, f) =>
-                val (s1, ok) = s.addSelTrigger(sel, f)
-                (Lst.maybe(ok), s1, ())
-
-              case ExclUpdate(ref, cycle, u, dom) =>
-                (Lst.empty, s.exclUpdate[dom.Domain, dom.Update, dom.IDelta](ref, cycle, u)(dom), ())
-              case Supply(ref, cycle, value) =>
-                val (s1, ks) = s.supply(ref)(cycle, value)
-                (ks, s1, ())
-              case NewAutoCell(setup, dom) =>
-                val (s1, ref) = s.newAutoCell(setup)(dom) // linter:ignore UndesirableTypeInference
-                (Lst.empty, s1, ref)
-              case AddFinalizer(ref, cycle, sub) =>
-                s.addFinalizer(ref, cycle, sub)
-              case RemoveFinalizer(ref, cycle, fid) =>
-                val s1 = s.removeFinalizer(ref, cycle, fid)
-                (Lst.empty, s1, ())
-            }
-          )
-        }
+            case ExclUpdate(ref, cycle, u, dom) =>
+              (Lst.empty, s0 set s.exclUpdate[dom.Domain, dom.Update, dom.IDelta](ref, cycle, u)(dom), ())
+            case Supply(ref, cycle, value) =>
+              val (s1, ks) = s.supply(ref)(cycle, value)
+              (ks, s0 set s1, ())
+            case NewAutoCell(setup, dom) =>
+              val (s1, ref) = s.newAutoCell(setup)(dom) // linter:ignore UndesirableTypeInference
+              (Lst.empty, s0 set s1, ref)
+            case AddFinalizer(ref, cycle, sub) =>
+              val (ks, s1, fid) = s.addFinalizer(ref, cycle, sub)
+              (ks, s0 set s1, fid)
+            case RemoveFinalizer(ref, cycle, fid) =>
+              val s1 = s.removeFinalizer(ref, cycle, fid)
+              (Lst.empty, s0 set s1, ())
+          }
+        })
+      }
 
       def uncons: Uncons[K, S] = Uncons[K, StateK[K]](_.uncons).zoomOut[S]
     }

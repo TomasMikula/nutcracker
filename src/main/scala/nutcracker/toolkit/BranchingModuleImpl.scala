@@ -2,6 +2,7 @@ package nutcracker.toolkit
 
 import nutcracker.ops._
 import nutcracker.util.{FreeK, Inject, Lst, Step, WriterState}
+import nutcracker.util.ops._
 import nutcracker.{Assessment, BranchingPropagation, Propagation, Splittable}
 import scalaz.Id.Id
 import scalaz.{Lens, ~>}
@@ -35,17 +36,15 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
 
   def emptyK[K[_]]: StateK[K] = BranchStore()
 
-  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): Step[K, Lang[K, ?], S] = new Step[K, Lang[K, ?], S] {
-    import BranchLang._
+  def interpreter[K[_], S](implicit l: Lens[S, StateK[K]]): Step[K, Lang[K, ?], S] = new Step[K, Lang[K, ?], S] {
 
-    def apply[A](f: BranchLang[VarK[K, ?], K, A]): WriterState[Lst[K[Unit]], S, A] =
-      go[VarK[K, ?], A](f).zoomOut[S]
-
-    // https://github.com/scala/bug/issues/10292
-    private def go[Ref[_], A](f: BranchLang[Ref, K, A]): WriterState[Lst[K[Unit]], BranchStore[Ref, K], A] = f match {
-      case Track(ref, ev) => WriterState(s => (Lst.empty, s.addVar(ref, ev), ()))
-      case Untrack(ref) => WriterState(s => (Lst.empty, s.removeVar(ref), ()))
-    }
+    def apply[A](f: BranchLang[VarK[K, ?], K, A]): WriterState[Lst[K[Unit]], S, A] = WriterState(s0 => {
+      val s = l.get(s0)
+      f.fold(
+        caseTrack = t => t match { case t1 => (Lst.empty, s0 set s.addVar(t1.ref, t1.ev), t1.wit(())) },
+        caseUntrack = u => (Lst.empty, s0 set s.removeVar(u.ref), u.wit(()))
+      )
+    })
   }
 
   def assess[K[_]](s: StateK[K])(fetch: VarK[K, ?] ~> Id)(implicit K: Propagation[K, VarK[K, ?], ValK[K, ?]]): Assessment[List[K[Unit]]] =
