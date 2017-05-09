@@ -1,10 +1,9 @@
 package nutcracker.toolkit
 
 import nutcracker.{IDom, OnDemandPropagation, Sel, SeqPreHandler, SeqTrigger, Subscription}
-import nutcracker.util.{FreeK, FreeKT, HOrderK, Index, Inject, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState}
+import nutcracker.util.{FreeK, HOrderK, Index, Inject, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState}
 import nutcracker.util.ops._
 import scala.language.existentials
-import scalaz.Id.Id
 import scalaz.syntax.equal._
 import scalaz.{-\/, Equal, Lens, Monad, Ordering, Show, \/-}
 import shapeless.{HList, Nat, Sized}
@@ -20,7 +19,7 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
   override def valOrderK[K[_]]: HOrderK[ValK[K, ?]] = CellId.orderKInstance
   override def valShowK[K[_]]: ShowK[ValK[K, ?]] = CellId.showKInstance
 
-  override implicit def prgMonad: Monad[FreeK[Lang, ?]] = FreeKT.freeKTMonad[Lang, Id]
+  override def prgMonad: Monad[FreeK[Lang, ?]] = implicitly
   override implicit def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): OnDemandPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] =
     PropagationLang.freePropagation[F]
 
@@ -31,7 +30,7 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
     PropagationStore.empty[K]
 
   override def interpret[A](p: Prg[A], s: PropagationStore[Prg]): (PropagationStore[Prg], A) =
-    interpreter(Lens.lensId[State]).freeInstance(_.run.toFree).apply(p.run.toFree).run(s)
+    interpreter(Lens.lensId[State]).freeInstance(_.unwrap).apply(p.unwrap).run(s)
 
   override def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] =
     new StateInterpreter[K, Lang[K, ?], S] {

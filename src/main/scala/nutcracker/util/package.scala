@@ -1,7 +1,7 @@
 package nutcracker
 
 import scalaz.Id.Id
-import scalaz.{Applicative, Bind, ContT, Lens, Monad, NonEmptyList, Store, Traverse, |>=|}
+import scalaz.{Applicative, Bind, ContT, Lens, Monad, NonEmptyList, Store, |>=|}
 import scalaz.NonEmptyList.nel
 import scalaz.syntax.monad._
 
@@ -94,34 +94,6 @@ package object util {
       new LensK[λ[K[_] => NonEmptyList[S[K]]], S] {
         def compute[K[_]]: Lens[NonEmptyList[S[K]], S[K]] = Lens(ss => Store(s => nel(s, ss.tail), ss.head))
       }
-  }
-
-  /** Free monad for type constructors of kind `F[_[_], _]`,
-    * where `F`'s first type parameter is recursively set to FreeK[F, ?].
-    * If we pretend that recursive type aliases are legal, then `FreeK` is
-    * equivalent to
-    *
-    * {{{
-    * type FreeK[F[_[_], _], A] = Free[F[FreeK[F, ?], ?], A]
-    * }}}
-    *
-    * This is useful for instruction sets (a.k.a. algebras, DSLs, ...) that
-    * need to refer to the type of the free program that they are embedded in.
-    */
-  type FreeK[F[_[_], _], A] = FreeKT[F, Id, A]
-  object FreeK {
-
-    def pure[F[_[_], _], A](a: A): FreeK[F, A] =
-      FreeKT.pure[F, Id, A](a)
-
-    def liftF[F[_[_], _], A](a: F[FreeK[F, ?], A]): FreeK[F, A] =
-      FreeKT.liftF[F, Id, A](a)
-
-    def sequence[F[_[_], _], C[_]: Traverse, A](ps: C[FreeK[F, A]]): FreeK[F, C[A]] =
-      Traverse[C].sequence[FreeKT[F, Id, ?], A](ps)(FreeKT.freeKTMonad[F, Id])
-
-    def traverse[F[_[_], _], C[_]: Traverse, A, B](ps: C[A])(f: A => FreeK[F, B]): FreeK[F, C[B]] =
-      Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)(FreeKT.freeKTMonad[F, Id])
   }
 
   type Desc[Ptr[_]] = FreeObjectOutput[String, Ptr, Unit]

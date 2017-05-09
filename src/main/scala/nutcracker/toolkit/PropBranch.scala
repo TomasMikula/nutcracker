@@ -1,12 +1,11 @@
 package nutcracker.toolkit
 
 import nutcracker.util.CoproductK.:++:
-import nutcracker.util.FreeKT
 import nutcracker.util.KPair._
 import nutcracker.{Assessment, BranchingPropagation, Propagation}
 import scala.language.existentials
 import scalaz.Id.Id
-import scalaz.~>
+import scalaz.{Monad, ~>}
 
 trait PropBranchToolkit extends PropagationToolkit with BranchingToolkit
 
@@ -30,7 +29,7 @@ object PropBranch extends FreePropagationToolkit with FreeBranchingToolkit with 
   def valOrderK[K[_]] = Prop.valOrderK
   def valShowK[K[_]] = Prop.valShowK
 
-  implicit def prgMonad = FreeKT.freeKTMonad
+  override def prgMonad: Monad[Prg] = implicitly
 
   implicit val propagationApi: Propagation[Prg, Var, Val] =
     Prop.freePropagation[Lang]
@@ -42,8 +41,8 @@ object PropBranch extends FreePropagationToolkit with FreeBranchingToolkit with 
   import Prop.{stashRestore => sr1}
   def stashRestoreK[K[_]]: StashRestore[StateK[K]] = StashRestore.kPairInstance
 
-  val interpreter = (Prop.interpreter[Prg, State] :+: Branch.interpreter[Prg, State]).freeInstance(_.run.toFree)
-  def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p.run.toFree).run(s)
+  val interpreter = (Prop.interpreter[Prg, State] :+: Branch.interpreter[Prg, State]).freeInstance(_.unwrap)
+  def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p.unwrap).run(s)
   def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] = Prop.fetchK(ref, s._1)
   def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A         = Prop.fetchK(ref, s._1)
   def emptyK[K[_]]: StateK[K] = Prop.emptyK[K] :*: Branch.emptyK[K]
