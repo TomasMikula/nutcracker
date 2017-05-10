@@ -7,7 +7,7 @@ import nutcracker.{Final, RelativelyComplementedDom, SplittableDomWithBottom, Te
   * algebra: contradiction is at the top, logical _and_ is join, and logical
   * _or_ is meet.
   */
-final case class Bool private(intValue: Int) extends AnyVal
+sealed abstract class Bool(val intValue: Int)
 
 object Bool {
   final case class Join(value: Bool) // extends AnyVal // value class may not wrap another user-defined value class
@@ -15,10 +15,18 @@ object Bool {
 
   type BoolDom = RelativelyComplementedDom[Bool] with SplittableDomWithBottom.Aux[Bool, Update, Unit] with TerminalDom[Bool]
 
-  val Contradiction = Bool(0)
-  val MustBeTrue = Bool(1)
-  val MustBeFalse = Bool(2)
-  val Anything = Bool(3)
+  case object Contradiction extends Bool(0)
+  case object MustBeTrue extends Bool(1)
+  case object MustBeFalse extends Bool(2)
+  case object Anything extends Bool(3)
+
+  private def apply(i: Int): Bool = i match {
+    case 0 => Contradiction
+    case 1 => MustBeTrue
+    case 2 => MustBeFalse
+    case 3 => Anything
+    case _ => sys.error("Illegal argument: " + i)
+  }
 
   implicit val finalInstance: Final.Aux[Bool, Boolean] = new Final[Bool] {
     type Out = Boolean

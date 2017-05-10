@@ -1,11 +1,10 @@
 package nutcracker.data.bool
 
-import scala.language.higherKinds
-import nutcracker.BranchingPropagation
+import nutcracker.{BranchingPropagation, Dom, Subscription, UpdateResult}
 import nutcracker.data.bool.Bool._
 import nutcracker.ops._
-
-import scalaz.{Applicative, Apply, Bind, Monad}
+import scalaz.{Applicative, Apply, Bind, Monad, Traverse}
+import scalaz.std.list._
 import scalaz.syntax.bind._
 
 class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Val]) {
@@ -29,39 +28,21 @@ class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Va
     })
   } yield res
 
-  def or(x: Var[Bool]*)(implicit M: Monad[M]): M[Var[Bool]] = {
-    newVar[Bool] >>= { res =>
-      def watch(i: Int, j: Int): M[_] = {
-        require(i < j)
-        if(j < 0) {
-          // all variables have been set to false,
-          // thus the result must be false
-          res.set(false)
-        } else if(i < 0) {
-          // all but one variable set to false,
-          // the result is equal to the remaining one
-          x(j) <=> res
-        } else {
-          _selThreshold2(x(i), x(j))((di, dj) => {
-            if (di == MustBeTrue || dj == MustBeTrue) {
-              // found a variable set to true,
-              // thus the result must be true
-              Some(res.set(true))
-            } else if (di == MustBeFalse) {
-              // pick next variable to watch instead of x(i)
-              Some(watch(i-1, j))
-            } else if (dj == MustBeFalse) {
-              // pick next variable to watch instead of x(j)
-              Some(watch(i-1, i))
-            } else {
-              None
-            }
-          })
-        }
-      }
-      watch(x.size - 2, x.size - 1) >> M.pure(res)
-    }
-  }
+  def or(x: Var[Bool], y: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
+    res <- newVar[Bool]
+    _ <- x._whenFinal({ r =>
+      if (r) res.set(true)
+      else y <=> res
+    })
+    _ <- y._whenFinal({ r =>
+      if (r) res.set(true)
+      else x <=> res
+    })
+    _ <- res._whenFinal({ r =>
+      if (r) M.pure(())
+      else x.set(false) >> y.set(false)
+    })
+  } yield res
 
   def neg(x: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
     res <- newVar[Bool]
@@ -92,8 +73,31 @@ class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Va
     })
   }
 
-  def atLeastOneTrue(x: Var[Bool]*)(implicit M: Monad[M]): M[Unit] =
-    presume(or(x: _*))
+  def atLeastOneTrue(x: Var[Bool]*)(implicit M: Monad[M]): M[Unit] = {
+    require(x.size > 0)
+
+    def watch(i: Int, wr: Var[Watched]): M[Subscription[M]] =
+      observe(x(i)).threshold(_ match {
+        case MustBeTrue => Some(update(wr).by(Watched.Satisfied))
+        case MustBeFalse => Some(update(wr).by(Watched.Failed(i)))
+        case Contradiction => Some(M.point(())) // already un-sat, no need to propagate contradiction
+        case Anything => None
+      })
+
+    val n = x.size
+    if (n == 1)
+      x(0).set(true)
+    else for {
+      wr <- newCell(Watched(n - 2, n - 1))
+      _ <- observe(wr).by(_ => sleep(untilRight((w: Watched, δ: Watched.Delta) => δ match {
+        case Watched.ToWatch(is) => Left(Traverse[List].traverse_(is)(watch(_, wr)))
+        case Watched.ToSatisfy(i) => Right(x(i).set(true))
+        case Watched.DoNothing => Right(M.point(()))
+      })))
+      _ <- watch(n - 1, wr)
+      _ <- watch(n - 2, wr)
+    } yield ()
+  }
 
   def presume(x: Var[Bool]): M[Unit] =
     x.set(true)
@@ -143,4 +147,56 @@ class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Va
 
 object BoolOps {
   def apply[M[_], Var[_], Val[_]](implicit P: BranchingPropagation[M, Var, Val]): BoolOps[M, Var, Val] = new BoolOps()
+}
+
+// Auxiliary domain for implementing Two Watched Variables
+private[bool] sealed abstract class Watched
+
+private[bool] object Watched {
+  case class Watching(i: Int, j: Int) extends Watched
+  case object Done extends Watched
+
+  def apply(i: Int, j: Int): Watched = {
+    require(i < j)
+    Watching(i, j)
+  }
+
+  sealed abstract class Update
+  case class Failed(i: Int) extends Update
+  case object Satisfied extends Update
+
+  sealed abstract class Delta
+  case class ToWatch(is: List[Int]) extends Delta
+  case class ToSatisfy(i: Int) extends Delta
+  case object DoNothing extends Delta
+
+  implicit val domInstance: Dom.Aux[Watched, Update, Delta] = new Dom[Watched] {
+    type Update = Watched.Update
+    type Delta = Watched.Delta
+
+    override def update[D0 <: Watched](d: D0, u: Update): UpdateResult[Watched, IDelta, D0] = d match {
+      case Watching(i, j) => u match {
+        case Satisfied => UpdateResult(Done, DoNothing)
+        case Failed(k) =>
+          assert(k == i || k == j)
+          val l = i + j - k
+          if(i == 0 || j == 0) UpdateResult(Done, ToSatisfy(l))
+          else {
+            val k1 = math.min(i, j) - 1
+            UpdateResult(Watching(k1, l), ToWatch(k1 :: Nil))
+          }
+      }
+      case Done => UpdateResult()
+    }
+
+    override def appendDeltas(d1: Delta, d2: Delta): Watched.Delta = (d1, d2) match {
+      case (DoNothing, _) => DoNothing
+      case (_, DoNothing) => DoNothing
+      case (s @ ToSatisfy(_), _) => s
+      case (_, s @ ToSatisfy(_)) => s
+      case (ToWatch(is), ToWatch(js)) => ToWatch(is ++ js)
+    }
+
+    override def isFailed(d: Watched): Boolean = false
+  }
 }
