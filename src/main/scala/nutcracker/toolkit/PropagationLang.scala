@@ -1,10 +1,9 @@
 package nutcracker.toolkit
 
 import nutcracker.util.{ContU, FreeK, Inject}
-import nutcracker.{Dom, IDom, OnDemandPropagation, Sel, SeqHandler, SeqPreHandler, SeqTrigger, Subscription}
+import nutcracker.{Dom, IDom, OnDemandPropagation, SeqHandler, SeqPreHandler, SeqTrigger, Subscription}
 import scalaz.{-\/, IndexedContT, \/, \/-}
 import scalaz.syntax.functor._
-import shapeless.HList
 
 private[nutcracker] sealed trait PropagationLang[K[_], A]
 
@@ -24,8 +23,6 @@ private[nutcracker] object PropagationLang {
     type Arg = D0
   }
   case class RmObserver[K[_], D](ref: SimpleCellId[K, D], oid: ObserverId) extends PropagationLang[K, Unit]
-
-  case class SelTrigger[K[_], L <: HList](sel: Sel[CellId[K, ?], L], f: L => (Option[K[Unit]], Boolean)) extends PropagationLang[K, Unit]
 
   case class NewAutoCell[K[_], A](setup: (AutoCellId[K, A], CellCycle[A]) => K[Unit], dom: Dom[A]) extends PropagationLang[K, CellId[K, A]]
   case class ObserveAuto[K[_], D, U, Δ[_, _]](ref: AutoCellId[K, D], f: SeqPreHandler[TokK[K, D, ?], K, D, Δ], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[K, Option[(CellCycle[D], ObserverId)]]
@@ -64,8 +61,6 @@ private[nutcracker] object PropagationLang {
     RmObserver(ref, oid)
   def rmAutoObserver[K[_], D](ref: AutoCellId[K, D], cycle: CellCycle[D], oid: ObserverId): PropagationLang[K, Unit] =
     RmAutoObserver(ref, cycle, oid)
-  def selTrigger[K[_], L <: HList](sel: Sel[CellId[K, ?], L])(f: L => (Option[K[Unit]], Boolean)): PropagationLang[K, Unit] =
-    SelTrigger(sel, f)
   def newAutoCell[K[_], A](setup: (AutoCellId[K, A], CellCycle[A]) => K[Unit])(implicit dom: Dom[A]): PropagationLang[K, CellId[K, A]] =
     NewAutoCell(setup, dom)
   def addFinalizer[K[_], A](ref: AutoCellId[K, A], cycle: CellCycle[A], value: Subscription[K]): PropagationLang[K, Option[FinalizerId]] =
@@ -184,9 +179,6 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit inj: Inject[Propa
             f(a).run({ case (tr, b) => resumeAutoF[F, A, dom.IDelta, A](ref, cycle, t, tr) >> k((subscription(ref, cycle, oid), b)) })
           ).void
       })
-
-  def selTrigger[L <: HList](sel: Sel[CellId[K, ?], L])(f: L => (Option[FreeK[F, Unit]], Boolean)): FreeK[F, Unit] =
-    FreeK.liftF(inj(PropagationLang.selTrigger[FreeK[F, ?], L](sel)(f)))
 
   private def subscription[D](ref: SimpleCellId[K, D], oid: ObserverId): Subscription[FreeK[F, ?]] =
     Subscription(rmObserverF(ref, oid))

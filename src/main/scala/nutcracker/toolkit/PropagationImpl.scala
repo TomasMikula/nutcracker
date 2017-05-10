@@ -1,12 +1,12 @@
 package nutcracker.toolkit
 
-import nutcracker.{IDom, OnDemandPropagation, Sel, SeqPreHandler, SeqTrigger, Subscription}
-import nutcracker.util.{FreeK, HOrderK, Index, Inject, KMap, KMapB, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState}
+import nutcracker.{IDom, OnDemandPropagation, SeqPreHandler, SeqTrigger, Subscription}
+import nutcracker.util.{FreeK, HOrderK, Inject, KMap, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState}
 import nutcracker.util.ops._
 import scala.language.existentials
 import scalaz.syntax.equal._
 import scalaz.{-\/, Equal, Lens, Monad, Ordering, Show, \/-}
-import shapeless.{HList, Nat, Sized}
+import shapeless.{Nat, Sized}
 
 private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with FreeOnDemandPropagationToolkit { self =>
   type VarK[K[_], A] = SimpleCellId[K, A]
@@ -72,10 +72,6 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
               val (s1, ks) = s.rmObserver(ref, cycle, oid)
               (ks, s0 set s1, ())
 
-            case SelTrigger(sel, f) =>
-              val (s1, ok) = s.addSelTrigger(sel, f)
-              (Lst.maybe(ok), s0 set s1, ())
-
             case ExclUpdate(ref, cycle, u, dom) =>
               (Lst.empty, s0 set s.exclUpdate[dom.Domain, dom.Update, dom.IDelta](ref, cycle, u)(dom), ())
             case Supply(ref, cycle, value) =>
@@ -116,11 +112,8 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   lastCellCycle: CellCycle[_],
   simpleCells: KMap[SimpleCellId[K, ?], SimpleCell[K, ?]],
   autoCells: KMap[AutoCellId[K, ?], OnDemandCell[K, ?]],
-  selTriggers: KMapB[λ[`L <: HList` => Sel[CellId[K, ?], L]], λ[L => List[L => (Option[K[Unit]], Boolean)]], HList],
-  cellsToSels: Index[CellId[K, _], Sel[CellId[K, ?], _ <: HList]],
   failedVars: Set[SimpleCellId[K, _]],
-  dirtyDomains: Set[CellId[K, _]],
-  dirtySelections: Set[Sel[CellId[K, ?], _ <: HList]]
+  dirtyDomains: Set[CellId[K, _]]
 ) {
   import shapeless.PolyDefns.~>
 
@@ -288,63 +281,24 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         this
     }
 
-  def addSelTrigger[L <: HList](sel: Sel[CellId[K, ?], L], t: L => (Option[K[Unit]], Boolean)): (PropagationStore[K], Option[K[Unit]]) = {
-    val (ko, keep) = t(sel.fetch(cellFetcher))
-    if(keep) (addSelTrigger0(sel, t), ko)
-    else     (this,                   ko)
-  }
-
-
-  private def addSelTrigger0[L <: HList](sel: Sel[CellId[K, ?], L], t: L => (Option[K[Unit]], Boolean)): PropagationStore[K] = {
-    copy(
-      selTriggers = selTriggers.put(sel)(t :: selTriggers.getOrElse(sel)(Nil)),
-      cellsToSels = cellsToSels.add(sel)
-    )
-  }
-
-  private def triggersForSel[L <: HList](sel: Sel[CellId[K, ?], L]): (PropagationStore[K], Lst[K[Unit]]) = {
-    val d = sel.fetch(cellFetcher)
-    collectSelTriggers(d, selTriggers.getOrElse(sel)(Nil)) match {
-      case (Nil, fired) => (copy(selTriggers = selTriggers - sel, cellsToSels = cellsToSels.remove(sel)), fired)
-      case (forLater, fired) => (copy(selTriggers = selTriggers.put(sel)(forLater)), fired)
-    }
-  }
-
-  private def getSelsForCell(ref: CellId[K, _]): Set[Sel[CellId[K, ?], _ <: HList]] = cellsToSels.get(ref)
-
-  private def collectSelTriggers[L <: HList](l: L, triggers: List[L => (Option[K[Unit]], Boolean)]): (List[L => (Option[K[Unit]], Boolean)], Lst[K[Unit]]) =
-    triggers match {
-      case Nil => (Nil, Lst.empty)
-      case t :: ts =>
-        val (ts1, ks) = collectSelTriggers(l, ts)
-        val (ko, keep) = t(l)
-        if(keep) (t :: ts1, ko ?+: ks)
-        else     (     ts1, ko ?+: ks)
-    }
-
   def uncons: Option[(PropagationStore[K], Lst[K[Unit]])] =
     if(dirtyDomains.nonEmpty) {
       val ref0 = dirtyDomains.head
       val ref: CellId[K, ref0.Domain] = ref0.aux
-      val dirtySels = dirtySelections union getSelsForCell(ref)
       ref match {
         case r @ SimpleCellId(_) =>
           val (cell, ks) = simpleCells(r).triggerPendingObservers(-\/(r))
-          Some((copy(simpleCells = simpleCells.put(r)(cell), dirtyDomains = dirtyDomains.tail, dirtySelections = dirtySels), ks))
+          Some((copy(simpleCells = simpleCells.put(r)(cell), dirtyDomains = dirtyDomains.tail), ks))
         case r @ AutoCellId(_, _) =>
           val cell0 = autoCells(r)
           val (cell, ks) = cell0.triggerPendingObservers(\/-((r, cell0.cycle)))
           cell match {
             case Some(cell) =>
-              Some((copy(autoCells = autoCells.put(r)(cell), dirtyDomains = dirtyDomains.tail, dirtySelections = dirtySels), ks))
+              Some((copy(autoCells = autoCells.put(r)(cell), dirtyDomains = dirtyDomains.tail), ks))
             case None =>
-              Some((copy(autoCells = autoCells - r, dirtyDomains = dirtyDomains.tail, dirtySelections = dirtySels), ks))
+              Some((copy(autoCells = autoCells - r, dirtyDomains = dirtyDomains.tail), ks))
           }
       }
-    } else if(dirtySelections.nonEmpty) {
-      val sel = dirtySelections.head
-      val (s1, ks) = triggersForSel(sel)
-      Some((s1.copy(dirtySelections = dirtySelections.tail), ks))
     }
     else None
 }
@@ -355,11 +309,8 @@ object PropagationStore {
     lastCellCycle = CellCycle.zero[Nothing],
     simpleCells = KMap[SimpleCellId[K, ?], SimpleCell[K, ?]](),
     autoCells = KMap[AutoCellId[K, ?], OnDemandCell[K, ?]](),
-    selTriggers = KMapB[λ[`L <: HList` => Sel[CellId[K, ?], L]], λ[L => List[L => (Option[K[Unit]], Boolean)]], HList](),
-    cellsToSels = Index.empty(sel => sel.cells),
     failedVars = Set(),
-    dirtyDomains = Set(),
-    dirtySelections = Set()
+    dirtyDomains = Set()
   )
 }
 
