@@ -388,5 +388,5 @@ object FreeObjectOutput {
   }
 
   implicit def aggregatorInstance[R, Ptr[_]]: Aggregator[FreeObjectOutput[R, Ptr, Unit], R] =
-    Aggregator(_ :+ _)
+    _ :+ _
 }

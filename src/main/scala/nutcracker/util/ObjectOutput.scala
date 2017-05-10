@@ -20,8 +20,8 @@ object ObjectOutput {
 
   def shallow[O, R, Ptr[_]](f: Ptr ~> λ[α => R])(implicit agg: Aggregator[O, R]): ObjectOutput[O, R, Ptr] =
     new ObjectOutput[O, R, Ptr] {
-      def write(out: O, r: R): O = agg.append(out, r)
-      def writeSubObject[A, B](out: O, pa: Ptr[A])(g: A => B)(implicit ser: ObjectSerializer[B, R, Ptr]): O = agg.append(out, f(pa))
+      def write(out: O, r: R): O = agg(out, r)
+      def writeSubObject[A, B](out: O, pa: Ptr[A])(g: A => B)(implicit ser: ObjectSerializer[B, R, Ptr]): O = agg(out, f(pa))
     }
 
 }

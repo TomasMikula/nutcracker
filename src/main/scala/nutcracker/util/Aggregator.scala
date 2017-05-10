@@ -1,23 +1,16 @@
 package nutcracker.util
 
-import nutcracker.util.typealigned.BalancedAppender
-
 import scalaz.{Semigroup, ~>}
 
-/** Represents the kind of function that one passes to `foldLeft`. */
-final case class Aggregator[B, A](append: (B, A) => B) extends AnyVal {
-  def apply(b: B, a: A): B = append(b, a)
-}
+/** Represents the kind of function that one passes to `foldLeft`, as a typeclass. */
+trait Aggregator[B, A] extends ((B, A) => B)
 
 object Aggregator {
   implicit def semigroupAggregator[A](implicit A: Semigroup[A]): Aggregator[A, A] =
-    Aggregator((a0, a1) => A.append(a0, a1))
+    A.append(_, _)
 
   implicit val stringBuilderAggregator: Aggregator[StringBuilder, String] =
-    Aggregator(_ append _)
-
-  implicit def appenderAggregator[A](implicit A: Semigroup[A]): Aggregator[BalancedAppender[A], A] =
-    Aggregator((acc, a) => acc.append(a))
+    _ append _
 }
 
 abstract class AggregatorK[B, F[_]] {

@@ -100,7 +100,7 @@ object BalancedAppender {
     BalancedAppender(BalancedPreComposer[λ[(α, β) => A], Nothing, Nothing](a))
 
   implicit def aggregator[A](implicit A: Semigroup[A]): Aggregator[BalancedAppender[A], A] =
-    Aggregator[BalancedAppender[A], A](_ append _)
+    _ append _
 }
 
 final case class BalancedPrepender[A] private(repr: BalancedPostComposer[λ[(α, β) => A], Nothing, Nothing]) extends AnyVal {
