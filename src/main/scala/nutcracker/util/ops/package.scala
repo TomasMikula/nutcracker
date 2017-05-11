@@ -10,3 +10,4 @@ package object ops
      with ToApplicativeOps
      with ToContTOps
      with ToIndexedContTOps
+     with ToStratifiedMonoidAggregatorOps

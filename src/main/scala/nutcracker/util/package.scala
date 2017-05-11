@@ -71,10 +71,6 @@ package object util {
       WriterStateT[Id, W, S, A](run)
   }
 
-  type StateInterpreter[K[_], F[_], S]  = StateInterpreterT[Id, K, F, S]
-
-  type Step[K[_], F[_], S] = StepT[Id, K, F, S]
-
   type LensK[S[_[_]], A[_[_]]] = `Forall{(* -> *) -> *}`[λ[X[_] => Lens[S[X], A[X]]]]
   object LensK {
     private val idLensK: LensK[Any, Any] = new LensK[Any, Any] {

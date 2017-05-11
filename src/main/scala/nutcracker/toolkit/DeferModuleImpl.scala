@@ -2,8 +2,10 @@ package nutcracker.toolkit
 
 import nutcracker.Defer
 import nutcracker.util.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
-import nutcracker.util.{FreeK, Inject, Lst, StateInterpreter, Step, Uncons, WriterState}
-import scalaz.{Heap, Lens, Order}
+import nutcracker.util.{FreeK, Inject, Lst, MonadTellState, StateInterpreter, StratifiedMonoidAggregator}
+import nutcracker.util.ops._
+import scalaz.{Bind, Heap, Lens, Order}
+import scalaz.syntax.monoid._
 
 private[nutcracker] class DeferModuleImpl[D](implicit D: NonDecreasingMonoid[D] with OrderPreservingMonoid[D]) extends PersistentDeferModule[D] { self =>
   type Lang[K[_], A] = DeferLang[D, K, A]
@@ -36,6 +38,8 @@ private[nutcracker] final case class DeferStore[D, K[_]] private (
     copy(heap = heap + ((D.append(currentTime, d), k)))
   }
 
+  def isEmpty: Boolean = heap.isEmpty
+
   def uncons: Option[(DeferStore[D, K], Lst[K[Unit]])] = heap.uncons match {
     case Some(((d, k), heap1)) => Some((DeferStore(d, heap1), Lst.singleton(k)))
     case None => None
@@ -50,13 +54,29 @@ private[nutcracker] object DeferStore {
     new StateInterpreter[K, DeferLang[D, K, ?], S] {
       import DeferLang._
 
-      def step: Step[K, DeferLang[D, K, ?], S] = new Step[K, DeferLang[D, K, ?], S] {
-        def apply[A](f: DeferLang[D, K, A]): WriterState[Lst[K[Unit]], S, A] =
-          WriterState(s => f match {
-            case Delay(d, k) => (Lst.empty, lens.mod(_.add(d, k), s), ())
-          })
-      }
+      override def apply[M[_], W, A](fa: DeferLang[D, K, A])(implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[DeferLang[D, K, ?], K], K: Bind[K]): M[A] =
+        M.writerState(s => {
+          @inline def scheduleExecution: W = Lst.singleton(inj(exec[D, K]())) at 10
 
-      def uncons: Uncons[K, S] = Uncons[K, DeferStore[D, K]](_.uncons).zoomOut[S]
+          val ds = lens.get(s)
+          fa match {
+            case Delay(d, k) =>
+              val s1 = s set ds.add(d, k)
+              if(ds.isEmpty) // was empty, schedule execution
+                (scheduleExecution, s1, ())
+              else // was non-empty, execution must have been scheduled already
+                (W.zero, s1, ())
+            case Exec() =>
+              ds.uncons match {
+                case Some((ds1, ks)) =>
+                  if(ds1.isEmpty)
+                    (ks at 0, s set ds1, ())
+                  else // more tasks to execute => schedule
+                    ((ks at 0) |+| scheduleExecution, s set ds1, ())
+                case None =>
+                  (W.zero, s, ())
+              }
+          }
+        })
     }
 }

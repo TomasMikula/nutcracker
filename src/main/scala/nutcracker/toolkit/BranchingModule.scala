@@ -1,6 +1,6 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{FreeK, Inject, Step}
+import nutcracker.util.{FreeK, Inject, StateInterpreter}
 import nutcracker.{Assessment, BranchingPropagation, Propagation}
 import scalaz.Id.Id
 import scalaz.{Lens, ~>}
@@ -17,7 +17,7 @@ trait BranchingModule extends Module {
   ): BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]]
 
   def emptyK[K[_]]: StateK[K]
-  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): Step[K, Lang[K, ?], S]
+  def stepInterpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S]
   def assess[K[_]](s: StateK[K])(fetch: VarK[K, ?] ~> Id)(implicit K: Propagation[K, VarK[K, ?], ValK[K, ?]]): Assessment[List[K[Unit]]]
 }
 
@@ -56,8 +56,8 @@ extends ListModule[Lang, State0](base) with BranchingModule {
   ): BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] =
     base.freeBranchingPropagation[F](i, P)
 
-  override def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): Step[K, Lang[K, ?], S] =
-    base.interpreter[K, S](Lens.nelHeadLens[State0[K]].compose(lens))
+  override def stepInterpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] =
+    base.stepInterpreter[K, S](Lens.nelHeadLens[State0[K]].compose(lens))
 
   override def assess[K[_]](s: StateK[K])(fetch: VarK[K, ?] ~> Id)(implicit K: Propagation[K, VarK[K, ?], ValK[K, ?]]): Assessment[List[K[Unit]]] =
     base.assess[K](s.head)(fetch)

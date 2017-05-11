@@ -1,6 +1,6 @@
 package nutcracker.util
 
-import scalaz.{Semigroup, ~>}
+import scalaz.{Monoid, Semigroup, ~>}
 
 /** Represents the kind of function that one passes to `foldLeft`, as a typeclass. */
 trait Aggregator[B, A] extends ((B, A) => B)
@@ -11,6 +11,16 @@ object Aggregator {
 
   implicit val stringBuilderAggregator: Aggregator[StringBuilder, String] =
     _ append _
+}
+
+trait MonoidAggregator[B, A] extends Aggregator[B, A] with Monoid[B] {
+  def initialize(a: A): B = apply(zero, a)
+}
+
+trait StratifiedAggregator[B, A] extends ((B, A, Int) => B)
+
+trait StratifiedMonoidAggregator[B, A] extends StratifiedAggregator[B, A] with Monoid[B] {
+  def initialize(a: A, level: Int): B = apply(zero, a, level)
 }
 
 abstract class AggregatorK[B, F[_]] {

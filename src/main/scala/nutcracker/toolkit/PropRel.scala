@@ -44,8 +44,5 @@ object PropRel extends FreePropagationToolkit with PropRelToolkit {
   def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A =
     Prop.fetchK(ref, s._1)
 
-  def interpret[A](p: Prg[A], s: State): (State, A) =
-    interpreter(p.unwrap).run(s)
-
-  val interpreter = (Prop.interpreter[Prg, StateK[Prg]] :+: RelMod.interpreter[Prg, StateK[Prg]]).freeInstance(_.unwrap)
+  val stepInterpreter = Prop.stepInterpreterK[Prg, StateK[Prg]] :+: RelMod.interpreter[Prg, StateK[Prg]]
 }

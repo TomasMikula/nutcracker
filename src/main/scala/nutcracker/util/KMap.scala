@@ -9,6 +9,7 @@ import scalaz.~>
 final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
+  def size: Int = map.size
   def head: ∃[λ[α => (K[α], V[α])]] = map.head.asInstanceOf[∃[λ[α => (K[α], V[α])]]]
   def tail: KMap[K, V] = KMap[K, V](map.tail)
   def apply[A](k: K[A]): V[A] = map(k).asInstanceOf[V[A]]
@@ -37,6 +38,7 @@ object KMap {
 final case class HKMap[K[_[_]], V[_[_]]](map: Map[K[Any], V[Any]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
+  def size: Int = map.size
   def head: (K[A], V[A]) forSome { type A[_] } = map.head.asInstanceOf[(K[A], V[A]) forSome { type A[_] }]
   def tail: HKMap[K, V] = HKMap[K, V](map.tail)
   def apply[A[_]](k: K[A]): V[A] = map(k.asInstanceOf[K[Any]]).asInstanceOf[V[A]]
@@ -58,6 +60,7 @@ object HKMap {
 final case class HHKMap[K[_[_[_]]], V[_[_[_]]]](map: Map[K[Any], V[Any]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
+  def size: Int = map.size
   def head: (K[A], V[A]) forSome { type A[_[_]] } = map.head.asInstanceOf[(K[A], V[A]) forSome { type A[_[_]] }]
   def tail: HHKMap[K, V] = HHKMap[K, V](map.tail)
   def apply[A[_[_]]](k: K[A]): V[A] = map(k.asInstanceOf[K[Any]]).asInstanceOf[V[A]]
@@ -80,6 +83,7 @@ object HHKMap {
 final case class KMapB[K[_ <: UB], V[_ <: UB], UB](map: Map[K[_ <: UB], V[_ <: UB]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
+  def size: Int = map.size
   def head: (K[A], V[A]) forSome { type A <: UB } = map.head.asInstanceOf[(K[A], V[A]) forSome { type A <: UB }]
   def tail: KMapB[K, V, UB] = KMapB[K, V, UB](map.tail)
   def apply[A <: UB](k: K[A]): V[A] = map(k).asInstanceOf[V[A]]
@@ -107,6 +111,7 @@ object KMapB {
 final case class KMap1_2[K[_], V[_, _, _], TC[_, _, _]](map: Map[K[_], V[_, _, _]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
+  def size: Int = map.size
   def head: (K[A], V[A, B, C]) forSome { type A; type B; type C } = map.head.asInstanceOf[(K[A], V[A, B, C]) forSome { type A; type B; type C }]
   def tail: KMap1_2[K, V, TC] = KMap1_2[K, V, TC](map.tail)
   def apply[A, B, C](k: K[A])(implicit ev: TC[A, B, C]): V[A, B, C] = map(k).asInstanceOf[V[A, B, C]]
@@ -129,6 +134,7 @@ object KMap1_2 {
 final case class K2Map[K[_, _], V[_, _]](map: Map[K[_, _], V[_, _]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
+  def size: Int = map.size
   def head: (K[A, B], V[A, B]) forSome { type A; type B } = map.head.asInstanceOf[(K[A, B], V[A, B]) forSome { type A; type B }]
   def tail: K2Map[K, V] = K2Map[K, V](map.tail)
   def apply[A, B](k: K[A, B]): V[A, B] = map(k).asInstanceOf[V[A, B]]
@@ -151,6 +157,7 @@ object K2Map {
 final case class K3Map[K[_, _, _], V[_, _, _]](map: Map[K[_, _, _], V[_, _, _]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
+  def size: Int = map.size
   def head: K3Pair[K, V] = K3Pair(map.head.asInstanceOf[(K[A, B, C], V[A, B, C]) forSome { type A; type B; type C }])
   def tail: K3Map[K, V] = K3Map[K, V](map.tail)
   def apply[A, B, C](k: K[A, B, C]): V[A, B, C] = map(k).asInstanceOf[V[A, B, C]]

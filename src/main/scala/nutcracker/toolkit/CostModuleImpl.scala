@@ -1,8 +1,8 @@
 package nutcracker.toolkit
 
 import nutcracker.CostApi
-import nutcracker.util.{FreeK, Inject, Lst, Step, WriterState}
-import scalaz.{Lens, Monoid}
+import nutcracker.util.{FreeK, Inject, Lst, MonadTellState, StateInterpreter, StratifiedMonoidAggregator}
+import scalaz.{Bind, Lens, Monoid}
 
 private[nutcracker] class CostModuleImpl[C](implicit C: Monoid[C]) extends PersistentCostModule[C] {
   import CostLang._
@@ -16,11 +16,11 @@ private[nutcracker] class CostModuleImpl[C](implicit C: Monoid[C]) extends Persi
 
   def stashable = new CostListModule[C, Lang, StateK](this)
 
-  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): Step[K, Lang[K, ?], S] = new Step[K, Lang[K, ?], S] {
-    override def apply[A](f: CostLang[C, K, A]): WriterState[Lst[K[Unit]], S, A] =
-      f match {
-        case Cost(c1) => WriterState(s => (Lst.empty, lens.mod(C.append(_, c1), s), ()))
-        case GetCost(ev) => WriterState(s => (Lst.empty, s, ev(lens.get(s))))
+  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] = new StateInterpreter[K, Lang[K, ?], S] {
+    def apply[M[_], W, A](fa: CostLang[C, K, A])(implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[CostLang[C, K, ?], K], K: Bind[K]): M[A] =
+      fa match {
+        case Cost(c1) => M.writerState(s => (W.zero, lens.mod(C.append(_, c1), s), ()))
+        case GetCost(ev) => M.writerState(s => (W.zero, s, ev(lens.get(s))))
       }
   }
 

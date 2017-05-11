@@ -38,6 +38,9 @@ private[nutcracker] object PropagationLang {
   case class RemoveFinalizer[K[_], A](ref: AutoCellId[K, A], cycle: CellCycle[A], id: FinalizerId) extends PropagationLang[K, Unit]
   case class ExclUpdate[K[_], A, U, Δ[_, _]](ref: AutoCellId[K, A], cycle: CellCycle[A], u: U, dom: IDom.Aux[A, U, Δ]) extends PropagationLang[K, Unit]
 
+  case class ExecTriggers[K[_], A](ref: SimpleCellId[K, A]) extends PropagationLang[K, Unit]
+  case class ExecTriggersAuto[K[_], A](ref: AutoCellId[K, A], cycle: CellCycle[A]) extends PropagationLang[K, Unit]
+
   // constructors returning less specific types, and curried to help with type inference
   def newCell[K[_], D](d: D)(implicit dom: Dom[D]): PropagationLang[K, SimpleCellId[K, D]] =
     NewCell[K, D, dom.Update, dom.Delta](d, dom)
@@ -69,6 +72,10 @@ private[nutcracker] object PropagationLang {
     RemoveFinalizer(ref, cycle, id)
   def exclUpdate[K[_], A, U, Δ[_, _]](ref: AutoCellId[K, A], cycle: CellCycle[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): PropagationLang[K, Unit] =
     ExclUpdate(ref, cycle, u, dom)
+  def execTriggers[K[_], A](ref: SimpleCellId[K, A]): PropagationLang[K, Unit] =
+    ExecTriggers(ref)
+  def execTriggersAuto[K[_], A](ref: AutoCellId[K, A], cycle: CellCycle[A]): PropagationLang[K, Unit] =
+    ExecTriggersAuto(ref, cycle)
 
 
   // constructors injected into free programs

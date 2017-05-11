@@ -41,8 +41,7 @@ object PropBranch extends FreePropagationToolkit with FreeBranchingToolkit with 
   import Prop.{stashRestore => sr1}
   def stashRestoreK[K[_]]: StashRestore[StateK[K]] = StashRestore.kPairInstance
 
-  val interpreter = (Prop.interpreter[Prg, State] :+: Branch.interpreter[Prg, State]).freeInstance(_.unwrap)
-  def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p.unwrap).run(s)
+  val stepInterpreter = Prop.stepInterpreterK[Prg, State] :+: Branch.stepInterpreter[Prg, State]
   def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] = Prop.fetchK(ref, s._1)
   def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A         = Prop.fetchK(ref, s._1)
   def emptyK[K[_]]: StateK[K] = Prop.emptyK[K] :*: Branch.emptyK[K]

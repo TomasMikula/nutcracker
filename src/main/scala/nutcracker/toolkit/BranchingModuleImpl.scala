@@ -1,11 +1,11 @@
 package nutcracker.toolkit
 
 import nutcracker.ops._
-import nutcracker.util.{FreeK, Inject, Lst, Step, WriterState}
+import nutcracker.util.{FreeK, Inject, Lst, MonadTellState, StateInterpreter, StratifiedMonoidAggregator}
 import nutcracker.util.ops._
 import nutcracker.{Assessment, BranchingPropagation, Propagation, Splittable}
 import scalaz.Id.Id
-import scalaz.{Lens, ~>}
+import scalaz.{Bind, Lens, ~>}
 
 private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] extends PersistentBranchingModule {
   type VarK[K[_], A] = Var0[K, A]
@@ -36,15 +36,16 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
 
   def emptyK[K[_]]: StateK[K] = BranchStore()
 
-  def interpreter[K[_], S](implicit l: Lens[S, StateK[K]]): Step[K, Lang[K, ?], S] = new Step[K, Lang[K, ?], S] {
+  def stepInterpreter[K[_], S](implicit l: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] = new StateInterpreter[K, Lang[K, ?], S] {
 
-    def apply[A](f: BranchLang[VarK[K, ?], K, A]): WriterState[Lst[K[Unit]], S, A] = WriterState(s0 => {
-      val s = l.get(s0)
-      f.fold(
-        caseTrack = t => t match { case t1 => (Lst.empty, s0 set s.addVar(t1.ref, t1.ev), t1.wit(())) },
-        caseUntrack = u => (Lst.empty, s0 set s.removeVar(u.ref), u.wit(()))
-      )
-    })
+    def apply[M[_], W, A](fa: BranchLang[Var0[K, ?], K, A])(implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[BranchLang[Var0[K, ?], K, ?], K], K: Bind[K]): M[A] =
+      M.writerState[A](s0 => {
+        val s = l.get(s0)
+        fa.fold(
+          caseTrack = t => t match { case t1 => (W.zero, s0 set s.addVar(t1.ref, t1.ev), t1.wit(())) },
+          caseUntrack = u => (W.zero, s0 set s.removeVar(u.ref), u.wit(()))
+        )
+      })
   }
 
   def assess[K[_]](s: StateK[K])(fetch: VarK[K, ?] ~> Id)(implicit K: Propagation[K, VarK[K, ?], ValK[K, ?]]): Assessment[List[K[Unit]]] =

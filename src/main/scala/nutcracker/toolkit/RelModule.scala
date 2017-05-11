@@ -1,12 +1,12 @@
 package nutcracker.toolkit
 
 import nutcracker.rel.Relations
-import nutcracker.util.{FreeK, Inject, Lst, Step, WriterState}
+import nutcracker.util.{FreeK, Inject, Lst, MonadTellState, StateInterpreter, StratifiedMonoidAggregator}
 import nutcracker.util.ops._
-import scalaz.Lens
+import scalaz.{Bind, Lens}
 
 trait RelModule extends Module {
-  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): Step[K, Lang[K, ?], S]
+  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S]
   def freeRelations[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): Relations[FreeK[F, ?]]
 }
 
@@ -36,18 +36,18 @@ private[toolkit] object RelModuleImpl extends PersistentRelModule {
   override def freeRelations[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): Relations[FreeK[F, ?]] =
     RelLang.relationsInstance[F]
 
-  def interpreter[K[_], S](implicit lens: Lens[S, RelDB[K]]): Step[K, RelLang[K, ?], S] = new Step[K, RelLang[K, ?], S] {
+  def interpreter[K[_], S](implicit lens: Lens[S, RelDB[K]]): StateInterpreter[K, RelLang[K, ?], S] = new StateInterpreter[K, RelLang[K, ?], S] {
     import RelLang._
 
-    override def apply[A](f: RelLang[K, A]): WriterState[Lst[K[Unit]], S, A] = f match {
+    def apply[M[_], W, A](fa: RelLang[K, A])(implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[RelLang[K, ?], K], K: Bind[K]): M[A] = fa match {
       case r @ Relate(rel, values) =>
-        WriterState(s => lens.get(s).insert(rel, values)(r.ordersWitness, r.orders) match { case (db1, ks) => (ks, s set db1, ()) })
+        M.writerState(s => lens.get(s).insert(rel, values)(r.ordersWitness, r.orders) match { case (db1, ks) => (ks at 0, s set db1, ()) })
       case OnPatternMatch(p, a, h) =>
-        WriterState(s => lens.get(s).addOnPatternMatch(p, a)(h) match { case (db1, ks) => (ks, s set db1, ()) })
+        M.writerState(s => lens.get(s).addOnPatternMatch(p, a)(h) match { case (db1, ks) => (ks at 0, s set db1, ()) })
       case ExecWith(rel, ass, supp, exec, m, os) =>
-        WriterState(s => lens.get(s).execWith(rel, ass)(supp)(exec)(m, os) match { case (db1, ko) => (Lst.maybe(ko), s set db1, ()) })
+        M.writerState(s => lens.get(s).execWith(rel, ass)(supp)(exec)(m, os) match { case (db1, ko) => (Lst.maybe(ko) at 0, s set db1, ()) })
       case Supply(rel, token, value) =>
-        WriterState(s => lens.get(s).supply(rel, token, value) match { case (db1, ks) => (ks, s set db1, ()) })
+        M.writerState(s => lens.get(s).supply(rel, token, value) match { case (db1, ks) => (ks at 0, s set db1, ()) })
     }
   }
 
@@ -57,6 +57,6 @@ private[toolkit] object RelModuleImpl extends PersistentRelModule {
 private[toolkit] class RelListModule[Lang[_[_], _], State0[_[_]]](base: PersistentRelModule.Aux[Lang, State0]) extends ListModule[Lang, State0](base) with StashRelModule {
   def freeRelations[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]) = base.freeRelations[F]
 
-  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): Step[K, Lang[K, ?], S] =
+  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] =
     base.interpreter[K, S](Lens.nelHeadLens[State0[K]].compose(lens))
 }

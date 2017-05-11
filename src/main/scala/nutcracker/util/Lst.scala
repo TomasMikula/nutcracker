@@ -185,9 +185,12 @@ object Lst {
     def append(f1: Lst[A], f2: => Lst[A]): Lst[A] = f1 ++ f2
   }
 
-  implicit val plusEmpty: PlusEmpty[Lst] = new PlusEmpty[Lst] {
+  implicit val catenable: Catenable[Lst] = new Catenable[Lst] {
     def empty[A]: Lst[A] = Nil
     def plus[A](a: Lst[A], b: => Lst[A]): Lst[A] = a ++ b
+    def cons[A](a: A, fa: Lst[A]): Lst[A] = a :: fa
+    def singleton[A](a: A): Lst[A] = Lst.singleton(a)
+    def uncons[A](fa: Lst[A]): Option[(A, Lst[A])] = fa.uncons
   }
 
   implicit def plusEmptyT[F[_]]: PlusEmpty[λ[α => Lst[F[α]]]] = new PlusEmpty[λ[α => Lst[F[α]]]] {

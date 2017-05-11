@@ -81,10 +81,7 @@ class PropagationStoreTest extends FunSuite {
   private def interpretAll(s: PropagationStore[Prg], l: Lst[Prg[Unit]]): PropagationStore[Prg] =
     l.uncons match {
       case Some((p, ps)) => interpretAll(p.run(s)._1, ps)
-      case None => s.uncons match {
-        case Some((s, ps)) => interpretAll(s, ps)
-        case None => s
-      }
+      case None => s
     }
 
   test("resume respects cycle") {
@@ -110,8 +107,9 @@ class PropagationStoreTest extends FunSuite {
     }
 
     def resume(s: PropagationStore[Prg], cyc: CellCycle[Promise[Int]], tok: Token[Promise[Int]]): PropagationStore[Prg] = {
-      val (s1, ks) = s.resume[Promise[Int], Promise.IDelta[Int, ?, ?], Promise[Int]](ref, cyc, tok, s.fire[Promise[Int]](Prg(s => { observed = true; (s, ()) })))
-      interpretAll(s1, ks)
+      val (s1, ks, becameDirty) = s.resume[Promise[Int], Promise.IDelta[Int, ?, ?], Promise[Int]](ref, cyc, tok, s.fire[Promise[Int]](Prg(s => { observed = true; (s, ()) })))
+      val (s2, ks2) = if(becameDirty) s.execTriggers(ref, cyc) else (s1, ks)
+      interpretAll(s2, ks2)
     }
 
     // observe
@@ -231,7 +229,7 @@ class OnDemandPropagationTest extends FunSuite {
     })
     val (store1, ref) = interpret(prg1, store0)
 
-    // check that ref0 observed hasn't been triggered yet
+    // check that ref0 observer hasn't been triggered yet
     assertResult(0)(observed0.size)
 
     // check that the cell doesn't have any value yet

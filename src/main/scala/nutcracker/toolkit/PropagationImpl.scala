@@ -1,11 +1,12 @@
 package nutcracker.toolkit
 
 import nutcracker.{IDom, OnDemandPropagation, SeqPreHandler, SeqTrigger, Subscription}
-import nutcracker.util.{FreeK, HOrderK, Inject, KMap, Lst, ShowK, StateInterpreter, Step, Uncons, WriterState}
+import nutcracker.util.{FreeK, HOrderK, Inject, KMap, Lst, MonadTellState, ShowK, StateInterpreter, StratifiedMonoidAggregator}
 import nutcracker.util.ops._
 import scala.language.existentials
 import scalaz.syntax.equal._
-import scalaz.{-\/, Equal, Lens, Monad, Ordering, Show, \/-}
+import scalaz.syntax.monoid._
+import scalaz.{-\/, Bind, Equal, Lens, Monad, Ordering, Show, \/-}
 import shapeless.{Nat, Sized}
 
 private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with FreeOnDemandPropagationToolkit { self =>
@@ -29,68 +30,87 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
   override def emptyK[K[_]]: PropagationStore[K] =
     PropagationStore.empty[K]
 
-  override def interpret[A](p: Prg[A], s: PropagationStore[Prg]): (PropagationStore[Prg], A) =
-    interpreter(Lens.lensId[State]).freeInstance(_.unwrap).apply(p.unwrap).run(s)
+  override val stepInterpreter =
+    stepInterpreterK(Lens.lensId[State])
 
-  override def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] =
+  override def stepInterpreterK[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] =
     new StateInterpreter[K, Lang[K, ?], S] {
+      import PropagationLang._
 
-      def step: Step[K, Lang[K, ?], S] = new Step[K, Lang[K, ?], S] {
-        import PropagationLang._
+      private def execTriggers[A](ref: SimpleCellId[K, A]): PropagationLang[K, Unit] =
+        PropagationLang.execTriggers[K, A](ref)
 
-        override def apply[A](p: PropagationLang[K, A]): WriterState[Lst[K[Unit]], S, A] = WriterState(s0 => {
+      private def execTriggersAuto[A](ref: AutoCellId[K, A], cycle: CellCycle[A]): PropagationLang[K, Unit] =
+        PropagationLang.ExecTriggersAuto(ref, cycle)
+
+      override def apply[M[_], W, A](p: PropagationLang[K, A])(implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[PropagationLang[K, ?], K], K: Bind[K]): M[A] =
+        M.writerState[A](s0 => {
           val s = lens.get(s0)
           p match {
             case Update(ref, u, dom) =>
-              (Lst.empty, s0 set s.update[dom.Domain, dom.Update, dom.IDelta](ref, u)(dom), ())
+              val (s1, becameDirty) = s.update[dom.Domain, dom.Update, dom.IDelta](ref, u)(dom)
+              val w = if(becameDirty) Lst.singleton(inj(execTriggers(ref))) at 1 else W.zero
+              (w, s0 set s1, ())
+            case ExclUpdate(ref, cycle, u, dom) =>
+              val (s1, becameDirty) = s.exclUpdate[dom.Domain, dom.Update, dom.IDelta](ref, cycle, u)(dom)
+              val w = if(becameDirty) Lst.singleton(inj(execTriggersAuto(ref, cycle))) at 1 else W.zero
+              (w, s0 set s1, ())
+
+            case ExecTriggers(ref) =>
+              val (s1, ks) = s.execTriggers(ref)
+              (ks at 0, s0 set s1, ())
+            case ExecTriggersAuto(ref, cycle) =>
+              val (s1, ks) = s.execTriggers(ref, cycle)
+              (ks at 0, s0 set s1, ())
+
             case Observe(ref, f, dom) =>
               val (ks, s1, oid) = s.observe[dom.Domain, dom.Update, dom.IDelta](ref, f)(dom)
-              (ks, s0 set s1, oid)
+              (ks at 0, s0 set s1, oid)
             case ObserveAuto(ref, f, dom) =>
               val (ks, s1, oid) = s.observe[dom.Domain, dom.Update, dom.IDelta](ref, f)(dom)
-              (ks, s0 set s1, oid)
-            case NewCell(d, dom) =>
-              val (s1, ref) = s.newCell(d)(dom) // linter:ignore UndesirableTypeInference
-              (Lst.empty, s0 set s1, ref)
+              (ks at 0, s0 set s1, oid)
 
             case Hold(ref, f) =>
               val (s1, oid, ks) = s.hold(ref)(f)
-              (ks, s0 set s1, oid)
+              (ks at 0, s0 set s1, oid)
             case HoldAuto(ref, f) =>
               val (s1, cycle, oid, ks) = s.hold(ref)(f) // linter:ignore UndesirableTypeInference
-              (ks, s0 set s1, oid)
+              (ks at 0, s0 set s1, oid)
             case res @ Resume(ref, token, trigger) =>
-              val (s1, ks) = s.resume[res.Domain, res.Delta, res.Arg](ref, token, trigger)
-              (ks, s0 set s1, ())
+              val (s1, ks, becameDirty) = s.resume[res.Domain, res.Delta, res.Arg](ref, token, trigger)
+              val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggers(ref))) at 1) else (ks at 0)
+              (w, s0 set s1, ())
             case res @ ResumeAuto(ref, cycle, token, trigger) =>
-              val (s1, ks) = s.resume[res.Domain, res.Delta, res.Arg](ref, cycle, token, trigger)
-              (ks, s0 set s1, ())
-            case RmObserver(ref, oid) =>
-              val (s1, ks) = s.rmObserver(ref, oid)
-              (ks, s0 set s1, ())
-            case RmAutoObserver(ref, cycle, oid) =>
-              val (s1, ks) = s.rmObserver(ref, cycle, oid)
-              (ks, s0 set s1, ())
+              val (s1, ks, becameDirty) = s.resume[res.Domain, res.Delta, res.Arg](ref, cycle, token, trigger)
+              val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggersAuto(ref, cycle))) at 1) else (ks at 0)
+              (w, s0 set s1, ())
 
-            case ExclUpdate(ref, cycle, u, dom) =>
-              (Lst.empty, s0 set s.exclUpdate[dom.Domain, dom.Update, dom.IDelta](ref, cycle, u)(dom), ())
-            case Supply(ref, cycle, value) =>
-              val (s1, ks) = s.supply(ref)(cycle, value)
-              (ks, s0 set s1, ())
+            case NewCell(d, dom) =>
+              val (s1, ref) = s.newCell(d)(dom) // linter:ignore UndesirableTypeInference
+              (W.zero, s0 set s1, ref)
             case NewAutoCell(setup, dom) =>
               val (s1, ref) = s.newAutoCell(setup)(dom) // linter:ignore UndesirableTypeInference
-              (Lst.empty, s0 set s1, ref)
+              (W.zero, s0 set s1, ref)
+
+            case Supply(ref, cycle, value) =>
+              val (s1, ks) = s.supply(ref)(cycle, value)
+              (ks at 0, s0 set s1, ())
+
+            case RmObserver(ref, oid) =>
+              val (s1, ks) = s.rmObserver(ref, oid)
+              (ks at 0, s0 set s1, ())
+            case RmAutoObserver(ref, cycle, oid) =>
+              val (s1, ks) = s.rmObserver(ref, cycle, oid)
+              (ks at 0, s0 set s1, ())
+
             case AddFinalizer(ref, cycle, sub) =>
               val (ks, s1, fid) = s.addFinalizer(ref, cycle, sub)
-              (ks, s0 set s1, fid)
+              (ks at 0, s0 set s1, fid)
             case RemoveFinalizer(ref, cycle, fid) =>
               val s1 = s.removeFinalizer(ref, cycle, fid)
-              (Lst.empty, s0 set s1, ())
+              (W.zero, s0 set s1, ())
           }
         })
-      }
-
-      def uncons: Uncons[K, S] = Uncons[K, StateK[K]](_.uncons).zoomOut[S]
     }
 
   override def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] =
@@ -112,8 +132,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   lastCellCycle: CellCycle[_],
   simpleCells: KMap[SimpleCellId[K, ?], SimpleCell[K, ?]],
   autoCells: KMap[AutoCellId[K, ?], OnDemandCell[K, ?]],
-  failedVars: Set[SimpleCellId[K, _]],
-  dirtyDomains: Set[CellId[K, _]]
+  failedVars: Set[SimpleCellId[K, _]]
 ) {
   import shapeless.PolyDefns.~>
 
@@ -153,27 +172,28 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   def fetchVector[D, N <: Nat](refs: Sized[Vector[SimpleCellId[K, D]], N]): Sized[Vector[D], N] =
     refs.map(ref => fetch(ref))
 
-  def update[D, U, Δ[_, _]](ref: SimpleCellId[K, D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] =
+  def update[D, U, Δ[_, _]](ref: SimpleCellId[K, D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Boolean) =
     simpleCells(ref).infer.update(u) match {
-      case None => this
-      case Some(cell) =>
+      case CellUpdated(cell, becameDirty) =>
         val failedVars1 = if(dom.isFailed(cell.value)) failedVars + ref else failedVars
         val domains1 = simpleCells.put(ref)(cell)
-        val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
-        copy(simpleCells = domains1, failedVars = failedVars1, dirtyDomains = dirtyDomains1)
+        (copy(simpleCells = domains1, failedVars = failedVars1), becameDirty)
+      case CellUnchanged =>
+        (this, false)
     }
 
-  def exclUpdate[D, U, Δ[_, _]](ref: AutoCellId[K, D], cycle: CellCycle[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): PropagationStore[K] =
+  def exclUpdate[D, U, Δ[_, _]](ref: AutoCellId[K, D], cycle: CellCycle[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Boolean) =
     autoCells.get(ref) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
         cell0.infer.exclUpdate(u) match {
-          case None => this
-          case Some(cell) =>
+          case CellUpdated(cell, becameDirty) =>
             val autoCells1 = autoCells.put(ref)(cell)
-            val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
-            copy(autoCells = autoCells1, dirtyDomains = dirtyDomains1)
+            (copy(autoCells = autoCells1), becameDirty)
+          case CellUnchanged =>
+            (this, false)
         }
-      case _ => this
+      case _ =>
+        (this, false)
     }
 
   def observe[D, U, Δ[_, _]](ref: SimpleCellId[K, D], f: PreHandler[D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (Lst[K[Unit]], PropagationStore[K], Option[ObserverId]) = {
@@ -225,25 +245,23 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         (this, Lst.empty)
     }
 
-  def resume[D, Δ[_, _], D0 <: D](ref: SimpleCellId[K, D], token: Token[D0], trigger: Trigger[D, Δ, D0]): (PropagationStore[K], Lst[K[Unit]]) = {
-    val (cell, ks) = simpleCells(ref).asInstanceOf[SimpleCell.AuxD[K, D, Δ]].resume(-\/(ref), token, trigger)
-    val dirtyDomains1 = if(cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
-    (copy(simpleCells = simpleCells.put(ref)(cell), dirtyDomains = dirtyDomains1), ks)
+  def resume[D, Δ[_, _], D0 <: D](ref: SimpleCellId[K, D], token: Token[D0], trigger: Trigger[D, Δ, D0]): (PropagationStore[K], Lst[K[Unit]], Boolean) = {
+    val (cell, ks, becameDirty) = simpleCells(ref).asInstanceOf[SimpleCell.AuxD[K, D, Δ]].resume(-\/(ref), token, trigger)
+    (copy(simpleCells = simpleCells.put(ref)(cell)), ks, becameDirty)
   }
 
-  def resume[D, Δ[_, _], D0 <: D](ref: AutoCellId[K, D], cycle: CellCycle[D], token: Token[D0], trigger: Trigger[D, Δ, D0]): (PropagationStore[K], Lst[K[Unit]]) =
+  def resume[D, Δ[_, _], D0 <: D](ref: AutoCellId[K, D], cycle: CellCycle[D], token: Token[D0], trigger: Trigger[D, Δ, D0]): (PropagationStore[K], Lst[K[Unit]], Boolean) =
     autoCells.get(ref) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
         val (cell, ks) = cell0.asInstanceOf[OnDemandCell.AuxD[K, D, Δ]].resume(\/-((ref, cycle)), token, trigger)
         cell match {
-          case Some(cell) =>
-            val dirtyDomains1 = if (cell.hasPendingObservers) dirtyDomains + ref else dirtyDomains
-            (copy(autoCells = autoCells.put(ref)(cell), dirtyDomains = dirtyDomains1), ks)
+          case Some((cell, becameDirty)) =>
+            (copy(autoCells = autoCells.put(ref)(cell)), ks, becameDirty)
           case None =>
-            (copy(autoCells = autoCells - ref), ks)
+            (copy(autoCells = autoCells - ref), ks, false)
         }
       case _ =>
-        (this, Lst.empty)
+        (this, Lst.empty, false)
     }
 
   def rmObserver[D](ref: SimpleCellId[K, D], oid: ObserverId): (PropagationStore[K], Lst[K[Unit]]) = {
@@ -281,26 +299,25 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         this
     }
 
-  def uncons: Option[(PropagationStore[K], Lst[K[Unit]])] =
-    if(dirtyDomains.nonEmpty) {
-      val ref0 = dirtyDomains.head
-      val ref: CellId[K, ref0.Domain] = ref0.aux
-      ref match {
-        case r @ SimpleCellId(_) =>
-          val (cell, ks) = simpleCells(r).triggerPendingObservers(-\/(r))
-          Some((copy(simpleCells = simpleCells.put(r)(cell), dirtyDomains = dirtyDomains.tail), ks))
-        case r @ AutoCellId(_, _) =>
-          val cell0 = autoCells(r)
-          val (cell, ks) = cell0.triggerPendingObservers(\/-((r, cell0.cycle)))
-          cell match {
-            case Some(cell) =>
-              Some((copy(autoCells = autoCells.put(r)(cell), dirtyDomains = dirtyDomains.tail), ks))
-            case None =>
-              Some((copy(autoCells = autoCells - r, dirtyDomains = dirtyDomains.tail), ks))
-          }
-      }
+  def execTriggers[A](r: SimpleCellId[K, A]): (PropagationStore[K], Lst[K[Unit]]) = {
+    val (cell, ks) = simpleCells(r).triggerPendingObservers(-\/(r))
+    (copy(simpleCells = simpleCells.put(r)(cell)), ks)
+  }
+
+  def execTriggers[A](r: AutoCellId[K, A], cycle: CellCycle[A]): (PropagationStore[K], Lst[K[Unit]]) = {
+    autoCells.get(r) match {
+      case Some(cell0) if(cell0.cycle === cycle) =>
+        val (cell, ks) = cell0.triggerPendingObservers(\/-((r, cell0.cycle)))
+        cell match {
+          case Some(cell) =>
+            (copy(autoCells = autoCells.put(r)(cell)), ks)
+          case None =>
+            (copy(autoCells = autoCells - r), ks)
+        }
+      case _ =>
+        (this, Lst.empty)
     }
-    else None
+  }
 }
 
 object PropagationStore {
@@ -309,8 +326,7 @@ object PropagationStore {
     lastCellCycle = CellCycle.zero[Nothing],
     simpleCells = KMap[SimpleCellId[K, ?], SimpleCell[K, ?]](),
     autoCells = KMap[AutoCellId[K, ?], OnDemandCell[K, ?]](),
-    failedVars = Set(),
-    dirtyDomains = Set()
+    failedVars = Set()
   )
 }
 

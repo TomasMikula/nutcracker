@@ -1,6 +1,8 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{FreeK, HOrderK, ShowK}
+import nutcracker.util.{FreeK, HOrderK, Lst, ShowK, StateInterpreter, TwoLevel, WriterState, WriterStateT}
+import scalaz.Id.Id
+import scalaz.{StateT, ~>}
 
 /** A [[Toolkit]] whose representation of a program ([[Toolkit.Prg]]) is
   * a free monad over some algebra ([[FreeToolkit.Lang]]).
@@ -17,6 +19,16 @@ trait FreeToolkit extends Toolkit {
   def emptyK[K[_]]: StateK[K]
 
   override def empty: State = emptyK[Prg]
+
+  val stepInterpreter: StateInterpreter[Prg, Lang[Prg, ?], State]
+
+  lazy val interpreter: Prg ~> StateT[Id, State, ?] = {
+    val freeInterpreter = stepInterpreter.free[WriterState[TwoLevel[Lst, Prg[Unit]], State, ?], TwoLevel[Lst, Prg[Unit]]](WriterStateT.monadTellStateInstance[Id, TwoLevel[Lst, Prg[Unit]], State], TwoLevel.stratifiedMonoidAggregator[Lst, Prg[Unit]], WriterStateT.bindRec[Id, TwoLevel[Lst, Prg[Unit]], State], implicitly, implicitly)
+    val freeKInterpreter = λ[Prg ~> WriterState[TwoLevel[Lst, Prg[Unit]], State, ?]](pa => freeInterpreter(pa.unwrap))
+    WriterStateT.recurse[Prg, Id, TwoLevel[Lst, ?], Prg[Unit], State](freeKInterpreter)(identity[Prg[Unit]])
+  }
+
+  def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p).run(s)
 }
 
 trait FreeRefToolkit extends FreeToolkit with RefToolkit {

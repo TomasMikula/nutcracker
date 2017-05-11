@@ -1,9 +1,12 @@
 package nutcracker.util
 
+import nutcracker.util.free.Free
 import scalaz.{-\/, Coproduct, \/-, ~>}
 
-// Like scalaz.Inject, but that one is sealed, so we can't
-// create it as a specialization of InjectK.
+/** Similar to [[scalaz.Inject]], except:
+  *  - not sealed, thus not restricted to injections into  [[scalaz.Coproduct]];
+  *  - doesn't require to implement projection, so more instances are possible.
+  */
 trait Inject[F[_], G[_]] extends (F ~> G) { self =>
   def inj[A](fa: F[A]): G[A]
 
@@ -22,23 +25,50 @@ object Inject extends InjectInstances0 {
 }
 
 trait InjectInstances0 extends InjectInstances1 {
-  implicit def reflexiveInject[F[_]]: Inject[F, F] =
-    new Inject[F, F] {
-      def inj[A](fa: F[A]): F[A] = fa
-    }
-
   implicit def injectLeft[F[_], G[_]]: Inject[F, Coproduct[F, G, ?]] =
     new Inject[F, Coproduct[F, G, ?]] {
       def inj[A](fa: F[A]): Coproduct[F, G, A] = Coproduct(-\/(fa))
     }
 
-  implicit def injectRight[F[_], G[_], H[_]](implicit I: Inject[F, G]): Inject[F, Coproduct[H, G, ?]] =
-    new Inject[F, Coproduct[H, G, ?]] {
-      def inj[A](fa: F[A]): Coproduct[H, G, A] = Coproduct(\/-(I.inj(fa)))
+  implicit def injectRight[F[_], G[_]]: Inject[G, Coproduct[F, G, ?]] =
+    new Inject[G, Coproduct[F, G, ?]] {
+      def inj[A](ga: G[A]): Coproduct[F, G, A] = Coproduct(\/-(ga))
     }
 }
 
 trait InjectInstances1 extends InjectInstances2 {
+  implicit def injectLeftRec[F[_], G[_], H[_]](implicit fg: Inject[F, G]): Inject[F, Coproduct[G, H, ?]] =
+    new Inject[F, Coproduct[G, H, ?]] {
+      def inj[A](fa: F[A]): Coproduct[G, H, A] = Coproduct(-\/(fg(fa)))
+    }
+
+  implicit def injectRightRec[F[_], G[_], H[_]](implicit fh: Inject[F, H]): Inject[F, Coproduct[G, H, ?]] =
+    new Inject[F, Coproduct[G, H, ?]] {
+      def inj[A](fa: F[A]): Coproduct[G, H, A] = Coproduct(\/-(fh(fa)))
+    }
+}
+
+trait InjectInstances2 extends InjectInstances3 {
+  implicit def freeLift[F[_]]: Inject[F, Free[F, ?]] =
+    λ[Inject[F, Free[F, ?]]].inj(fa => Free.liftF(fa))
+
+  implicit def freeKLift[F[_[_], _]]: Inject[F[FreeK[F, ?], ?], FreeK[F, ?]] =
+    λ[Inject[F[FreeK[F, ?], ?], FreeK[F, ?]]].inj(fa => FreeK.liftF(fa))
+}
+
+trait InjectInstances3 extends InjectInstances4 {
+  implicit def reflexiveInject[F[_]]: Inject[F, F] =
+    new Inject[F, F] {
+      def inj[A](fa: F[A]): F[A] = fa
+    }
+}
+
+trait InjectInstances4 extends InjectInstances5 {
+  implicit def transitiveInject[F[_], G[_], H[_]](implicit fg: Inject[F, G], gh: Inject[G, H]): Inject[F, H] =
+    fg andThen gh
+}
+
+trait InjectInstances5 extends InjectInstances6 {
   implicit def injectCoproduct[F[_], G[_], H[_]](implicit
     injF: Inject[F, H],
     injG: Inject[G, H]
@@ -50,6 +80,6 @@ trait InjectInstances1 extends InjectInstances2 {
   }
 }
 
-trait InjectInstances2 {
+trait InjectInstances6 {
   implicit def specialize[F[_[_], _], G[_[_], _], K[_]](implicit inj: InjectK[F, G]): Inject[F[K, ?], G[K, ?]] = inj[K]
 }

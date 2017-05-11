@@ -23,8 +23,6 @@ private[nutcracker] sealed abstract class Cell[K[_], D] {
   type PendingObserver[Val] = Cell.PendingObserver[K, D, Delta, Val]
   type BlockedIdleObserver[D0, Val] = Cell.BlockedIdleObserver[D, Delta, D0, Val]
   type BlockedPendingObserver[D0, Val] = Cell.BlockedPendingObserver[D, Delta, D0, Val]
-
-  def hasPendingObservers: Boolean
 }
 
 private[nutcracker] object Cell {
@@ -120,9 +118,9 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
 
   def hasObserver: Boolean = idleObservers.nonEmpty || pendingObservers.nonEmpty || blockedIdleObservers.nonEmpty || blockedPendingObservers.nonEmpty
 
-  def hasPendingObservers: Boolean = pendingObservers.nonEmpty
+  private def hasPendingObservers: Boolean = pendingObservers.nonEmpty
 
-  def update(u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[SimpleCell[K, D]] =
+  def update(u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[SimpleCell[K, D]] =
     dom.update(value, u) match {
       case up @ Updated(newVal, delta) =>
         val pending0 = pendingObservers.map(_.addDelta(delta))
@@ -137,9 +135,11 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
         )
         val blocked = blocked0 ++ blocked1
 
-        Some(SimpleCell(newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[up.NewValue, ?]](), blocked, lastObserverId, lastToken))
+        val cell = SimpleCell[K, D, Update, Delta, D](newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[up.NewValue, ?]](), blocked, lastObserverId, lastToken)
+        val becameDirty = !this.hasPendingObservers && cell.hasPendingObservers
+        CellUpdated(cell, becameDirty)
 
-      case Unchanged() => None
+      case Unchanged() => CellUnchanged
     }
 
   def observe(self: CellIncarnationId, f: PreHandler): (SimpleCell.Aux1[K, D, Update, Delta, Value], Option[ObserverId], Lst[K[Unit]]) = {
@@ -196,15 +196,17 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
     }
   }
 
-  def resume[D0 <: D](self: CellIncarnationId, token: Token[D0], trigger: Trigger[D0]): (SimpleCell.Aux1[K, D, Update, Delta, Value], Lst[K[Unit]]) = {
+  def resume[D0 <: D](self: CellIncarnationId, token: Token[D0], trigger: Trigger[D0]): (SimpleCell.Aux1[K, D, Update, Delta, Value], Lst[K[Unit]], Boolean) = {
     import SeqTrigger._
     trigger match {
-      case Discard() => (copy(blockedIdleObservers = blockedIdleObservers - token, blockedPendingObservers = blockedPendingObservers - token), Lst.empty)
-      case Fire(k)   => (copy(blockedIdleObservers = blockedIdleObservers - token, blockedPendingObservers = blockedPendingObservers - token), Lst.singleton(k))
+      case Discard() => (copy(blockedIdleObservers = blockedIdleObservers - token, blockedPendingObservers = blockedPendingObservers - token), Lst.empty, false)
+      case Fire(k)   => (copy(blockedIdleObservers = blockedIdleObservers - token, blockedPendingObservers = blockedPendingObservers - token), Lst.singleton(k), false)
       case Sleep(handler) =>
-        (resumeWithHandler(token, handler), Lst.empty)
+        val (cell, becameDirty) = resumeWithHandler(token, handler)
+        (cell, Lst.empty, becameDirty)
       case FireReload(k, handler) =>
-        (resumeWithHandler(token, handler), Lst.singleton(k))
+        val (cell, becameDirty) = resumeWithHandler(token, handler)
+        (cell, Lst.singleton(k), becameDirty)
       case Reconsider(f) =>
         val nextToken = lastToken.inc[D0]
         val k = f((self, nextToken))
@@ -225,20 +227,21 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
               sys.error(s"unrecognized token $token")
           }
         }
-        (cell, Lst.singleton(k))
+        (cell, Lst.singleton(k), false)
     }
   }
 
-  private def resumeWithHandler[D0 <: D](token: Token[D0], handler: Handler[D0]): SimpleCell.Aux1[K, D, Update, Delta, Value] =
+  private def resumeWithHandler[D0 <: D](token: Token[D0], handler: Handler[D0]): (SimpleCell.Aux1[K, D, Update, Delta, Value], Boolean) =
     blockedIdleObservers.get(token) match {
       case Some(obs) =>
         assert(blockedPendingObservers.get(token).isEmpty)
         val obs1 = obs.resume(handler)
-        SimpleCell[K, D, Update, Delta, Value](value)(obs1 :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, lastObserverId, lastToken)
+        (SimpleCell[K, D, Update, Delta, Value](value)(obs1 :: idleObservers, pendingObservers, blockedIdleObservers - token, blockedPendingObservers, lastObserverId, lastToken), false)
       case None => blockedPendingObservers.get(token) match {
         case Some(obs) =>
           val obs1 = obs.resume(handler)
-          SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, obs1 :: pendingObservers, blockedIdleObservers, blockedPendingObservers - token, lastObserverId, lastToken)
+          val becameDirty = pendingObservers.isEmpty
+          (SimpleCell[K, D, Update, Delta, Value](value)(idleObservers, obs1 :: pendingObservers, blockedIdleObservers, blockedPendingObservers - token, lastObserverId, lastToken), becameDirty)
         case None =>
           sys.error(s"unrecognized token $token")
       }
@@ -323,11 +326,11 @@ private[nutcracker] sealed abstract class OnDemandCell[K[_], D] extends Cell[K, 
 
   def hold(f: (D, CellCycle[D], Token[D], ObserverId) => K[Unit]): (OnDemandCell[K, D], ObserverId, Lst[K[Unit]])
 
-  def resume[D0 <: D](self: CellIncarnationId, token: Token[D0], trigger: Trigger[D0]): (Option[OnDemandCell[K, D]], Lst[K[Unit]])
+  def resume[D0 <: D](self: CellIncarnationId, token: Token[D0], trigger: Trigger[D0]): (Option[(OnDemandCell[K, D], Boolean)], Lst[K[Unit]])
 
   def supply[D0 <: D](self: CellIncarnationId, value: D0): (Option[OnDemandCell[K, D]], Lst[K[Unit]])
 
-  def exclUpdate(u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): Option[OnDemandCell[K, D]]
+  def exclUpdate(u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[OnDemandCell[K, D]]
 
   def addFinalizer(sub: Subscription[K]): (Lst[K[Unit]], OnDemandCell[K, D], FinalizerId)
 
@@ -361,8 +364,6 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
   private val observerCount = preHandlers.size + preHandlersM.size
 
   override def getValue: Option[Value] = None
-
-  override def hasPendingObservers: Boolean = false
 
   override def observe(self: CellIncarnationId, f: PreHandler): (OnDemandCell[K, D], Option[ObserverId], Lst[K[Unit]]) = {
     val obsId = lastObserverId.inc
@@ -413,7 +414,7 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
     }
   }
 
-  override def exclUpdate(u: U)(implicit dom: IDom.Aux[D, U, Δ]): Option[OnDemandCell[K, D]] = {
+  override def exclUpdate(u: U)(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D]] = {
     sys.error("Unreachable code: no one has access to the current cycle yet")
   }
 
@@ -423,7 +424,7 @@ private[nutcracker] case class InitializingCell[K[_], D, U, Δ[_, _]](
   override def removeFinalizer(fid: FinalizerId): OnDemandCell[K, D] =
     sys.error("Unreachable code: no one has access to the current cycle yet")
 
-  override def resume[D0 <: D](self: CellIncarnationId, token: Token[D0], trigger: Trigger[D0]): (Option[OnDemandCell.Aux[K, D, U, Δ]], Lst[K[Unit]]) =
+  override def resume[D0 <: D](self: CellIncarnationId, token: Token[D0], trigger: Trigger[D0]): (Option[(OnDemandCell.Aux[K, D, U, Δ], Boolean)], Lst[K[Unit]]) =
     sys.error("No tokens issued in this cycle yet")
 
   override def triggerPendingObservers(self: CellIncarnationId): (Option[OnDemandCell[K, D]], Lst[K[Unit]]) =
@@ -488,8 +489,6 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
 
   override def getValue: Option[Value] = Some(impl.value)
 
-  override def hasPendingObservers: Boolean = impl.hasPendingObservers
-
   override def observe(self: CellIncarnationId, f: PreHandler): (OnDemandCell[K, D], Option[ObserverId], Lst[K[Unit]]) = {
     val (cell, oid, ks) = impl.observe(self, f)
     (copy(impl = cell), oid, ks)
@@ -500,10 +499,15 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
     (copy(impl = cell), oid, ks)
   }
 
-  override def resume[D0 <: D](self: CellIncarnationId, token: Token[D0], trigger: Trigger[D0]): (Option[OnDemandCell[K, D]], Lst[K[Unit]]) = {
-    val (cell, ks) = impl.resume(self, token, trigger)
-    if(cell.hasObserver) (Some(copy(impl = cell)), ks)
-    else (None, ks ++ collectFinalizers)
+  override def resume[D0 <: D](self: CellIncarnationId, token: Token[D0], trigger: Trigger[D0]): (Option[(OnDemandCell[K, D], Boolean)], Lst[K[Unit]]) = {
+    val (cell, ks, becameDirty) = impl.resume(self, token, trigger)
+
+    if (cell.hasObserver) {
+      (Some((copy(impl = cell), becameDirty)), ks)
+    } else {
+      assert(!becameDirty)
+      (None, ks ++ collectFinalizers)
+    }
   }
 
   override def rmObserver(oid: ObserverId): (Option[OnDemandCell[K, D]], Lst[K[Unit]]) = {
@@ -521,10 +525,10 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
     else (None, ks ++ collectFinalizers)
   }
 
-  override def exclUpdate(u: U)(implicit dom: IDom.Aux[D, U, Δ]): Option[OnDemandCell[K, D]] = {
-    impl.update(u) match { // linter:ignore UseOptionMapNotPatMatch
-      case Some(cell) => Some(ActiveCell[K, D, cell.Update, cell.Delta, cell.Value](cycle, cell, finalizers, lastFinalizerId))
-      case None => None
+  override def exclUpdate(u: U)(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D]] = {
+    impl.update(u) match {
+      case CellUpdated(cell, becameDirty) => CellUpdated(ActiveCell[K, D, cell.Update, cell.Delta, cell.Value](cycle, cell, finalizers, lastFinalizerId), becameDirty)
+      case CellUnchanged => CellUnchanged
     }
   }
 
@@ -539,6 +543,10 @@ private[nutcracker] case class ActiveCell[K[_], D, U, Δ[_, _], Val <: D](
   private def collectFinalizers: Lst[K[Unit]] =
     finalizers.valuesIterator.foldLeft(Lst.empty[K[Unit]])((ks, sub) => sub.unsubscribe ++ ks)
 }
+
+private[toolkit] sealed abstract class CellUpdateResult[+C]
+private[toolkit] case class CellUpdated[C](cell: C, becameDirty: Boolean) extends CellUpdateResult[C]
+private[toolkit] case object CellUnchanged extends CellUpdateResult[Nothing]
 
 private[nutcracker] final class Token[+A] private(val id: Long) extends AnyVal {
   def inc[B]: Token[B] = new Token(id + 1)
