@@ -25,7 +25,7 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   type VarK[K[_], A] = Prop.VarK[K, A]
   type ValK[K[_], A] = Prop.ValK[K, A]
 
-  type Lang[K[_], A] = (Prop.Lang   :+: Branch.Lang   :++: Cost.Lang  )#Out1[K, A]
+  type Lang[K[_], A] = (Prop.Lang   :+: Branch.Lang   :++: Cost.Lang  )#Out[K, A]
   type StateK[K[_]]  = (Prop.StateK :*: Branch.StateK :**: Cost.StateK)#Out[K]
 
   override def readOnlyK[K[_], A](ref: VarK[K, A]): ValK[K, A] = Prop.readOnlyK(ref)

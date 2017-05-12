@@ -21,7 +21,7 @@ object PropBranch extends FreePropagationToolkit with FreeBranchingToolkit with 
 
   val Branch = PersistentBranchingModule.instance[VarK, ValK].stashable
 
-  type Lang[K[_], A] = (Prop.Lang   :++: Branch.Lang  )#Out1[K, A]
+  type Lang[K[_], A] = (Prop.Lang   :++: Branch.Lang  )#Out[K, A]
   type StateK[K[_]]  = (Prop.StateK :**: Branch.StateK)#Out[K]
 
   def varOrderK[K[_]] = Prop.varOrderK

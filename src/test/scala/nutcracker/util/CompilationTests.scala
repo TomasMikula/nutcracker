@@ -16,7 +16,7 @@ object CompilationTests {
     trait BarS[K[_]]
     trait BazS[K[_]]
 
-    type FooBarBazL[K[_], A] = (FooL :+: BarL :++: BazL)#Out1[K, A]
+    type FooBarBazL[K[_], A] = (FooL :+: BarL :++: BazL)#Out[K, A]
     type FooBarBazS[K[_]]    = (FooS :*: BarS :**: BazS)#Out[K]
 
     def fooIntr[K[_], S](implicit lens: Lens[S, FooS[K]]): StateInterpreter[K, FooL[K, ?], S] = ???
@@ -33,7 +33,7 @@ object CompilationTests {
     type QuxL[K[_], A] = QuuxL[Int, K, A]
     type QuxS[K[_]]    = QuuxS[Int, K]
 
-    type FooBarQuxL[K[_], A] = (FooL :+: BarL :++: QuxL)#Out1[K, A]
+    type FooBarQuxL[K[_], A] = (FooL :+: BarL :++: QuxL)#Out[K, A]
     type FooBarQuxS[K[_]]    = (FooS :*: BarS :**: QuxS)#Out[K]
 
     type Prg2[A] = FreeK[FooBarQuxL, A]

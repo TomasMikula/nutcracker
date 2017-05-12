@@ -19,7 +19,7 @@ object PropRel extends FreePropagationToolkit with PropRelToolkit {
   type VarK[K[_], A] = Prop.VarK[K, A]
   type ValK[K[_], A] = Prop.ValK[K, A]
 
-  type Lang[K[_], A] = (Prop.Lang   :++: RelMod.Lang  )#Out1[K, A]
+  type Lang[K[_], A] = (Prop.Lang   :++: RelMod.Lang  )#Out[K, A]
   type StateK[K[_]]  = (Prop.StateK :**: RelMod.StateK)#Out[K]
 
   override def readOnlyK[K[_], A](ref: VarK[K, A]): ValK[K, A] = Prop.readOnlyK(ref)
