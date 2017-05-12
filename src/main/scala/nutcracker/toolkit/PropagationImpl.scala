@@ -7,7 +7,6 @@ import scala.language.existentials
 import scalaz.syntax.equal._
 import scalaz.syntax.monoid._
 import scalaz.{-\/, Bind, Equal, Lens, Monad, Ordering, Show, \/-}
-import shapeless.{Nat, Sized}
 
 private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with FreeOnDemandPropagationToolkit { self =>
   type VarK[K[_], A] = SimpleCellId[K, A]
@@ -163,9 +162,6 @@ private[nutcracker] case class PropagationStore[K[_]] private(
 
   // unsafe, should only be allowed on simple cells
   def fetch[D](ref: CellId[K, D]): D = tryFetch(ref).get
-
-  def fetchVector[D, N <: Nat](refs: Sized[Vector[SimpleCellId[K, D]], N]): Sized[Vector[D], N] =
-    refs.map(ref => fetch(ref))
 
   def update[D, U, Δ[_, _]](ref: SimpleCellId[K, D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Boolean) =
     simpleCells(ref).infer.update(u) match {

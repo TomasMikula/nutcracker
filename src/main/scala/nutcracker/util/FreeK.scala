@@ -1,7 +1,7 @@
 package nutcracker.util
 
 import nutcracker.util.free.Free
-import scalaz.{Monad, Traverse}
+import scalaz.Monad
 
 /** Free monad for type constructors of kind `F[_[_], _]`,
   * where `F`'s first type parameter is recursively set to FreeK[F, ?].
@@ -48,10 +48,4 @@ object FreeK {
       def point[A](a: => A): FreeK[F, A] = FreeK.pure(a)
       def bind[A, B](fa: FreeK[F, A])(f: A => FreeK[F, B]): FreeK[F, B] = fa.flatMap(f)
     }
-
-  def sequence[F[_[_], _], C[_]: Traverse, A](ps: C[FreeK[F, A]]): FreeK[F, C[A]] =
-    Traverse[C].sequence[FreeK[F, ?], A](ps)
-
-  def traverse[F[_[_], _], C[_]: Traverse, A, B](ps: C[A])(f: A => FreeK[F, B]): FreeK[F, C[B]] =
-    Traverse[C].traverse[FreeK[F, ?], A, B](ps)(f)
 }
