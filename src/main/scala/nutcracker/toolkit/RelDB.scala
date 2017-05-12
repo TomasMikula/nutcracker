@@ -1,6 +1,6 @@
 package nutcracker.toolkit
 
-import nutcracker.rel.{Assignment, OrientedPattern, PartiallyAssignedOrientedPattern, PartiallyAssignedPattern, Pattern, Rel, RelChoice}
+import nutcracker.{Assignment, OrientedPattern, PartiallyAssignedOrientedPattern, PartiallyAssignedPattern, Pattern, Rel, RelChoice}
 import nutcracker.util.{KMapB, Lst, Mapped, TransformedIndex}
 import scala.language.existentials
 import scalaz.Order

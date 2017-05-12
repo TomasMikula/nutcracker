@@ -1,13 +1,12 @@
-package nutcracker.rel
+package nutcracker
 
-import nutcracker.rel.Pattern.Orientation
-import nutcracker.util.{ValuedPointers, Pointers}
+import nutcracker.Pattern.Orientation
+import nutcracker.util.{Pointers, ValuedPointers}
+import scala.annotation.tailrec
+import scalaz.{ICons, IList, INil, NonEmptyList}
 import shapeless.ops.hlist.Length
 import shapeless.ops.nat.ToInt
 import shapeless.{:: => _, _}
-
-import scala.annotation.tailrec
-import scalaz.{ICons, IList, INil, NonEmptyList}
 
 sealed trait Pattern[V <: HList] {
 
@@ -28,13 +27,13 @@ sealed trait Pattern[V <: HList] {
   }
   final override def hashCode: Int = relations.toSet.hashCode()
 
-  private[rel] def head: RelChoice[V, _ <: HList]
-  private[rel] def matchHead[K <: HList](r: Rel[K]): Option[Pattern0[V, K]]
+  private[nutcracker] def head: RelChoice[V, _ <: HList]
+  private[nutcracker] def matchHead[K <: HList](r: Rel[K]): Option[Pattern0[V, K]]
 }
 
-private[rel] sealed trait Pattern0[V <: HList, L <: HList] extends Pattern[V]
+private[nutcracker] sealed trait Pattern0[V <: HList, L <: HList] extends Pattern[V]
 
-private[rel] case class SingleRelPattern[V <: HList, L <: HList, N <: Nat](rel: RelChoice[V, L])(implicit l: Length.Aux[V, N], nToInt: ToInt[N]) extends Pattern0[V, L] {
+private[nutcracker] case class SingleRelPattern[V <: HList, L <: HList, N <: Nat](rel: RelChoice[V, L])(implicit l: Length.Aux[V, N], nToInt: ToInt[N]) extends Pattern0[V, L] {
   override def head = rel
   override def matchHead[K <: HList](r: Rel[K]): Option[Pattern0[V, K]] = rel.matches(r) map { SingleRelPattern(_) }
   override val vertexCount = nToInt()
@@ -43,7 +42,7 @@ private[rel] case class SingleRelPattern[V <: HList, L <: HList, N <: Nat](rel: 
   override def emptyAssignment = Assignment[V].empty
 }
 
-private[rel] case class ComposedPattern[V <: HList, L <: HList](
+private[nutcracker] case class ComposedPattern[V <: HList, L <: HList](
   rel: RelChoice[V, L],
   base: Pattern[V]
 ) extends Pattern0[V, L] {
@@ -104,7 +103,7 @@ object Pattern {
 
 }
 
-case class OrientedPattern[V <: HList, L <: HList] private[rel] (pattern: Pattern[V], rel: Rel[L]) {
+case class OrientedPattern[V <: HList, L <: HList] private[nutcracker] (pattern: Pattern[V], rel: Rel[L]) {
 
   /**
     * For each occurrence of relation `rel` in `pattern`, contains

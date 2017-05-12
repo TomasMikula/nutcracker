@@ -1,4 +1,4 @@
-package nutcracker.rel
+package nutcracker
 
 import shapeless.HList
 

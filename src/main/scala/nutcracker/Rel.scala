@@ -1,4 +1,4 @@
-package nutcracker.rel
+package nutcracker
 
 import nutcracker.util.ChooseByPtrs
 import shapeless._

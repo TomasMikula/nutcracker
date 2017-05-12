@@ -1,7 +1,8 @@
 package nutcracker.rel
 
+import nutcracker.Assignment
 import org.scalatest.{FlatSpec, Matchers}
-import shapeless.{HNil, ::}
+import shapeless.{::, HNil}
 import shapeless.nat._
 
 class AssignmentTest extends FlatSpec with Matchers {

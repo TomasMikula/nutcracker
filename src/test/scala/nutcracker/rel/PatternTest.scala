@@ -1,10 +1,10 @@
 package nutcracker.rel
 
-import nutcracker.rel.Rel.{Rel1, Rel2, Rel3}
+import nutcracker.Pattern
+import nutcracker.Rel.{Rel1, Rel2, Rel3}
 import org.scalatest.{FlatSpec, Matchers}
 import shapeless.test.illTyped
 import shapeless.{::, HNil}
-
 import scalaz.NonEmptyList
 
 class PatternTest extends FlatSpec with Matchers {

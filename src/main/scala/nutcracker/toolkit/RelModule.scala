@@ -1,6 +1,6 @@
 package nutcracker.toolkit
 
-import nutcracker.rel.Relations
+import nutcracker.Relations
 import nutcracker.util.{FreeK, Inject, Lst, MonadTellState, StateInterpreter, StratifiedMonoidAggregator}
 import nutcracker.util.ops._
 import scalaz.{Bind, Lens}

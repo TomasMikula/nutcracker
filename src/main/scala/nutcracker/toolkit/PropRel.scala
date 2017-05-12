@@ -1,7 +1,6 @@
 package nutcracker.toolkit
 
-import nutcracker.OnDemandPropagation
-import nutcracker.rel.Relations
+import nutcracker.{OnDemandPropagation, Relations}
 import nutcracker.util.CoproductK._
 import nutcracker.util.KPair._
 import scalaz.Monad

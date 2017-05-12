@@ -1,6 +1,6 @@
 package nutcracker.toolkit
 
-import nutcracker.rel.Assignment
+import nutcracker.Assignment
 import nutcracker.util.{Lst, Mapped}
 import scala.annotation.tailrec
 import scalaz.Order

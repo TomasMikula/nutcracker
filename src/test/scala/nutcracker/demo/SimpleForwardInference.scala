@@ -1,7 +1,7 @@
 package nutcracker.demo
 
-import nutcracker.rel.Pattern
-import nutcracker.rel.Rel.Rel2
+import nutcracker.Pattern
+import nutcracker.Rel.Rel2
 import org.scalatest.{FunSpec, Matchers}
 import scalaz.{NonEmptyList, Order}
 import scalaz.std.anyVal._

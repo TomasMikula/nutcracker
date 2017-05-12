@@ -1,5 +1,6 @@
 package nutcracker.rel
 
+import nutcracker.Pattern
 import nutcracker.data.Tupled2
 import nutcracker.data.bool.Bool
 import nutcracker.toolkit.PropRel

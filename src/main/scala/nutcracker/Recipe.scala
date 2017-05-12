@@ -1,4 +1,4 @@
-package nutcracker.rel
+package nutcracker
 
 import nutcracker.util.Choose
 import scalaz.Bind

@@ -1,8 +1,7 @@
 package nutcracker.data
 
-import nutcracker.{Dom, OnDemandPropagation, Subscription, SyncDom}
-import nutcracker.rel.{Recipe, Relations}
-import nutcracker.rel.Rel.Rel3
+import nutcracker.{Dom, OnDemandPropagation, Recipe, Relations, Subscription, SyncDom}
+import nutcracker.Rel.Rel3
 import nutcracker.util.{Choose, ContU, HOrderK, ∃}
 import scalaz.{IndexedContT, Monad, \&/}
 import scalaz.syntax.monad._

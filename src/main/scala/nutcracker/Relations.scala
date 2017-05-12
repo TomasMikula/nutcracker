@@ -1,8 +1,8 @@
-package nutcracker.rel
+package nutcracker
 
 import nutcracker.util.{ContU, Mapped, MappedListBuilder, SummonHList}
-import scalaz.{Bind, Order}
 import scalaz.syntax.bind._
+import scalaz.{Bind, Order}
 import shapeless.{::, HList, HNil}
 
 trait Relations[M[_]] {
