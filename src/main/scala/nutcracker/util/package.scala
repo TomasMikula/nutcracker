@@ -63,10 +63,10 @@ package object util {
       TransformedIndex.empty(f, (v, k) => v)
   }
 
-  type WriterState[W, S, A] = WriterStateT[Id, W, S, A]
+  type WriterState[W, S, A] = WriterStateT[W, S, Id, A]
   object WriterState {
     def apply[W, S, A](run: S => (W, S, A)): WriterState[W, S, A] =
-      WriterStateT[Id, W, S, A](run)
+      WriterStateT[W, S, Id, A](run)
   }
 
   type Desc[Ptr[_]] = FreeObjectOutput[String, Ptr, Unit]
