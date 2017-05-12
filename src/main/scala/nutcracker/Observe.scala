@@ -183,8 +183,8 @@ final class ObserveSyntaxHelper[M[_], A, U, Δ, Tr[_, _]](src: Observable[M, A] 
   def by(f: A => Tr[A, Δ]): M[Subscription[M]] = src.observeImpl(f)
   def by_(f: A => Tr[A, Δ])(implicit M: Functor[M]): M[Unit] = by(f).void
 
-  def byC[B](f: A => ContU[M, (Tr[A, Δ], B)])(implicit M: Bind[M]): ContU[M, (Subscription[M], B)] = src.observeImplC(f)
-  def byC_[B](f: A => ContU[M, (Tr[A, Δ], B)])(implicit M: Bind[M]): ContU[M, B] = byC(f).map(_._2)
+  def byC[B](f: A => ContU[M, (Tr[A, Δ], B)]): ContU[M, (Subscription[M], B)] = src.observeImplC(f)
+  def byC_[B](f: A => ContU[M, (Tr[A, Δ], B)]): ContU[M, B] = byC(f).map(_._2)
 
   def byM[B](f: A => M[(Tr[A, Δ], B)])(implicit M: Bind[M]): ContU[M, (Subscription[M], B)] = byC(a => ContU.liftM(f(a)))
   def byM_[B](f: A => M[(Tr[A, Δ], B)])(implicit M: Bind[M]): ContU[M, B] = byM(f).map(_._2)

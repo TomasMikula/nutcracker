@@ -4,7 +4,7 @@ version := "0.2-SNAPSHOT"
 
 organization := "com.github.tomasmikula"
 
-scalaVersion := "2.12.1"
+scalaVersion := "2.12.2"
 
 autoCompilerPlugins := true
 addCompilerPlugin("org.spire-math" % "kind-projector" % "0.9.3" cross CrossVersion.binary)
@@ -14,7 +14,9 @@ scalastyleFailOnError := true
 
 scalacOptions ++= Seq(
   "-language:higherKinds",
-  "-Xlint",
+  "-Xlint:-unused,_", // Exclude "unused", because:
+                      //  - it produces some false positives;
+                      //  - sometimes we use them as jsut implicit evidence.
   "-unchecked",
   "-deprecation",
   "-feature",
@@ -33,12 +35,12 @@ parallelExecution in Test := false // currently, ScalaProps does not support par
 
 libraryDependencies ++= Seq(
   "org.typelevel" %% "algebra" % "0.6.0",
-  "org.scalaz" %% "scalaz-core" % "7.3.0-M11",
+  "org.scalaz" %% "scalaz-core" % "7.3.0-M12",
   "com.chuusai" %% "shapeless" % "2.3.2",
   "com.github.scalaprops" %% "scalaprops" % "0.4.1",
 
   "org.scalatest" %% "scalatest" % "3.0.1" % "test",
-  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.0-M10" % "test",
+  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.0-M12" % "test",
   "org.scalacheck" %% "scalacheck" % "1.13.4" % "test"
 )
 

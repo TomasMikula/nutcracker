@@ -17,11 +17,11 @@ trait CostToolkit[C] extends Toolkit {
   def solveBfs[A, B](p: Prg[A], f: (A, State) => Option[B]): StreamT[Id, (B, C)] =
     solveBfsM[Id, A, B](p, f)
 
-  def solveBfsM[M[_], A, B](p: Prg[A], f: (A, State) => Option[B])(implicit M0: BindRec[M], M1: Monad[M]): StreamT[M, (B, C)] = {
+  def solveBfsM[M[_], A, B](p: Prg[A], f: (A, State) => Option[B])(implicit M: Monad[M]): StreamT[M, (B, C)] = {
     val (s, a) = interpret(p, empty)
 
     new BFSSolver[Prg[Unit], State, M, C, B](
-      (pu, s) => M1.point(interpret(pu, s)._1),
+      (pu, s) => M.point(interpret(pu, s)._1),
       s => assess(s) match {
         case Incomplete(bs) => -\/(bs)
         case Done => f(a, s).fold[List[Prg[Unit]] \/ B](-\/(Nil))(\/-(_))

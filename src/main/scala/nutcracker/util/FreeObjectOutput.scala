@@ -217,7 +217,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
       }
     })._1
 
-  def serialize[M[_]](implicit M: MonadObjectOutput[M, R, Ptr], M1: BindRec[M]): M[A] =
+  def serialize[M[_]](implicit M: MonadObjectOutput[M, R, Ptr]): M[A] =
     unwrap.foldMap[M](λ[OutputInst[R, Ptr, ?] ~> M](_ match {
       case Write(r) => M.write(r)
       case WriteRec(pa, f) => M.writeRec(pa)(f(_).serialize[M])

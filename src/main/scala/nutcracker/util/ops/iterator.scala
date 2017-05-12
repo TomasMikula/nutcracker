@@ -23,7 +23,7 @@ final case class IteratorOps[A](it: Iterator[A]) extends AnyVal {
   }
 
   def collectToList[B](f: A => Option[B]): List[B] = {
-    var buf = List.newBuilder[B]
+    val buf = List.newBuilder[B]
     while(it.hasNext) {
       f(it.next()).foreach(buf += _)
     }

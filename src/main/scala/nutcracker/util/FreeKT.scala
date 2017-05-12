@@ -1,7 +1,7 @@
 package nutcracker.util
 
 import nutcracker.util.free.FreeT
-import scalaz.{Applicative, BindRec, Functor, Monad, MonadPartialOrder, ~>}
+import scalaz.{Applicative, BindRec, Monad, MonadPartialOrder, ~>}
 
 final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M, A]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-7685
 
@@ -44,19 +44,18 @@ final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M
   ): FreeKT[G, M, A] =
     FreeKT.injectionOrder[F, G, M].apply(this)
 
-  def hoist[N[_]](mn: M ~> N)(implicit FK: FunctorKA[F], N: Functor[N]): FreeKT[F, N, A] =
+  def hoist[N[_]](mn: M ~> N)(implicit FK: FunctorKA[F]): FreeKT[F, N, A] =
     FreeKT.hoist[F, M, N](mn).apply(this)
 
   def promote[N[_]](implicit mn: MonadPartialOrder[N, M], FK: FunctorKA[F]): FreeKT[F, N, A] =
-    hoist(mn)(FK, mn.MG)
+    hoist(mn)
 
-  def foldMap(tr: F[FreeKT[F, M, ?], ?] ~> M)(implicit M0: BindRec[M], M1: Applicative[M]): M[A] =
+  def foldMap(tr: F[FreeKT[F, M, ?], ?] ~> M)(implicit M: BindRec[M]): M[A] =
     run.foldMap(tr)
 
   def foldMapN[N[_]](tr: F[FreeKT[F, M, ?], ?] ~> N)(implicit
     mn: MonadPartialOrder[N, M],
-    N0: BindRec[N],
-    N1: Applicative[N]
+    N0: BindRec[N]
   ): N[A] =
     run.hoist(mn).foldMap(tr)
 }
@@ -66,7 +65,7 @@ object FreeKT {
   def pure[F[_[_], _], M[_], A](a: A)(implicit M: Applicative[M]): FreeKT[F, M, A] =
     FreeKT(FreeT.point(a))
 
-  def liftF[F[_[_], _], M[_], A](a: F[FreeKT[F, M, ?], A])(implicit M: Applicative[M]): FreeKT[F, M, A] =
+  def liftF[F[_[_], _], M[_], A](a: F[FreeKT[F, M, ?], A]): FreeKT[F, M, A] =
     FreeKT(FreeT.liftF[F[FreeKT[F, M, ?], ?], M, A](a))
 
   implicit def freeKTMonad[F[_[_], _], M[_]](implicit M: Applicative[M]): Monad[FreeKT[F, M, ?]] =
@@ -92,10 +91,7 @@ object FreeKT {
         FreeKT(fa.run.interpret(tr))
     }
 
-  def hoist[F[_[_], _], M[_], N[_]](mn: M ~> N)(implicit
-    FK: FunctorKA[F],
-    N: Functor[N]
-  ): (FreeKT[F, M, ?] ~> FreeKT[F, N, ?]) =
+  def hoist[F[_[_], _], M[_], N[_]](mn: M ~> N)(implicit FK: FunctorKA[F]): (FreeKT[F, M, ?] ~> FreeKT[F, N, ?]) =
     new (FreeKT[F, M, ?] ~> FreeKT[F, N, ?]) { self =>
 
       val tr = new (F[FreeKT[F, M, ?], ?] ~> F[FreeKT[F, N, ?], ?]) {

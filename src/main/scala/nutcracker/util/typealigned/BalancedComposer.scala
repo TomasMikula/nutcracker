@@ -1,34 +1,30 @@
 package nutcracker.util.typealigned
 
 import nutcracker.util.Aggregator
-
 import scala.annotation.tailrec
-import scala.language.higherKinds
-import nutcracker.util.typealigned.BalancedComposer.Direction
-
 import scalaz.{Compose, Semigroup}
 
 
-final class BalancedComposer[F[_, _], A, B, D <: Direction] private(count: Int, stack: AList1[F, A, B]) {
+final class BalancedComposer[F[_, _], A, B, Dir] private(count: Int, stack: AList1[F, A, B]) {
   import BalancedComposer._
 
-  def +:[Z](f: F[Z, A])(implicit F: Compose[F], pre: D =:= Pre): BalancedComposer[F, Z, B, D] =
+  def +:[Z](f: F[Z, A])(implicit F: Compose[F], pre: Dir =:= Pre): BalancedComposer[F, Z, B, Dir] =
     add(pair(f, stack), 1, count)
 
   /** Like `+:`, but to be used in post-compose mode. */
-  def :+[Z](f: F[Z, A])(implicit F: Compose[Op[F, ?, ?]], post: D =:= Post): BalancedComposer[F, Z, B, D] =
+  def :+[Z](f: F[Z, A])(implicit F: Compose[Op[F, ?, ?]], post: Dir =:= Post): BalancedComposer[F, Z, B, Dir] =
     add(pair(f, stack), 1, count)(unflip(F))
 
   /** Reduction when used as pre-composer. */
-  def reduceLeft(implicit F: Compose[F], pre: D =:= Pre): F[A, B] =
+  def reduceLeft(implicit F: Compose[F], pre: Dir =:= Pre): F[A, B] =
     stack.reduceLeft
 
   /** Reduction when used as post-composer. */
-  def reduceRight(implicit F: Compose[Op[F, ?, ?]], post: D =:= Post): F[A, B] =
+  def reduceRight(implicit F: Compose[Op[F, ?, ?]], post: Dir =:= Post): F[A, B] =
     stack.reduceLeft(unflip(F))
 
   @tailrec
-  private def add[Z](p: APair[F[Z, ?], AList1[F, ?, B]], lcount: Int, rfactor: Int)(implicit F: Compose[F]): BalancedComposer[F, Z, B, D] = {
+  private def add[Z](p: APair[F[Z, ?], AList1[F, ?, B]], lcount: Int, rfactor: Int)(implicit F: Compose[F]): BalancedComposer[F, Z, B, Dir] = {
     // lcount: number of elemnts composed in the left part or the pair
     // rfactor: how many times more elements are there in the right part of the pair (rcount = lcount * rfactor)
     if(rfactor % 2 == 0) new BalancedComposer(lcount * (rfactor + 1), p._1 :: p._2)
@@ -46,11 +42,10 @@ final class BalancedComposer[F[_, _], A, B, D <: Direction] private(count: Int, 
 }
 
 object BalancedComposer {
-  sealed trait Direction
-  sealed trait Pre extends Direction  // linter:ignore UnextendedSealedTrait
-  sealed trait Post extends Direction // linter:ignore UnextendedSealedTrait
+  sealed trait Pre  // linter:ignore UnextendedSealedTrait
+  sealed trait Post // linter:ignore UnextendedSealedTrait
 
-  def apply[F[_, _], A, B, D <: Direction](f: F[A, B]): BalancedComposer[F, A, B, D] =
+  def apply[F[_, _], A, B, Dir](f: F[A, B]): BalancedComposer[F, A, B, Dir] =
     new BalancedComposer(1, AList1(f))
 
   implicit def contravariantLike[F[_, _], C](implicit F: Compose[F]): ContravariantLike[BalancedPreComposer[F, ?, C], F] = {
@@ -61,7 +56,6 @@ object BalancedComposer {
   }
 
   implicit def functorLike[F[_, _], A](implicit F: Compose[F]): FunctorLike[BalancedPostComposer[F, A, ?], F] = {
-    implicit val Fop = flip(F)
     new FunctorLike.FromCovariant[BalancedPostComposer[F, A, ?], F] {
       def map[B, C](bin: BalancedPostComposer[F, A, B])(f: F[B, C]): BalancedPostComposer[F, A, C] =
         bin :+ f

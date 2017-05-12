@@ -90,7 +90,7 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
               val (s1, ref) = s.newCell(d)(dom) // linter:ignore UndesirableTypeInference
               (W.zero, s0 set s1, ref)
             case NewAutoCell(setup, dom) =>
-              val (s1, ref) = s.newAutoCell(setup)(dom) // linter:ignore UndesirableTypeInference
+              val (s1, ref) = s.newAutoCell(setup) // linter:ignore UndesirableTypeInference
               (W.zero, s0 set s1, ref)
 
             case Supply(ref, cycle, value) =>
@@ -135,8 +135,6 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   autoCells: KMap[AutoCellId[K, ?], OnDemandCell[K, ?]],
   failedVars: Set[SimpleCellId[K, _]]
 ) {
-  import shapeless.PolyDefns.~>
-
   type CellIncarnationId[A] = Cell.IncarnationId[K, A]
   type Tok[D, D0] = (CellIncarnationId[D], Token[D0])
   type PreHandler[D, Δ[_, _]] = SeqPreHandler[Tok[D, ?], K, D, Δ]
@@ -146,10 +144,6 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   def fire[D](k: K[Unit])(implicit dom: IDom[D]): Trigger[D, dom.IDelta, D] = SeqTrigger.Fire[Tok[D, ?], K, D, dom.IDelta, D](k)
   def once[D](f: D => K[Unit])(implicit dom: IDom[D]): PreHandler[D, dom.IDelta] = SeqPreHandler[Tok[D, ?], K, D, dom.IDelta](d => fire[D](f(d)))
 
-  private val cellFetcher: CellId[K, ?] ~> shapeless.Id = new (CellId[K, ?] ~> shapeless.Id) {
-    def apply[D](cell: CellId[K, D]): D = fetch(cell)
-  }
-
   def newCell[D](d: D)(implicit dom: IDom[D]): (PropagationStore[K], SimpleCellId[K, D]) = {
     val ref = lastCellId.inc[K, D]
     val simpleCells1 = simpleCells.put(ref)(SimpleCell.init(d))
@@ -157,7 +151,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     (copy(lastCellId = ref.counter, simpleCells = simpleCells1, failedVars = failedVars1), ref)
   }
 
-  def newAutoCell[D](setup: (AutoCellId[K, D], CellCycle[D]) => K[Unit])(implicit dom: IDom[D]): (PropagationStore[K], AutoCellId[K, D]) = {
+  def newAutoCell[D](setup: (AutoCellId[K, D], CellCycle[D]) => K[Unit]): (PropagationStore[K], AutoCellId[K, D]) = {
     val ref = lastCellId.inc[K, D](setup)
     (copy(lastCellId = ref.counter), ref)
   }
