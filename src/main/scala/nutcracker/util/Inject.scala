@@ -68,7 +68,7 @@ trait InjectInstances4 extends InjectInstances5 {
     fg andThen gh
 }
 
-trait InjectInstances5 extends InjectInstances6 {
+trait InjectInstances5 {
   implicit def injectCoproduct[F[_], G[_], H[_]](implicit
     injF: Inject[F, H],
     injG: Inject[G, H]
@@ -78,8 +78,4 @@ trait InjectInstances5 extends InjectInstances6 {
       case \/-(ga) => injG.inj(ga)
     }
   }
-}
-
-trait InjectInstances6 {
-  implicit def specialize[F[_[_], _], G[_[_], _], K[_]](implicit inj: InjectK[F, G]): Inject[F[K, ?], G[K, ?]] = inj[K]
 }

@@ -23,7 +23,7 @@ final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M
   } yield a
 
   def >>>=[G[_[_], _], B](f: A => FreeKT[G, M, B])(implicit
-    inj: InjectK[F, G],
+    inj: Inject[F[FreeKT[G, M, ?], ?], G[FreeKT[G, M, ?], ?]],
     FK: FunctorKA[F],
     M: Applicative[M]
   ): FreeKT[G, M, B] =
@@ -31,14 +31,14 @@ final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M
 
   def >>>[G[_[_], _], B](gb: => FreeKT[G, M, B])(implicit
     AIsUnit: A =:= Unit,
-    inj: InjectK[F, G],
+    inj: Inject[F[FreeKT[G, M, ?], ?], G[FreeKT[G, M, ?], ?]],
     FK: FunctorKA[F],
     M: Applicative[M]
   ): FreeKT[G, M, B] =
     this >>>= { _ => gb }
 
   def inject[G[_[_], _]](implicit
-    inj: InjectK[F, G],
+    inj: Inject[F[FreeKT[G, M, ?], ?], G[FreeKT[G, M, ?], ?]],
     FK: FunctorKA[F],
     M: Applicative[M]
   ): FreeKT[G, M, A] =
@@ -76,7 +76,7 @@ object FreeKT {
     }
 
   implicit def injectionOrder[F[_[_], _], G[_[_], _], M[_]](implicit
-    inj: InjectK[F, G],
+    inj: Inject[F[FreeKT[G, M, ?], ?], G[FreeKT[G, M, ?], ?]],
     FK: FunctorKA[F],
     M: Applicative[M]
   ): MonadPartialOrder[FreeKT[G, M, ?], FreeKT[F, M, ?]] =
@@ -84,9 +84,8 @@ object FreeKT {
       override val MG = freeKTMonad[G, M]
       override val MF = freeKTMonad[F, M]
 
-      val tr = new (F[FreeKT[F, M, ?], ?] ~> G[FreeKT[G, M, ?], ?]) {
-        def apply[A](fa: F[FreeKT[F, M, ?], A]): G[FreeKT[G, M, ?], A] =
-          inj(FK.transform(fa)(self))
+      val tr = λ[F[FreeKT[F, M, ?], ?] ~> G[FreeKT[G, M, ?], ?]] {
+        fa => inj(FK.transform(fa)(self))
       }
 
       def promote[A](fa: FreeKT[F, M, A]): FreeKT[G, M, A] =
