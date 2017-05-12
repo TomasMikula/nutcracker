@@ -50,10 +50,6 @@ object CompilationTests {
     implicitly[Lens[FooBarQuxS[List], BarS[List]]]
     implicitly[Lens[FooBarQuxS[List], QuxS[List]]]
 
-    implicitly[LensK[FooBarQuxS, FooS]]
-    implicitly[LensK[FooBarQuxS, BarS]]
-    implicitly[LensK[FooBarQuxS, QuxS]]
-
     ()
   }
 }
