@@ -1,12 +1,9 @@
 package nutcracker.toolkit
 
 import nutcracker.{OnDemandPropagation, Propagation}
-import scala.language.implicitConversions
 
 trait PropagationToolkit extends RefToolkit {
   implicit val propagationApi: Propagation[Prg, Var, Val]
-
-  override implicit def readOnly[A](ref: Var[A]): Val[A] = propagationApi.readOnly(ref)
 }
 
 object PropagationToolkit {

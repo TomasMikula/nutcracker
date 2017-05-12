@@ -20,6 +20,7 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
   override def valOrderK[K[_]]: HOrderK[ValK[K, ?]] = CellId.orderKInstance
   override def valShowK[K[_]]: ShowK[ValK[K, ?]] = CellId.showKInstance
 
+  override def readOnlyK[K[_], A](ref: SimpleCellId[K, A]): CellId[K, A] = ref
   override def prgMonad: Monad[FreeK[Lang, ?]] = implicitly
   override implicit def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): OnDemandPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] =
     PropagationLang.freePropagation[F]

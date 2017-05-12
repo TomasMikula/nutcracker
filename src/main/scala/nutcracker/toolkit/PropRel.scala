@@ -22,6 +22,8 @@ object PropRel extends FreePropagationToolkit with PropRelToolkit {
   type Lang[K[_], A] = (Prop.Lang   :++: RelMod.Lang  )#Out1[K, A]
   type StateK[K[_]]  = (Prop.StateK :**: RelMod.StateK)#Out[K]
 
+  override def readOnlyK[K[_], A](ref: VarK[K, A]): ValK[K, A] = Prop.readOnlyK(ref)
+
   implicit def varOrderK[K[_]] = Prop.varOrderK
   implicit def varShowK[K[_]] = Prop.varShowK
   implicit def valOrderK[K[_]] = Prop.valOrderK

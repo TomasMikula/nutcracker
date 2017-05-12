@@ -1,6 +1,7 @@
 package nutcracker.toolkit
 
 import nutcracker.util.{FreeK, HOrderK, Lst, ShowK, StateInterpreter, TwoLevel, WriterState, WriterStateT}
+import scala.language.implicitConversions
 import scalaz.Id.Id
 import scalaz.{StateT, ~>}
 
@@ -53,6 +54,10 @@ trait FreeRefToolkit extends FreeToolkit with RefToolkit {
 
   override def fetch[A](ref: Val[A], s: State): Option[A] = fetchK(ref, s)
   override def fetch[A](ref: Var[A], s: State): A = fetchK(ref, s)
+
+  def readOnlyK[K[_], A](ref: VarK[K, A]): ValK[K, A]
+
+  override implicit def readOnly[A](ref: Var[A]): Val[A] = readOnlyK(ref)
 }
 
 trait FreeStashToolkit extends FreeToolkit with StashToolkit {

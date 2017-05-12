@@ -8,6 +8,8 @@ trait PropagationModule extends Module {
   type VarK[K[_], A]
   type ValK[K[_], A]
 
+  def readOnlyK[K[_], A](ref: VarK[K, A]): ValK[K, A]
+
   implicit def varOrderK[K[_]]: HOrderK[VarK[K, ?]]
   implicit def varShowK[K[_]]: ShowK[VarK[K, ?]]
   implicit def valOrderK[K[_]]: HOrderK[ValK[K, ?]]
@@ -53,6 +55,8 @@ class PropagationListModule[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _], State0
 extends ListModule[Lang0, State0](base) with StashPropagationModule {
   type VarK[K[_], A] = Var0[K, A]
   type ValK[K[_], A] = Val0[K, A]
+
+  def readOnlyK[K[_], A](ref: VarK[K, A]): ValK[K, A] = base.readOnlyK(ref)
 
   override implicit def varOrderK[K[_]]: HOrderK[VarK[K, ?]] = base.varOrderK
   override implicit def varShowK[K[_]]: ShowK[VarK[K, ?]] = base.varShowK
