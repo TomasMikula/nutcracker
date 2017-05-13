@@ -8,13 +8,17 @@ import scalaz.Id.Id
 import scalaz.~>
 
 private[nutcracker] case class BranchStore[Ref[_], K[_]](
-  unresolvedVars: KMap[Ref, Splittable]
+  unresolvedVars: KMap[Ref, Splittable],
+  failedVars: Set[Ref[_]]
 ) {
-  def addVar[D](ref: Ref[D], ev: Splittable[D]): BranchStore[Ref, K] =
-    copy(unresolvedVars = unresolvedVars.put(ref)(ev))
+  def addUnresolved[D](ref: Ref[D], ev: Splittable[D]): BranchStore[Ref, K] =
+    copy[Ref, K](unresolvedVars = unresolvedVars.put(ref)(ev))
 
-  def removeVar[D](ref: Ref[D]): BranchStore[Ref, K] =
-    copy(unresolvedVars = unresolvedVars - ref)
+  def removeUnresolved[D](ref: Ref[D]): BranchStore[Ref, K] =
+    copy[Ref, K](unresolvedVars = unresolvedVars - ref)
+
+  def addFailed[D](ref: Ref[D]): BranchStore[Ref, K] =
+    copy[Ref, K](failedVars = failedVars + ref)
 
   def split[Val[_]](fetch: Ref ~> Id)(implicit K: Propagation[K, Ref, Val]): Assessment[List[K[Unit]]] =
     if(unresolvedVars.isEmpty) Done
@@ -31,8 +35,11 @@ private[nutcracker] case class BranchStore[Ref[_], K[_]](
         case Some(branches) => Incomplete(branches)
       }).getOrElse(Stuck)
     }
+
+  def hasFailedVars: Boolean = failedVars.nonEmpty
 }
 
 object BranchStore {
-  def apply[Ref[_], K[_]](): BranchStore[Ref, K] = BranchStore(KMap())
+  def apply[Ref[_], K[_]](): BranchStore[Ref, K] =
+    BranchStore[Ref, K](KMap[Ref, Splittable](), Set.empty[Ref[_]])
 }

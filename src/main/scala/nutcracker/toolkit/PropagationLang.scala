@@ -24,7 +24,7 @@ private[nutcracker] object PropagationLang {
   }
   case class RmObserver[K[_], D](ref: SimpleCellId[K, D], oid: ObserverId) extends PropagationLang[K, Unit]
 
-  case class NewAutoCell[K[_], A](setup: (AutoCellId[K, A], CellCycle[A]) => K[Unit], dom: Dom[A]) extends PropagationLang[K, CellId[K, A]]
+  case class NewAutoCell[K[_], A](setup: (AutoCellId[K, A], CellCycle[A]) => K[Unit]) extends PropagationLang[K, CellId[K, A]]
   case class ObserveAuto[K[_], D, U, Δ[_, _]](ref: AutoCellId[K, D], f: SeqPreHandler[TokK[K, D, ?], K, D, Δ], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[K, Option[(CellCycle[D], ObserverId)]]
   case class HoldAuto[K[_], D](ref: AutoCellId[K, D], f: (D, CellCycle[D], Token[D], ObserverId) => K[Unit]) extends PropagationLang[K, ObserverId]
   case class ResumeAuto[K[_], D, Δ[_, _], D0 <: D](ref: AutoCellId[K, D], cycle: CellCycle[D], token: Token[D0], trigger: SeqTrigger[TokK[K, D, ?], K, D, Δ, D0]) extends PropagationLang[K, Unit] {
@@ -64,8 +64,8 @@ private[nutcracker] object PropagationLang {
     RmObserver(ref, oid)
   def rmAutoObserver[K[_], D](ref: AutoCellId[K, D], cycle: CellCycle[D], oid: ObserverId): PropagationLang[K, Unit] =
     RmAutoObserver(ref, cycle, oid)
-  def newAutoCell[K[_], A](setup: (AutoCellId[K, A], CellCycle[A]) => K[Unit])(implicit dom: Dom[A]): PropagationLang[K, CellId[K, A]] =
-    NewAutoCell(setup, dom)
+  def newAutoCell[K[_], A](setup: (AutoCellId[K, A], CellCycle[A]) => K[Unit]): PropagationLang[K, CellId[K, A]] =
+    NewAutoCell(setup)
   def addFinalizer[K[_], A](ref: AutoCellId[K, A], cycle: CellCycle[A], value: Subscription[K]): PropagationLang[K, Option[FinalizerId]] =
     AddFinalizer(ref, cycle, value)
   def removeFinalizer[K[_], A](ref: AutoCellId[K, A], cycle: CellCycle[A], id: FinalizerId): PropagationLang[K, Unit] =
@@ -115,7 +115,7 @@ private[nutcracker] object PropagationLang {
   def rmAutoObserverF[F[_[_], _], D](ref: AutoCellId[FreeK[F, ?], D], cycle: CellCycle[D], oid: ObserverId)(implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Unit] =
     FreeK.liftF(inj(rmAutoObserver[FreeK[F, ?], D](ref, cycle, oid)))
 
-  def newAutoCellF[F[_[_], _], A](setup: (AutoCellId[FreeK[F, ?], A], CellCycle[A]) => FreeK[F, Unit])(implicit dom: Dom[A], inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, CellId[FreeK[F, ?], A]] =
+  def newAutoCellF[F[_[_], _], A](setup: (AutoCellId[FreeK[F, ?], A], CellCycle[A]) => FreeK[F, Unit])(implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, CellId[FreeK[F, ?], A]] =
     FreeK.liftF(inj(newAutoCell[FreeK[F, ?], A](setup)))
 
   def addFinalizerF[F[_[_], _], A](ref: AutoCellId[FreeK[F, ?], A], cycle: CellCycle[A], value: Subscription[FreeK[F, ?]])(implicit inj: Inject[PropagationLang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Option[FinalizerId]] =

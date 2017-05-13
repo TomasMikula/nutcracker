@@ -48,8 +48,5 @@ object PropBranch extends FreePropagationToolkit with FreeBranchingToolkit with 
   def emptyK[K[_]]: StateK[K] = Prop.emptyK[K] :*: Branch.emptyK[K]
 
   def assess(s: State): Assessment[List[Prg[Unit]]] =
-    if (Prop.isConsistent(s._1))
-      Branch.assess(s._2)(λ[Var ~> Id](ref => Prop.fetchK(ref, s._1)))
-    else
-      Assessment.Failed
+    Branch.assess(s._2)(λ[Var ~> Id](ref => Prop.fetchK(ref, s._1)))
 }

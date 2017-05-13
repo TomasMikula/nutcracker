@@ -88,7 +88,7 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
             case NewCell(d, dom) =>
               val (s1, ref) = s.newCell(d)(dom) // linter:ignore UndesirableTypeInference
               (W.zero, s0 set s1, ref)
-            case NewAutoCell(setup, dom) =>
+            case NewAutoCell(setup) =>
               val (s1, ref) = s.newAutoCell(setup) // linter:ignore UndesirableTypeInference
               (W.zero, s0 set s1, ref)
 
@@ -119,9 +119,6 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
   override def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A =
     s.fetch(ref)
 
-  override def isConsistent[K[_]](s: PropagationStore[K]): Boolean =
-    s.failedVars.isEmpty
-
   override def stashable: StashOnDemandPropagationModule.AuxL[self.VarK, self.ValK, self.Lang] =
     new OnDemandPropagationListModule[self.VarK, self.ValK, self.Lang, self.StateK](this)
 }
@@ -131,8 +128,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   lastCellId: CellIdCounter,
   lastCellCycle: CellCycle[_],
   simpleCells: KMap[SimpleCellId[K, ?], SimpleCell[K, ?]],
-  autoCells: KMap[AutoCellId[K, ?], OnDemandCell[K, ?]],
-  failedVars: Set[SimpleCellId[K, _]]
+  autoCells: KMap[AutoCellId[K, ?], OnDemandCell[K, ?]]
 ) {
   type CellIncarnationId[A] = Cell.IncarnationId[K, A]
   type Tok[D, D0] = (CellIncarnationId[D], Token[D0])
@@ -146,8 +142,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   def newCell[D](d: D)(implicit dom: IDom[D]): (PropagationStore[K], SimpleCellId[K, D]) = {
     val ref = lastCellId.inc[K, D]
     val simpleCells1 = simpleCells.put(ref)(SimpleCell.init(d))
-    val failedVars1 = if(dom.isFailed(d)) failedVars + ref else failedVars
-    (copy(lastCellId = ref.counter, simpleCells = simpleCells1, failedVars = failedVars1), ref)
+    (copy(lastCellId = ref.counter, simpleCells = simpleCells1), ref)
   }
 
   def newAutoCell[D](setup: (AutoCellId[K, D], CellCycle[D]) => K[Unit]): (PropagationStore[K], AutoCellId[K, D]) = {
@@ -166,9 +161,8 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   def update[D, U, Δ[_, _]](ref: SimpleCellId[K, D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Boolean) =
     simpleCells(ref).infer.update(u) match {
       case CellUpdated(cell, becameDirty) =>
-        val failedVars1 = if(dom.isFailed(cell.value)) failedVars + ref else failedVars
         val domains1 = simpleCells.put(ref)(cell)
-        (copy(simpleCells = domains1, failedVars = failedVars1), becameDirty)
+        (copy(simpleCells = domains1), becameDirty)
       case CellUnchanged =>
         (this, false)
     }
@@ -316,8 +310,7 @@ object PropagationStore {
     lastCellId = CellIdCounter.zero,
     lastCellCycle = CellCycle.zero[Nothing],
     simpleCells = KMap[SimpleCellId[K, ?], SimpleCell[K, ?]](),
-    autoCells = KMap[AutoCellId[K, ?], OnDemandCell[K, ?]](),
-    failedVars = Set()
+    autoCells = KMap[AutoCellId[K, ?], OnDemandCell[K, ?]]()
   )
 }
 

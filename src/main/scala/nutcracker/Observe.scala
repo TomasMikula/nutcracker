@@ -195,8 +195,14 @@ final class ObserveSyntaxHelper[M[_], A, U, Δ, Tr[_, _]](src: Observable[M, A] 
   def thresholdOpt(f: A => Option[Option[M[Unit]]]): M[Subscription[M]] = src.observeImpl(src.thresholdOpt(f))
   def thresholdOpt_(f: A => Option[Option[M[Unit]]])(implicit M: Functor[M]): M[Unit] = thresholdOpt(f).void
 
+  def thresholdTransition(f: A => Option[Tr[A, Δ]]): M[Subscription[M]] = src.observeImpl(src.thresholdTransition(f))
+  def thresholdTransition_(f: A => Option[Tr[A, Δ]])(implicit M: Functor[M]): M[Unit] = thresholdTransition(f).void
+
   def untilRight(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Subscription[M]] = src.observeImpl(src.untilRight(f))
   def untilRight_(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Unit] = untilRight(f).void
+
+  def untilRightS[S](init: A => Either[M[S], M[Unit]], trans: (S, A, Δ) => Either[M[S], M[Unit]])(implicit M: Functor[M]): M[Subscription[M]] =
+    src.observeImpl(src.untilRightS(init, trans))
 }
 
 trait Observers[M[_]] {
@@ -260,6 +266,14 @@ trait Observers[M[_]] {
       }
     }
 
+  def thresholdTransition[D, Δ](f: D => Option[Trigger[D, Δ]]): D => Trigger[D, Δ] =
+    f(_).getOrElse(sleep(thresholdTransition1(f)))
+
+  def thresholdTransition1[D, Δ](f: D => Option[Trigger[D, Δ]]): (D, Δ) => Trigger[D, Δ] =
+    new ((D, Δ) => Trigger[D, Δ]) {
+      override def apply(d: D, δ: Δ): Trigger[D, Δ] = f(d).getOrElse(sleep(this))
+    }
+
   def untilRight[D, Δ](f: D => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): D => Trigger[D, Δ] =
     d => f(d) match {
       case Left(k) => reconsider(k.as(sleep(untilRight((d, δ) => f(d)))))
@@ -272,6 +286,18 @@ trait Observers[M[_]] {
         case Left(k) => reconsider(k.as(sleep(this)))
         case Right(k) => fire(k)
       }
+    }
+
+  def untilRightS[S, D, Δ](init: D => Either[M[S], M[Unit]], trans: (S, D, Δ) => Either[M[S], M[Unit]])(implicit M: Functor[M]): D => Trigger[D, Δ] =
+    d => init(d) match {
+      case Left(ms) => reconsider(ms.map(s => sleep(untilRightS(s)(trans))))
+      case Right(k) => fire(k)
+    }
+
+  def untilRightS[S, D, Δ](s: S)(f: (S, D, Δ) => Either[M[S], M[Unit]])(implicit M: Functor[M]): (D, Δ) => Trigger[D, Δ] =
+    (d, δ) => f(s, d, δ) match {
+      case Left(ms) => reconsider(ms.map(s => sleep(untilRightS(s)(f))))
+      case Right(k) => fire(k)
     }
 
   def continually[D, Δ](f: D => M[Unit])(implicit M: Functor[M]): D => Trigger[D, Δ] =

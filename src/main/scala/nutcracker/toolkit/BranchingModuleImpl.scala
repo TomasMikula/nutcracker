@@ -3,9 +3,10 @@ package nutcracker.toolkit
 import nutcracker.ops._
 import nutcracker.util.{FreeK, Inject, Lst, MonadTellState, StateInterpreter, StratifiedMonoidAggregator}
 import nutcracker.util.ops._
-import nutcracker.{Assessment, BranchingPropagation, Propagation, Splittable}
+import nutcracker.{Assessment, BranchingPropagation, Propagation, Splittable, Subscription}
 import scalaz.Id.Id
 import scalaz.{Bind, Lens, ~>}
+import scalaz.syntax.functor._
 
 private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] extends PersistentBranchingModule {
   type VarK[K[_], A] = Var0[K, A]
@@ -21,17 +22,36 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
       override val propagation: Propagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] = P
 
       def newVar[A](a: A)(implicit ev: Splittable[A]): FreeK[F, VarK[FreeK[F, ?], A]] =
-        if(ev.isUnresolved(a))
-          for {
-            ref <- propagation.newCell[A](a)
-            _ <- BranchLang.trackF[VarK[FreeK[F, ?], ?], F, A](ref)
-            _ <- ref.observe.threshold(a =>
-              if(ev.isUnresolved(a)) None
-              else Some(BranchLang.untrackF[VarK[FreeK[F, ?], ?], F, A](ref))
-            )
-          } yield ref
-        else
-          propagation.newCell[A](a)
+        for {
+          ref <- propagation.newCell[A](a)
+          _ <- observeVar(ref)
+        } yield ref
+
+      private def observeVar[A](ref: VarK[FreeK[F, ?], A])(implicit ev: Splittable[A]): FreeK[F, Subscription[FreeK[F, ?]]] =
+        ref.observe.by(a =>
+          if(ev.isUnresolved(a)) P.reconsider(addUnresolvedF(ref) as P.sleep(unresolvedObserver(ref)))
+          else if(!ev.isFailed(a)) P.sleep(resolvedObserver(ref))
+          else P.fire(addFailedF(ref))
+        )
+
+      private def unresolvedObserver[A](ref: VarK[FreeK[F, ?], A])(implicit ev: Splittable[A]): (A, ev.Delta) => P.Trigger[A, ev.Delta] =
+        P.thresholdTransition1(a =>
+          if(ev.isUnresolved(a)) None
+          else if(!ev.isFailed(a)) Some(P.reconsider(rmUnresolvedF(ref) as P.sleep(resolvedObserver(ref))))
+          else Some(P.fire(rmUnresolvedF(ref) >> addFailedF(ref)))
+        )
+
+      private def resolvedObserver[A](ref: VarK[FreeK[F, ?], A])(implicit ev: Splittable[A]): (A, ev.Delta) => P.Trigger[A, ev.Delta] =
+        P.threshold1(a => if(ev.isFailed(a)) Some(addFailedF(ref)) else None)
+
+      private def addUnresolvedF[A](ref: VarK[FreeK[F, ?], A])(implicit ev: Splittable[A]): FreeK[F, Unit] =
+        BranchLang.addUnresolvedF[VarK[FreeK[F, ?], ?], F, A](ref)
+
+      private def rmUnresolvedF[A](ref: VarK[FreeK[F, ?], A]): FreeK[F, Unit] =
+        BranchLang.rmUnresolvedF[VarK[FreeK[F, ?], ?], F, A](ref)
+
+      private def addFailedF[A](ref: VarK[FreeK[F, ?], A]): FreeK[F, Unit] =
+        BranchLang.addFailedF[VarK[FreeK[F, ?], ?], F, A](ref)
     }
 
   def emptyK[K[_]]: StateK[K] = BranchStore()
@@ -42,14 +62,16 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
       M.writerState[A](s0 => {
         val s = l.get(s0)
         fa.fold(
-          caseTrack = t => t match { case t1 => (W.zero, s0 set s.addVar(t1.ref, t1.ev), t1.wit(())) },
-          caseUntrack = u => (W.zero, s0 set s.removeVar(u.ref), u.wit(()))
+          caseAddUnresolved = t => t match { case t1 => (W.zero, s0 set s.addUnresolved(t1.ref, t1.ev), t1.wit(())) },
+          caseRmUnresolved = u => (W.zero, s0 set s.removeUnresolved(u.ref), u.wit(())),
+          caseAddFailed = i => (W.zero, s0 set s.addFailed(i.ref), i.wit(()))
         )
       })
   }
 
   def assess[K[_]](s: StateK[K])(fetch: VarK[K, ?] ~> Id)(implicit K: Propagation[K, VarK[K, ?], ValK[K, ?]]): Assessment[List[K[Unit]]] =
-    s.split(fetch)
+    if(s.hasFailedVars) Assessment.Failed
+    else s.split(fetch)
 
   def stashable = new BranchingListModule[VarK, ValK, Lang, StateK](this)
 }
