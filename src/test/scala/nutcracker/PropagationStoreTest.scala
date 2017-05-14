@@ -218,7 +218,7 @@ class OnDemandPropagationTest extends FunSuite {
       setupCalled.append(())
       P.observe(ref0).byM[P.ExclRef[Promise[Int]]](pi =>
         k(pi).map(exclRef => (
-          P.untilRight((pi: Promise[Int]) => {
+          P.untilRightSeq((pi: Promise[Int]) => {
             val update = P.exclUpdate(exclRef).by(pi)
             observed0.append(pi)
             if(pi.isConflict) Right(update) else Left(update)
