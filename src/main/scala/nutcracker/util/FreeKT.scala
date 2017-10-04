@@ -1,7 +1,7 @@
 package nutcracker.util
 
 import nutcracker.util.free.FreeT
-import scalaz.{Applicative, BindRec, Monad, MonadPartialOrder, ~>}
+import scalaz.{Applicative, BindRec, Monad, ~>}
 
 final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M, A]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-7685
 
@@ -42,22 +42,13 @@ final case class FreeKT[F[_[_], _], M[_], A](run: FreeT[F[FreeKT[F, M, ?], ?], M
     FK: FunctorKA[F],
     M: Applicative[M]
   ): FreeKT[G, M, A] =
-    FreeKT.injectionOrder[F, G, M].apply(this)
+    FreeKT.injection[F, G, M].apply(this)
 
   def hoist[N[_]](mn: M ~> N)(implicit FK: FunctorKA[F]): FreeKT[F, N, A] =
     FreeKT.hoist[F, M, N](mn).apply(this)
 
-  def promote[N[_]](implicit mn: MonadPartialOrder[N, M], FK: FunctorKA[F]): FreeKT[F, N, A] =
-    hoist(mn)
-
   def foldMap(tr: F[FreeKT[F, M, ?], ?] ~> M)(implicit M: BindRec[M]): M[A] =
     run.foldMap(tr)
-
-  def foldMapN[N[_]](tr: F[FreeKT[F, M, ?], ?] ~> N)(implicit
-    mn: MonadPartialOrder[N, M],
-    N0: BindRec[N]
-  ): N[A] =
-    run.hoist(mn).foldMap(tr)
 }
 
 object FreeKT {
@@ -74,20 +65,17 @@ object FreeKT {
       def bind[A, B](fa: FreeKT[F, M, A])(f: A => FreeKT[F, M, B]): FreeKT[F, M, B] = fa.flatMap(f)
     }
 
-  implicit def injectionOrder[F[_[_], _], G[_[_], _], M[_]](implicit
+  def injection[F[_[_], _], G[_[_], _], M[_]](implicit
     inj: Inject[F[FreeKT[G, M, ?], ?], G[FreeKT[G, M, ?], ?]],
     FK: FunctorKA[F],
     M: Applicative[M]
-  ): MonadPartialOrder[FreeKT[G, M, ?], FreeKT[F, M, ?]] =
-    new MonadPartialOrder[FreeKT[G, M, ?], FreeKT[F, M, ?]] { self =>
-      override val MG = freeKTMonad[G, M]
-      override val MF = freeKTMonad[F, M]
-
+  ): FreeKT[F, M, ?] ~> FreeKT[G, M, ?] =
+    new (FreeKT[F, M, ?] ~> FreeKT[G, M, ?]) { self =>
       val tr = λ[F[FreeKT[F, M, ?], ?] ~> G[FreeKT[G, M, ?], ?]] {
         fa => inj(FK.transform(fa)(self))
       }
 
-      def promote[A](fa: FreeKT[F, M, A]): FreeKT[G, M, A] =
+      def apply[A](fa: FreeKT[F, M, A]): FreeKT[G, M, A] =
         FreeKT(fa.run.interpret(tr))
     }
 

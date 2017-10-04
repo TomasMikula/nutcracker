@@ -4,10 +4,10 @@ version := "0.2-SNAPSHOT"
 
 organization := "com.github.tomasmikula"
 
-scalaVersion := "2.12.2"
+scalaVersion := "2.12.3"
 
 autoCompilerPlugins := true
-addCompilerPlugin("org.spire-math" % "kind-projector" % "0.9.3" cross CrossVersion.binary)
+addCompilerPlugin("org.spire-math" % "kind-projector" % "0.9.4" cross CrossVersion.binary)
 addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.17")
 
 scalastyleFailOnError := true
@@ -35,12 +35,12 @@ parallelExecution in Test := false // currently, ScalaProps does not support par
 
 libraryDependencies ++= Seq(
   "org.typelevel" %% "algebra" % "0.6.0",
-  "org.scalaz" %% "scalaz-core" % "7.3.0-M12",
+  "org.scalaz" %% "scalaz-core" % "7.3.0-M16",
   "com.chuusai" %% "shapeless" % "2.3.2",
-  "com.github.scalaprops" %% "scalaprops" % "0.4.1",
+  "com.github.scalaprops" %% "scalaprops" % "0.5.1",
 
   "org.scalatest" %% "scalatest" % "3.0.1" % "test",
-  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.0-M12" % "test",
+  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.0-M16" % "test",
   "org.scalacheck" %% "scalacheck" % "1.13.4" % "test"
 )
 

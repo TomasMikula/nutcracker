@@ -1,7 +1,7 @@
 package nutcracker
 
 import scalaz.Id.Id
-import scalaz.{Applicative, Bind, ContT, Monad, |>=|}
+import scalaz.{Applicative, Bind, ContT}
 import scalaz.syntax.monad._
 
 package object util {
@@ -72,11 +72,4 @@ package object util {
   type Desc[Ptr[_]] = FreeObjectOutput[String, Ptr, Unit]
 
   type DeepShow[A, Ptr[_]] = ObjectSerializer[A, String, Ptr]
-
-  implicit def idToM[M[_]](implicit M: Monad[M]): M |>=| Id = new (M |>=| Id) {
-    override val MF = implicitly[Monad[Id]]
-    override val MG = M
-
-    override def promote[A](a: Id[A]): M[A] = M.point(a)
-  }
 }
