@@ -4,9 +4,10 @@ import nutcracker.ops._
 import nutcracker.util.ops.iterator._
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
 import nutcracker.{Dom, Propagation, Subscription, UpdateResult}
-import scalaz.std.list._
-import scalaz.syntax.bind._
 import scalaz.{Applicative, Bind, Functor, IndexedContT, Monad}
+import scalaz.std.list._
+import scalaz.syntax.functor._
+import scalaz.syntax.bind0._
 
 /** Similar to [[IncSet]] but specialized for domain references.
   * Failed domains might be removed from this set automatically without emitting any delta.
@@ -124,7 +125,7 @@ object CellSet {
     collect(ContU.sequence(cps))
 
   def relBind[F[_], Var[_], Val[_], A, B](sref: Val[CellSet[Var, A]])(f: Var[A] => F[Var[CellSet[Var, B]]])(implicit P: Propagation[F, Var, Val], domB: Dom[B], M: Monad[F]): F[Var[CellSet[Var, B]]] = {
-    import scalaz.syntax.traverse._
+    import scalaz.syntax.foldable0._
     for {
       res <- init[B]()
       _ <- P.observe[CellSet[Var, A]](sref).by((sa: CellSet[Var, A]) => {

@@ -3,7 +3,7 @@ package nutcracker.util.free
 import scala.annotation.tailrec
 import scalaz.{-\/, Applicative, ApplicativePlus, BindRec, Foldable, Monad, MonadPlus, MonadTrans, Monoid, Plus, Traverse, \/, \/-, ~>}
 import scalaz.Id.Id
-import scalaz.syntax.monadPlus._
+import scalaz.syntax.applicative._
 
 final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A]) extends AnyVal {
   type F1[X] = (M :++: F)#Out[X]

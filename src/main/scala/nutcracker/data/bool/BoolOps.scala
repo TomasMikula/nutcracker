@@ -5,7 +5,8 @@ import nutcracker.data.bool.Bool._
 import nutcracker.ops._
 import scalaz.{Applicative, Apply, Bind, Monad, Traverse}
 import scalaz.std.list._
-import scalaz.syntax.bind._
+import scalaz.syntax.apply._
+import scalaz.syntax.bind0._
 
 class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Val]) {
   import BP._

@@ -6,8 +6,8 @@ import nutcracker.util.typealigned.{AList, ANone, APair, ASome}
 
 import scalaz.Leibniz.===
 import scalaz.{-\/, Applicative, BindRec, Foldable, Monad, MonadTrans, Monoid, NaturalTransformation, Traverse, \/, \/-, ~>}
-import scalaz.syntax.foldable._
-import scalaz.syntax.monad._
+import scalaz.syntax.functor._
+import scalaz.syntax.foldable0._
 
 sealed abstract class FreeBind[F[_], A] {
   import FreeBind._

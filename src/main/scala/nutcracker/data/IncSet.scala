@@ -3,9 +3,10 @@ package nutcracker.data
 import nutcracker.ops._
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
 import nutcracker.{Dom, Propagation, Subscription, UpdateResult}
-import scalaz.std.list._
-import scalaz.syntax.bind._
 import scalaz.{Applicative, Bind, Functor, IndexedContT, Monad}
+import scalaz.std.list._
+import scalaz.syntax.functor._
+import scalaz.syntax.bind0._
 
 /** Increasing set.
   * A wrapper for `Set` where a _monotonic_ update is one that adds
@@ -117,7 +118,7 @@ class IncSets[F[_], Var[_], Val[_]](implicit P: Propagation[F, Var, Val]) {
     * This is equivalent to having a monad instance for `λ[A => F[Var[IncSet[A]]]]`.
     */
   def relBind[A, B](sref: Var[IncSet[A]])(f: A => F[Var[IncSet[B]]])(implicit M: Monad[F]): F[Var[IncSet[B]]] = {
-    import scalaz.syntax.traverse._
+    import scalaz.syntax.foldable0._
     for {
       res <- init[B]
       _ <- sref.observe.by((sa: IncSet[A]) => {

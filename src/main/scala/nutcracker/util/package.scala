@@ -2,7 +2,8 @@ package nutcracker
 
 import scalaz.Id.Id
 import scalaz.{Applicative, Bind, ContT}
-import scalaz.syntax.monad._
+import scalaz.syntax.applicative._
+import scalaz.syntax.bind0._
 
 package object util {
   import ops._

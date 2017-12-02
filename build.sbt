@@ -16,7 +16,7 @@ scalacOptions ++= Seq(
   "-language:higherKinds",
   "-Xlint:-unused,_", // Exclude "unused", because:
                       //  - it produces some false positives;
-                      //  - sometimes we use them as jsut implicit evidence.
+                      //  - sometimes we use them as just implicit evidence.
   "-unchecked",
   "-deprecation",
   "-feature",
@@ -35,12 +35,12 @@ parallelExecution in Test := false // currently, ScalaProps does not support par
 
 libraryDependencies ++= Seq(
   "org.typelevel" %% "algebra" % "0.6.0",
-  "org.scalaz" %% "scalaz-core" % "7.3.0-M16",
+  "org.scalaz" %% "scalaz-core" % "7.3.0-M18",
   "com.chuusai" %% "shapeless" % "2.3.2",
   "com.github.scalaprops" %% "scalaprops" % "0.5.2",
 
   "org.scalatest" %% "scalatest" % "3.0.4" % "test",
-  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.0-M16" % "test",
+  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.0-M18" % "test",
   "org.scalacheck" %% "scalacheck" % "1.13.4" % "test"
 )
 

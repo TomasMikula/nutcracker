@@ -5,7 +5,9 @@ import nutcracker.{BranchingPropagation, Dom, Final, JoinDom, ObserveSyntaxHelpe
 import nutcracker.data.bool.Bool
 import nutcracker.util.ContU
 import scalaz.{Applicative, Apply, Bind, Functor, IndexedContT, Traverse}
-import scalaz.syntax.bind._
+import scalaz.syntax.functor._
+import scalaz.syntax.apply0._
+import scalaz.syntax.bind0._
 
 final case class ValOps[Val[_], D](ref: Val[D]) extends AnyVal {
   def observe[M[_], Var[_]](implicit P: Propagation[M, Var, Val], dom: Dom[D]): ObserveSyntaxHelper[M, D, dom.Update, dom.Delta, P.Trigger] =

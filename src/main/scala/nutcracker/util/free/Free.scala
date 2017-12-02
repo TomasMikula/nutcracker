@@ -3,7 +3,7 @@ package nutcracker.util.free
 import scala.language.higherKinds
 import scalaz.{-\/, Applicative, BindRec, Monad, Monoid, Traverse, \/, \/-, ~>}
 import scalaz.Id.Id
-import scalaz.syntax.monad._
+import scalaz.syntax.applicative._
 
 final case class Free[F[_], A] private(unwrap: FreeBind[(Id :++: F)#Out, A]) extends AnyVal {
   private type F1[X] = (Id :++: F)#Out[X]

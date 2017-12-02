@@ -3,7 +3,7 @@ package nutcracker.util
 import nutcracker.util.free.Free
 
 import scalaz.{Applicative, BindRec, IList, INil, -\/, \/, \/-, ~>}
-import scalaz.syntax.monad._
+import scalaz.syntax.bind._
 
 final case class IsEqual[Ptr1[_], Ptr2[_]] private (private val unwrap: Free[IsEqual.IsEqF[Ptr1, Ptr2, ?], Boolean]) { // extends AnyVal // https://issues.scala-lang.org/browse/SI-7685
   import IsEqual._

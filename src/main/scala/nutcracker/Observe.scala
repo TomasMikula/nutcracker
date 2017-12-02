@@ -3,7 +3,8 @@ package nutcracker
 import nutcracker.util.ContU
 import scalaz.Leibniz.===
 import scalaz.{Bind, Functor, IndexedContT, Leibniz}
-import scalaz.syntax.bind._
+import scalaz.syntax.functor._
+import scalaz.syntax.bind0._
 
 /** If we are allowed effects `M`, then `Val[A]` can be observed
   * for changes to a (mutable) value of type `A` (for any `A`).
