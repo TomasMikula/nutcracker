@@ -8,14 +8,14 @@ import scalaz.std.string._
 class BalancedComposerTest extends FunSuite {
 
   test("post-compose stack safety") {
-    val composer = BalancedPostComposer[? => ?, Int, Int](i => i)
+    val composer = BalancedPostComposer[* => *, Int, Int](i => i)
     val f = (1 to 10000).foldLeft(composer)((c, _) => c :+ (_ + 1)).reduceRight
     val n = f(0)
     assertResult(10000)(n)
   }
 
   test("pre-compose stack safety") {
-    val composer = BalancedPreComposer[? => ?, Int, Int](i => i)
+    val composer = BalancedPreComposer[* => *, Int, Int](i => i)
     val f = (1 to 10000).foldLeft(composer)((c, _) => ((i: Int) => i + 1) +: c).reduceLeft
     val n = f(0)
     assertResult(10000)(n)

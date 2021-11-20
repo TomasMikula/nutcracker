@@ -19,7 +19,7 @@ object TwoLevel extends TwoLevelInstances {
 }
 
 trait TwoLevelInstances extends TwoLevelInstances1 {
-  implicit def catenableInstance[F[_]](implicit F: Catenable[F]): Catenable[TwoLevel[F, ?]] =
+  implicit def catenableInstance[F[_]](implicit F: Catenable[F]): Catenable[TwoLevel[F, *]] =
     new TwoLevelCatenable[F]
 
   implicit def stratifiedMonoidAggregator[F[_], A](implicit F: PlusEmpty[F]): StratifiedMonoidAggregator[TwoLevel[F, A], F[A]] =
@@ -41,19 +41,19 @@ trait TwoLevelInstances extends TwoLevelInstances1 {
 }
 
 trait TwoLevelInstances1 {
-  implicit def plusEmptyInstance[F[_]](implicit F: PlusEmpty[F]): PlusEmpty[TwoLevel[F, ?]] =
+  implicit def plusEmptyInstance[F[_]](implicit F: PlusEmpty[F]): PlusEmpty[TwoLevel[F, *]] =
     new TwoLevelPlusEmpty[F]
 
   implicit def monoidInstance[F[_], A](implicit F: PlusEmpty[F]): Monoid[TwoLevel[F, A]] =
     plusEmptyInstance[F].monoid[A]
 }
 
-private[util] class TwoLevelPlusEmpty[F[_]](implicit val F: PlusEmpty[F]) extends PlusEmpty[TwoLevel[F, ?]] {
+private[util] class TwoLevelPlusEmpty[F[_]](implicit val F: PlusEmpty[F]) extends PlusEmpty[TwoLevel[F, *]] {
   def empty[A]: TwoLevel[F, A] = TwoLevel.empty[F, A]
   def plus[A](a: TwoLevel[F, A], b: => TwoLevel[F, A]): TwoLevel[F, A] = a plus b
 }
 
-private[util] class TwoLevelCatenable[F[_]](override implicit val F: Catenable[F]) extends TwoLevelPlusEmpty[F] with Catenable[TwoLevel[F, ?]] {
+private[util] class TwoLevelCatenable[F[_]](override implicit val F: Catenable[F]) extends TwoLevelPlusEmpty[F] with Catenable[TwoLevel[F, *]] {
   def cons[A](a: A, fa: TwoLevel[F, A]): TwoLevel[F, A] =
     TwoLevel(F.cons(a, fa._1), fa._2)
 

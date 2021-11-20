@@ -5,7 +5,7 @@ import nutcracker.util.free.Free
 import scalaz.{Applicative, BindRec, IList, INil, -\/, \/, \/-, ~>}
 import scalaz.syntax.bind._
 
-final case class IsEqual[Ptr1[_], Ptr2[_]] private (private val unwrap: Free[IsEqual.IsEqF[Ptr1, Ptr2, ?], Boolean]) { // extends AnyVal // https://issues.scala-lang.org/browse/SI-7685
+final case class IsEqual[Ptr1[_], Ptr2[_]] private (private val unwrap: Free[IsEqual.IsEqF[Ptr1, Ptr2, *], Boolean]) { // extends AnyVal // https://issues.scala-lang.org/browse/SI-7685
   import IsEqual._
 
   def &&(that: => IsEqual[Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] = IsEqual(unwrap.flatMap(if(_) that.unwrap else IsEqual(false).unwrap))
@@ -35,13 +35,13 @@ object IsEqual {
   private[util] case class Pair[Ptr1[_], Ptr2[_], X, Y](p1: Ptr1[X], p2: Ptr2[Y], f: (X, Y) => IsEqual[Ptr1, Ptr2]) extends IsEqF[Ptr1, Ptr2, Boolean]
 
   def apply[Ptr1[_], Ptr2[_]](value: Boolean): IsEqual[Ptr1, Ptr2] =
-    IsEqual(Free.point[IsEqF[Ptr1, Ptr2, ?], Boolean](value))
+    IsEqual(Free.point[IsEqF[Ptr1, Ptr2, *], Boolean](value))
 
   def apply[Ptr1[_], Ptr2[_], A1, A2](a1: A1, a2: A2)(implicit ev: DeepEqual[A1, A2, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
     ev.equal(a1, a2)
 
   def refs[Ptr1[_], Ptr2[_], X, Y](p1: Ptr1[X], p2: Ptr2[Y])(implicit ev: DeepEqual[X, Y, Ptr1, Ptr2]): IsEqual[Ptr1, Ptr2] =
-    IsEqual(Free.liftF[IsEqF[Ptr1, Ptr2, ?], Boolean](Pair(p1, p2, ev.equal)))
+    IsEqual(Free.liftF[IsEqF[Ptr1, Ptr2, *], Boolean](Pair(p1, p2, ev.equal)))
 
   def apply[Ptr1[_], Ptr2[_]]: PApplied[Ptr1, Ptr2] = new PApplied[Ptr1, Ptr2]
   final class PApplied[Ptr1[_], Ptr2[_]] private[IsEqual] {

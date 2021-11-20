@@ -14,14 +14,14 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
   type Lang[K[_], A] = PropagationLang[K, A]
   type StateK[K[_]] = PropagationStore[K]
 
-  override def varOrderK[K[_]]: HOrderK[VarK[K, ?]] = SimpleCellId.orderKInstance
-  override def varShowK[K[_]]: ShowK[VarK[K, ?]] = SimpleCellId.showKInstance
-  override def valOrderK[K[_]]: HOrderK[ValK[K, ?]] = CellId.orderKInstance
-  override def valShowK[K[_]]: ShowK[ValK[K, ?]] = CellId.showKInstance
+  override def varOrderK[K[_]]: HOrderK[VarK[K, *]] = SimpleCellId.orderKInstance
+  override def varShowK[K[_]]: ShowK[VarK[K, *]] = SimpleCellId.showKInstance
+  override def valOrderK[K[_]]: HOrderK[ValK[K, *]] = CellId.orderKInstance
+  override def valShowK[K[_]]: ShowK[ValK[K, *]] = CellId.showKInstance
 
   override def readOnlyK[K[_], A](ref: SimpleCellId[K, A]): CellId[K, A] = ref
-  override def prgMonad: Monad[FreeK[Lang, ?]] = implicitly
-  override implicit def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): OnDemandPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] =
+  override def prgMonad: Monad[FreeK[Lang, *]] = implicitly
+  override implicit def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]): OnDemandPropagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] =
     PropagationLang.freePropagation[F]
 
   override val propagationApi: OnDemandPropagation[Prg, Var, Val] =
@@ -33,8 +33,8 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
   override val stepInterpreter =
     stepInterpreterK(Lens.lensId[State])
 
-  override def stepInterpreterK[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] =
-    new StateInterpreter[K, Lang[K, ?], S] {
+  override def stepInterpreterK[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, *], S] =
+    new StateInterpreter[K, Lang[K, *], S] {
       import PropagationLang._
 
       private def execTriggers[A](ref: SimpleCellId[K, A]): PropagationLang[K, Unit] =
@@ -43,7 +43,7 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
       private def execTriggersAuto[A](ref: AutoCellId[K, A], cycle: CellCycle[A]): PropagationLang[K, Unit] =
         PropagationLang.ExecTriggersAuto(ref, cycle)
 
-      override def apply[M[_], W, A](p: PropagationLang[K, A])(implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[PropagationLang[K, ?], K], K: Bind[K]): M[A] =
+      override def apply[M[_], W, A](p: PropagationLang[K, A])(implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[PropagationLang[K, *], K], K: Bind[K]): M[A] =
         M.writerState[A](s0 => {
           val s = lens.get(s0)
           p match {
@@ -127,17 +127,17 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
 private[nutcracker] case class PropagationStore[K[_]] private(
   lastCellId: CellIdCounter,
   lastCellCycle: CellCycle[_],
-  simpleCells: KMap[SimpleCellId[K, ?], SimpleCell[K, ?]],
-  autoCells: KMap[AutoCellId[K, ?], OnDemandCell[K, ?]]
+  simpleCells: KMap[SimpleCellId[K, *], SimpleCell[K, *]],
+  autoCells: KMap[AutoCellId[K, *], OnDemandCell[K, *]]
 ) {
   type CellIncarnationId[A] = Cell.IncarnationId[K, A]
   type Tok[D, D0] = (CellIncarnationId[D], Token[D0])
-  type PreHandler[D, Δ[_, _]] = SeqPreHandler[Tok[D, ?], K, D, Δ]
-  type Trigger[D, Δ[_, _], D0] = SeqTrigger[Tok[D, ?], K, D, Δ, D0]
+  type PreHandler[D, Δ[_, _]] = SeqPreHandler[Tok[D, *], K, D, Δ]
+  type Trigger[D, Δ[_, _], D0] = SeqTrigger[Tok[D, *], K, D, Δ, D0]
 
   // helpers for testing
-  def fire[D](k: K[Unit])(implicit dom: IDom[D]): Trigger[D, dom.IDelta, D] = SeqTrigger.Fire[Tok[D, ?], K, D, dom.IDelta, D](k)
-  def once[D](f: D => K[Unit])(implicit dom: IDom[D]): PreHandler[D, dom.IDelta] = SeqPreHandler[Tok[D, ?], K, D, dom.IDelta](d => fire[D](f(d)))
+  def fire[D](k: K[Unit])(implicit dom: IDom[D]): Trigger[D, dom.IDelta, D] = SeqTrigger.Fire[Tok[D, *], K, D, dom.IDelta, D](k)
+  def once[D](f: D => K[Unit])(implicit dom: IDom[D]): PreHandler[D, dom.IDelta] = SeqPreHandler[Tok[D, *], K, D, dom.IDelta](d => fire[D](f(d)))
 
   def newCell[D](d: D)(implicit dom: IDom[D]): (PropagationStore[K], SimpleCellId[K, D]) = {
     val ref = lastCellId.inc[K, D]
@@ -309,8 +309,8 @@ object PropagationStore {
   def empty[K[_]]: PropagationStore[K] = PropagationStore[K](
     lastCellId = CellIdCounter.zero,
     lastCellCycle = CellCycle.zero[Nothing],
-    simpleCells = KMap[SimpleCellId[K, ?], SimpleCell[K, ?]](),
-    autoCells = KMap[AutoCellId[K, ?], OnDemandCell[K, ?]]()
+    simpleCells = KMap[SimpleCellId[K, *], SimpleCell[K, *]](),
+    autoCells = KMap[AutoCellId[K, *], OnDemandCell[K, *]]()
   )
 }
 
@@ -351,12 +351,12 @@ private[nutcracker] object CellId {
     else if(fa.domainId == fb.domainId) Ordering.EQ
     else Ordering.GT
 
-  implicit def orderKInstance[K[_]]: HOrderK[CellId[K, ?]] = new HOrderK[CellId[K, ?]] {
+  implicit def orderKInstance[K[_]]: HOrderK[CellId[K, *]] = new HOrderK[CellId[K, *]] {
     override def hOrderK[A, B](fa: CellId[K, A], fb: CellId[K, B]): Ordering =
       CellId.order(fa, fb)
   }
 
-  implicit def showKInstance[K[_]]: ShowK[CellId[K, ?]] = new ShowK[CellId[K, ?]] {
+  implicit def showKInstance[K[_]]: ShowK[CellId[K, *]] = new ShowK[CellId[K, *]] {
     def shows[A](ref: CellId[K, A]): String = s"cell${ref.domainId}"
   }
 }
@@ -368,7 +368,7 @@ private[nutcracker] final case class SimpleCellId[K[_], D](domainId: Long) exten
 private[nutcracker] object SimpleCellId {
   type Aux[K[_], D, U, Δ[_, _]] = SimpleCellId[K, D] { type Update = U; type Delta[D1, D2] = Δ[D1, D2] }
 
-  implicit def orderKInstance[K[_]]: HOrderK[SimpleCellId[K, ?]] = new HOrderK[SimpleCellId[K, ?]] {
+  implicit def orderKInstance[K[_]]: HOrderK[SimpleCellId[K, *]] = new HOrderK[SimpleCellId[K, *]] {
     override def hOrderK[A, B](fa: SimpleCellId[K, A], fb: SimpleCellId[K, B]): Ordering =
       CellId.order(fa, fb)
   }
@@ -377,7 +377,7 @@ private[nutcracker] object SimpleCellId {
     override def shows(ref: SimpleCellId[K, D]): String = s"ref${ref.domainId}"
   }
 
-  implicit def showKInstance[K[_]]: ShowK[SimpleCellId[K, ?]] = new ShowK[SimpleCellId[K, ?]] {
+  implicit def showKInstance[K[_]]: ShowK[SimpleCellId[K, *]] = new ShowK[SimpleCellId[K, *]] {
     def shows[A](ref: SimpleCellId[K, A]): String = s"cell${ref.domainId}"
   }
 }

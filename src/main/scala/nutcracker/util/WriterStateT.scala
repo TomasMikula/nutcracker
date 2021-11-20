@@ -43,13 +43,13 @@ object WriterStateT extends WriterStateTInstances {
   def unfold[F[_], G[_], W0, S](gw: G[W0], f: W0 => WriterStateT[G[W0], S, F, Unit])(s: S)(implicit F0: BindRec[F], F1: Applicative[F], G: Catenable[G]): F[S] =
     unfold[F, G[W0], S](gw, gw => G.uncons(gw).map({ case (w0, gw) => (f(w0), gw) }))(s)(F0, F1, G.monoid[W0])
 
-  def recurse[H[_], F[_], G[_], W0, S](f: H ~> WriterStateT[G[W0], S, F, ?])(wh: W0 => H[Unit])(implicit F0: BindRec[F], F1: Monad[F], G: Catenable[G]): H ~> StateT[F, S, ?] =
-    λ[H ~> StateT[F, S, ?]](ha => f(ha).recurse(gw => G.uncons(gw).map({ case (w0, gw) => (f(wh(w0)), gw) }))(F0, F1, G.monoid[W0]))
+  def recurse[H[_], F[_], G[_], W0, S](f: H ~> WriterStateT[G[W0], S, F, *])(wh: W0 => H[Unit])(implicit F0: BindRec[F], F1: Monad[F], G: Catenable[G]): H ~> StateT[F, S, *] =
+    λ[H ~> StateT[F, S, *]](ha => f(ha).recurse(gw => G.uncons(gw).map({ case (w0, gw) => (f(wh(w0)), gw) }))(F0, F1, G.monoid[W0]))
 }
 
 trait WriterStateTInstances extends WriterStateTInstances1 {
-  implicit def monadTellStateInstance[F[_], W, S](implicit F: Monad[F], W: Monoid[W]): MonadTellState[WriterStateT[W, S, F, ?], W, S] =
-    new WriterStateTMonad[F, W, S] with MonadTellState[WriterStateT[W, S, F, ?], W, S] {
+  implicit def monadTellStateInstance[F[_], W, S](implicit F: Monad[F], W: Monoid[W]): MonadTellState[WriterStateT[W, S, F, *], W, S] =
+    new WriterStateTMonad[F, W, S] with MonadTellState[WriterStateT[W, S, F, *], W, S] {
       def writerState[A](f: S => (W, S, A)): WriterStateT[W, S, F, A] =
         WriterStateT(s => F.point(f(s)))
 
@@ -63,19 +63,19 @@ trait WriterStateTInstances extends WriterStateTInstances1 {
         WriterStateT(s => F.point((w, s, a)))
     }
 
-  implicit def monadTrans[W, S](implicit W: Monoid[W]): MonadTrans[WriterStateT[W, S, ?[_], ?]] =
-    new MonadTrans[WriterStateT[W, S, ?[_], ?]] {
+  implicit def monadTrans[W, S](implicit W: Monoid[W]): MonadTrans[WriterStateT[W, S, *[_], *]] =
+    new MonadTrans[WriterStateT[W, S, *[_], *]] {
       def liftM[G[_], A](ga: G[A])(implicit G: Monad[G]): WriterStateT[W, S, G, A] =
         WriterStateT(s => G.map(ga)(a => (W.zero, s, a)))
 
-      implicit def apply[G[_]](implicit G: Monad[G]): Monad[WriterStateT[W, S, G, ?]] =
+      implicit def apply[G[_]](implicit G: Monad[G]): Monad[WriterStateT[W, S, G, *]] =
         monad[G, W, S]
     }
 }
 
 trait WriterStateTInstances1 extends WriterStateTInstances2 {
-  implicit def bindRec[F[_], W, S](implicit F0: BindRec[F], W: Monoid[W]): BindRec[WriterStateT[W, S, F, ?]] =
-    new BindRec[WriterStateT[W, S, F, ?]] {
+  implicit def bindRec[F[_], W, S](implicit F0: BindRec[F], W: Monoid[W]): BindRec[WriterStateT[W, S, F, *]] =
+    new BindRec[WriterStateT[W, S, F, *]] {
       def tailrecM[A, B](a: A)(f: A => WriterStateT[W, S, F, A \/ B]): WriterStateT[W, S, F, B] = {
         def go(x: (W, S, A)): F[(W, S, A) \/ (W, S, B)] = {
           val (w, s, a) = x
@@ -96,11 +96,11 @@ trait WriterStateTInstances1 extends WriterStateTInstances2 {
 }
 
 trait WriterStateTInstances2 {
-  implicit def monad[F[_], W, S](implicit F: Monad[F], W: Monoid[W]): Monad[WriterStateT[W, S, F, ?]] =
+  implicit def monad[F[_], W, S](implicit F: Monad[F], W: Monoid[W]): Monad[WriterStateT[W, S, F, *]] =
     new WriterStateTMonad[F, W, S]
 }
 
-private[util] class WriterStateTMonad[F[_], W, S](implicit F: Monad[F], W: Monoid[W]) extends Monad[WriterStateT[W, S, F, ?]] {
+private[util] class WriterStateTMonad[F[_], W, S](implicit F: Monad[F], W: Monoid[W]) extends Monad[WriterStateT[W, S, F, *]] {
   def point[A](a: => A): WriterStateT[W, S, F, A] =
     WriterStateT(s => F.point((W.zero, s, a)))
 

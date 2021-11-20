@@ -10,10 +10,10 @@ abstract class StateInterpreter[K[_], F[_], S] { self =>
   def apply[M[_], W](implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[F, K], K: Bind[K]): F ~> M =
     λ[F ~> M](self(_))
 
-  def free[M[_], W](implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], M1: BindRec[M], inj: Inject[F, K], K: Bind[K]): Free[F, ?] ~> M =
-    λ[Free[F, ?] ~> M](fa => fa.foldMap(self[M, W]))
+  def free[M[_], W](implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], M1: BindRec[M], inj: Inject[F, K], K: Bind[K]): Free[F, *] ~> M =
+    λ[Free[F, *] ~> M](fa => fa.foldMap(self[M, W]))
 
-  def :+:[G[_]](that: StateInterpreter[K, G, S]): StateInterpreter[K, Coproduct[G, F, ?], S] = {
+  def :+:[G[_]](that: StateInterpreter[K, G, S]): StateInterpreter[K, Coproduct[G, F, *], S] = {
     type H[A] = Coproduct[G, F, A]
 
     new StateInterpreter[K, H, S] {

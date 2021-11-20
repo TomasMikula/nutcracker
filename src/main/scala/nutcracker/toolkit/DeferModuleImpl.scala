@@ -11,15 +11,15 @@ private[nutcracker] class DeferModuleImpl[D](implicit D: NonDecreasingMonoid[D] 
   type Lang[K[_], A] = DeferLang[D, K, A]
   type StateK[K[_]] = DeferStore[D, K]
 
-  implicit def freeDeferApi[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): Defer[FreeK[F, ?], D] =
-    new Defer[FreeK[F, ?], D] {
+  implicit def freeDeferApi[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]): Defer[FreeK[F, *], D] =
+    new Defer[FreeK[F, *], D] {
       def defer(delay: D, k: FreeK[F, Unit]): FreeK[F, Unit] =
-        FreeK.liftF(i(DeferLang.defer[D, FreeK[F, ?]](delay, k)))
+        FreeK.liftF(i(DeferLang.defer[D, FreeK[F, *]](delay, k)))
     }
 
   def emptyK[K[_]] = DeferStore.empty[D, K]
 
-  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] =
+  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, *], S] =
     DeferStore.interpreter[D, K, S]
 
   def stashable: StashDeferModule[D] { type Lang[K[_], A] = self.Lang[K, A] } =
@@ -50,11 +50,11 @@ private[nutcracker] object DeferStore {
   def empty[D, K[_]](implicit D: NonDecreasingMonoid[D] with OrderPreservingMonoid[D]): DeferStore[D, K] =
     DeferStore(D.zero, Heap.Empty[(D, K[Unit])])
 
-  def interpreter[D, K[_], S](implicit lens: Lens[S, DeferStore[D, K]]): StateInterpreter[K, DeferLang[D, K, ?], S] =
-    new StateInterpreter[K, DeferLang[D, K, ?], S] {
+  def interpreter[D, K[_], S](implicit lens: Lens[S, DeferStore[D, K]]): StateInterpreter[K, DeferLang[D, K, *], S] =
+    new StateInterpreter[K, DeferLang[D, K, *], S] {
       import DeferLang._
 
-      override def apply[M[_], W, A](fa: DeferLang[D, K, A])(implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[DeferLang[D, K, ?], K], K: Bind[K]): M[A] =
+      override def apply[M[_], W, A](fa: DeferLang[D, K, A])(implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[DeferLang[D, K, *], K], K: Bind[K]): M[A] =
         M.writerState(s => {
           @inline def scheduleExecution: W = Lst.singleton(inj(exec[D, K]())) at 10
 

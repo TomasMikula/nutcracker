@@ -17,7 +17,7 @@ scalacOptions ++= Seq(
   "-unchecked",
   "-deprecation",
   "-feature",
-  //"-Xfatal-warnings",
+  "-Xfatal-warnings",
   "-Yno-adapted-args",
   "-Ypartial-unification",
   "-Ywarn-numeric-widen",

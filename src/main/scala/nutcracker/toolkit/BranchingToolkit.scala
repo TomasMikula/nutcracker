@@ -22,14 +22,14 @@ trait BranchingToolkit extends RefToolkit with StashToolkit {
     toList(solveDfs(p))
 
   /** Like [[solveDfs[D]*]], but also outputs the number of times it had to backtrack. */
-  def solveDfs1[D](p: Prg[Val[D]])(implicit fin: Final[D]): StreamT[Writer[Int, ?], fin.Out] =
-    solveDfsM[Writer[Int, ?], D](p)
+  def solveDfs1[D](p: Prg[Val[D]])(implicit fin: Final[D]): StreamT[Writer[Int, *], fin.Out] =
+    solveDfsM[Writer[Int, *], D](p)
 
   /** Like [[solveDfsAll]], but also returns the number of dead branches explored. */
   def solveDfsAll1[D](p: Prg[Val[D]])(implicit fin: Final[D]): (List[fin.Out], Int) =
     toList(solveDfs1(p)).run.swap
 
-  private implicit val mt: MonadTell[Writer[Int, ?], Int] = WriterT.writerTMonadListen[Id, Int]
+  private implicit val mt: MonadTell[Writer[Int, *], Int] = WriterT.writerTMonadListen[Id, Int]
 
   private def solveDfsM[M[_], A, B](p: Prg[A], f: (A, State) => Option[B])(implicit M0: BindRec[M], M1: MonadTell[M, Int]): StreamT[M, B] = {
     val (s, a) = interpret(p, empty)

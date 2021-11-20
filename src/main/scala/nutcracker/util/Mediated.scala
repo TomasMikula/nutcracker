@@ -54,7 +54,7 @@ final class Mediated[M[_], A, B, C](private val value: M[(A, B => M[C])]) extend
 }
 
 object Mediated {
-  type Cps[F[_], A, B, C] = Mediated[ContT[F, Unit, ?], A, B, C]
+  type Cps[F[_], A, B, C] = Mediated[ContT[F, Unit, *], A, B, C]
 
   def apply[M[_], A, B, C](value: M[(A, B => M[C])]): Mediated[M, A, B, C] =
     new Mediated[M, A, B, C](value)

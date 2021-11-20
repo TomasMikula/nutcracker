@@ -8,7 +8,7 @@ import scalaz.{-\/, Applicative, BindRec, Foldable, Monoid, Writer, \/, \/-, ~>}
 import scalaz.Leibniz.===
 import scalaz.syntax.monad._
 
-final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private val unwrap: Free[FreeObjectOutput.OutputInst[R, Ptr, ?], A]) /* extends AnyVal // can't have nested AnyVals :( */ {
+final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private val unwrap: Free[FreeObjectOutput.OutputInst[R, Ptr, *], A]) /* extends AnyVal // can't have nested AnyVals :( */ {
   import FreeObjectOutput._
 
   def flatMap[B](f: A => FreeObjectOutput[R, Ptr, B]): FreeObjectOutput[R, Ptr, B] =
@@ -21,7 +21,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
   def ::(r: R): FreeObjectOutput[R, Ptr, A] = r +: this
 
   private def foldMap(showRef: Ptr ~> λ[α => R]): Lst[R] =
-    unwrap.foldMapRec[Writer[Lst[R], ?]](λ[OutputInst[R, Ptr, ?] ~> λ[α => Writer[Lst[R], Free[OutputInst[R, Ptr, ?], α] \/ α]]](_ match {
+    unwrap.foldMapRec[Writer[Lst[R], *]](λ[OutputInst[R, Ptr, *] ~> λ[α => Writer[Lst[R], Free[OutputInst[R, Ptr, *], α] \/ α]]](_ match {
       case Write(r) => Writer(Lst.singleton(r), \/-(()))
       case WriteRec(pa, _) => Writer(Lst.singleton(showRef(pa)), \/-(()))
       case Nest(fa) => Writer(Lst.empty[R], -\/(fa.unwrap))
@@ -45,7 +45,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
   private def foldBiState[S1, S2, M[_]](s1: S1)(step: S1 => Ptr ~> λ[α => (S1, S2 => (S2, Decoration[R])) \/ (S2, R)])(deref: Ptr ~> M)(implicit S2: Monoid[S2], M0: BindRec[M], M1: Applicative[M]): M[Tree[R]] = {
     import Tree._
     type S2_ = (S2, Tree[R]); import scalaz.std.tuple.tuple2Monoid
-    M0.map(unwrap.foldRunRecParM[M, S1, S2_](s1, λ[λ[α => (S1, OutputInst[R, Ptr, α])] ~> λ[α => M[(S1, Free[OutputInst[R, Ptr, ?], α], S2_ => S2_) \/ (S2_, α)]]] {
+    M0.map(unwrap.foldRunRecParM[M, S1, S2_](s1, λ[λ[α => (S1, OutputInst[R, Ptr, α])] ~> λ[α => M[(S1, Free[OutputInst[R, Ptr, *], α], S2_ => S2_) \/ (S2_, α)]]] {
       case (s1, inst) => inst match {
         case Write(r) => M1.point(\/-(((S2.zero, singleton(r)), ())))
         case WriteRec(pa, f) => step(s1)(pa) match {
@@ -64,7 +64,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
   /** Specialized [[foldBiState]] for `S2 = Unit`. */
   private def foldState[S, M[_]](s: S)(step: S => Ptr ~> λ[α => (S, Decoration[R]) \/ R])(deref: Ptr ~> M)(implicit M0: BindRec[M], M1: Applicative[M]): M[Tree[R]] = {
     type S2 = Tree[R]
-    M0.map(unwrap.foldRunRecParM[M, S, S2](s, λ[λ[α => (S, OutputInst[R, Ptr, α])] ~> λ[α => M[(S, Free[OutputInst[R, Ptr, ?], α], S2 => S2) \/ (S2, α)]]] {
+    M0.map(unwrap.foldRunRecParM[M, S, S2](s, λ[λ[α => (S, OutputInst[R, Ptr, α])] ~> λ[α => M[(S, Free[OutputInst[R, Ptr, *], α], S2 => S2) \/ (S2, α)]]] {
       case (s, inst) => inst match {
         case Write(r) => M1.point(\/-((Tree.singleton(r), ())))
         case WriteRec(pa, f) => step(s)(pa) match {
@@ -136,7 +136,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     M1: Applicative[M],
     ev: R === String
   ): M[String] =
-    M0.map(ev.subst[FreeObjectOutput[?, Ptr, A]](this).appendTo(
+    M0.map(ev.subst[FreeObjectOutput[*, Ptr, A]](this).appendTo(
       new StringBuilder,
       deref,
       decorateReferenced,
@@ -154,7 +154,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     M1: Applicative[M],
     ev: R === String
   ): M[String] =
-    M0.map(ev.subst[FreeObjectOutput[?, Ptr, A]](this).eval(
+    M0.map(ev.subst[FreeObjectOutput[*, Ptr, A]](this).eval(
       deref,
       decorateReferenced,
       decorateUnreferenced,
@@ -208,7 +208,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     M0.map(appendTo(new StringBuilder, deref, decorateContent, showReference))(_.result())
 
   def writeTo[O](out: O)(implicit O: ObjectOutput[O, R, Ptr]): O =
-    unwrap.foldRunRec[O](out, λ[λ[α => (O, OutputInst[R, Ptr, α])] ~> λ[α => (O, Free[OutputInst[R, Ptr, ?], α], O => O) \/ (O, α)]] {
+    unwrap.foldRunRec[O](out, λ[λ[α => (O, OutputInst[R, Ptr, α])] ~> λ[α => (O, Free[OutputInst[R, Ptr, *], α], O => O) \/ (O, α)]] {
       case (out, i) => i match {
         case Write(r) => \/-((O.write(out, r), ()))
         case WriteRec(pa, f) => \/-((O.writeSubObject(out, pa)(f), ()))
@@ -218,7 +218,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     })._1
 
   def serialize[M[_]](implicit M: MonadObjectOutput[M, R, Ptr]): M[A] =
-    unwrap.foldMap[M](λ[OutputInst[R, Ptr, ?] ~> M](_ match {
+    unwrap.foldMap[M](λ[OutputInst[R, Ptr, *] ~> M](_ match {
       case Write(r) => M.write(r)
       case WriteRec(pa, f) => M.writeRec(pa)(f(_).serialize[M])
       case Nest(fx) => M.nest(fx.serialize[M])
@@ -231,16 +231,16 @@ object FreeObjectOutput {
   private[FreeObjectOutput] case class WriteRec[R, Ptr[_], A](pa: Ptr[A], f: A => FreeObjectOutput[R, Ptr, Unit]) extends OutputInst[R, Ptr, Unit]
   private[FreeObjectOutput] case class Nest[R, Ptr[_], A](fa: FreeObjectOutput[R, Ptr, A]) extends OutputInst[R, Ptr, A]
 
-  private def wrap[R, Ptr[_], A](fa: Free[FreeObjectOutput.OutputInst[R, Ptr, ?], A]): FreeObjectOutput[R, Ptr, A] = new FreeObjectOutput(fa)
+  private def wrap[R, Ptr[_], A](fa: Free[FreeObjectOutput.OutputInst[R, Ptr, *], A]): FreeObjectOutput[R, Ptr, A] = new FreeObjectOutput(fa)
 
-  def point[R, Ptr[_], A](a: A): FreeObjectOutput[R, Ptr, A] = wrap(Free.point[OutputInst[R, Ptr, ?], A](a))
+  def point[R, Ptr[_], A](a: A): FreeObjectOutput[R, Ptr, A] = wrap(Free.point[OutputInst[R, Ptr, *], A](a))
   def empty[R, Ptr[_]]: FreeObjectOutput[R, Ptr, Unit] = point(())
-  def write[R, Ptr[_]](r: R): FreeObjectOutput[R, Ptr, Unit] = wrap(Free.liftF[OutputInst[R, Ptr, ?], Unit](Write(r)))
+  def write[R, Ptr[_]](r: R): FreeObjectOutput[R, Ptr, Unit] = wrap(Free.liftF[OutputInst[R, Ptr, *], Unit](Write(r)))
   def writeRec[R, Ptr[_], A](pa: Ptr[A], f: A => FreeObjectOutput[R, Ptr, Unit]): FreeObjectOutput[R, Ptr, Unit] =
-    wrap(Free.liftF[OutputInst[R, Ptr, ?], Unit](WriteRec(pa, f)))
+    wrap(Free.liftF[OutputInst[R, Ptr, *], Unit](WriteRec(pa, f)))
   def writeObject[R, Ptr[_], A](pa: Ptr[A], ser: ObjectSerializer[A, R, Ptr]): FreeObjectOutput[R, Ptr, Unit] =
     writeRec(pa, (a: A) => ser.free(a))
-  def nest[R, Ptr[_], A](fa: FreeObjectOutput[R, Ptr, A]): FreeObjectOutput[R, Ptr, A] = wrap(Free.liftF[OutputInst[R, Ptr, ?], A](Nest(fa)))
+  def nest[R, Ptr[_], A](fa: FreeObjectOutput[R, Ptr, A]): FreeObjectOutput[R, Ptr, A] = wrap(Free.liftF[OutputInst[R, Ptr, *], A](Nest(fa)))
 
   sealed abstract class IndexedDecoration[+R1, +R2] {
     def beforeOption: Option[R1]
@@ -348,8 +348,8 @@ object FreeObjectOutput {
         wrap(out.unwrap >> FreeObjectOutput.writeRec(pa, (a: A) => ser.free(f(a))).unwrap)
     }
 
-  implicit def monadObjectOutputInstance[R, Ptr[_]]: MonadObjectOutput[FreeObjectOutput[R, Ptr, ?], R, Ptr] with BindRec[FreeObjectOutput[R, Ptr, ?]] =
-    new MonadObjectOutput[FreeObjectOutput[R, Ptr, ?], R, Ptr] with BindRec[FreeObjectOutput[R, Ptr, ?]] {
+  implicit def monadObjectOutputInstance[R, Ptr[_]]: MonadObjectOutput[FreeObjectOutput[R, Ptr, *], R, Ptr] with BindRec[FreeObjectOutput[R, Ptr, *]] =
+    new MonadObjectOutput[FreeObjectOutput[R, Ptr, *], R, Ptr] with BindRec[FreeObjectOutput[R, Ptr, *]] {
 
       def writeRec[A](pa: Ptr[A])(f: A => FreeObjectOutput[R, Ptr, Unit]): FreeObjectOutput[R, Ptr, Unit] =
         FreeObjectOutput.writeRec(pa, f)

@@ -23,13 +23,13 @@ package object typealigned {
   type Op[F[_, _], A, B] = F[B, A]
 
   /** Contravariant functor is a (covariant) functor in the opposite category. */
-  type ContravariantLike[F[_], ->[_, _]] = FunctorLike[F, Op[->, ?, ?]]
+  type ContravariantLike[F[_], ->[_, _]] = FunctorLike[F, Op[->, *, *]]
 
   /**
    * Binary counter-like accumulator for type-aligned binary type constructors,
    * with the most significant bit on the left and addition of new elements (i.e. "increment") from the right.
    */
-  type BalancedPostComposer[F[_, _], A, B] = BalancedComposer[Op[F, ?, ?], B, A, Post]
+  type BalancedPostComposer[F[_, _], A, B] = BalancedComposer[Op[F, *, *], B, A, Post]
 
   /**
    * Binary counter-like accumulator for type-aligned binary type constructors,

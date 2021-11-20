@@ -12,13 +12,13 @@ trait BranchingModule extends Module {
   type StateK[K[_]]
 
   implicit def freeBranchingPropagation[F[_[_], _]](implicit
-    i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]],
-    P: Propagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]]
-  ): BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]]
+    i: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]],
+    P: Propagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
+  ): BranchingPropagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
 
   def emptyK[K[_]]: StateK[K]
-  def stepInterpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S]
-  def assess[K[_]](s: StateK[K])(fetch: VarK[K, ?] ~> Id)(implicit K: Propagation[K, VarK[K, ?], ValK[K, ?]]): Assessment[List[K[Unit]]]
+  def stepInterpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, *], S]
+  def assess[K[_]](s: StateK[K])(fetch: VarK[K, *] ~> Id)(implicit K: Propagation[K, VarK[K, *], ValK[K, *]]): Assessment[List[K[Unit]]]
 }
 
 object BranchingModule {
@@ -51,14 +51,14 @@ extends ListModule[Lang, State0](base) with BranchingModule {
   type ValK[K[_], A] = Val0[K, A]
 
   override def freeBranchingPropagation[F[_[_], _]](implicit
-    i: Inject[Lang[FreeK[F, ?], ?], F[FreeK[F, ?], ?]],
-    P: Propagation[FreeK[F, ?], Var0[FreeK[F, ?], ?], Val0[FreeK[F, ?], ?]]
-  ): BranchingPropagation[FreeK[F, ?], VarK[FreeK[F, ?], ?], ValK[FreeK[F, ?], ?]] =
+    i: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]],
+    P: Propagation[FreeK[F, *], Var0[FreeK[F, *], *], Val0[FreeK[F, *], *]]
+  ): BranchingPropagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] =
     base.freeBranchingPropagation[F](i, P)
 
-  override def stepInterpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, ?], S] =
+  override def stepInterpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, *], S] =
     base.stepInterpreter[K, S](Lens.nelHeadLens[State0[K]].compose(lens))
 
-  override def assess[K[_]](s: StateK[K])(fetch: VarK[K, ?] ~> Id)(implicit K: Propagation[K, VarK[K, ?], ValK[K, ?]]): Assessment[List[K[Unit]]] =
+  override def assess[K[_]](s: StateK[K])(fetch: VarK[K, *] ~> Id)(implicit K: Propagation[K, VarK[K, *], ValK[K, *]]): Assessment[List[K[Unit]]] =
     base.assess[K](s.head)(fetch)
 }

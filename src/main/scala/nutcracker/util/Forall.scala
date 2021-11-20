@@ -52,8 +52,8 @@ trait `Forall{(* -> *) -> * -> *}`[F[_[_], _]] { self =>
   protected def compute[K[_], A]: F[K, A]
 
   final def apply[K[_], A]: F[K, A] = value.asInstanceOf[F[K, A]]
-  final def papply[K[_]]: `Forall{* -> *}`[F[K, ?]] = PApplied(this)
-  final def curried: `Forall{(* -> *) -> *}`[λ[K[_] => `Forall{* -> *}`[F[K, ?]]]] = Curried(this)
+  final def papply[K[_]]: `Forall{* -> *}`[F[K, *]] = PApplied(this)
+  final def curried: `Forall{(* -> *) -> *}`[λ[K[_] => `Forall{* -> *}`[F[K, *]]]] = Curried(this)
 
   /** Transform this value by a universally quantified function
     * `f: ∀ K[_], A. F[K, A] => G[K, A]`
@@ -64,10 +64,10 @@ trait `Forall{(* -> *) -> * -> *}`[F[_[_], _]] { self =>
 }
 
 object `Forall{(* -> *) -> * -> *}` {
-  private case class Curried[F[_[_], _]](run: `Forall{(* -> *) -> * -> *}`[F]) extends `Forall{(* -> *) -> *}`[λ[K[_] => `Forall{* -> *}`[F[K, ?]]]] {
-    protected final def compute[K[_]]: `Forall{* -> *}`[F[K, ?]] = run.papply[K]
+  private case class Curried[F[_[_], _]](run: `Forall{(* -> *) -> * -> *}`[F]) extends `Forall{(* -> *) -> *}`[λ[K[_] => `Forall{* -> *}`[F[K, *]]]] {
+    protected final def compute[K[_]]: `Forall{* -> *}`[F[K, *]] = run.papply[K]
   }
-  private case class PApplied[F[_[_], _], K[_]](run: `Forall{(* -> *) -> * -> *}`[F]) extends `Forall{* -> *}`[F[K, ?]] {
+  private case class PApplied[F[_[_], _], K[_]](run: `Forall{(* -> *) -> * -> *}`[F]) extends `Forall{* -> *}`[F[K, *]] {
     protected final def compute[A]: F[K, A] = run[K, A]
   }
 }

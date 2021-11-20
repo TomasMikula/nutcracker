@@ -28,8 +28,8 @@ sealed abstract class FreeCompose[=>:[_, _], A, B] {
     Chain(Lift(f), this)
 
   final def foldLeft[F[_]](fa: F[A])(implicit F: FunctorLike[F, =>:]): F[B] = {
-    @inline def pair[X](fx: F[X], f: FreeCompose[=>:, X, B]) = APair[F, FreeCompose[=>:, ?, B], X](fx, f)
-    @tailrec def go(step: APair[F, FreeCompose[=>:, ?, B]]): F[B] =
+    @inline def pair[X](fx: F[X], f: FreeCompose[=>:, X, B]) = APair[F, FreeCompose[=>:, *, B], X](fx, f)
+    @tailrec def go(step: APair[F, FreeCompose[=>:, *, B]]): F[B] =
       step._2 match {
         case Chain(Chain(f, g), h) => go(pair(step._1, f >>> (g >>> h)))
         case Chain(Lift(f), g) => go(pair(F.map(step._1)(f), g))
@@ -39,8 +39,8 @@ sealed abstract class FreeCompose[=>:[_, _], A, B] {
   }
 
   def foldRight[F[_]](fb: F[B])(implicit F: ContravariantLike[F, =>:]): F[A] = {
-    @inline def pair[X](f: FreeCompose[=>:, A, X], fx: F[X]) = APair[FreeCompose[=>:, A, ?], F, X](f, fx)
-    @tailrec def go(step: APair[FreeCompose[=>:, A, ?], F]): F[A] =
+    @inline def pair[X](f: FreeCompose[=>:, A, X], fx: F[X]) = APair[FreeCompose[=>:, A, *], F, X](f, fx)
+    @tailrec def go(step: APair[FreeCompose[=>:, A, *], F]): F[A] =
       step._1 match {
         case Chain(f, Chain(g, h)) => go(pair((f >>> g) >>> h, step._2))
         case Chain(f, Lift(g)) => go(pair(f, F.contramap(step._2)(g)))
@@ -55,7 +55,7 @@ sealed abstract class FreeCompose[=>:[_, _], A, B] {
   @tailrec
   final def reduce(implicit ev: Compose[=>:]): A =>: B = this match {
     case Chain(Chain(f, g), h) => (f >>> (g >>> h)).reduce
-    case Chain(Lift(f), g) => g.foldLeft[BalancedPostComposer[=>:, A, ?]](BalancedPostComposer(f)).reduceRight
+    case Chain(Lift(f), g) => g.foldLeft[BalancedPostComposer[=>:, A, *]](BalancedPostComposer(f)).reduceRight
     case Lift(f) => f
   }
 }

@@ -107,7 +107,7 @@ class PropagationStoreTest extends FunSuite {
     }
 
     def resume(s: PropagationStore[Prg], cyc: CellCycle[Promise[Int]], tok: Token[Promise[Int]]): PropagationStore[Prg] = {
-      val (s1, ks, becameDirty) = s.resume[Promise[Int], Promise.IDelta[Int, ?, ?], Promise[Int]](ref, cyc, tok, s.fire[Promise[Int]](Prg(s => { observed = true; (s, ()) })))
+      val (s1, ks, becameDirty) = s.resume[Promise[Int], Promise.IDelta[Int, *, *], Promise[Int]](ref, cyc, tok, s.fire[Promise[Int]](Prg(s => { observed = true; (s, ()) })))
       val (s2, ks2) = if(becameDirty) s.execTriggers(ref, cyc) else (s1, ks)
       interpretAll(s2, ks2)
     }
@@ -171,7 +171,7 @@ class PropagationStoreTest extends FunSuite {
     assertResult(None)(s3.tryFetch(ref))
 
     // these should be no-ops, but cause no error
-    s3.exclUpdate[Promise[Int], Promise.Update[Int], Promise.IDelta[Int, ?, ?]](ref, cycle, Promise.completed(77))
+    s3.exclUpdate[Promise[Int], Promise.Update[Int], Promise.IDelta[Int, *, *]](ref, cycle, Promise.completed(77))
     s3.supply(ref)(cycle, Promise.completed(77))
     s3.addFinalizer(ref, cycle, Subscription())
     s3.removeFinalizer(ref, cycle, FinalizerId.zero)
@@ -196,7 +196,7 @@ class PropagationStoreTest extends FunSuite {
 
     // these should be no-ops, but cause no error
     s5.rmObserver(ref, cycle, oid)
-    s5.resume[Promise[Int], Promise.IDelta[Int, ?, ?], Promise[Int]](ref, cycle, token.get, s5.fire[Promise[Int]](().point[Prg]))
+    s5.resume[Promise[Int], Promise.IDelta[Int, *, *], Promise[Int]](ref, cycle, token.get, s5.fire[Promise[Int]](().point[Prg]))
   }
 }
 

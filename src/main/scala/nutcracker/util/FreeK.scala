@@ -15,7 +15,7 @@ import scalaz.Monad
   * This is useful for instruction sets (a.k.a. algebras, DSLs, ...) that
   * need to refer to the type of the free program that they are embedded in.
   */
-final class FreeK[F[_[_], _], A](val unwrap: Free[F[FreeK[F, ?], ?], A]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-7685
+final class FreeK[F[_[_], _], A](val unwrap: Free[F[FreeK[F, *], *], A]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-7685
   import FreeK._
 
   def map[B](f: A => B): FreeK[F, B] =
@@ -34,17 +34,17 @@ final class FreeK[F[_[_], _], A](val unwrap: Free[F[FreeK[F, ?], ?], A]) { // ex
 object FreeK {
 
   @inline
-  private def wrap[F[_[_], _], A](fa: Free[F[FreeK[F, ?], ?], A]): FreeK[F, A] =
+  private def wrap[F[_[_], _], A](fa: Free[F[FreeK[F, *], *], A]): FreeK[F, A] =
     new FreeK(fa)
 
   def pure[F[_[_], _], A](a: A): FreeK[F, A] =
     wrap(Free.point(a))
 
-  def liftF[F[_[_], _], A](a: F[FreeK[F, ?], A]): FreeK[F, A] =
-    wrap(Free.liftF[F[FreeK[F, ?], ?], A](a))
+  def liftF[F[_[_], _], A](a: F[FreeK[F, *], A]): FreeK[F, A] =
+    wrap(Free.liftF[F[FreeK[F, *], *], A](a))
 
-  implicit def freeKMonad[F[_[_], _]]: Monad[FreeK[F, ?]] =
-    new Monad[FreeK[F, ?]] {
+  implicit def freeKMonad[F[_[_], _]]: Monad[FreeK[F, *]] =
+    new Monad[FreeK[F, *]] {
       def point[A](a: => A): FreeK[F, A] = FreeK.pure(a)
       def bind[A, B](fa: FreeK[F, A])(f: A => FreeK[F, B]): FreeK[F, B] = fa.flatMap(f)
     }

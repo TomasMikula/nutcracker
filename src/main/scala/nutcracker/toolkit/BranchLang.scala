@@ -35,10 +35,10 @@ object BranchLang {
   def rmUnresolved[Ref[_], K[_], A](ref: Ref[A]): BranchLang[Ref, K, Unit] = RmUnresolved(ref, Leibniz.refl)
   def addFailed[Ref[_], K[_], A](ref: Ref[A]): BranchLang[Ref, K, Unit] = AddFailed(ref, Leibniz.refl)
 
-  def addUnresolvedF[Ref[_], F[_[_], _], A](ref: Ref[A])(implicit ev: Splittable[A], inj: Inject[BranchLang[Ref, FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Unit] =
-    FreeK.liftF(inj(addUnresolved[Ref, FreeK[F, ?], A](ref)))
-  def rmUnresolvedF[Ref[_], F[_[_], _], A](ref: Ref[A])(implicit inj: Inject[BranchLang[Ref, FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Unit] =
-    FreeK.liftF(inj(rmUnresolved[Ref, FreeK[F, ?], A](ref)))
-  def addFailedF[Ref[_], F[_[_], _], A](ref: Ref[A])(implicit inj: Inject[BranchLang[Ref, FreeK[F, ?], ?], F[FreeK[F, ?], ?]]): FreeK[F, Unit] =
-    FreeK.liftF(inj(addFailed[Ref, FreeK[F, ?], A](ref)))
+  def addUnresolvedF[Ref[_], F[_[_], _], A](ref: Ref[A])(implicit ev: Splittable[A], inj: Inject[BranchLang[Ref, FreeK[F, *], *], F[FreeK[F, *], *]]): FreeK[F, Unit] =
+    FreeK.liftF(inj(addUnresolved[Ref, FreeK[F, *], A](ref)))
+  def rmUnresolvedF[Ref[_], F[_[_], _], A](ref: Ref[A])(implicit inj: Inject[BranchLang[Ref, FreeK[F, *], *], F[FreeK[F, *], *]]): FreeK[F, Unit] =
+    FreeK.liftF(inj(rmUnresolved[Ref, FreeK[F, *], A](ref)))
+  def addFailedF[Ref[_], F[_[_], _], A](ref: Ref[A])(implicit inj: Inject[BranchLang[Ref, FreeK[F, *], *], F[FreeK[F, *], *]]): FreeK[F, Unit] =
+    FreeK.liftF(inj(addFailed[Ref, FreeK[F, *], A](ref)))
 }

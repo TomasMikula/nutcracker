@@ -107,18 +107,18 @@ class FreeTTest extends TestSuite {
   }
 
   object instances {
-    def bind[S[_]: Functor, F[_]: Applicative] = Bind[FreeT[S, F, ?]]
-    def foldable[S[_]: Foldable: Functor, F[_]: Foldable: Applicative: BindRec] = Foldable[FreeT[S, F, ?]]
-    def traverse[S[_]: Traverse, F[_]: Traverse: Applicative: BindRec] = Traverse[FreeT[S, F, ?]]
-    def monad[S[_]: Functor, F[_]: Applicative] = Monad[FreeT[S, F, ?]]
-    def plus[S[_]: Functor, F[_]: Applicative: BindRec: Plus] = Plus[FreeT[S, F, ?]]
-    def monadPlus[S[_]: Functor, F[_]: ApplicativePlus: BindRec] = MonadPlus[FreeT[S, F, ?]]
-    def monadTrans[S[_]: Functor] = MonadTrans[FreeT[S, ?[_], ?]]
+    def bind[S[_]: Functor, F[_]: Applicative] = Bind[FreeT[S, F, *]]
+    def foldable[S[_]: Foldable: Functor, F[_]: Foldable: Applicative: BindRec] = Foldable[FreeT[S, F, *]]
+    def traverse[S[_]: Traverse, F[_]: Traverse: Applicative: BindRec] = Traverse[FreeT[S, F, *]]
+    def monad[S[_]: Functor, F[_]: Applicative] = Monad[FreeT[S, F, *]]
+    def plus[S[_]: Functor, F[_]: Applicative: BindRec: Plus] = Plus[FreeT[S, F, *]]
+    def monadPlus[S[_]: Functor, F[_]: ApplicativePlus: BindRec] = MonadPlus[FreeT[S, F, *]]
+    def monadTrans[S[_]: Functor] = MonadTrans[FreeT[S, *[_], *]]
 
     // checking absence of ambiguity
-    def functor[S[_]: Traverse, F[_]: Traverse: Applicative: BindRec] = Functor[FreeT[S, F, ?]]
-    def foldable[S[_]: Traverse, F[_]: Traverse: Applicative: BindRec] = Foldable[FreeT[S, F, ?]]
-    def monad[S[_]: Functor, F[_]: ApplicativePlus: BindRec] = Monad[FreeT[S, F, ?]]
-    def plus[S[_]: Functor, F[_]: ApplicativePlus: BindRec] = Plus[FreeT[S, F, ?]]
+    def functor[S[_]: Traverse, F[_]: Traverse: Applicative: BindRec] = Functor[FreeT[S, F, *]]
+    def foldable[S[_]: Traverse, F[_]: Traverse: Applicative: BindRec] = Foldable[FreeT[S, F, *]]
+    def monad[S[_]: Functor, F[_]: ApplicativePlus: BindRec] = Monad[FreeT[S, F, *]]
+    def plus[S[_]: Functor, F[_]: ApplicativePlus: BindRec] = Plus[FreeT[S, F, *]]
   }
 }

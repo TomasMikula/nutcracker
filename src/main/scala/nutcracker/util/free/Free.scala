@@ -28,8 +28,8 @@ final case class Free[F[_], A] private(unwrap: FreeBind[(Id :++: F)#Out, A]) ext
     }))
   }
 
-  def foldRun[S](s: S, f: λ[α => (S, F[α])] ~> (S, ?)): (S, A) =
-    unwrap.foldRun(s, λ[λ[α => (S, F1[α])] ~> (S, ?)]{
+  def foldRun[S](s: S, f: λ[α => (S, F[α])] ~> (S, *)): (S, A) =
+    unwrap.foldRun(s, λ[λ[α => (S, F1[α])] ~> (S, *)]{
       case (s, f1x) => f1x match {
         case Left(x) => (s, x)
         case Right(fx) => f((s, fx))
@@ -74,8 +74,8 @@ object Free extends FreeInstances {
 
 trait FreeInstances extends FreeInstances1 {
 
-  implicit def bindRecMonadInstance[F[_]]: Monad[Free[F, ?]] with BindRec[Free[F, ?]] =
-    new Monad[Free[F, ?]] with BindRec[Free[F, ?]] {
+  implicit def bindRecMonadInstance[F[_]]: Monad[Free[F, *]] with BindRec[Free[F, *]] =
+    new Monad[Free[F, *]] with BindRec[Free[F, *]] {
       def tailrecM[A, B](a: A)(f: A => Free[F, A \/ B]): Free[F, B] =
         f(a) flatMap {
           case -\/(a) => tailrecM(a)(f)
@@ -90,8 +90,8 @@ trait FreeInstances extends FreeInstances1 {
 
 trait FreeInstances1 {
 
-  implicit def traverseInstance[F[_]](implicit F: Traverse[F]): Traverse[Free[F, ?]] =
-    new Traverse[Free[F, ?]] {
+  implicit def traverseInstance[F[_]](implicit F: Traverse[F]): Traverse[Free[F, *]] =
+    new Traverse[Free[F, *]] {
       val impl = FreeBind.traverseInstance[(Id :++: F)#Out](coproductTraverse[Id, F])
       def traverseImpl[G[_], A, B](fa: Free[F, A])(f: A => G[B])(implicit G: Applicative[G]): G[Free[F, B]] =
         G.map(impl.traverse(fa.unwrap)(f))(Free.apply)

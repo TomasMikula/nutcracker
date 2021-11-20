@@ -24,7 +24,7 @@ trait ObjectSerializer[A, S, Ptr[_]] { self =>
 
   def pointer: ObjectSerializer[Ptr[A], S, Ptr]
 
-  final def free(a: A): FreeObjectOutput[S, Ptr, Unit] = serialize[FreeObjectOutput[S, Ptr, ?]](a)
+  final def free(a: A): FreeObjectOutput[S, Ptr, Unit] = serialize[FreeObjectOutput[S, Ptr, *]](a)
 
   def show(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
     decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
@@ -36,7 +36,7 @@ trait ObjectSerializer[A, S, Ptr[_]] { self =>
   }
 
   def shallowShow(implicit S: ShowK[Ptr], ev: S === String): Show[A] = new Show[A] {
-    override def shows(a: A): String = ev.subst[ObjectSerializer[A, ?, Ptr]](self).free(a).showShallow(S)
+    override def shows(a: A): String = ev.subst[ObjectSerializer[A, *, Ptr]](self).free(a).showShallow(S)
   }
 }
 

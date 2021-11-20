@@ -25,35 +25,35 @@ object Inject extends InjectInstances0 {
 }
 
 trait InjectInstances0 extends InjectInstances1 {
-  implicit def injectLeft[F[_], G[_]]: Inject[F, Coproduct[F, G, ?]] =
-    new Inject[F, Coproduct[F, G, ?]] {
+  implicit def injectLeft[F[_], G[_]]: Inject[F, Coproduct[F, G, *]] =
+    new Inject[F, Coproduct[F, G, *]] {
       def inj[A](fa: F[A]): Coproduct[F, G, A] = Coproduct(-\/(fa))
     }
 
-  implicit def injectRight[F[_], G[_]]: Inject[G, Coproduct[F, G, ?]] =
-    new Inject[G, Coproduct[F, G, ?]] {
+  implicit def injectRight[F[_], G[_]]: Inject[G, Coproduct[F, G, *]] =
+    new Inject[G, Coproduct[F, G, *]] {
       def inj[A](ga: G[A]): Coproduct[F, G, A] = Coproduct(\/-(ga))
     }
 }
 
 trait InjectInstances1 extends InjectInstances2 {
-  implicit def injectLeftRec[F[_], G[_], H[_]](implicit fg: Inject[F, G]): Inject[F, Coproduct[G, H, ?]] =
-    new Inject[F, Coproduct[G, H, ?]] {
+  implicit def injectLeftRec[F[_], G[_], H[_]](implicit fg: Inject[F, G]): Inject[F, Coproduct[G, H, *]] =
+    new Inject[F, Coproduct[G, H, *]] {
       def inj[A](fa: F[A]): Coproduct[G, H, A] = Coproduct(-\/(fg(fa)))
     }
 
-  implicit def injectRightRec[F[_], G[_], H[_]](implicit fh: Inject[F, H]): Inject[F, Coproduct[G, H, ?]] =
-    new Inject[F, Coproduct[G, H, ?]] {
+  implicit def injectRightRec[F[_], G[_], H[_]](implicit fh: Inject[F, H]): Inject[F, Coproduct[G, H, *]] =
+    new Inject[F, Coproduct[G, H, *]] {
       def inj[A](fa: F[A]): Coproduct[G, H, A] = Coproduct(\/-(fh(fa)))
     }
 }
 
 trait InjectInstances2 extends InjectInstances3 {
-  implicit def freeLift[F[_]]: Inject[F, Free[F, ?]] =
-    λ[Inject[F, Free[F, ?]]].inj(fa => Free.liftF(fa))
+  implicit def freeLift[F[_]]: Inject[F, Free[F, *]] =
+    λ[Inject[F, Free[F, *]]].inj(fa => Free.liftF(fa))
 
-  implicit def freeKLift[F[_[_], _]]: Inject[F[FreeK[F, ?], ?], FreeK[F, ?]] =
-    λ[Inject[F[FreeK[F, ?], ?], FreeK[F, ?]]].inj(fa => FreeK.liftF(fa))
+  implicit def freeKLift[F[_[_], _]]: Inject[F[FreeK[F, *], *], FreeK[F, *]] =
+    λ[Inject[F[FreeK[F, *], *], FreeK[F, *]]].inj(fa => FreeK.liftF(fa))
 }
 
 trait InjectInstances3 extends InjectInstances4 {
@@ -72,7 +72,7 @@ trait InjectInstances5 {
   implicit def injectCoproduct[F[_], G[_], H[_]](implicit
     injF: Inject[F, H],
     injG: Inject[G, H]
-  ): Inject[Coproduct[F, G, ?], H] = new Inject[Coproduct[F, G, ?], H] {
+  ): Inject[Coproduct[F, G, *], H] = new Inject[Coproduct[F, G, *], H] {
     def inj[A](ca: Coproduct[F, G, A]): H[A] = ca.run match {
       case -\/(fa) => injF.inj(fa)
       case \/-(ga) => injG.inj(ga)

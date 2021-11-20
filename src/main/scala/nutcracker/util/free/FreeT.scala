@@ -29,7 +29,7 @@ final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A
       case Right(fx) => f(fx)
     }))
 
-  def foldMapRec(tr: F ~> FreeT[F, M, ?])(implicit M: BindRec[M]): M[A] = {
+  def foldMapRec(tr: F ~> FreeT[F, M, *])(implicit M: BindRec[M]): M[A] = {
     @tailrec def toM[Z](fa: FreeBind[F1, Z]): M[FreeBind[F1, Z] \/ Z] = {
       fa.resume match {
         case \/-(f1z) => f1z match {
@@ -71,7 +71,7 @@ final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A
           case Left(ma) => M0.map(ma)(a => \/-(FreeT.point(a)))
           case Right(fa) => M1.point(\/.right(FreeT.liftF[F, M, A](fa)))
         },
-        λ[unwrap.Bound ~> Const[M[FreeT[F, M, A] \/ FreeT[F, M, A]], ?]] {
+        λ[unwrap.Bound ~> Const[M[FreeT[F, M, A] \/ FreeT[F, M, A]], *]] {
           case (mfz, f) => mfz match {
             case  Left(mz) => M0.map(mz)(z => -\/(FreeT(f(z))))
             case Right(fz) => M1.point(\/-(FreeT.liftBind(fz, f andThen FreeT.apply)))
@@ -99,17 +99,17 @@ object FreeT extends FreeTInstances {
   private[FreeT] def liftBind[F[_], M[_], Z, A](fz: F[Z], f: Z => FreeT[F, M, A]): FreeT[F, M, A] =
     liftF(fz).flatMap(f)
 
-  implicit def monadTransInstance[F[_]]: MonadTrans[FreeT[F, ?[_], ?]] =
-    new MonadTrans[FreeT[F, ?[_], ?]] {
+  implicit def monadTransInstance[F[_]]: MonadTrans[FreeT[F, *[_], *]] =
+    new MonadTrans[FreeT[F, *[_], *]] {
       def liftM[M[_], A](ma: M[A])(implicit M: Monad[M]): FreeT[F, M, A] = FreeT.liftM[F, M, A](ma)
-      implicit def apply[M[_]](implicit M: Monad[M]): Monad[FreeT[F, M, ?]] = monadBindRecInstance
+      implicit def apply[M[_]](implicit M: Monad[M]): Monad[FreeT[F, M, *]] = monadBindRecInstance
     }
 }
 
 private[free] trait FreeTInstances extends FreeTInstances1 {
 
-  implicit def monadPlusInstance[F[_], M[_]: ApplicativePlus: BindRec]: MonadPlus[FreeT[F, M, ?]] =
-    new MonadPlus[FreeT[F, M, ?]] {
+  implicit def monadPlusInstance[F[_], M[_]: ApplicativePlus: BindRec]: MonadPlus[FreeT[F, M, *]] =
+    new MonadPlus[FreeT[F, M, *]] {
       def point[A](a: => A): FreeT[F, M, A] = FreeT.point[F, M, A](a)
       def bind[A, B](fa: FreeT[F, M, A])(f: (A) => FreeT[F, M, B]): FreeT[F, M, B] = fa.flatMap(f)
       def empty[A]: FreeT[F, M, A] = FreeT.liftM[F, M, A](ApplicativePlus[M].empty[A])
@@ -121,8 +121,8 @@ private[free] trait FreeTInstances extends FreeTInstances1 {
 
 private[free] trait FreeTInstances1 extends FreeTInstances2 {
 
-  implicit def monadBindRecInstance[F[_], M[_]: Applicative]: Monad[FreeT[F, M, ?]] with BindRec[FreeT[F, M, ?]] =
-    new Monad[FreeT[F, M, ?]] with BindRec[FreeT[F, M, ?]] {
+  implicit def monadBindRecInstance[F[_], M[_]: Applicative]: Monad[FreeT[F, M, *]] with BindRec[FreeT[F, M, *]] =
+    new Monad[FreeT[F, M, *]] with BindRec[FreeT[F, M, *]] {
       def tailrecM[A, B](a: A)(f: A => FreeT[F, M, A \/ B]): FreeT[F, M, B] =
         f(a) flatMap {
           case -\/(a) => tailrecM(a)(f)
@@ -137,8 +137,8 @@ private[free] trait FreeTInstances1 extends FreeTInstances2 {
 
 private[free] trait FreeTInstances2 extends FreeTInstances3 {
 
-  implicit def traverseInstance[F[_] : Traverse, M[_] : Traverse]: Traverse[FreeT[F, M, ?]] =
-    new Traverse[FreeT[F, M, ?]] {
+  implicit def traverseInstance[F[_] : Traverse, M[_] : Traverse]: Traverse[FreeT[F, M, *]] =
+    new Traverse[FreeT[F, M, *]] {
       def traverseImpl[G[_], A, B](fa: FreeT[F, M, A])(f: A => G[B])(implicit G: Applicative[G]): G[FreeT[F, M, B]] =
         fa.traverse(f)
     }
@@ -146,8 +146,8 @@ private[free] trait FreeTInstances2 extends FreeTInstances3 {
 
 private[free] trait FreeTInstances3 extends FreeTInstances4 {
 
-  implicit def foldableInstance[F[_]: Foldable, M[_]: Foldable]: Foldable[FreeT[F, M, ?]] =
-    new Foldable[FreeT[F, M, ?]] with Foldable.FromFoldMap[FreeT[F, M, ?]] {
+  implicit def foldableInstance[F[_]: Foldable, M[_]: Foldable]: Foldable[FreeT[F, M, *]] =
+    new Foldable[FreeT[F, M, *]] with Foldable.FromFoldMap[FreeT[F, M, *]] {
       def foldMap[A, B](fa: FreeT[F, M, A])(f: A => B)(implicit B: Monoid[B]): B =
         fa.cata(f)
     }
@@ -155,8 +155,8 @@ private[free] trait FreeTInstances3 extends FreeTInstances4 {
 
 private[free] trait FreeTInstances4 {
 
-  implicit def plusInstance[F[_], M[_]: Plus: BindRec: Applicative]: Plus[FreeT[F, M, ?]] =
-    new Plus[FreeT[F, M, ?]] {
+  implicit def plusInstance[F[_], M[_]: Plus: BindRec: Applicative]: Plus[FreeT[F, M, *]] =
+    new Plus[FreeT[F, M, *]] {
       def plus[A](a: FreeT[F, M, A], b: => FreeT[F, M, A]): FreeT[F, M, A] =
         a plus b
     }

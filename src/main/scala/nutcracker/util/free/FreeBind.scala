@@ -18,7 +18,7 @@ sealed abstract class FreeBind[F[_], A] {
     FlatMap(this, f)
 
   @tailrec
-  final def handle[B](onLeaf: F[A] => B, onBind: Bound ~> Const[B, ?]): B =
+  final def handle[B](onLeaf: F[A] => B, onBind: Bound ~> Const[B, *]): B =
     this match {
       case LiftF(fa) => onLeaf(fa)
       case FlatMap(fz, f) => fz match {
@@ -28,11 +28,11 @@ sealed abstract class FreeBind[F[_], A] {
     }
 
   @tailrec
-  final def resume: APair[F, ? => FreeBind[F, A]] \/ F[A] =
+  final def resume: APair[F, * => FreeBind[F, A]] \/ F[A] =
     this match {
       case LiftF(fa) => \/-(fa)
       case fm @ FlatMap(fz, f) => fz match {
-        case LiftF(fz) => -\/(APair[F, ? => FreeBind[F, A], fm.Pivot](fz, f))
+        case LiftF(fz) => -\/(APair[F, * => FreeBind[F, A], fm.Pivot](fz, f))
         case FlatMap(fy, g) => (fy flatMap (y => g(y) flatMap f)).resume
       }
     }
@@ -40,7 +40,7 @@ sealed abstract class FreeBind[F[_], A] {
   def mapF[G[_]](f: F ~> G): FreeBind[G, A] =
     handle(
       fa => LiftF(f(fa)),
-      λ[Bound ~> Const[FreeBind[G, A], ?]] {
+      λ[Bound ~> Const[FreeBind[G, A], *]] {
         case (fz, g) => LiftF(f(fz)) flatMap (z => g(z).mapF[G](f))
       }
     )
@@ -48,7 +48,7 @@ sealed abstract class FreeBind[F[_], A] {
   def foldMap[M[_]](f: F ~> M)(implicit M: BindRec[M]): M[A] =
     M.tailrecM(this)(_.handle(
       fa => f(fa) map (\/.right),
-      λ[Bound ~> Const[M[FreeBind[F, A] \/ A], ?]] {
+      λ[Bound ~> Const[M[FreeBind[F, A] \/ A], *]] {
         case (fz, g) => f(fz) map { z => \/.left(g(z)) }
       }
     ))
@@ -76,7 +76,7 @@ sealed abstract class FreeBind[F[_], A] {
     M.tailrecM((s, this)) { case (s, fa) =>
       fa.handle(
         fa => f((s, fa)) map (\/.right),
-        λ[Bound ~> Const[M[(S, FreeBind[F, A]) \/ (S, A)], ?]] {
+        λ[Bound ~> Const[M[(S, FreeBind[F, A]) \/ (S, A)], *]] {
           case (fz, g) => f((s, fz)) map { case (s, z) => \/.left((s, g(z))) }
         }
       )
@@ -88,11 +88,11 @@ sealed abstract class FreeBind[F[_], A] {
     case class FlatMap[α, β](f: α => FreeBind[F, β]) extends Tr[α, β]
     def stateTr[α](tr: S => S): Tr[α, α] = StateTr(tr, implicitly)
 
-    type X0[β] = APair[FreeBind[F, ?], AList[Tr, ?, β]]
-    def X0[α, β](fα: FreeBind[F, α], l: AList[Tr, α, β]): X0[β] = APair[FreeBind[F, ?], AList[Tr, ?, β], α](fα, l)
+    type X0[β] = APair[FreeBind[F, *], AList[Tr, *, β]]
+    def X0[α, β](fα: FreeBind[F, α], l: AList[Tr, α, β]): X0[β] = APair[FreeBind[F, *], AList[Tr, *, β], α](fα, l)
 
     def applyTransitions[α, β](s: S, α: α, l: AList[Tr, α, β]): (S, X0[β]) \/ (S, β) =
-      l.foldLeftWhile[(S, ?), λ[α => (S, FreeBind[F, α])]]((s, α))(λ[λ[α => APair[(S, ?), Tr[?, α]]] ~> λ[α => (S, FreeBind[F, α]) \/ (S, α)]](p => {
+      l.foldLeftWhile[(S, *), λ[α => (S, FreeBind[F, α])]]((s, α))(λ[λ[α => APair[(S, *), Tr[*, α]]] ~> λ[α => (S, FreeBind[F, α]) \/ (S, α)]](p => {
         val ((s, x), tr) = (p._1, p._2)
         tr match {
           case StateTr(f, ev) => \/-((f(s), ev(x)))
@@ -101,20 +101,20 @@ sealed abstract class FreeBind[F[_], A] {
       })).leftMap(p => (p._1._1, X0(p._1._2, p._2)))
 
     type X = X0[A]
-    def X(fa: FreeBind[F, A]): X = APair[FreeBind[F, ?], AList[Tr, ?, A], A](fa, AList.empty[Tr, A])
+    def X(fa: FreeBind[F, A]): X = APair[FreeBind[F, *], AList[Tr, *, A], A](fa, AList.empty[Tr, A])
 
     M.tailrecM[(S, X), (S, A)]((s, X(this))) { case (s, x) =>
       x._1.resume match {
         case \/-(fa) => f((s, fa)) map {
-          case -\/((s, fa, pop)) => -\/((s, APair[FreeBind[F, ?], AList[Tr, ?, A], x.A](fa, stateTr[x.A](pop) +: x._2)))
+          case -\/((s, fa, pop)) => -\/((s, APair[FreeBind[F, *], AList[Tr, *, A], x.A](fa, stateTr[x.A](pop) +: x._2)))
           case \/-((s, a)) => x._2.uncons match {
             case ANone(ev) => \/-((s, ev(a)))
             case ASome(l) => applyTransitions(s, a, l.toList)
           }
         }
         case -\/(p) => f((s, p._1)) map {
-          case -\/((s, fz, pop)) => -\/((s, APair[FreeBind[F, ?], AList[Tr, ?, A], p.A](fz, stateTr[p.A](pop) +: FlatMap[p.A, x.A](p._2) +: x._2)))
-          case \/-((s, z)) => -\/((s, APair[FreeBind[F, ?], AList[Tr, ?, A], x.A](p._2(z), x._2)))
+          case -\/((s, fz, pop)) => -\/((s, APair[FreeBind[F, *], AList[Tr, *, A], p.A](fz, stateTr[p.A](pop) +: FlatMap[p.A, x.A](p._2) +: x._2)))
+          case \/-((s, z)) => -\/((s, APair[FreeBind[F, *], AList[Tr, *, A], x.A](p._2(z), x._2)))
         }
       }
     }
@@ -134,7 +134,7 @@ sealed abstract class FreeBind[F[_], A] {
   }
 
   /** foldRunM specialized for `Id` */
-  @tailrec final def foldRun[S](s: S, f: λ[α => (S, F[α])] ~> (S, ?)): (S, A) =
+  @tailrec final def foldRun[S](s: S, f: λ[α => (S, F[α])] ~> (S, *)): (S, A) =
     this match {
       case LiftF(fa) => f((s, fa))
       case FlatMap(fz, h) => fz match {
@@ -216,7 +216,7 @@ trait FreeBindInstances extends FreeBindInstances1 {
   implicit val monadTransInstance: MonadTrans[FreeBind] = new MonadTrans[FreeBind] {
     def liftM[G[_], A](ga: G[A])(implicit G: Monad[G]): FreeBind[G, A] = FreeBind.liftF(ga)
 
-    implicit def apply[G[_]](implicit G: Monad[G]): Monad[FreeBind[G, ?]] = new Monad[FreeBind[G, ?]] {
+    implicit def apply[G[_]](implicit G: Monad[G]): Monad[FreeBind[G, *]] = new Monad[FreeBind[G, *]] {
       def point[A](a: => A): FreeBind[G, A] = FreeBind.liftF(G.point(a))
       def bind[A, B](fa: FreeBind[G, A])(f: A => FreeBind[G, B]): FreeBind[G, B] = fa.flatMap(f)
     }
@@ -224,8 +224,8 @@ trait FreeBindInstances extends FreeBindInstances1 {
 }
 
 trait FreeBindInstances1 {
-  implicit def traverseInstance[F[_]: Traverse]: Traverse[FreeBind[F, ?]] =
-    new Traverse[FreeBind[F, ?]] {
+  implicit def traverseInstance[F[_]: Traverse]: Traverse[FreeBind[F, *]] =
+    new Traverse[FreeBind[F, *]] {
       def traverseImpl[G[_], A, B](fa: FreeBind[F, A])(f: A => G[B])(implicit G: Applicative[G]): G[FreeBind[F, B]] =
         fa.traverse(f)
     }

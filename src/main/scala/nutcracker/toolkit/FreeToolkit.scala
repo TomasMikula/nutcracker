@@ -21,12 +21,12 @@ trait FreeToolkit extends Toolkit {
 
   override def empty: State = emptyK[Prg]
 
-  val stepInterpreter: StateInterpreter[Prg, Lang[Prg, ?], State]
+  val stepInterpreter: StateInterpreter[Prg, Lang[Prg, *], State]
 
-  lazy val interpreter: Prg ~> StateT[Id, State, ?] = {
-    val freeInterpreter = stepInterpreter.free[WriterState[TwoLevel[Lst, Prg[Unit]], State, ?], TwoLevel[Lst, Prg[Unit]]](WriterStateT.monadTellStateInstance[Id, TwoLevel[Lst, Prg[Unit]], State], TwoLevel.stratifiedMonoidAggregator[Lst, Prg[Unit]], WriterStateT.bindRec[Id, TwoLevel[Lst, Prg[Unit]], State], implicitly, implicitly)
-    val freeKInterpreter = λ[Prg ~> WriterState[TwoLevel[Lst, Prg[Unit]], State, ?]](pa => freeInterpreter(pa.unwrap))
-    WriterStateT.recurse[Prg, Id, TwoLevel[Lst, ?], Prg[Unit], State](freeKInterpreter)(identity[Prg[Unit]])
+  lazy val interpreter: Prg ~> StateT[Id, State, *] = {
+    val freeInterpreter = stepInterpreter.free[WriterState[TwoLevel[Lst, Prg[Unit]], State, *], TwoLevel[Lst, Prg[Unit]]](WriterStateT.monadTellStateInstance[Id, TwoLevel[Lst, Prg[Unit]], State], TwoLevel.stratifiedMonoidAggregator[Lst, Prg[Unit]], WriterStateT.bindRec[Id, TwoLevel[Lst, Prg[Unit]], State], implicitly, implicitly)
+    val freeKInterpreter = λ[Prg ~> WriterState[TwoLevel[Lst, Prg[Unit]], State, *]](pa => freeInterpreter(pa.unwrap))
+    WriterStateT.recurse[Prg, Id, TwoLevel[Lst, *], Prg[Unit], State](freeKInterpreter)(identity[Prg[Unit]])
   }
 
   def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p).run(s)
@@ -39,10 +39,10 @@ trait FreeRefToolkit extends FreeToolkit with RefToolkit {
   type Var[A] = VarK[Prg, A]
   type Val[A] = ValK[Prg, A]
 
-  def varOrderK[K[_]]: HOrderK[VarK[K, ?]]
-  def varShowK[K[_]]:  ShowK[VarK[K, ?]]
-  def valOrderK[K[_]]: HOrderK[ValK[K, ?]]
-  def valShowK[K[_]]:  ShowK[ValK[K, ?]]
+  def varOrderK[K[_]]: HOrderK[VarK[K, *]]
+  def varShowK[K[_]]:  ShowK[VarK[K, *]]
+  def valOrderK[K[_]]: HOrderK[ValK[K, *]]
+  def valShowK[K[_]]:  ShowK[ValK[K, *]]
 
   implicit def varOrder: HOrderK[Var] = varOrderK[Prg]
   implicit def varShow:  ShowK[Var]   = varShowK[Prg]
