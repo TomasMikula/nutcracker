@@ -8,9 +8,6 @@ scalaVersion := "2.12.10"
 
 autoCompilerPlugins := true
 addCompilerPlugin("org.typelevel" % "kind-projector" % "0.11.0" cross CrossVersion.full)
-addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.17")
-
-scalastyleFailOnError := true
 
 scalacOptions ++= Seq(
   "-language:higherKinds",

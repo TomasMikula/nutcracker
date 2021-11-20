@@ -3,8 +3,8 @@ package nutcracker.util
 import nutcracker.util.free.Free
 import scalaz.{-\/, Coproduct, \/-, ~>}
 
-/** Similar to [[scalaz.Inject]], except:
-  *  - not sealed, thus not restricted to injections into  [[scalaz.Coproduct]];
+/** Similar to `scalaz.Inject`, except:
+  *  - not sealed, thus not restricted to injections into  `scalaz.Coproduct`;
   *  - doesn't require to implement projection, so more instances are possible.
   */
 trait Inject[F[_], G[_]] extends (F ~> G) { self =>
