@@ -7,7 +7,7 @@ organization := "com.github.tomasmikula"
 scalaVersion := "2.12.10"
 
 autoCompilerPlugins := true
-addCompilerPlugin("org.typelevel" % "kind-projector" % "0.11.0" cross CrossVersion.full)
+addCompilerPlugin("org.typelevel" % "kind-projector" % "0.11.3" cross CrossVersion.full)
 
 scalacOptions ++= Seq(
   "-language:higherKinds",
@@ -17,7 +17,7 @@ scalacOptions ++= Seq(
   "-unchecked",
   "-deprecation",
   "-feature",
-  "-Xfatal-warnings",
+  //"-Xfatal-warnings",
   "-Yno-adapted-args",
   "-Ypartial-unification",
   "-Ywarn-numeric-widen",
