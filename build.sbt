@@ -4,10 +4,10 @@ version := "0.2-SNAPSHOT"
 
 organization := "com.github.tomasmikula"
 
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.10"
 
 autoCompilerPlugins := true
-addCompilerPlugin("org.spire-math" % "kind-projector" % "0.9.5" cross CrossVersion.binary)
+addCompilerPlugin("org.typelevel" % "kind-projector" % "0.11.0" cross CrossVersion.full)
 addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.17")
 
 scalastyleFailOnError := true
@@ -31,7 +31,7 @@ scalacOptions ++= Seq(
 
 testFrameworks += new TestFramework("scalaprops.ScalapropsFramework")
 
-parallelExecution in Test := false // currently, ScalaProps does not support parallel execution
+Test / parallelExecution := false // currently, ScalaProps does not support parallel execution
 
 libraryDependencies ++= Seq(
   "org.typelevel" %% "algebra" % "0.6.0",
