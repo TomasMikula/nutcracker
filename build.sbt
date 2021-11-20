@@ -1,13 +1,11 @@
 name := "nutcracker"
 
-version := "0.2-SNAPSHOT"
-
 organization := "com.github.tomasmikula"
 
-scalaVersion := "2.12.10"
+scalaVersion := "2.12.15"
 
 autoCompilerPlugins := true
-addCompilerPlugin("org.typelevel" % "kind-projector" % "0.11.3" cross CrossVersion.full)
+addCompilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
 
 scalacOptions ++= Seq(
   "-language:higherKinds",
@@ -48,8 +46,6 @@ fork := true
  *** Publishing ***
  ******************/
 
-publishMavenStyle := true
-
 publishTo := {
   val nexus = "https://oss.sonatype.org/"
   if (isSnapshot.value)
@@ -77,3 +73,20 @@ pomExtra := (
       <name>Tomas Mikula</name>
     </developer>
   </developers>)
+
+import ReleaseTransformations._
+
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,
+  inquireVersions,
+  runClean,
+  runTest,
+  setReleaseVersion,
+  commitReleaseVersion,
+  tagRelease,
+  releaseStepCommand("publishSigned"),
+  releaseStepCommand("sonatypeRelease"),
+  setNextVersion,
+  commitNextVersion,
+  //pushChanges,
+)
