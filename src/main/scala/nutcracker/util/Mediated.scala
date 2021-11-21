@@ -49,12 +49,12 @@ final class Mediated[M[_], A, B, C](private val value: M[(A, B => M[C])]) extend
     *
     * Don't confuse with [[Mediated.Cps]], which is unrelated.
     */
-  def cps(implicit M: Bind[M]): IndexedContT[M, C, B, A] =
+  def cps(implicit M: Bind[M]): IndexedContT[C, B, M, A] =
     IndexedContT((k: A => M[B]) => completeM(k))
 }
 
 object Mediated {
-  type Cps[F[_], A, B, C] = Mediated[ContT[F, Unit, *], A, B, C]
+  type Cps[F[_], A, B, C] = Mediated[ContT[Unit, F, *], A, B, C]
 
   def apply[M[_], A, B, C](value: M[(A, B => M[C])]): Mediated[M, A, B, C] =
     new Mediated[M, A, B, C](value)

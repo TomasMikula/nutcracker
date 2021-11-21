@@ -4,13 +4,13 @@ import nutcracker.data.bool.Bool._
 import nutcracker.data.bool._
 import nutcracker.ops._
 import nutcracker.util.ops.applicative._
-import org.scalatest.FunSpec
+import org.scalatest.funspec.AnyFunSpec
 import scalaz.Traverse
 import scalaz.std.anyVal._
 import scalaz.std.vector._
 import scalaz.syntax.monad._
 
-class Sat extends FunSpec {
+class Sat extends AnyFunSpec {
   import nutcracker.toolkit.PropBranchToolkit.instance._
   import nutcracker.toolkit.PropBranchToolkit.instance.branchingApi.{propagation => _, _}
   import nutcracker.data.Promises._

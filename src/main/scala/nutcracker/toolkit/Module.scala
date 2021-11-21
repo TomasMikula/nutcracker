@@ -74,7 +74,7 @@ class ListModule[Lang0[_[_], _], State0[_[_]]](base: PersistentStateModule.Aux[L
   type Lang[K[_], A] = Lang0[K, A]
   type StateK[K[_]] = NonEmptyList[State0[K]]
 
-  override def emptyK[K[_]] =
+  override def emptyK[K[_]]: StateK[K] =
     NonEmptyList(base.emptyK[K])
 
   override implicit def stashRestore[K[_]]: StashRestore[StateK[K]] =

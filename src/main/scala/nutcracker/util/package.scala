@@ -18,7 +18,7 @@ package object util {
   type ≈~>[F[_[_], _], G[_[_], _]] = `FunctionK{(* -> *) -> * -> *}`[F, G]
 
   /** Continuation monad with result type `M[Unit]`. */
-  type ContU[M[_], A] = ContT[M, Unit, A]
+  type ContU[M[_], A] = ContT[Unit, M, A]
   object ContU {
     def apply[F[_], A](f: (A => F[Unit]) => F[Unit]): ContU[F, A] =
       ContT(f)

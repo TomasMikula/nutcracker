@@ -2,8 +2,7 @@ package nutcracker.toolkit
 
 import nutcracker.Splittable
 import nutcracker.util.{FreeK, Inject}
-import scalaz.Leibniz
-import scalaz.Leibniz.===
+import scalaz.{Leibniz, ===}
 
 sealed abstract class BranchLang[Ref[_], K[_], A] {
   import BranchLang._

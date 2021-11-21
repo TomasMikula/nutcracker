@@ -1,8 +1,7 @@
 package nutcracker.util.ops
 
 import scala.language.implicitConversions
-import scalaz.Applicative
-import scalaz.Leibniz.===
+import scalaz.{Applicative, ===}
 
 object iterable extends ToIterableOps
 

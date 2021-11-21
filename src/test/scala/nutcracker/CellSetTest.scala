@@ -2,13 +2,13 @@ package nutcracker
 
 import nutcracker.data.{CellSet, Promise, Promises}
 import nutcracker.toolkit.PropagationToolkit
-import org.scalatest.FunSuite
-import org.scalatest.Matchers._
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
 import scala.collection.mutable
 import scalaz.std.anyVal._
 import scalaz.syntax.monad._
 
-class CellSetTest extends FunSuite {
+class CellSetTest extends AnyFunSuite {
   val Prop = PropagationToolkit.instance
   import Prop._
 

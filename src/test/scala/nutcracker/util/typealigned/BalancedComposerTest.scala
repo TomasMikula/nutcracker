@@ -1,11 +1,11 @@
 package nutcracker.util.typealigned
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import scalaz.std.function._
 import scalaz.std.string._
 
-class BalancedComposerTest extends FunSuite {
+class BalancedComposerTest extends AnyFunSuite {
 
   test("post-compose stack safety") {
     val composer = BalancedPostComposer[* => *, Int, Int](i => i)

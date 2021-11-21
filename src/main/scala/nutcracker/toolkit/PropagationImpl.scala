@@ -373,9 +373,8 @@ private[nutcracker] object SimpleCellId {
       CellId.order(fa, fb)
   }
 
-  implicit def showInstance[K[_], D]: Show[SimpleCellId[K, D]] = new Show[SimpleCellId[K, D]] {
-    override def shows(ref: SimpleCellId[K, D]): String = s"ref${ref.domainId}"
-  }
+  implicit def showInstance[K[_], D]: Show[SimpleCellId[K, D]] =
+    Show.shows[SimpleCellId[K, D]](ref => s"ref${ref.domainId}")
 
   implicit def showKInstance[K[_]]: ShowK[SimpleCellId[K, *]] = new ShowK[SimpleCellId[K, *]] {
     def shows[A](ref: SimpleCellId[K, A]): String = s"cell${ref.domainId}"

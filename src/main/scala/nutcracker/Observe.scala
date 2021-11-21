@@ -1,8 +1,7 @@
 package nutcracker
 
 import nutcracker.util.ContU
-import scalaz.Leibniz.===
-import scalaz.{Bind, Functor, IndexedContT, Leibniz}
+import scalaz.{Bind, Functor, IndexedContT, Leibniz, ===}
 import scalaz.syntax.functor._
 import scalaz.syntax.bind0._
 
@@ -135,7 +134,7 @@ trait Observable[M[_], A] extends Observers[M] { self =>
     }
   }
 
-  def asCont(implicit fin: Final[A], dom: Dom[A]): IndexedContT[M, Subscription[M], Unit, fin.Out] =
+  def asCont(implicit fin: Final[A], dom: Dom[A]): IndexedContT[Subscription[M], Unit, M, fin.Out] =
     IndexedContT { whenFinal.exec(_) }
 
   def whenFinal(implicit fin: Final[A], dom: Dom[A]): WhenFinalSyntaxHelper[fin.Out] =
@@ -170,7 +169,7 @@ trait RelObservable[F[_], A] {
     }
   }
 
-  def asCont[M[_]](implicit fin: Final[A], da: Dom[A], F: ObserveVal[M, F], M: Functor[M]): IndexedContT[M, Subscription[M], Unit, fin.Out] =
+  def asCont[M[_]](implicit fin: Final[A], da: Dom[A], F: ObserveVal[M, F], M: Functor[M]): IndexedContT[Subscription[M], Unit, M, fin.Out] =
     apply[M].asCont
 }
 

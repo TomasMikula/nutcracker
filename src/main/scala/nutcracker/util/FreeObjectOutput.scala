@@ -4,8 +4,7 @@ import nutcracker.util.free.Free
 import nutcracker.util.ops.toFoldableOps
 
 import scala.annotation.tailrec
-import scalaz.{-\/, Applicative, BindRec, Foldable, Monoid, Writer, \/, \/-, ~>}
-import scalaz.Leibniz.===
+import scalaz.{-\/, Applicative, BindRec, Foldable, Monoid, Writer, \/, \/-, ~>, ===}
 import scalaz.syntax.monad._
 
 final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private val unwrap: Free[FreeObjectOutput.OutputInst[R, Ptr, *], A]) /* extends AnyVal // can't have nested AnyVals :( */ {
@@ -273,7 +272,7 @@ object FreeObjectOutput {
   final case class Tree[R](lst: Lst[R \/ Tree[R]]) { // extends AnyVal { // https://issues.scala-lang.org/browse/SI-9600
     def ++(that: Tree[R]): Tree[R] = Tree(this.lst ++ that.lst)
     def :+(r: R): Tree[R] = Tree(lst :+ -\/(r))
-    def +:(r: R): Tree[R] = Tree(-\/(r) +: lst)
+    def +:(r: R): Tree[R] = Tree(-\/[R, Tree[R]](r) +: lst)
 
     def foldLeft[B](z: B)(f: (B, R) => B): B = {
       @tailrec def go(z: B, lst: Lst[R \/ Tree[R]]): B = lst.uncons match {

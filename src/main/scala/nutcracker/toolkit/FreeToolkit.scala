@@ -23,7 +23,7 @@ trait FreeToolkit extends Toolkit {
 
   val stepInterpreter: StateInterpreter[Prg, Lang[Prg, *], State]
 
-  lazy val interpreter: Prg ~> StateT[Id, State, *] = {
+  lazy val interpreter: Prg ~> StateT[State, Id, *] = {
     val freeInterpreter = stepInterpreter.free[WriterState[TwoLevel[Lst, Prg[Unit]], State, *], TwoLevel[Lst, Prg[Unit]]](WriterStateT.monadTellStateInstance[Id, TwoLevel[Lst, Prg[Unit]], State], TwoLevel.stratifiedMonoidAggregator[Lst, Prg[Unit]], WriterStateT.bindRec[Id, TwoLevel[Lst, Prg[Unit]], State], implicitly, implicitly)
     val freeKInterpreter = λ[Prg ~> WriterState[TwoLevel[Lst, Prg[Unit]], State, *]](pa => freeInterpreter(pa.unwrap))
     WriterStateT.recurse[Prg, Id, TwoLevel[Lst, *], Prg[Unit], State](freeKInterpreter)(identity[Prg[Unit]])

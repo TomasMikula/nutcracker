@@ -1,7 +1,6 @@
 package nutcracker.util.typealigned
 
-import scalaz.Leibniz
-import scalaz.Leibniz.===
+import scalaz.{Leibniz, ===}
 
 /** Similar to `Option[F[A, B]]`, but the empty case witnesses type equality
   * between `A` and `B`.

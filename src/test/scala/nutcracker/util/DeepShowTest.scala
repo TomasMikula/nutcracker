@@ -1,13 +1,13 @@
 package nutcracker.util
 
 import nutcracker.util.FreeObjectOutput.Decoration
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import scalaz.{NaturalTransformation, ~>}
 import scalaz.Id.Id
 import scalaz.syntax.monad._
 
-class DeepShowTest extends FunSuite {
+class DeepShowTest extends AnyFunSuite {
 
   val idShowK: ShowK[Id] = new ShowK[Id] {
     def shows[A](fa: Id[A]): String = System.identityHashCode(fa).formatted("%x")

@@ -6,13 +6,13 @@ import nutcracker.util.algebraic.NonDecreasingMonoid
 import nutcracker.data.DecSet._
 import nutcracker.data.Promise
 import nutcracker.toolkit.PropBranchCostToolkit
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 import scala.annotation.tailrec
 import scalaz.Id._
 import scalaz.{Equal, Ordering, StreamT}
 import scalaz.syntax.monad._
 
-class PathSearch extends FunSuite {
+class PathSearch extends AnyFunSuite {
 
   implicit val positiveIntMonoid: NonDecreasingMonoid[Int] = new NonDecreasingMonoid[Int] {
     def zero: Int = 0

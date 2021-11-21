@@ -58,7 +58,7 @@ final case class FinalValOps[M[_], Var[_], Val[_], D, U, Δ, A](ref: Val[D])(imp
   def whenFinal0_(f: D => M[Unit])(implicit M: Functor[M]): M[Unit] =
     whenFinal0(f).void
 
-  def asCont: IndexedContT[M, Subscription[M], Unit, A] =
+  def asCont: IndexedContT[Subscription[M], Unit, M, A] =
     IndexedContT { whenFinal(_) }
 
   def asCont_(implicit M: Functor[M]): ContU[M, A] =

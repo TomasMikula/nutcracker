@@ -3,9 +3,8 @@ package nutcracker.toolkit
 import nutcracker.util.{KMap, Lst, ∃}
 import nutcracker.{IDom, SeqHandler, SeqPreHandler, SeqTrigger, Subscription}
 import scala.annotation.tailrec
-import scalaz.Leibniz.===
 import scalaz.syntax.equal._
-import scalaz.{Equal, Leibniz, \/, ~>}
+import scalaz.{Equal, Leibniz, \/, ~>, ===}
 
 
 private[nutcracker] sealed abstract class Cell[K[_], D] {

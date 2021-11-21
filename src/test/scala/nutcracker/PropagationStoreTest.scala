@@ -6,13 +6,13 @@ import nutcracker.data.listLog._
 import nutcracker.ops._
 import nutcracker.toolkit.{CellCycle, FinalizerId, ObserverId, PropagationStore, Token}
 import nutcracker.util.Lst
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 import scala.annotation.tailrec
 import scalaz.Monad
 import scalaz.std.anyVal._
 import scalaz.syntax.monad._
 
-class PropagationTest extends FunSuite {
+class PropagationTest extends AnyFunSuite {
   import nutcracker.toolkit.PropBranchToolkit.instance._
 
   val P = propagationApi
@@ -64,7 +64,7 @@ class PropagationTest extends FunSuite {
   }
 }
 
-class PropagationStoreTest extends FunSuite {
+class PropagationStoreTest extends AnyFunSuite {
   import scalaz.syntax.traverse._
 
   case class Prg[A](run: PropagationStore[Prg] => (PropagationStore[Prg], A))
@@ -200,7 +200,7 @@ class PropagationStoreTest extends FunSuite {
   }
 }
 
-class OnDemandPropagationTest extends FunSuite {
+class OnDemandPropagationTest extends AnyFunSuite {
   import nutcracker.toolkit.OnDemandPropagationToolkit.instance._
 
   private val P = propagationApi

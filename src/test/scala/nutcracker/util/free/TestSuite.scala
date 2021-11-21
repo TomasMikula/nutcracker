@@ -1,10 +1,10 @@
 package nutcracker.util.free
 
 import org.scalacheck.{Prop, Properties}
-import org.scalatest.FunSuite
-import org.scalatest.prop.Checkers
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatestplus.scalacheck.Checkers
 
-trait TestSuite extends FunSuite with Checkers {
+trait TestSuite extends AnyFunSuite with Checkers {
 
   private var context: String = ""
 

@@ -2,14 +2,15 @@ package nutcracker.demo
 
 import nutcracker.Pattern
 import nutcracker.Rel.Rel2
-import org.scalatest.{FunSpec, Matchers}
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers._
 import scalaz.{NonEmptyList, Order}
 import scalaz.std.anyVal._
 import scalaz.std.string._
 import scalaz.syntax.monad._
 import shapeless.{::, HNil}
 
-class SimpleForwardInference extends FunSpec with Matchers {
+class SimpleForwardInference extends AnyFunSpec {
   import nutcracker.toolkit.PropRelToolkit.{instance => tk}
   import tk._
   import relationsApi._

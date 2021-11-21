@@ -2,12 +2,12 @@ package nutcracker.util
 
 import scala.language.existentials
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 import shapeless.Nat._
 import shapeless.test.illTyped
 import shapeless.{HList, HNil, ::}
 
-class HListPtrTest extends FunSuite {
+class HListPtrTest extends AnyFunSuite {
 
   type Pointer[L <: HList, A] = nutcracker.util.HListPtr.Aux[L, _, A]
 

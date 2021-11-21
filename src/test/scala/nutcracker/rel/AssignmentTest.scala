@@ -1,11 +1,12 @@
 package nutcracker.rel
 
 import nutcracker.Assignment
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers._
 import shapeless.{::, HNil}
 import shapeless.nat._
 
-class AssignmentTest extends FlatSpec with Matchers {
+class AssignmentTest extends AnyFlatSpec {
 
   type ISB = Int :: String :: Boolean :: HNil
 

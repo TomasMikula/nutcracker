@@ -5,7 +5,7 @@ import nutcracker.data.bool.Bool._
 import nutcracker.data.bool._
 import nutcracker.ops._
 import nutcracker.toolkit.PropBranchToolkit
-import org.scalatest.FreeSpec
+import org.scalatest.freespec.AnyFreeSpec
 import scalaz.std.anyVal._
 import scalaz.syntax.monad._
 
@@ -17,7 +17,7 @@ import scalaz.syntax.monad._
 // groups of inhabitants. Usually the aim is for the visitor to deduce
 // the inhabitants' type from their statements.
 
-class KnightsAndKnaves extends FreeSpec {
+class KnightsAndKnaves extends AnyFreeSpec {
   val tk = PropBranchToolkit.instance
   import tk._
   import tk.branchingApi.{propagation => _, _}

@@ -77,7 +77,7 @@ object CellSet {
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
     */
-  def forEach[F[_], Var[_], Val[_], A](set: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], F: Applicative[F]): IndexedContT[F, Subscription[F], Unit, Var[A]] = {
+  def forEach[F[_], Var[_], Val[_], A](set: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], F: Applicative[F]): IndexedContT[Subscription[F], Unit, F, Var[A]] = {
     import scalaz.syntax.traverse._
     IndexedContT(f => set.observe.by(as => {
       val now = as.toList.traverse_(f)

@@ -29,14 +29,14 @@ testFrameworks += new TestFramework("scalaprops.ScalapropsFramework")
 Test / parallelExecution := false // currently, ScalaProps does not support parallel execution
 
 libraryDependencies ++= Seq(
-  "org.typelevel" %% "algebra" % "0.6.0",
-  "org.scalaz" %% "scalaz-core" % "7.3.0-M18",
-  "com.chuusai" %% "shapeless" % "2.3.2",
-  "com.github.scalaprops" %% "scalaprops" % "0.5.2",
+  "org.typelevel" %% "algebra" % "2.2.3",
+  "org.scalaz" %% "scalaz-core" % "7.3.5",
+  "com.chuusai" %% "shapeless" % "2.3.7",
+  "com.github.scalaprops" %% "scalaprops" % "0.8.3",
 
-  "org.scalatest" %% "scalatest" % "3.0.4" % "test",
-  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.0-M18" % "test",
-  "org.scalacheck" %% "scalacheck" % "1.13.4" % "test"
+  "org.scalatest" %% "scalatest" % "3.2.10" % "test",
+  "org.scalatestplus" %% "scalacheck-1-15" % "3.2.10.0" % "test",
+  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.5" % "test",
 )
 
 fork := true

@@ -3,7 +3,6 @@ package nutcracker.util.algebraic.laws
 import scalaprops.{Check, Gen, Properties}
 import scalaprops.Property.forAll
 import scalaz.{Equal, Monoid}
-import scalaz.std.string._
 import scalaz.syntax.equal._
 import scalaz.syntax.semigroup.ToSemigroupOps
 

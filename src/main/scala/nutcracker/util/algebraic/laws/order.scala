@@ -3,7 +3,6 @@ package nutcracker.util.algebraic.laws
 import scalaprops.{Check, Gen, Properties}
 import scalaprops.Property.forAll
 import scalaz.Order
-import scalaz.std.string._
 import scalaz.syntax.order.ToOrderOps
 
 object order {

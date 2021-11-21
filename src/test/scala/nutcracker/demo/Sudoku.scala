@@ -4,11 +4,11 @@ import nutcracker.data.DecSet
 import nutcracker.data.DecSet._
 import nutcracker.ops._
 import nutcracker.util.ops._
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 import scalaz.std.anyVal._
 import scalaz.syntax.monad._
 
-class Sudoku extends FunSuite {
+class Sudoku extends AnyFunSuite {
   import nutcracker.toolkit.PropBranchToolkit.instance._
   import nutcracker.data.Promises._
 

@@ -56,7 +56,7 @@ final case class Free[F[_], A] private(unwrap: FreeBind[(Id :++: F)#Out, A]) ext
         case Left(x) => M1.point(\/.right((S2.zero, x)))
         case Right(fx) => M0.map(f((s1, fx))) {
           case -\/((s1, fx, tr)) => -\/((s1, fx.unwrap, tr))
-          case s2x @ \/-((s2, x)) => s2x
+          case s2x @ \/-((s2, x)) => s2x.coerceLeft
         }
       }
     })

@@ -29,7 +29,7 @@ trait BranchingToolkit extends RefToolkit with StashToolkit {
   def solveDfsAll1[D](p: Prg[Val[D]])(implicit fin: Final[D]): (List[fin.Out], Int) =
     toList(solveDfs1(p)).run.swap
 
-  private implicit val mt: MonadTell[Writer[Int, *], Int] = WriterT.writerTMonadListen[Id, Int]
+  private implicit val mt: MonadTell[Writer[Int, *], Int] = WriterT.writerTMonadListen[Int, Id]
 
   private def solveDfsM[M[_], A, B](p: Prg[A], f: (A, State) => Option[B])(implicit M0: BindRec[M], M1: MonadTell[M, Int]): StreamT[M, B] = {
     val (s, a) = interpret(p, empty)

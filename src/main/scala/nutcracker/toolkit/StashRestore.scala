@@ -11,7 +11,7 @@ trait StashRestore[S] {
 object StashRestore {
   implicit def nelInstance[A]: StashRestore[NonEmptyList[A]] = new StashRestore[NonEmptyList[A]] {
     def stash(s: NonEmptyList[A]) = s.head <:: s
-    def restore(s: NonEmptyList[A]) = s.tail.toNel.get
+    def restore(s: NonEmptyList[A]) = s.tail.toNel.getOrElse { throw new IllegalStateException("Bottom of the stack, nothing to restore.") }
   }
 
   implicit def kPairInstance[F[_[_]], G[_[_]], A[_]](implicit F: StashRestore[F[A]], G: StashRestore[G[A]]): StashRestore[KPair[F, G, A]] =

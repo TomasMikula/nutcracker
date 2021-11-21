@@ -3,8 +3,7 @@ package nutcracker.util.ops
 import scala.annotation.tailrec
 import scala.collection.mutable.{Map => MMap}
 import scala.language.implicitConversions
-import scalaz.Leibniz.===
-import scalaz.{Applicative, Semigroup}
+import scalaz.{Applicative, Semigroup, ===}
 
 object iterator extends ToIteratorOps
 

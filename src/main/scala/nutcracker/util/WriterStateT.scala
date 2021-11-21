@@ -20,7 +20,7 @@ final case class WriterStateT[W, S, F[_], A](run: S => F[(W, S, A)]) extends Any
   def runRec(s: S)(f: W => Option[(WriterStateT[W, S, F, Unit], W)])(implicit F0: BindRec[F], F1: Applicative[F], W: Monoid[W]): F[(S, A)] =
     F0.bind(run(s)) { case (w, s, a) => F0.map(unfold(w, f)(s))((_, a)) }
 
-  def recurse(f: W => Option[(WriterStateT[W, S, F, Unit], W)])(implicit F0: BindRec[F], F1: Monad[F], W: Monoid[W]): StateT[F, S, A] =
+  def recurse(f: W => Option[(WriterStateT[W, S, F, Unit], W)])(implicit F0: BindRec[F], F1: Monad[F], W: Monoid[W]): StateT[S, F, A] =
     StateT(s => runRec(s)(f))
 
   def zoomOut[T](implicit l: Lens[T, S], F: Functor[F]): WriterStateT[W, T, F, A] =
@@ -43,8 +43,8 @@ object WriterStateT extends WriterStateTInstances {
   def unfold[F[_], G[_], W0, S](gw: G[W0], f: W0 => WriterStateT[G[W0], S, F, Unit])(s: S)(implicit F0: BindRec[F], F1: Applicative[F], G: Catenable[G]): F[S] =
     unfold[F, G[W0], S](gw, gw => G.uncons(gw).map({ case (w0, gw) => (f(w0), gw) }))(s)(F0, F1, G.monoid[W0])
 
-  def recurse[H[_], F[_], G[_], W0, S](f: H ~> WriterStateT[G[W0], S, F, *])(wh: W0 => H[Unit])(implicit F0: BindRec[F], F1: Monad[F], G: Catenable[G]): H ~> StateT[F, S, *] =
-    λ[H ~> StateT[F, S, *]](ha => f(ha).recurse(gw => G.uncons(gw).map({ case (w0, gw) => (f(wh(w0)), gw) }))(F0, F1, G.monoid[W0]))
+  def recurse[H[_], F[_], G[_], W0, S](f: H ~> WriterStateT[G[W0], S, F, *])(wh: W0 => H[Unit])(implicit F0: BindRec[F], F1: Monad[F], G: Catenable[G]): H ~> StateT[S, F, *] =
+    λ[H ~> StateT[S, F, *]](ha => f(ha).recurse(gw => G.uncons(gw).map({ case (w0, gw) => (f(wh(w0)), gw) }))(F0, F1, G.monoid[W0]))
 }
 
 trait WriterStateTInstances extends WriterStateTInstances1 {

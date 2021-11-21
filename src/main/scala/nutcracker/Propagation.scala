@@ -42,7 +42,7 @@ trait OnDemandPropagation[M[_], Var[_], Val[_]] extends Propagation[M, Var, Val]
     * cleanup routines (finalizers) that will be executed when all observers
     * leave. Typically, such finalizers will stop observing other cells.
     */
-  def newAutoCellC[A](setup: IndexedContT[M, Unit, ExclRef[A], A])(implicit dom: Dom[A]): M[Val[A]]
+  def newAutoCellC[A](setup: IndexedContT[Unit, ExclRef[A], M, A])(implicit dom: Dom[A]): M[Val[A]]
 
   def newAutoCell[A](setup: (A => M[ExclRef[A]]) => M[Unit])(implicit dom: Dom[A]): M[Val[A]] =
     newAutoCellC[A](IndexedContT(setup))

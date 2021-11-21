@@ -1,10 +1,11 @@
 package nutcracker.util
 
-import org.scalatest.{Matchers, FlatSpec}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers._
 import shapeless.{HNil, ::, HList}
 import shapeless.nat._
 
-class ChooseTest extends FlatSpec with Matchers {
+class ChooseTest extends AnyFlatSpec {
 
   type Pointer[L <: HList, A] = nutcracker.util.HListPtr.Aux[L, _, A]
 

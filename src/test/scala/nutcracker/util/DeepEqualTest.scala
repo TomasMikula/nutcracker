@@ -1,11 +1,11 @@
 package nutcracker.util
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import scalaz.Id.Id
-import scalaz.{NaturalTransformation}
+import scalaz.NaturalTransformation
 
-class DeepEqualTest extends FunSuite {
+class DeepEqualTest extends AnyFunSuite {
 
   val listEqual: DeepEqual[List[Int], List[Int], Id, Id] = DeepEqual.listInstance[Id, Id, Int, Int]
   val setEqual: DeepEqual[Set[Int], Set[Int], Id, Id] = DeepEqual.setInstance[Id, Id, Int, Int]

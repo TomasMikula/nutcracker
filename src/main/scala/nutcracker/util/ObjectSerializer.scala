@@ -3,8 +3,7 @@ package nutcracker.util
 import nutcracker.util.FreeObjectOutput.Decoration
 
 import scalaz.Id.Id
-import scalaz.Leibniz.===
-import scalaz.{Show, ~>}
+import scalaz.{Show, ~>, ===}
 
 /** Serialization of (potentially cyclic) object graphs.
   * Features:
@@ -30,14 +29,15 @@ trait ObjectSerializer[A, S, Ptr[_]] { self =>
     decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
     decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
     decorateReference: String => String = ref => s"<ref $ref/>"
-  )(implicit E: HEqualK[Ptr], ev: S === String): Show[A] = new Show[A] {
-    override def shows(a: A): String =
+  )(implicit E: HEqualK[Ptr], ev: S === String): Show[A] =
+    Show.shows[A] { a =>
       self.free(a).showAutoLabeled(deref, showRef)(decorateReferenced, decorateUnreferenced, decorateReference)
-  }
+    }
 
-  def shallowShow(implicit S: ShowK[Ptr], ev: S === String): Show[A] = new Show[A] {
-    override def shows(a: A): String = ev.subst[ObjectSerializer[A, *, Ptr]](self).free(a).showShallow(S)
-  }
+  def shallowShow(implicit S: ShowK[Ptr], ev: S === String): Show[A] =
+    Show.shows[A] { a =>
+      ev.subst[ObjectSerializer[A, *, Ptr]](self).free(a).showShallow(S)
+    }
 }
 
 object ObjectSerializer {

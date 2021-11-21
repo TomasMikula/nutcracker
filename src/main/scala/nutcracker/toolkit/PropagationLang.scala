@@ -149,7 +149,7 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit inj: Inject[Propa
   def newCell[D](d: D)(implicit dom: Dom[D]): FreeK[F, SimpleCellId[K, D]] =
     newCellF[F, D](d)
 
-  def newAutoCellC[A](setup: IndexedContT[FreeK[F, *], Unit, ExclRef[A], A])(implicit dom: Dom[A]): FreeK[F, CellId[K, A]] = {
+  def newAutoCellC[A](setup: IndexedContT[Unit, ExclRef[A], FreeK[F, *], A])(implicit dom: Dom[A]): FreeK[F, CellId[K, A]] = {
     val setup1 = (r: AutoCellId[K, A], c: CellCycle[A]) => setup.run(a => supplyF(r)(c, a).as((r, c)))
     newAutoCellF(setup1)
   }

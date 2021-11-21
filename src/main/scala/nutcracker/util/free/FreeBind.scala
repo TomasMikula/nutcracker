@@ -4,8 +4,7 @@ import scala.annotation.tailrec
 import scala.language.higherKinds
 import nutcracker.util.typealigned.{AList, ANone, APair, ASome}
 
-import scalaz.Leibniz.===
-import scalaz.{-\/, Applicative, BindRec, Foldable, Monad, MonadTrans, Monoid, NaturalTransformation, Traverse, \/, \/-, ~>}
+import scalaz.{-\/, Applicative, BindRec, Foldable, Monad, MonadTrans, Monoid, NaturalTransformation, Traverse, \/, \/-, ~>, ===}
 import scalaz.syntax.functor._
 import scalaz.syntax.foldable0._
 
@@ -46,7 +45,7 @@ sealed abstract class FreeBind[F[_], A] {
     )
 
   def foldMap[M[_]](f: F ~> M)(implicit M: BindRec[M]): M[A] =
-    M.tailrecM(this)(_.handle(
+    M.tailrecM(this)(_.handle[M[FreeBind[F, A] \/ A]](
       fa => f(fa) map (\/.right),
       λ[Bound ~> Const[M[FreeBind[F, A] \/ A], *]] {
         case (fz, g) => f(fz) map { z => \/.left(g(z)) }
@@ -74,7 +73,7 @@ sealed abstract class FreeBind[F[_], A] {
 
   def foldRunM[M[_], S](s: S, f: λ[α => (S, F[α])] ~> λ[α => M[(S, α)]])(implicit M: BindRec[M]): M[(S, A)] =
     M.tailrecM((s, this)) { case (s, fa) =>
-      fa.handle(
+      fa.handle[M[(S, FreeBind[F, A]) \/ (S, A)]](
         fa => f((s, fa)) map (\/.right),
         λ[Bound ~> Const[M[(S, FreeBind[F, A]) \/ (S, A)], *]] {
           case (fz, g) => f((s, fz)) map { case (s, z) => \/.left((s, g(z))) }

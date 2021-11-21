@@ -5,6 +5,7 @@ import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput, 
 import nutcracker.{Final, Propagation, RDom, UpdateResult}
 import scalaz.Id.Id
 import scalaz.{Bind, ContT, Functor, Monad, Show}
+import scalaz.syntax.contravariant._
 
 /** Marker wrapper meaning that any two distinct values of type `Discrete[A]`
   * should be treated as incomparable. As a consequence, a value of type
@@ -33,7 +34,7 @@ object Discrete extends DiscreteInstances {
     res <- f(a)
   } yield res
 
-  def filterMap[M[_], Var[_], Val[_], A, B](refC: ContT[M, Unit, Var[Discrete[A]]])(f: A => Option[B])(implicit P: Propagation[M, Var, Val], M: Monad[M]): ContT[M, Unit, Var[Discrete[B]]] = for {
+  def filterMap[M[_], Var[_], Val[_], A, B](refC: ContT[Unit, M, Var[Discrete[A]]])(f: A => Option[B])(implicit P: Propagation[M, Var, Val], M: Monad[M]): ContT[Unit, M, Var[Discrete[B]]] = for {
     ref <- refC
     a   <- ref.asCont_
     res <- f(a) match {
@@ -42,8 +43,8 @@ object Discrete extends DiscreteInstances {
     }
   } yield res
 
-  def cellC[M[_], Var[_], Val[_], A](a: A)(implicit M: Propagation[M, Var, Val], MB: Bind[M]): ContT[M, Unit, Var[Discrete[A]]] =
-    ContT.liftM[Id, M, Unit, Var[Discrete[A]]](M.newCell(Discrete(a)))
+  def cellC[M[_], Var[_], Val[_], A](a: A)(implicit M: Propagation[M, Var, Val], MB: Bind[M]): ContT[Unit, M, Var[Discrete[A]]] =
+    ContT.liftM[Id, Unit, M, Var[Discrete[A]]](M.newCell(Discrete(a)))
 
   implicit def domInstance[A]: RDom.Aux[Discrete[A], Update[A], Delta[A]] = new RDom[Discrete[A]] {
     type Update = Discrete.Update[A]
@@ -63,9 +64,8 @@ object Discrete extends DiscreteInstances {
     def embed(a: A): Discrete[A] = Discrete(a)
   }
 
-  implicit def showInstance[A](implicit A: Show[A]): Show[Discrete[A]] = new Show[Discrete[A]] {
-    override def shows(a: Discrete[A]): String = A.shows(a.value)
-  }
+  implicit def showInstance[A](implicit A: Show[A]): Show[Discrete[A]] =
+    A.contramap(_.value)
 
 }
 

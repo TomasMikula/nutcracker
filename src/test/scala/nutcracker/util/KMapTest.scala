@@ -1,6 +1,6 @@
 package nutcracker.util
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 import shapeless.test.illTyped
 
 object KMapTest {
@@ -12,7 +12,7 @@ object KMapTest {
   implicit val tc1: Typeclass[Int, Unit, Unit] = new Typeclass[Int, Unit, Unit]{}
 }
 
-class KMapTest extends FunSuite {
+class KMapTest extends AnyFunSuite {
   import KMapTest._
 
   test("KMap1_2 compilation test") {

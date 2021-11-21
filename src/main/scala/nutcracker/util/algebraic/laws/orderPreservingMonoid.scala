@@ -2,7 +2,6 @@ package nutcracker.util.algebraic.laws
 
 import nutcracker.util.algebraic.OrderPreservingMonoid
 import scalaprops.{Gen, Properties}
-import scalaz.std.string._
 
 object orderPreservingMonoid {
 

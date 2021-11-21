@@ -3,7 +3,6 @@ package nutcracker.util.algebraic.laws
 import nutcracker.util.algebraic.NonIncreasingSemigroup
 import scalaprops.{Check, Gen, Properties}
 import scalaprops.Property.forAll
-import scalaz.std.string._
 
 object nonIncreasingSemigroup {
 

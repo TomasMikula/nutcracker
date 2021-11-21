@@ -66,7 +66,7 @@ final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A
     * and map the rest of the computation inside it. */
   private def flattenM(implicit M0: BindRec[M], M1: Applicative[M]): M[FreeT[F, M, A]] = {
     def go(ft: FreeT[F, M, A]): M[FreeT[F, M, A] \/ FreeT[F, M, A]] =
-      ft.unwrap.handle(
+      ft.unwrap.handle[M[FreeT[F, M, A] \/ FreeT[F, M, A]]](
         mfa => mfa match {
           case Left(ma) => M0.map(ma)(a => \/-(FreeT.point(a)))
           case Right(fa) => M1.point(\/.right(FreeT.liftF[F, M, A](fa)))

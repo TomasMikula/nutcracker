@@ -1,11 +1,11 @@
 package nutcracker.util.ops
 
-import org.scalatest.FunSuite
-import org.scalatest.Matchers._
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
 import scala.annotation.tailrec
 import scalaz.Semigroup
 
-class IteratorOpsTest extends FunSuite {
+class IteratorOpsTest extends AnyFunSuite {
 
   private sealed trait Tree {
     def depth: Int = this match {

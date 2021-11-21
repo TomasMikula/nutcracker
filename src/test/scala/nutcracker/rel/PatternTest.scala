@@ -2,12 +2,13 @@ package nutcracker.rel
 
 import nutcracker.Pattern
 import nutcracker.Rel.{Rel1, Rel2, Rel3}
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers._
 import shapeless.test.illTyped
 import shapeless.{::, HNil}
-import scalaz.NonEmptyList
+import scalaz.{IList, NonEmptyList}
 
-class PatternTest extends FlatSpec with Matchers {
+class PatternTest extends AnyFlatSpec {
 
   type ISBISB = Int :: String :: Boolean :: Int :: String :: Boolean :: HNil
 
@@ -63,7 +64,7 @@ class PatternTest extends FlatSpec with Matchers {
 
   it should "produce results whose every prefix is connected" in {
     ppat.orientations foreach {
-      case (r, rs) => NonEmptyList(r, rs:_*).reverse.tails.init.toList.foreach {
+      case (r, rs) => NonEmptyList.nel(r, IList.fromList(rs)).reverse.tails.init.toList.foreach {
         case NonEmptyList(h, t) => (h.vertexSet intersect t.foldLeft(Set[Int]())((acc, rel) => acc union rel.vertexSet)) should not be (Set.empty)
       }
     }

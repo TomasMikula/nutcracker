@@ -4,18 +4,18 @@ import nutcracker.Pattern
 import nutcracker.data.Tupled2
 import nutcracker.data.bool.Bool
 import nutcracker.toolkit.PropRel
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 import scala.collection.mutable
 import scalaz.{ContT, NonEmptyList}
 import scalaz.syntax.monad._
 import shapeless.{::, HNil}
 
-class FunctionalRelationTest extends FunSuite {
+class FunctionalRelationTest extends AnyFunSuite {
   import PropRel._
   import PropRel.propagationApi.{Val => _, readOnly =>_, _}
   import PropRel.relationsApi._
 
-  type ContU[A] = ContT[Prg, Unit, A]
+  type ContU[A] = ContT[Unit, Prg, A]
 
   test("blah") {
     type L = Val[Bool] :: Val[Bool] :: Val[(Bool, Bool)] :: HNil

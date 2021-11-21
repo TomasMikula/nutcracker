@@ -1,8 +1,7 @@
 package nutcracker
 
-import scalaz.{Leibniz, Semigroup, \&/}
+import scalaz.{Leibniz, Semigroup, \&/, ===}
 import scalaz.Isomorphism.<=>
-import scalaz.Leibniz.===
 
 trait IDom[D] {
   type Domain = D

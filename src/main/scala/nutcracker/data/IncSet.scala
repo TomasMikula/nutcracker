@@ -72,7 +72,7 @@ class IncSets[F[_], Var[_], Val[_]](implicit P: Propagation[F, Var, Val]) {
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
     */
-  def forEach[A](ref: Var[IncSet[A]])(implicit F: Applicative[F]): IndexedContT[F, Subscription[F], Unit, A] = {
+  def forEach[A](ref: Var[IncSet[A]])(implicit F: Applicative[F]): IndexedContT[Subscription[F], Unit, F, A] = {
     import scalaz.syntax.traverse._
     IndexedContT(f => ref.observe.by(as => {
       val now = as.toList.traverse_(f)
