@@ -1,6 +1,5 @@
 package nutcracker.toolkit
 
-import scala.language.higherKinds
 import scalaz.{Leibniz, ===}
 
 sealed trait CostLang[C, K[_], A]

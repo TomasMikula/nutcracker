@@ -47,67 +47,67 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
         M.writerState[A](s0 => {
           val s = lens.get(s0)
           p match {
-            case Update(ref, u, dom) =>
-              val (s1, becameDirty) = s.update[dom.Domain, dom.Update, dom.IDelta](ref, u)(dom)
-              val w = if(becameDirty) Lst.singleton(inj(execTriggers(ref))) at 1 else W.zero
+            case upd: Update[k, d, u, δ] =>
+              val (s1, becameDirty) = s.update[upd.dom.Domain, upd.dom.Update, upd.dom.IDelta](upd.ref, upd.u)(upd.dom)
+              val w = if(becameDirty) Lst.singleton(inj(execTriggers(upd.ref))) at 1 else W.zero
               (w, s0 set s1, ())
-            case ExclUpdate(ref, cycle, u, dom) =>
-              val (s1, becameDirty) = s.exclUpdate[dom.Domain, dom.Update, dom.IDelta](ref, cycle, u)(dom)
-              val w = if(becameDirty) Lst.singleton(inj(execTriggersAuto(ref, cycle))) at 1 else W.zero
+            case exc: ExclUpdate[_, a, u, δ] =>
+              val (s1, becameDirty) = s.exclUpdate[exc.dom.Domain, exc.dom.Update, exc.dom.IDelta](exc.ref, exc.cycle, exc.u)(exc.dom)
+              val w = if(becameDirty) Lst.singleton(inj(execTriggersAuto(exc.ref, exc.cycle))) at 1 else W.zero
               (w, s0 set s1, ())
 
-            case ExecTriggers(ref) =>
-              val (s1, ks) = s.execTriggers(ref)
+            case ext: ExecTriggers[K, _] =>
+              val (s1, ks) = s.execTriggers(ext.ref)
               (ks at 0, s0 set s1, ())
-            case ExecTriggersAuto(ref, cycle) =>
-              val (s1, ks) = s.execTriggers(ref, cycle)
+            case eta: ExecTriggersAuto[K, _] =>
+              val (s1, ks) = s.execTriggers(eta.ref, eta.cycle)
               (ks at 0, s0 set s1, ())
 
-            case Observe(ref, f, dom) =>
-              val (ks, s1, oid) = s.observe[dom.Domain, dom.Update, dom.IDelta](ref, f)(dom)
+            case obs: Observe[k, d, u, δ] =>
+              val (ks, s1, oid) = s.observe[obs.dom.Domain, obs.dom.Update, obs.dom.IDelta](obs.ref, obs.f)(obs.dom)
               (ks at 0, s0 set s1, oid)
-            case ObserveAuto(ref, f, dom) =>
-              val (ks, s1, oid) = s.observe[dom.Domain, dom.Update, dom.IDelta](ref, f)(dom)
+            case oba: ObserveAuto[k, d, u, δ] =>
+              val (ks, s1, oid) = s.observe[oba.dom.Domain, oba.dom.Update, oba.dom.IDelta](oba.ref, oba.f)(oba.dom)
               (ks at 0, s0 set s1, oid)
 
-            case Hold(ref, f) =>
-              val (s1, oid, ks) = s.hold(ref)(f)
+            case h: Hold[K, d] =>
+              val (s1, oid, ks) = s.hold(h.ref)(h.f)
               (ks at 0, s0 set s1, oid)
-            case HoldAuto(ref, f) =>
-              val (s1, cycle, oid, ks) = s.hold(ref)(f) // linter:ignore UndesirableTypeInference
+            case ha: HoldAuto[K, d] =>
+              val (s1, cycle, oid, ks) = s.hold(ha.ref)(ha.f) // linter:ignore UndesirableTypeInference
               (ks at 0, s0 set s1, oid)
-            case res @ Resume(ref, token, trigger) =>
-              val (s1, ks, becameDirty) = s.resume[res.Domain, res.Delta, res.Arg](ref, token, trigger)
-              val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggers(ref))) at 1) else (ks at 0)
+            case res: Resume[k, d, δ, d0] =>
+              val (s1, ks, becameDirty) = s.resume[res.Domain, res.Delta, res.Arg](res.ref, res.token, res.trigger)
+              val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggers(res.ref))) at 1) else (ks at 0)
               (w, s0 set s1, ())
-            case res @ ResumeAuto(ref, cycle, token, trigger) =>
-              val (s1, ks, becameDirty) = s.resume[res.Domain, res.Delta, res.Arg](ref, cycle, token, trigger)
-              val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggersAuto(ref, cycle))) at 1) else (ks at 0)
+            case res: ResumeAuto[k, d, δ, d0] =>
+              val (s1, ks, becameDirty) = s.resume[res.Domain, res.Delta, res.Arg](res.ref, res.cycle, res.token, res.trigger)
+              val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggersAuto(res.ref, res.cycle))) at 1) else (ks at 0)
               (w, s0 set s1, ())
 
-            case NewCell(d, dom) =>
-              val (s1, ref) = s.newCell(d)(dom) // linter:ignore UndesirableTypeInference
+            case nc: NewCell[K, d, u, δ] =>
+              val (s1, ref) = s.newCell(nc.d)(nc.dom)
               (W.zero, s0 set s1, ref)
-            case NewAutoCell(setup) =>
-              val (s1, ref) = s.newAutoCell(setup) // linter:ignore UndesirableTypeInference
+            case nac: NewAutoCell[K, _] =>
+              val (s1, ref) = s.newAutoCell(nac.setup) // linter:ignore UndesirableTypeInference
               (W.zero, s0 set s1, ref)
 
-            case Supply(ref, cycle, value) =>
-              val (s1, ks) = s.supply(ref)(cycle, value)
+            case sup: Supply[K, d] =>
+              val (s1, ks) = s.supply(sup.ref)(sup.cycle, sup.value)
               (ks at 0, s0 set s1, ())
 
-            case RmObserver(ref, oid) =>
-              val (s1, ks) = s.rmObserver(ref, oid)
+            case rmo: RmObserver[K, d] =>
+              val (s1, ks) = s.rmObserver(rmo.ref, rmo.oid)
               (ks at 0, s0 set s1, ())
-            case RmAutoObserver(ref, cycle, oid) =>
-              val (s1, ks) = s.rmObserver(ref, cycle, oid)
+            case rao: RmAutoObserver[K, d] =>
+              val (s1, ks) = s.rmObserver(rao.ref, rao.cycle, rao.oid)
               (ks at 0, s0 set s1, ())
 
-            case AddFinalizer(ref, cycle, sub) =>
-              val (ks, s1, fid) = s.addFinalizer(ref, cycle, sub)
+            case add: AddFinalizer[K, _] =>
+              val (ks, s1, fid) = s.addFinalizer(add.ref, add.cycle, add.value)
               (ks at 0, s0 set s1, fid)
-            case RemoveFinalizer(ref, cycle, fid) =>
-              val s1 = s.removeFinalizer(ref, cycle, fid)
+            case rmf: RemoveFinalizer[K, _] =>
+              val s1 = s.removeFinalizer(rmf.ref, rmf.cycle, rmf.id)
               (W.zero, s0 set s1, ())
           }
         })

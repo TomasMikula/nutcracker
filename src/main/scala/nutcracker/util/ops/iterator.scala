@@ -91,7 +91,7 @@ final case class IteratorOps[A](it: Iterator[A]) extends AnyVal {
     var l = List[B]()
     var n = 0 // number of elements accumulated in l
     while(it.hasNext) {
-      l = append(l, n, f(it.next))
+      l = append(l, n, f(it.next()))
       n = n + 1
     }
 

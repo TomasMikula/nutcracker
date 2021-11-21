@@ -44,9 +44,9 @@ case class Updated[D, Δ[_, _], D0, D1 <: D](newValue: D1, delta: Δ[D0, D1]) ex
 }
 
 object UpdateResult {
-  private val _unchanged = Unchanged() // linter:ignore UndesirableTypeInference
+  private val _unchanged = Unchanged()
 
-  def unchanged[D, Δ[_, _], D0](): UpdateResult[D, Δ, D0] =
+  def unchanged[D, Δ[_, _], D0]: UpdateResult[D, Δ, D0] =
     _unchanged.asInstanceOf[UpdateResult[D, Δ, D0]]
 
   def updated[D, Δ[_, _], D0, D1 <: D](newVal: D1, δ: Δ[D0, D1]): UpdateResult[D, Δ, D0] =

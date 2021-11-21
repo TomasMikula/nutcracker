@@ -1,7 +1,5 @@
 package nutcracker.util
 
-import scala.language.higherKinds
-
 import shapeless._
 import shapeless.poly.~>
 

@@ -1,6 +1,5 @@
 package nutcracker.util
 
-import scala.language.higherKinds
 import scalaz.Monoid
 
 trait MonoidK[F[_]] { self =>

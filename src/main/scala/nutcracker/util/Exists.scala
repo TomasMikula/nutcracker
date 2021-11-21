@@ -1,6 +1,5 @@
 package nutcracker.util
 
-import scala.language.higherKinds
 import scalaz.~>
 
 sealed abstract class Exists[F[_]] {
@@ -34,7 +33,7 @@ object `Exists{(* -> *) -> *}` {
       val value = fa
     }
 
-  def apply[F[_[_]]]: SyntaxHelper[F] = SyntaxHelper[F]
+  def apply[F[_[_]]]: SyntaxHelper[F] = SyntaxHelper[F]()
 
   final case class SyntaxHelper[F[_[_]]]() {
     def from[A[_]](fa: F[A]): `Exists{(* -> *) -> *}`[F] = apply[F, A](fa)

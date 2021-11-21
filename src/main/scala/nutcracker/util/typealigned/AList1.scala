@@ -1,7 +1,6 @@
 package nutcracker.util.typealigned
 
 import scala.annotation.tailrec
-import scala.language.higherKinds
 import scalaz.{-\/, Compose, \/, \/-, ~>}
 
 

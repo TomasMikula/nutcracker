@@ -1,7 +1,5 @@
 package nutcracker.util.typealigned
 
-import scala.language.higherKinds
-
 object APair {
   def apply[F[_], G[_], A](fa: F[A], ga: G[A]): APair[F, G] =
     BoundedAPair[Any, F, G, A](fa, ga)

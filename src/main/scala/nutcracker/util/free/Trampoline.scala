@@ -1,7 +1,7 @@
 package nutcracker.util.free
 
 import scalaz.Id._
-import scalaz._
+import scalaz.{FreeBind => _, _}
 
 final case class Trampoline[A] private(unwrap: FreeBind[Id, A]) extends AnyVal {
   def apply(): A = eval

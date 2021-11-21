@@ -1,6 +1,5 @@
 package nutcracker.util.free
 
-import scala.language.higherKinds
 import scalaz.~>
 
 sealed trait CoproductBuilder {

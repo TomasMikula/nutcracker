@@ -1,6 +1,6 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{KMap, Lst, ∃}
+import nutcracker.util.{KMap, Lst}
 import nutcracker.{IDom, SeqHandler, SeqPreHandler, SeqTrigger, Subscription}
 import scala.annotation.tailrec
 import scalaz.syntax.equal._
@@ -81,7 +81,7 @@ private[nutcracker] object Cell {
     go(Nil, l)
   }
 
-  def mapRemoveFirst[Key[_], V[_]](m: KMap[Key, V])(p: ∃[V] => Boolean): Option[KMap[Key, V]] =
+  def mapRemoveFirst[Key[_], V[_]](m: KMap[Key, V])(p: V[_] => Boolean): Option[KMap[Key, V]] =
     m.find(p).map(m - _._1)
 }
 

@@ -1,6 +1,5 @@
 package nutcracker.util.typealigned
 
-import scala.language.higherKinds
 import scalaz.{\/, \/-, ~>}
 
 /**

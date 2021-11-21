@@ -1,6 +1,5 @@
 package nutcracker.util
 
-import scala.language.higherKinds
 import scala.language.implicitConversions
 
 import shapeless._

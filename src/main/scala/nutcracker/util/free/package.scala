@@ -1,6 +1,5 @@
 package nutcracker.util
 
-import scala.language.higherKinds
 import scalaz.{Applicative, Foldable, Monoid, Traverse}
 import scalaz.syntax.applicative._
 import scalaz.syntax.traverse0._

@@ -7,6 +7,11 @@ import shapeless._
   */
 trait SummonHList[L <: HList] {
   def get: L
+
+  def ::[H](h: H): SummonHList[H :: L] =
+    new SummonHList[H :: L] {
+      override def get: H :: L = h :: SummonHList.this.get
+    }
 }
 
 object SummonHList {
@@ -14,7 +19,6 @@ object SummonHList {
     def get: HNil = HNil
   }
 
-  implicit def hconsWrapper[H, T <: HList](implicit h: H, w: SummonHList[T]): SummonHList[H :: T] = new SummonHList[H :: T] {
-    def get: H :: T = h :: w.get
-  }
+  implicit def hconsWrapper[H, T <: HList](implicit h: H, w: SummonHList[T]): SummonHList[H :: T] =
+    h :: w
 }

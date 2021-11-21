@@ -1,6 +1,5 @@
 package nutcracker.util
 
-import scala.language.higherKinds
 import scalaz.{Lens, Store}
 
 final case class KPair[F[_[_]], G[_[_]], A[_]](_1: F[A], _2: G[A])

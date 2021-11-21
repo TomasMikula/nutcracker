@@ -2,7 +2,7 @@ package nutcracker.data
 
 import nutcracker.{Dom, OnDemandPropagation, Recipe, Relations, Subscription, SyncDom}
 import nutcracker.Rel.Rel3
-import nutcracker.util.{Choose, ContU, HOrderK, ∃}
+import nutcracker.util.{Choose, ContU, HOrderK}
 import scalaz.{IndexedContT, Monad, \&/}
 import scalaz.syntax.monad._
 import shapeless.{::, HNil}
@@ -17,7 +17,7 @@ import shapeless.nat._
   * of the other columns, and therefore is not considered type-safe.
   */
 case class Tupled2[A, B, Ref[_]]() extends Rel3[Ref[A], Ref[B], Ref[(A, B)]] {
-  type Projection = ∃[Ref] :: ∃[Ref] :: ∃[Ref] :: HNil
+  type Projection = Ref[_] :: Ref[_] :: Ref[_] :: HNil
 }
 
 object Tupled2 {
@@ -25,7 +25,7 @@ object Tupled2 {
   private type C[A, B, Ref[_]] = Ref[A] :: Ref[B]                :: HNil
 
   def establish[A, B, Var[_], Val[_], K[_]](ra: Val[A], rb: Val[B])(implicit P: OnDemandPropagation[K, Var, Val], R: Relations[K], O: HOrderK[Val], K: Monad[K], da: SyncDom[A], db: SyncDom[B]): ContU[K, Val[(A, B)]] = {
-    R.establish(Tupled2[A, B, Val]).matching2(ra, rb).by(recipe).map(_.tail.tail.head)
+    R.establish(Tupled2[A, B, Val]()).matching2(ra, rb).by(recipe).map(_.tail.tail.head)
   }
 
   def recipe[A, B, Var[_], Val[_], K[_]](implicit P: OnDemandPropagation[K, Var, Val], K: Monad[K], da: SyncDom[A], db: SyncDom[B]): Recipe[L[A, B, Val], C[A, B, Val], K] =

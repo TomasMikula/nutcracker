@@ -1,6 +1,5 @@
 package nutcracker.toolkit
 
-import scala.language.higherKinds
 import scalaz.syntax.monad._
 import scalaz.{-\/, BindRec, MonadTell, StreamT, \/, \/-}
 

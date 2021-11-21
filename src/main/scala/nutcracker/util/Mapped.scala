@@ -1,7 +1,6 @@
 package nutcracker.util
 
 import nutcracker.util.typealigned.{BoundedAPair}
-import scala.language.higherKinds
 import scalaz.{Applicative, Forall, PlusEmpty}
 import shapeless._
 import shapeless.poly.~>
@@ -52,7 +51,7 @@ object Mapped {
     type Out = HNil
     def extract(l: HNil, f: F ~> Id): HNil = HNil
     def remap[G[_]](l: HNil, f: F ~> G): BoundedAPair[HList, Id, Mapped.Aux[HNil, G, *]] =
-      BoundedAPair.of[HList, Id, Mapped.Aux[HNil, G, *]](HNil, implicitly[Mapped.Aux[HNil, G, HNil]])
+      BoundedAPair.of[HList, Id, Mapped.Aux[HNil, G, *]](HNil, hnilMapped[G])
     def toList(l: HNil): List[F[_]] = Nil
     def toList[A](l: HNil, f: F ~>> A): List[A] = Nil
   }

@@ -165,7 +165,7 @@ object Lst {
   @inline
   private final def revPrepend[A](as: Iterable[A], lst: Lst[A]): Lst[A] = {
     @tailrec def loop(it: Iterator[A], lst: Lst[A]): Lst[A] =
-      if(it.hasNext) loop(it, Cons(it.next, lst))
+      if(it.hasNext) loop(it, Cons(it.next(), lst))
       else lst
 
     loop(as.iterator, lst)
@@ -174,7 +174,7 @@ object Lst {
   @inline
   private final def mapRevPrepend[A, B](as: Iterable[A], lst: Lst[B], f: A => B): Lst[B] = {
     @tailrec def loop(it: Iterator[A], lst: Lst[B]): Lst[B] =
-      if(it.hasNext) loop(it, Cons(f(it.next), lst))
+      if(it.hasNext) loop(it, Cons(f(it.next()), lst))
       else lst
 
     loop(as.iterator, lst)

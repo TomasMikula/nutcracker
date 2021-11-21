@@ -1,7 +1,6 @@
 package nutcracker.util.free
 
 import scala.annotation.tailrec
-import scala.language.higherKinds
 import nutcracker.util.typealigned.{AList, ANone, APair, ASome}
 
 import scalaz.{-\/, Applicative, BindRec, Foldable, Monad, MonadTrans, Monoid, NaturalTransformation, Traverse, \/, \/-, ~>, ===}

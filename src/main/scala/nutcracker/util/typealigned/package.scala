@@ -1,7 +1,5 @@
 package nutcracker.util
 
-import scala.language.higherKinds
-
 import nutcracker.util.typealigned.BalancedComposer.{Post, Pre}
 
 package object typealigned {

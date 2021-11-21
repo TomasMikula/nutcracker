@@ -1,6 +1,5 @@
 package nutcracker.util
 
-import scala.language.higherKinds
 import scalaz.Equal
 import scalaz.Id.Id
 
@@ -37,11 +36,11 @@ object HEqual {
   *
   * Note that (heterogeneous) equality between `A` and `B` is not required to compare `F[A]` to `F[B]`.
   */
-trait HEqualK[F[_]] extends EqualK[F] with Equal[∃[F]] {
+trait HEqualK[F[_]] extends EqualK[F] with Equal[F[_]] {
   def hEqualK[A, B](fa: F[A], fb: F[B]): Boolean
 
   override def equalK[A](f1: F[A], f2: F[A]): Boolean = hEqualK(f1, f2)
-  override def equal(f1: ∃[F], f2: ∃[F]) = hEqualK(f1, f2)
+  override def equal(f1: F[_], f2: F[_]): Boolean = hEqualK(f1, f2)
 
   def homogenize: EqualK[F] = new EqualK[F] {
     override def equalK[A](f1: F[A], f2: F[A]): Boolean =

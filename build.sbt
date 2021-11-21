@@ -2,27 +2,33 @@ name := "nutcracker"
 
 organization := "com.github.tomasmikula"
 
-scalaVersion := "2.12.15"
+lazy val scala212 = "2.12.15"
+lazy val scala213 = "2.13.7"
+
+scalaVersion := scala212
+crossScalaVersions := Seq(scala212, scala213)
 
 autoCompilerPlugins := true
 addCompilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
 
-scalacOptions ++= Seq(
-  "-language:higherKinds",
-  "-Xlint:-unused,_", // Exclude "unused", because:
-                      //  - it produces some false positives;
-                      //  - sometimes we use them as just implicit evidence.
-  "-unchecked",
-  "-deprecation",
-  "-feature",
-  "-Xfatal-warnings",
-  "-Yno-adapted-args",
-  "-Ypartial-unification",
-  "-Ywarn-numeric-widen",
-  "-Ywarn-unused-import",
-  "-Ywarn-value-discard",
-  "-Ypatmat-exhaust-depth", "40",
-  "-Xfuture")
+scalacOptions ++=
+  Seq(
+    "-language:higherKinds",
+    "-Xlint:-unused,_", // Exclude "unused", because:
+                        //  - it produces some false positives;
+                        //  - sometimes we use them as just implicit evidence.
+    "-unchecked",
+    "-deprecation",
+    "-feature",
+    "-Ywarn-numeric-widen",
+    "-Ywarn-value-discard",
+    "-Ypatmat-exhaust-depth", "40",
+  ) ++ (
+    CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((2, 12)) => Seq("-Ywarn-unused-import", "-Ypartial-unification", "-Xfatal-warnings")
+      case _             => Seq("-Wunused:imports")
+    }
+  )
 
 testFrameworks += new TestFramework("scalaprops.ScalapropsFramework")
 
@@ -76,6 +82,8 @@ pomExtra := (
 
 import ReleaseTransformations._
 
+releaseCrossBuild := true
+
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
   inquireVersions,
@@ -84,8 +92,8 @@ releaseProcess := Seq[ReleaseStep](
   setReleaseVersion,
   commitReleaseVersion,
   tagRelease,
-  releaseStepCommand("publishSigned"),
-  releaseStepCommand("sonatypeRelease"),
+  releaseStepCommandAndRemaining("+publishSigned"),
+  releaseStepCommandAndRemaining("sonatypeReleaseAll"),
   setNextVersion,
   commitNextVersion,
   //pushChanges,

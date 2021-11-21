@@ -1,6 +1,5 @@
 package nutcracker.util.free
 
-import scala.language.higherKinds
 import scalaz.{-\/, Applicative, BindRec, Monad, Monoid, Traverse, \/, \/-, ~>}
 import scalaz.Id.Id
 import scalaz.syntax.applicative._

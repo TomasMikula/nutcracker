@@ -1,6 +1,5 @@
 package nutcracker.util
 
-import scala.language.higherKinds
 import scalaz.{Applicative, BindRec, ~>}
 
 /** Comparing of (potentially cyclic) object graphs for equality.

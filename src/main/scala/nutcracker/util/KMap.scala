@@ -3,7 +3,6 @@ package nutcracker.util
 import nutcracker.util.typealigned.APair
 
 import scala.language.existentials
-import scala.language.higherKinds
 import scalaz.~>
 
 final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
@@ -24,7 +23,7 @@ final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
     }
   def -(k: K[_]): KMap[K, V] = KMap[K, V](map - k)
   def mapValues[W[_]](f: V ~> W): KMap[K, W] =
-    KMap[K, W](map.mapValues[W[_]](v => f(v)))
+    KMap[K, W](map.mapValues[W[_]](v => f(v)).toMap)
   def ++(that: KMap[K, V]): KMap[K, V] =
     KMap[K, V](this.map ++ that.map)
   def toStream: Stream[APair[K, V]] =
