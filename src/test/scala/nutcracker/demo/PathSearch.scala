@@ -28,26 +28,26 @@ class PathSearch extends AnyFunSuite {
   import C._
 
 
-  type Vertex = Symbol
+  type Vertex = String
 
   val edges = List(
-    'A -> ((1, 'B)),
-    'A -> ((9, 'C)),
-    'B -> ((3, 'D)),
-    'B -> ((4, 'E)),
-    'C -> ((5, 'F)),
-    'C -> ((6, 'G)),
-    'D -> ((7, 'H)),
-    'E -> ((8, 'A)),
-    'E -> ((9, 'G)),
-    'F -> ((0, 'I)),
-    'G -> ((1, 'I)),
-    'G -> ((2, 'K)),
-    'H -> ((3, 'B)),
-    'H -> ((4, 'K)),
-    'I -> ((5, 'J)),
-    'J -> ((6, 'F)),
-    'K -> ((7, 'E))
+    "A" -> ((1, "B")),
+    "A" -> ((9, "C")),
+    "B" -> ((3, "D")),
+    "B" -> ((4, "E")),
+    "C" -> ((5, "F")),
+    "C" -> ((6, "G")),
+    "D" -> ((7, "H")),
+    "E" -> ((8, "A")),
+    "E" -> ((9, "G")),
+    "F" -> ((0, "I")),
+    "G" -> ((1, "I")),
+    "G" -> ((2, "K")),
+    "H" -> ((3, "B")),
+    "H" -> ((4, "K")),
+    "I" -> ((5, "J")),
+    "J" -> ((6, "F")),
+    "K" -> ((7, "E"))
   )
 
 
@@ -111,12 +111,12 @@ class PathSearch extends AnyFunSuite {
 
     type Stream[A] = StreamT[Id, A]
 
-    val paths = solveBfs(findPath('A, 'K)).toStream.toList
+    val paths = solveBfs(findPath("A", "K")).toStream.toList
 
     assertResult(List(
-      (path('A, 'B, 'D, 'H, 'K), 15),
-      (path('A, 'B, 'E, 'G, 'K), 16),
-      (path('A, 'C, 'G, 'K), 17)
+      (path("A", "B", "D", "H", "K"), 15),
+      (path("A", "B", "E", "G", "K"), 16),
+      (path("A", "C", "G", "K"), 17)
     ))(paths)
   }
 }

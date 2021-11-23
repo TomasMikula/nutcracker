@@ -4,7 +4,7 @@ import nutcracker.Pattern
 import nutcracker.Rel.Rel2
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers._
-import scalaz.{NonEmptyList, Order}
+import scalaz.NonEmptyList
 import scalaz.std.anyVal._
 import scalaz.std.string._
 import scalaz.syntax.monad._
@@ -19,15 +19,12 @@ class SimpleForwardInference extends AnyFunSpec {
 
   // Define some relations.
   // In this demo, we're going to do reasoning with symbols only, so our relations are between symbols
-  object LT  extends Rel2[Symbol, Symbol] // a binary relation on Symbols
-  object LTE extends Rel2[Symbol, Symbol] // another binary relation on Symbols
+  object LT  extends Rel2[String, String] // a binary relation on Strings
+  object LTE extends Rel2[String, String] // another binary relation on Strings
 
   // define some shortcuts
-  type Pair = Symbol :: Symbol :: HNil
-  type Triple = Symbol :: Symbol :: Symbol :: HNil
-
-  // to be able to index Symbol values in a relational database, we need to define an ordering on Symbols
-  implicit val symbolOrdering: Order[Symbol] = Order.orderBy(_.name)
+  type Pair = String :: String :: HNil
+  type Triple = String :: String :: String :: HNil
 
   // a program to add some inference rules for LT and LTE
   val LtLteRules: Prg[Unit] = for {
@@ -58,17 +55,17 @@ class SimpleForwardInference extends AnyFunSpec {
 
     val problem =
       // set up the initial relations
-      relate(LTE).values('a :: 'b :: HNil) >>
-      relate(LTE).values('b :: 'c :: HNil) >>
-      relate(LT ).values('c :: 'd :: HNil) >>
-      relate(LTE).values('d :: 'e :: HNil) >>
+      relate(LTE).values("a" :: "b" :: HNil) >>
+      relate(LTE).values("b" :: "c" :: HNil) >>
+      relate(LT ).values("c" :: "d" :: HNil) >>
+      relate(LTE).values("d" :: "e" :: HNil) >>
       // add inference rules to the mix
       LtLteRules >>
       // observe when a < e is inferred
       (for {
         pr <- promise[Unit]()
         _ <- onPatternMatch(
-          Pattern[Pair].where({ case (x :: y :: HNil) => (x -> 'a) :: (y -> 'e) :: HNil }).build({ case (x :: y :: HNil) => NonEmptyList(LT(x, y)) }))(
+          Pattern[Pair].where({ case (x :: y :: HNil) => (x -> "a") :: (y -> "e") :: HNil }).build({ case (x :: y :: HNil) => NonEmptyList(LT(x, y)) }))(
           { _ => complete(pr, ()) })
       } yield pr)
 
