@@ -23,11 +23,11 @@ final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
     }
   def -(k: K[_]): KMap[K, V] = KMap[K, V](map - k)
   def mapValues[W[_]](f: V ~> W): KMap[K, W] =
-    KMap[K, W](map.mapValues[W[_]](v => f(v)).toMap)
+    KMap[K, W](map.iterator.map { case (k, v) => (k, f(v)) }.toMap[K[_], W[_]])
   def ++(that: KMap[K, V]): KMap[K, V] =
     KMap[K, V](this.map ++ that.map)
-  def toStream: Stream[APair[K, V]] =
-    map.toStream.map(kv => APair(kv._1.asInstanceOf[K[Any]], kv._2.asInstanceOf[V[Any]]))
+  def iterator: Iterator[APair[K, V]] =
+    map.iterator.map(kv => APair(kv._1.asInstanceOf[K[Any]], kv._2.asInstanceOf[V[Any]]))
 }
 
 object KMap {

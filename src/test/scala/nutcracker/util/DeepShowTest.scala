@@ -10,7 +10,7 @@ import scalaz.syntax.monad._
 class DeepShowTest extends AnyFunSuite {
 
   val idShowK: ShowK[Id] = new ShowK[Id] {
-    def shows[A](fa: Id[A]): String = System.identityHashCode(fa).formatted("%x")
+    def shows[A](fa: Id[A]): String = "%x".format(System.identityHashCode(fa))
   }
 
   val listShow: DeepShow[List[Int], Id] = new DeepShow.FromSerialize[List[Int], Id] {

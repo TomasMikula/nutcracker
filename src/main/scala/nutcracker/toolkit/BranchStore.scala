@@ -31,7 +31,7 @@ private[nutcracker] case class BranchStore[Ref[_], K[_]](
         }
       }
 
-      unresolvedVars.toStream.map(p => splitDomain(p._1)(p._2)).collectFirst({
+      unresolvedVars.iterator.map(p => splitDomain(p._1)(p._2)).collectFirst({
         case Some(branches) => Incomplete(branches)
       }).getOrElse(Stuck)
     }

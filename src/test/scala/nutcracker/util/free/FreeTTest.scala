@@ -1,6 +1,5 @@
 package nutcracker.util.free
 
-import scala.language.higherKinds
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Prop.forAll
 
