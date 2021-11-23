@@ -5,7 +5,7 @@ organization := "com.github.tomasmikula"
 lazy val scala212 = "2.12.15"
 lazy val scala213 = "2.13.7"
 
-scalaVersion := scala212
+scalaVersion := scala213
 crossScalaVersions := Seq(scala212, scala213)
 
 autoCompilerPlugins := true
