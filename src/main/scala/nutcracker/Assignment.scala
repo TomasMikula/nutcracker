@@ -1,13 +1,12 @@
 package nutcracker
 
-import nutcracker.util.{Choose, HListPtr, Mapped}
+import nutcracker.util.{Choose, HList, HListPtr, Mapped, Nat}
+import nutcracker.util.HList.{HNil, Length, ::}
+import nutcracker.util.Nat.ToInt
 import scala.annotation.tailrec
 import scalaz.std.option._
 import scalaz.std.vector._
 import scalaz.syntax.traverse._
-import shapeless.ops.hlist.Length
-import shapeless.ops.nat.ToInt
-import shapeless.{::, HList, HNil, Nat}
 
 case class Assignment[L <: HList] private (values: Vector[Option[_]]) extends AnyVal {
 

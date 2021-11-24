@@ -1,6 +1,6 @@
 package nutcracker.util
 
-import shapeless._
+import nutcracker.util.HList.{::, HNil}
 
 trait ValuedPointers[V <: HList, PA <: HList] {
   type Values <: HList

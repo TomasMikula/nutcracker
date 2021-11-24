@@ -1,12 +1,12 @@
 package nutcracker.util
 
-import nutcracker.util.typealigned.{BoundedAPair}
-import scalaz.{Applicative, Forall, PlusEmpty}
-import shapeless._
-import shapeless.poly.~>
+import nutcracker.util.HList.{::, HNil}
+import nutcracker.util.typealigned.BoundedAPair
+import scalaz.{Applicative, Const, Forall, PlusEmpty, ~>}
+import scalaz.Id.Id
 
 trait Mapped[L <: HList, F[_]] extends Serializable { self =>
-  import shapeless.poly.~>>
+  import Mapped.~>>
 
   type Out <: HList
 
@@ -24,12 +24,12 @@ trait Mapped[L <: HList, F[_]] extends Serializable { self =>
         BoundedAPair.of[HList, Id, Mapped.Aux[H :: L, G, *]](f(l.head) :: tRes._1, tRes._2.prepend[H])
       }
       def toList(l: Out): List[F[_]] = l.head :: self.toList(l.tail)
-      def toList[A](l: Out, f: F ~>> A): List[A] = f(l.head) :: self.toList(l.tail, f)
+      def toList[A](l: Out, f: F ~>> A): List[A] = f(l.head).getConst :: self.toList(l.tail, f)
     }
 }
 
 object Mapped {
-  import shapeless.poly.~>>
+  type ~>>[G[_], B] = G ~> Const[B, *]
 
   type Aux[L <: HList, F[_], Out0 <: HList] = Mapped[L, F] { type Out = Out0 }
 
@@ -38,7 +38,7 @@ object Mapped {
   def pure[L <: HList, F[_]](l: L)(implicit F: Applicative[F]): BoundedAPair[HList, Id, Mapped.Aux[L, F, *]] = {
     l match {
       case HNil => BoundedAPair.of[HList, Id, Mapped.Aux[L, F, *]](HNil, hnilMapped[F].asInstanceOf[Mapped.Aux[L, F, HNil]])
-      case shapeless.::(h, t) =>
+      case h :: t =>
         val ev = pure(t)(F)
         BoundedAPair[HList, Id, Mapped.Aux[L, F, *], HList](F.point(h) :: ev._1, ev._2.prepend.asInstanceOf[Mapped.Aux[L, F, HList]])
     }

@@ -3,10 +3,10 @@ package nutcracker.data
 import nutcracker.{Dom, OnDemandPropagation, Recipe, Relations, Subscription, SyncDom}
 import nutcracker.Rel.Rel3
 import nutcracker.util.{Choose, ContU, HOrderK}
+import nutcracker.util.HList.{::, HNil}
+import nutcracker.util.Nat.{_0, _1}
 import scalaz.{IndexedContT, Monad, \&/}
 import scalaz.syntax.monad._
-import shapeless.{::, HNil}
-import shapeless.nat._
 
 /** Product of two cells.
   *

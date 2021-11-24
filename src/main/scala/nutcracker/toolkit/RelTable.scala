@@ -1,10 +1,9 @@
 package nutcracker.toolkit
 
 import nutcracker.Assignment
-import nutcracker.util.{Lst, Mapped}
+import nutcracker.util.{HList, Lst, Mapped}
 import scala.annotation.tailrec
 import scalaz.Order
-import shapeless.HList
 
 private[toolkit] sealed trait RelTable[K[_], L <: HList] {
   def insert(row: L): Option[RelTable[K, L]]

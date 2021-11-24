@@ -1,8 +1,7 @@
 package nutcracker.util
 
+import nutcracker.util.HList.{::, HNil}
 import scala.language.implicitConversions
-
-import shapeless._
 
 trait Choose[L <: HList, C <: HList] extends (L => C) {
   def get(l: L): C

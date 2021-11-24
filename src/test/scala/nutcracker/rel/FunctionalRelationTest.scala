@@ -4,12 +4,12 @@ import nutcracker.Pattern
 import nutcracker.data.Tupled2
 import nutcracker.data.bool.Bool
 import nutcracker.toolkit.PropRel
+import nutcracker.util.HList.{::, HNil}
 import nutcracker.util.SummonHList
 import org.scalatest.funsuite.AnyFunSuite
 import scala.collection.mutable
 import scalaz.{ContT, NonEmptyList, Order}
 import scalaz.syntax.monad._
-import shapeless.{::, HNil}
 
 class FunctionalRelationTest extends AnyFunSuite {
   import PropRel._

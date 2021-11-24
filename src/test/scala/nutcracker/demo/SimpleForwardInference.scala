@@ -2,13 +2,13 @@ package nutcracker.demo
 
 import nutcracker.Pattern
 import nutcracker.Rel.Rel2
+import nutcracker.util.HList.{::, HNil}
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers._
 import scalaz.NonEmptyList
 import scalaz.std.anyVal._
 import scalaz.std.string._
 import scalaz.syntax.monad._
-import shapeless.{::, HNil}
 
 class SimpleForwardInference extends AnyFunSpec {
   import nutcracker.toolkit.PropRelToolkit.{instance => tk}

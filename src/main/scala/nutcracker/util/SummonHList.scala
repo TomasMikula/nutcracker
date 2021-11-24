@@ -1,6 +1,6 @@
 package nutcracker.util
 
-import shapeless._
+import nutcracker.util.HList.{::, HNil}
 
 /**
   * Used to implicitly summon an HList by implicitly summoning its elements.

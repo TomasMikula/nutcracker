@@ -1,11 +1,12 @@
 package nutcracker.util
 
+import nutcracker.util.HList.::
+import nutcracker.util.Nat.{_0, Succ}
 import scala.language.implicitConversions
 
-import shapeless._
-import shapeless.ops.hlist.At
+trait HListPtr[L <: HList, N <: Nat] {
+  type Out
 
-trait HListPtr[L <: HList, N <: Nat] extends At[L, N] {
   def index: Int
   def get(l: L): Out
   def set(l: L, a: Out): L

@@ -1,9 +1,8 @@
 package nutcracker
 
-import nutcracker.util.Choose
+import nutcracker.util.{Choose, HList}
 import scalaz.Bind
 import scalaz.syntax.bind._
-import shapeless.HList
 
 abstract class Recipe[L <: HList, C <: HList, M[_]](val choose: Choose[L, C]) {
   def create(c: C): M[L]

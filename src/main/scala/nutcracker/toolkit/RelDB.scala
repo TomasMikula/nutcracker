@@ -1,10 +1,9 @@
 package nutcracker.toolkit
 
 import nutcracker.{Assignment, OrientedPattern, PartiallyAssignedOrientedPattern, PartiallyAssignedPattern, Pattern, Rel, RelChoice}
-import nutcracker.util.{KMapB, Lst, Mapped, TransformedIndex}
+import nutcracker.util.{HList, KMapB, Lst, Mapped, TransformedIndex}
 import scala.language.existentials
 import scalaz.Order
-import shapeless.HList
 
 private[toolkit] case class RelDB[K[_]] private (
   private val tables: KMapB[Rel, λ[`L <: HList` => RelTable[K, L]], HList],

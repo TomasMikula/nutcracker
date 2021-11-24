@@ -1,11 +1,9 @@
 package nutcracker.util
 
-import scala.language.existentials
-
 import org.scalatest.funsuite.AnyFunSuite
-import shapeless.Nat._
-import shapeless.test.illTyped
-import shapeless.{HList, HNil, ::}
+import org.scalatest.matchers.should.Matchers._
+import nutcracker.util.HList.{HNil, ::}
+import nutcracker.util.Nat._
 
 class HListPtrTest extends AnyFunSuite {
 
@@ -24,14 +22,12 @@ class HListPtrTest extends AnyFunSuite {
     ()
   }
 
-  private def eval(testFun: => Unit): Unit = testFun
-
-  eval { illTyped("""ListPtr[ISB, _0]: Pointer[ISB, Boolean]""") }
-  eval { illTyped("""ListPtr[ISB, _1]: Pointer[ISB, Int]""") }
-  eval { illTyped("""ListPtr[ISB, _2]: Pointer[ISB, String]""") }
-
-  eval { illTyped("""ListPtr(_0): Pointer[ISB, String]""") }
-  eval { illTyped("""ListPtr(_1): Pointer[ISB, Boolean]""") }
-  eval { illTyped("""ListPtr(_2): Pointer[ISB, Int]""") }
-
+  test("ill-typed expressions should not typecheck") {
+    """HListPtr[ISB, _0]: Pointer[ISB, Boolean]""" shouldNot typeCheck
+    """HListPtr[ISB, _1]: Pointer[ISB, Int]""" shouldNot typeCheck
+    """HListPtr[ISB, _2]: Pointer[ISB, String]""" shouldNot typeCheck
+    """HListPtr(_0): Pointer[ISB, String]""" shouldNot typeCheck
+    """HListPtr(_1): Pointer[ISB, Boolean]""" shouldNot typeCheck
+    """HListPtr(_2): Pointer[ISB, Int]""" shouldNot typeCheck
+  }
 }

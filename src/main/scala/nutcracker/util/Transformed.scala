@@ -1,7 +1,8 @@
 package nutcracker.util
 
-import shapeless._
-import shapeless.poly.~>
+import nutcracker.util.HList.{::, HNil}
+import scalaz.{~>, Const}
+import scalaz.Id.Id
 
 trait Transformed[L <: HList, F[_], G[_]] extends Serializable {
   type Out <: HList
@@ -30,10 +31,10 @@ object Transformed {
       def map(f: F ~> G, fa: HNil): HNil = HNil
     }
 
-  implicit def hnilTransformed2[F[_], A]: Transformed.Aux[HNil, F, Const[A]#λ, HNil] =
-    new Transformed[HNil, F, Const[A]#λ] {
+  implicit def hnilTransformed2[F[_], A]: Transformed.Aux[HNil, F, Const[A, *], HNil] =
+    new Transformed[HNil, F, Const[A, *]] {
       type Out = HNil
-      def map(f: F ~> Const[A]#λ, fa: HNil): HNil = HNil
+      def map(f: F ~> Const[A, *], fa: HNil): HNil = HNil
     }
 
   implicit def hconsTransformed1[H, T <: HList, F[_], G[_]](implicit tr : Transformed[T, F, G]) =
@@ -54,15 +55,15 @@ object Transformed {
       def map(f: F ~> Id, fa: F[H] :: T): Out = f(fa.head) :: tr.map(f, fa.tail)
     }
 
-  implicit def hconsTransformed4[H, T <: HList, F[_], A](implicit tr : Transformed[T, F, Const[A]#λ]) =
-    new Transformed[F[H] :: T, F, Const[A]#λ] {
+  implicit def hconsTransformed4[H, T <: HList, F[_], A](implicit tr : Transformed[T, F, Const[A, *]]) =
+    new Transformed[F[H] :: T, F, Const[A, *]] {
       type Out = A :: tr.Out
-      def map(f: F ~> Const[A]#λ, fa: F[H] :: T): Out = f(fa.head) :: tr.map(f, fa.tail)
+      def map(f: F ~> Const[A, *], fa: F[H] :: T): Out = f(fa.head).getConst :: tr.map(f, fa.tail)
     }
 
-  implicit def hconsTransformed5[H, T <: HList, A](implicit tr : Transformed[T, Id, Const[A]#λ]) =
-    new Transformed[H :: T, Id, Const[A]#λ] {
+  implicit def hconsTransformed5[H, T <: HList, A](implicit tr : Transformed[T, Id, Const[A, *]]) =
+    new Transformed[H :: T, Id, Const[A, *]] {
       type Out = A :: tr.Out
-      def map(f: Id ~> Const[A]#λ, fa: H :: T): Out = f(fa.head) :: tr.map(f, fa.tail)
+      def map(f: Id ~> Const[A, *], fa: H :: T): Out = f(fa.head).getConst :: tr.map(f, fa.tail)
     }
 }

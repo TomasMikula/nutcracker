@@ -1,10 +1,9 @@
 package nutcracker.toolkit
 
 import nutcracker.{Assignment, Pattern, Recipe, Rel, Relations}
-import nutcracker.util.{ContU, FreeK, Inject, Mapped, MappedListBuilder, SummonHList}
+import nutcracker.util.{ContU, FreeK, HList, Inject, Mapped, MappedListBuilder, SummonHList}
 import scalaz.Order
 import scalaz.std.option._
-import shapeless.HList
 
 private[toolkit] sealed trait RelLang[K[_], A]
 

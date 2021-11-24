@@ -1,7 +1,7 @@
 package nutcracker
 
-import nutcracker.util.ChooseByPtrs
-import shapeless._
+import nutcracker.util.{ChooseByPtrs, HList}
+import nutcracker.util.HList.{::, HNil}
 
 /** N-ary relation (where N is determined by `L`).
   * Loosely speaking, it represents the signature of a database table,

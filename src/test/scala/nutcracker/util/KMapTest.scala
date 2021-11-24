@@ -1,7 +1,7 @@
 package nutcracker.util
 
 import org.scalatest.funsuite.AnyFunSuite
-import shapeless.test.illTyped
+import org.scalatest.matchers.should.Matchers._
 
 object KMapTest {
   final case class Foo[A]()
@@ -31,6 +31,6 @@ class KMapTest extends AnyFunSuite {
 
     val k2: Foo[String] = Foo()
 
-    illTyped("""m.put(k2)(v1)""")
+    """m.put(k2)(v1)""" shouldNot typeCheck
   }
 }

@@ -2,10 +2,9 @@ package nutcracker.rel
 
 import nutcracker.Pattern
 import nutcracker.Rel.{Rel1, Rel2, Rel3}
+import nutcracker.util.HList.{::, HNil}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
-import shapeless.test.illTyped
-import shapeless.{::, HNil}
 import scalaz.{IList, NonEmptyList}
 
 class PatternTest extends AnyFlatSpec {
@@ -37,11 +36,11 @@ class PatternTest extends AnyFlatSpec {
   }
 
   "Trying to build ill-typed pattern" should "not typecheck" in {
-    illTyped("""
+    """
       Pattern[ISBISB].build({ case i1 :: s1 :: b1 :: i2 :: s2 :: b2 :: HNil => NonEmptyList(
         R_II(i1 :: s1 :: HNil)
       ) })
-    """)
+    """ shouldNot typeCheck
   }
 
 

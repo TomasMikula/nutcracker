@@ -1,9 +1,9 @@
 package nutcracker
 
-import nutcracker.util.{ContU, Mapped, MappedListBuilder, SummonHList}
+import nutcracker.util.{ContU, HList, Mapped, MappedListBuilder, SummonHList}
+import nutcracker.util.HList.{::, HNil}
 import scalaz.syntax.bind._
 import scalaz.{Bind, Order}
-import shapeless.{::, HList, HNil}
 
 trait Relations[M[_]] {
   def relateImpl[L <: HList, OrderL <: HList](rel: Rel[L], values: L)(implicit m: Mapped.Aux[L, Order, OrderL], os: SummonHList[OrderL]): M[Unit]

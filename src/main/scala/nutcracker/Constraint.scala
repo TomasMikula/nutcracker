@@ -1,6 +1,6 @@
 package nutcracker
 
-import shapeless.HList
+import nutcracker.util.HList
 
 abstract class Constraint[L <: HList, K[_]](val rel: Rel[L]) {
 

@@ -2,8 +2,8 @@ package nutcracker.util
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
-import shapeless.{HNil, ::, HList}
-import shapeless.nat._
+import nutcracker.util.HList.{HNil, ::}
+import nutcracker.util.Nat._
 
 class ChooseTest extends AnyFlatSpec {
 

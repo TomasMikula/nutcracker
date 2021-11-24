@@ -1,12 +1,11 @@
 package nutcracker
 
 import nutcracker.Pattern.Orientation
-import nutcracker.util.{Pointers, ValuedPointers}
+import nutcracker.util.{HList, Nat, Pointers, ValuedPointers}
+import nutcracker.util.HList.Length
+import nutcracker.util.Nat.ToInt
 import scala.annotation.tailrec
 import scalaz.{ICons, IList, INil, NonEmptyList}
-import shapeless.ops.hlist.Length
-import shapeless.ops.nat.ToInt
-import shapeless.{:: => _, _}
 
 sealed trait Pattern[V <: HList] {
 

@@ -1,8 +1,7 @@
 package nutcracker.util
 
-import shapeless.Nat._0
-import shapeless.ops.hlist.Drop
-import shapeless.{Succ, Nat, HNil, HList, ::}
+import nutcracker.util.HList.{::, Drop, HNil}
+import nutcracker.util.Nat.{_0, Succ}
 
 trait Pointers[L <: HList] {
   type Out <: HList

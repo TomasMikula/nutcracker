@@ -1,10 +1,10 @@
 package nutcracker.rel
 
 import nutcracker.Assignment
+import nutcracker.util.HList.{::, HNil}
+import nutcracker.util.Nat.{_0, _1, _2}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
-import shapeless.{::, HNil}
-import shapeless.nat._
 
 class AssignmentTest extends AnyFlatSpec {
 
