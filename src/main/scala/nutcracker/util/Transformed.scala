@@ -37,31 +37,31 @@ object Transformed {
       def map(f: F ~> Const[A, *], fa: HNil): HNil = HNil
     }
 
-  implicit def hconsTransformed1[H, T <: HList, F[_], G[_]](implicit tr : Transformed[T, F, G]) =
+  implicit def hconsTransformed1[H, T <: HList, F[_], G[_]](implicit tr : Transformed[T, F, G]): Transformed.Aux[F[H] :: T, F, G, G[H] :: tr.Out] =
     new Transformed[F[H] :: T, F, G] {
       type Out = G[H] :: tr.Out
       def map(f: F ~> G, fa: F[H] :: T): Out = f(fa.head) :: tr.map(f, fa.tail)
     }
 
-  implicit def hconsTransformed2[H, T <: HList, G[_]](implicit tr : Transformed[T, Id, G]) =
+  implicit def hconsTransformed2[H, T <: HList, G[_]](implicit tr : Transformed[T, Id, G]): Transformed.Aux[H :: T, Id, G, G[H] :: tr.Out] =
     new Transformed[H :: T, Id, G] {
       type Out = G[H] :: tr.Out
       def map(f: Id ~> G, fa: H :: T): Out = f(fa.head) :: tr.map(f, fa.tail)
     }
 
-  implicit def hconsTransformed3[H, T <: HList, F[_]](implicit tr : Transformed[T, F, Id]) =
+  implicit def hconsTransformed3[H, T <: HList, F[_]](implicit tr : Transformed[T, F, Id]): Transformed.Aux[F[H] :: T, F, Id, H :: tr.Out] =
     new Transformed[F[H] :: T, F, Id] {
       type Out = H :: tr.Out
       def map(f: F ~> Id, fa: F[H] :: T): Out = f(fa.head) :: tr.map(f, fa.tail)
     }
 
-  implicit def hconsTransformed4[H, T <: HList, F[_], A](implicit tr : Transformed[T, F, Const[A, *]]) =
+  implicit def hconsTransformed4[H, T <: HList, F[_], A](implicit tr : Transformed[T, F, Const[A, *]]): Transformed.Aux[F[H] :: T, F, Const[A, *], A :: tr.Out] =
     new Transformed[F[H] :: T, F, Const[A, *]] {
       type Out = A :: tr.Out
       def map(f: F ~> Const[A, *], fa: F[H] :: T): Out = f(fa.head).getConst :: tr.map(f, fa.tail)
     }
 
-  implicit def hconsTransformed5[H, T <: HList, A](implicit tr : Transformed[T, Id, Const[A, *]]) =
+  implicit def hconsTransformed5[H, T <: HList, A](implicit tr : Transformed[T, Id, Const[A, *]]): Transformed.Aux[H :: T, Id, Const[A, *], A :: tr.Out] =
     new Transformed[H :: T, Id, Const[A, *]] {
       type Out = A :: tr.Out
       def map(f: Id ~> Const[A, *], fa: H :: T): Out = f(fa.head).getConst :: tr.map(f, fa.tail)

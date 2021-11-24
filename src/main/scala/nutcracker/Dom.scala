@@ -152,6 +152,10 @@ object Dom {
 
   /** import content to get implicit tupled Doms */
   object tupled {
-    implicit def tuple2[D1, D2](implicit dom1: Dom[D1], dom2: Dom[D2]) = Dom.tuple2[D1, D2]
+    implicit def tuple2[D1, D2](implicit
+      dom1: Dom[D1],
+      dom2: Dom[D2],
+    ): Dom.Aux[(D1, D2), dom1.Update \&/ dom2.Update, dom1.Delta \&/ dom2.Delta] =
+      Dom.tuple2[D1, D2]
   }
 }
