@@ -1,7 +1,7 @@
 package nutcracker.toolkit
 
 import nutcracker.util.CoproductK.:++:
-import nutcracker.util.KPair._
+import nutcracker.util.APairK._
 import nutcracker.{Assessment, BranchingPropagation, Propagation}
 import scala.language.existentials
 import scalaz.Id.Id

@@ -2,7 +2,7 @@ package nutcracker.toolkit
 
 import nutcracker.{OnDemandPropagation, Relations}
 import nutcracker.util.CoproductK._
-import nutcracker.util.KPair._
+import nutcracker.util.APairK._
 import scalaz.Monad
 
 trait PropRelToolkit extends OnDemandPropagationToolkit with RelToolkit

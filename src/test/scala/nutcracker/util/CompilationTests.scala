@@ -6,7 +6,7 @@ object CompilationTests {
 
   def f(): Unit = {
     import CoproductK._
-    import KPair._
+    import APairK._
 
     trait FooL[K[_], A]
     trait BarL[K[_], A]

@@ -42,7 +42,10 @@ final case class HKMap[K[_[_]], V[_[_]]](map: Map[K[Any], V[Any]]) extends AnyVa
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
   def size: Int = map.size
-  def head: (K[A], V[A]) forSome { type A[_] } = map.head.asInstanceOf[(K[A], V[A]) forSome { type A[_] }]
+  def head: APairK[K, V] = {
+    val (k, v) = map.head
+    APairK[K, V, Any](k, v)
+  }
   def tail: HKMap[K, V] = HKMap[K, V](map.tail)
   def apply[A[_]](k: K[A]): V[A] = map(k.asInstanceOf[K[Any]]).asInstanceOf[V[A]]
   def get[A[_]](k: K[A]): Option[V[A]] = map.get(k.asInstanceOf[K[Any]]).asInstanceOf[Option[V[A]]]
