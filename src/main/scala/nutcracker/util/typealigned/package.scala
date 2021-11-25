@@ -4,18 +4,7 @@ import nutcracker.util.typealigned.BalancedComposer.{Post, Pre}
 
 package object typealigned {
 
-  /**
-    * Type-aligned pair. Isomorphic to
-    *
-    * {{{
-    * (F[A], G[A]) forSome { type A }
-    * }}}
-    *
-    * The "pivot" type `A` is intentionally "hidden" as a type member
-    * (as opposed to being a type parameter), so that pairs that differ
-    * only in the pivot are considered to be of the same type and thus
-    * can be used as arguments to tail-optimized recursive calls.
-    */
+  /** Type-aligned pair. */
   type APair[F[_], G[_]] = BoundedAPair[Any, F, G]
 
   type Op[F[_, _], A, B] = F[B, A]
