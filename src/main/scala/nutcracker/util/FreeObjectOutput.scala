@@ -20,11 +20,16 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
   def ::(r: R): FreeObjectOutput[R, Ptr, A] = r +: this
 
   private def foldMap(showRef: Ptr ~> λ[α => R]): Lst[R] =
-    unwrap.foldMapRec[Writer[Lst[R], *]](λ[OutputInst[R, Ptr, *] ~> λ[α => Writer[Lst[R], Free[OutputInst[R, Ptr, *], α] \/ α]]](_ match {
-      case Write(r) => Writer(Lst.singleton(r), \/-(()))
-      case WriteRec(pa, _) => Writer(Lst.singleton(showRef(pa)), \/-(()))
-      case Nest(fa) => Writer(Lst.empty[R], -\/(fa.unwrap))
-    })).run._1
+    unwrap.foldMapRec[Writer[Lst[R], *]](
+      new (OutputInst[R, Ptr, *] ~> λ[α => Writer[Lst[R], Free[OutputInst[R, Ptr, *], α] \/ α]]) {
+        override def apply[X](fa: OutputInst[R, Ptr, X]) =
+          fa match {
+            case Write(r) => Writer(Lst.singleton(r), \/-(()))
+            case WriteRec(pa, _) => Writer(Lst.singleton(showRef(pa)), \/-(()))
+            case Nest(fa) => Writer(Lst.empty[R], -\/(fa.unwrap))
+          }
+      }
+    ).run._1
 
   /**
     *
@@ -44,35 +49,51 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
   private def foldBiState[S1, S2, M[_]](s1: S1)(step: S1 => Ptr ~> λ[α => (S1, S2 => (S2, Decoration[R])) \/ (S2, R)])(deref: Ptr ~> M)(implicit S2: Monoid[S2], M0: BindRec[M], M1: Applicative[M]): M[Tree[R]] = {
     import Tree._
     type S2_ = (S2, Tree[R]); import scalaz.std.tuple.tuple2Monoid
-    M0.map(unwrap.foldRunRecParM[M, S1, S2_](s1, λ[λ[α => (S1, OutputInst[R, Ptr, α])] ~> λ[α => M[(S1, Free[OutputInst[R, Ptr, *], α], S2_ => S2_) \/ (S2_, α)]]] {
-      case (s1, inst) => inst match {
-        case Write(r) => M1.point(\/-(((S2.zero, singleton(r)), ())))
-        case WriteRec(pa, f) => step(s1)(pa) match {
-          case -\/((s11, tr)) => M0.map(deref(pa)) { a =>
-            -\/((s11, f(a).unwrap, {
-              case (s2, tree) => tr(s2) match { case (s2, decor) => (s2, nest(decor.decorate(tree)(_ +: _, _ :+ _))) }
-            }))
-          }
-          case \/-((s2, r)) => M1.point(\/-(((s2, singleton(r)), ())))
+    M0.map(
+      unwrap.foldRunRecParM[M, S1, S2_](
+        s1,
+        new (λ[α => (S1, OutputInst[R, Ptr, α])] ~> λ[α => M[(S1, Free[OutputInst[R, Ptr, *], α], S2_ => S2_) \/ (S2_, α)]]) {
+          override def apply[X](fx: (S1, OutputInst[R, Ptr, X])) =
+            fx match {
+              case (s1, inst) => inst match {
+                case Write(r) => M1.point(\/-(((S2.zero, singleton(r)), ())))
+                case WriteRec(pa, f) => step(s1)(pa) match {
+                  case -\/((s11, tr)) => M0.map(deref(pa)) { a =>
+                    -\/((s11, f(a).unwrap, {
+                      case (s2, tree) => tr(s2) match { case (s2, decor) => (s2, nest(decor.decorate(tree)(_ +: _, _ :+ _))) }
+                    }))
+                  }
+                  case \/-((s2, r)) => M1.point(\/-(((s2, singleton(r)), ())))
+                }
+                case Nest(fx) => M1.point(-\/((s1, fx.unwrap, { case (s2, tree) => (s2, nest(tree)) })))
+              }
+            }
         }
-        case Nest(fx) => M1.point(-\/((s1, fx.unwrap, { case (s2, tree) => (s2, nest(tree)) })))
-      }
-    }))(_._1._2)
+      )
+    )(_._1._2)
   }
 
   /** Specialized [[foldBiState]] for `S2 = Unit`. */
   private def foldState[S, M[_]](s: S)(step: S => Ptr ~> λ[α => (S, Decoration[R]) \/ R])(deref: Ptr ~> M)(implicit M0: BindRec[M], M1: Applicative[M]): M[Tree[R]] = {
     type S2 = Tree[R]
-    M0.map(unwrap.foldRunRecParM[M, S, S2](s, λ[λ[α => (S, OutputInst[R, Ptr, α])] ~> λ[α => M[(S, Free[OutputInst[R, Ptr, *], α], S2 => S2) \/ (S2, α)]]] {
-      case (s, inst) => inst match {
-        case Write(r) => M1.point(\/-((Tree.singleton(r), ())))
-        case WriteRec(pa, f) => step(s)(pa) match {
-          case -\/((s1, decor)) => M0.map(deref(pa))(a => -\/((s1, f(a).unwrap, t => decor.decorate(t)(_ +: _, _ :+ _))))
-          case \/-(r) => M1.point(\/-((Tree.singleton(r), ())))
-        }
-        case Nest(fx) => M1.point(-\/((s, fx.unwrap, tree => Tree.nest(tree))))
-      }
-    }))(_._1)
+    M0.map(
+      unwrap.foldRunRecParM[M, S, S2](
+        s,
+        new (λ[α => (S, OutputInst[R, Ptr, α])] ~> λ[α => M[(S, Free[OutputInst[R, Ptr, *], α], S2 => S2) \/ (S2, α)]]) {
+          override def apply[X](fx: (S, OutputInst[R, Ptr, X])) =
+            fx match {
+              case (s, inst) => inst match {
+                case Write(r) => M1.point(\/-((Tree.singleton(r), ())))
+                case WriteRec(pa, f) => step(s)(pa) match {
+                  case -\/((s1, decor)) => M0.map(deref(pa))(a => -\/((s1, f(a).unwrap, t => decor.decorate(t)(_ +: _, _ :+ _))))
+                  case \/-(r) => M1.point(\/-((Tree.singleton(r), ())))
+                }
+                case Nest(fx) => M1.point(-\/((s, fx.unwrap, tree => Tree.nest(tree))))
+              }
+            }
+        },
+      )
+    )(_._1)
   }
 
   def eval(showReference: Ptr ~> λ[α => R]): Lst[R] =
@@ -99,14 +120,16 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     type S2 = Lst[Ptr[_]]  // referenced within the subgraph
 
     val step = (s1: S1) =>
-      λ[Ptr ~> λ[α => (S1, S2 => (S2, Decoration[R])) \/ (S2, R)]](pa => {
-        if(s1.exists(E.hEqualK(_, pa))) \/-((Lst.singleton(pa), showReference(pa)))
-        else -\/((pa :: s1, s2 => {
-          val s21 = s2.filterNot(E.hEqualK(_, pa))
-          val dec = if(s21.size < s2.size) decorateReferenced(pa) else decorateUnreferenced(pa)
-          (s21, dec)
-        }))
-      })
+      new (Ptr ~> λ[α => (S1, S2 => (S2, Decoration[R])) \/ (S2, R)]) {
+        override def apply[X](px: Ptr[X]) = {
+          if(s1.exists(E.hEqualK(_, px))) \/-((Lst.singleton(px), showReference(px)))
+          else -\/((px :: s1, s2 => {
+            val s21 = s2.filterNot(E.hEqualK(_, px))
+            val dec = if(s21.size < s2.size) decorateReferenced(px) else decorateUnreferenced(px)
+            (s21, dec)
+          }))
+        }
+      }
 
     foldBiState[S1, S2, M](Nil)(step)(deref)
   }
@@ -126,8 +149,10 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     M0.map(eval(deref, decorateReferenced, decorateUnreferenced, showReference))(_.aggregateLeft(b))
 
   def showAutoLabeled[M[_]](deref: Ptr ~> M, showRef: Ptr ~> λ[α => String])(
-    decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
-    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration.naked),
+    decorateReferenced: Ptr ~> λ[α => Decoration[String]] =
+      new (Ptr ~> λ[α => Decoration[String]]) { override def apply[X](ref: Ptr[X]) = Decoration(s"<def ${showRef(ref)}>", "</def>") },
+    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] =
+      new (Ptr ~> λ[α => Decoration[String]]) { override def apply[X](ref: Ptr[X]) = Decoration.naked },
     decorateReference: String => String = ref => s"<ref $ref/>"
   )(implicit
     E: HEqualK[Ptr],
@@ -140,13 +165,20 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
       deref,
       decorateReferenced,
       decorateUnreferenced,
-      λ[Ptr ~> λ[α => String]](p => decorateReference(showRef(p)))
+      new (Ptr ~> λ[α => String]) { override def apply[X](p: Ptr[X]) = decorateReference(showRef(p)) }
     ))(_.result())
 
   def printTree[M[_]](deref: Ptr ~> M, showRef: Ptr ~> λ[α => String], lineLimit: Int = 60, tab: String = "  ", newLine: String = "\n")(
-    decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
-    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration.naked),
-    decorateReference: String => String = ref => s"<ref $ref/>"
+    decorateReferenced: Ptr ~> λ[α => Decoration[String]] =
+      new (Ptr ~> λ[α => Decoration[String]]) {
+        override def apply[X](ref: Ptr[X]) = Decoration(s"<def ${showRef(ref)}>", "</def>")
+      },
+    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] =
+      new (Ptr ~> λ[α => Decoration[String]]) {
+        override def apply[X](ref: Ptr[X]) = Decoration.naked
+      },
+    decorateReference: String => String =
+      ref => s"<ref $ref/>"
   )(implicit
     E: HEqualK[Ptr],
     M0: BindRec[M],
@@ -157,7 +189,9 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
       deref,
       decorateReferenced,
       decorateUnreferenced,
-      λ[Ptr ~> λ[α => String]](p => decorateReference(showRef(p)))
+      new (Ptr ~> λ[α => String]) {
+        override def apply[X](p: Ptr[X]) = decorateReference(showRef(p))
+      },
     ))(_.print(lineLimit, tab, newLine)(_.length).aggregateLeft(new StringBuilder).result())
 
   /** Serialize, cutting off cycles. Pointers that would cause cycles will be handled by `showReference`. */
@@ -173,10 +207,11 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     type S = List[Ptr[_]] // context, i.e. all parents
 
     val step = (s: S) =>
-      λ[Ptr ~> λ[α => (S, Decoration[R]) \/ R]](pa => {
-        if(s.exists(E.hEqualK(_, pa))) \/-(showReference(pa))
-        else -\/((pa :: s, decorateContent(pa)))
-      })
+      new (Ptr ~> λ[α => (S, Decoration[R]) \/ R]) {
+        override def apply[X](px: Ptr[X]) =
+          if (s.exists(E.hEqualK(_, px))) \/-(showReference(px))
+          else -\/((px :: s, decorateContent(px)))
+      }
 
     foldState[S, M](Nil)(step)(deref)
   }
@@ -207,21 +242,31 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     M0.map(appendTo(new StringBuilder, deref, decorateContent, showReference))(_.result())
 
   def writeTo[O](out: O)(implicit O: ObjectOutput[O, R, Ptr]): O =
-    unwrap.foldRunRec[O](out, λ[λ[α => (O, OutputInst[R, Ptr, α])] ~> λ[α => (O, Free[OutputInst[R, Ptr, *], α], O => O) \/ (O, α)]] {
-      case (out, i) => i match {
-        case Write(r) => \/-((O.write(out, r), ()))
-        case WriteRec(pa, f) => \/-((O.writeSubObject(out, pa)(f), ()))
-        case Nest(fx) => -\/((out, fx.unwrap, o => o)) // Note: if ObjectOutput supported nesting, here we would
-                                                       // "open a parenthesis" and close it in the continuation
+    unwrap.foldRunRec[O](
+      out,
+      new (λ[α => (O, OutputInst[R, Ptr, α])] ~> λ[α => (O, Free[OutputInst[R, Ptr, *], α], O => O) \/ (O, α)]) {
+        override def apply[X](fx: (O, OutputInst[R, Ptr, X])) = fx match {
+          case (out, i) => i match {
+            case Write(r) => \/-((O.write(out, r), ()))
+            case WriteRec(pa, f) => \/-((O.writeSubObject(out, pa)(f), ()))
+            case Nest(fx) => -\/((out, fx.unwrap, o => o)) // Note: if ObjectOutput supported nesting, here we would
+                                                           // "open a parenthesis" and close it in the continuation
+          }
+        }
       }
-    })._1
+    )._1
 
   def serialize[M[_]](implicit M: MonadObjectOutput[M, R, Ptr]): M[A] =
-    unwrap.foldMap[M](λ[OutputInst[R, Ptr, *] ~> M](_ match {
-      case Write(r) => M.write(r)
-      case WriteRec(pa, f) => M.writeRec(pa)(f(_).serialize[M])
-      case Nest(fx) => M.nest(fx.serialize[M])
-    }))
+    unwrap.foldMap[M](
+      new (OutputInst[R, Ptr, *] ~> M) {
+        override def apply[X](fx: OutputInst[R, Ptr, X]) =
+          fx match {
+            case Write(r) => M.write(r)
+            case WriteRec(pa, f) => M.writeRec(pa)(f(_).serialize[M])
+            case Nest(fx) => M.nest(fx.serialize[M])
+          }
+      }
+    )
 }
 
 object FreeObjectOutput {

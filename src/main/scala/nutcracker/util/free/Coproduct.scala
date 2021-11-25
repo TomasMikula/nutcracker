@@ -16,14 +16,20 @@ sealed trait :+:[F[_], B <: CoproductBuilder] extends CoproductBuilder {
 
 object Coproduct {
   def injectLeft[F[_], G[_], H[_]](f: F ~> G): (F :++: H)#Out ~> (G :++: H)#Out =
-    λ[(F :++: H)#Out ~> (G :++: H)#Out](_ match {
-      case Left(fa) => Left(f(fa))
-      case Right(ha) => Right(ha)
-    })
+    new ((F :++: H)#Out ~> (G :++: H)#Out) {
+      override def apply[A](ca: (F :++: H)#Out[A]): (G :++: H)#Out[A] =
+        ca match {
+          case Left(fa) => Left(f(fa))
+          case Right(ha) => Right(ha)
+        }
+    }
 
   def injectRight[F[_], G[_], H[_]](f: G ~> H): (F :++: G)#Out ~> (F :++: H)#Out =
-    λ[(F :++: G)#Out ~> (F :++: H)#Out](_ match {
-      case Left(fa) => Left(fa)
-      case Right(ga) => Right(f(ga))
-    })
+    new ((F :++: G)#Out ~> (F :++: H)#Out) {
+      override def apply[A](ca: (F :++: G)#Out[A]): (F :++: H)#Out[A] =
+        ca match {
+          case Left(fa) => Left(fa)
+          case Right(ga) => Right(f(ga))
+        }
+    }
 }

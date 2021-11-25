@@ -44,7 +44,10 @@ object WriterStateT extends WriterStateTInstances {
     unfold[F, G[W0], S](gw, gw => G.uncons(gw).map({ case (w0, gw) => (f(w0), gw) }))(s)(F0, F1, G.monoid[W0])
 
   def recurse[H[_], F[_], G[_], W0, S](f: H ~> WriterStateT[G[W0], S, F, *])(wh: W0 => H[Unit])(implicit F0: BindRec[F], F1: Monad[F], G: Catenable[G]): H ~> StateT[S, F, *] =
-    λ[H ~> StateT[S, F, *]](ha => f(ha).recurse(gw => G.uncons(gw).map({ case (w0, gw) => (f(wh(w0)), gw) }))(F0, F1, G.monoid[W0]))
+    new (H ~> StateT[S, F, *]) {
+      override def apply[A](ha: H[A]): StateT[S, F, A] =
+        f(ha).recurse(gw => G.uncons(gw).map({ case (w0, gw) => (f(wh(w0)), gw) }))(F0, F1, G.monoid[W0])
+    }
 }
 
 trait WriterStateTInstances extends WriterStateTInstances1 {

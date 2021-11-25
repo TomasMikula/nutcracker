@@ -5,7 +5,7 @@ import scalaz.{FreeBind => _, _}
 
 final case class Trampoline[A] private(unwrap: FreeBind[Id, A]) extends AnyVal {
   def apply(): A = eval
-  def eval: A = unwrap.foldMap(λ[Id ~> Id](x => x))
+  def eval: A = unwrap.foldMap(new (Id ~> Id) { override def apply[X](x: X) = x })
   def flatMap[B](f: A => Trampoline[B]): Trampoline[B] = Trampoline(unwrap.flatMap(a => f(a).unwrap))
 }
 

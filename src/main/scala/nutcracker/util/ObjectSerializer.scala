@@ -26,8 +26,14 @@ trait ObjectSerializer[A, S, Ptr[_]] { self =>
   final def free(a: A): FreeObjectOutput[S, Ptr, Unit] = serialize[FreeObjectOutput[S, Ptr, *]](a)
 
   def show(deref: Ptr ~> Id, showRef: Ptr ~> λ[α => String])(
-    decorateReferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration(s"<def ${showRef(ref)}>", "</def>")),
-    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] = λ[Ptr ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
+    decorateReferenced: Ptr ~> λ[α => Decoration[String]] =
+      new (Ptr ~> λ[α => Decoration[String]]) {
+        override def apply[X](ref: Ptr[X]): Decoration[String] = Decoration(s"<def ${showRef(ref)}>", "</def>")
+      },
+    decorateUnreferenced: Ptr ~> λ[α => Decoration[String]] =
+      new (Ptr ~> λ[α => Decoration[String]]) {
+        override def apply[X](ref: Ptr[X]): Decoration[String] = Decoration("", "")
+      },
     decorateReference: String => String = ref => s"<ref $ref/>"
   )(implicit E: HEqualK[Ptr], ev: S === String): Show[A] =
     Show.shows[A] { a =>

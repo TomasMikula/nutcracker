@@ -24,10 +24,15 @@ final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A
     FreeT(unwrap.mapF[(M :++: G)#Out](Coproduct.injectRight[M, F, G](f)))
 
   def foldMap(f: F ~> M)(implicit M: BindRec[M]): M[A] =
-    unwrap.foldMap(λ[F1 ~> M](_ match {
-      case Left(mx) => mx
-      case Right(fx) => f(fx)
-    }))
+    unwrap.foldMap(
+      new (F1 ~> M) {
+        override def apply[X](fx: F1[X]): M[X] =
+          fx match {
+            case Left(mx) => mx
+            case Right(fx) => f(fx)
+          }
+      }
+    )
 
   def foldMapRec(tr: F ~> FreeT[F, M, *])(implicit M: BindRec[M]): M[A] = {
     @tailrec def toM[Z](fa: FreeBind[F1, Z]): M[FreeBind[F1, Z] \/ Z] = {
@@ -44,10 +49,15 @@ final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A
           }
       }
     }
-    unwrap.foldMapRec[M](λ[F1 ~> λ[α => M[FreeBind[F1, α] \/ α]]](_ match {
-      case Left(mx) => M.map(mx)(\/.right)
-      case Right(fx) => toM(tr(fx).unwrap)
-    }))
+    unwrap.foldMapRec[M](
+      new (F1 ~> λ[α => M[FreeBind[F1, α] \/ α]]) {
+        override def apply[X](fx: F1[X]) =
+          fx match {
+            case Left(mx) => M.map(mx)(\/.right)
+            case Right(fx) => toM(tr(fx).unwrap)
+          }
+      }
+    )
   }
 
   def cata[B](f: A => B)(implicit F: Foldable[F], M: Foldable[M], B: Monoid[B]): B =
@@ -71,11 +81,14 @@ final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A
           case Left(ma) => M0.map(ma)(a => \/-(FreeT.point(a)))
           case Right(fa) => M1.point(\/.right(FreeT.liftF[F, M, A](fa)))
         },
-        λ[unwrap.Bound ~> Const[M[FreeT[F, M, A] \/ FreeT[F, M, A]], *]] {
-          case (mfz, f) => mfz match {
-            case  Left(mz) => M0.map(mz)(z => -\/(FreeT(f(z))))
-            case Right(fz) => M1.point(\/-(FreeT.liftBind(fz, f andThen FreeT.apply)))
-          }
+        new (unwrap.Bound ~> Const[M[FreeT[F, M, A] \/ FreeT[F, M, A]], *]) {
+          override def apply[X](b: unwrap.Bound[X]): Const[M[FreeT[F, M, A] \/ FreeT[F, M, A]], X] =
+            b match {
+              case (mfz, f) => mfz match {
+                case Left(mz) => M0.map(mz)(z => -\/(FreeT(f(z))))
+                case Right(fz) => M1.point(\/-(FreeT.liftBind(fz, f andThen FreeT.apply)))
+              }
+            }
         }
       )
 

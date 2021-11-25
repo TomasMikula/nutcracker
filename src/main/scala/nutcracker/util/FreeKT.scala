@@ -71,8 +71,9 @@ object FreeKT {
     M: Applicative[M]
   ): FreeKT[F, M, *] ~> FreeKT[G, M, *] =
     new (FreeKT[F, M, *] ~> FreeKT[G, M, *]) { self =>
-      val tr = λ[F[FreeKT[F, M, *], *] ~> G[FreeKT[G, M, *], *]] {
-        fa => inj(FK.transform(fa)(self))
+      val tr = new (F[FreeKT[F, M, *], *] ~> G[FreeKT[G, M, *], *]) {
+        override def apply[A](fa: F[FreeKT[F, M, *], A]): G[FreeKT[G, M, *], A] =
+          inj(FK.transform(fa)(self))
       }
 
       def apply[A](fa: FreeKT[F, M, A]): FreeKT[G, M, A] =

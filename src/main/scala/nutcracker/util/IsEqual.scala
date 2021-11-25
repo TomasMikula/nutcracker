@@ -19,14 +19,21 @@ final case class IsEqual[Ptr1[_], Ptr2[_]] private (private val unwrap: Free[IsE
 
     type F[X] = IsEqF[Ptr1, Ptr2, X]
 
-    M0.map(unwrap.foldRunRecParM[M, Γ, Unit](Γ(), λ[λ[α => (Γ, F[α])] ~> λ[α => M[(Γ, Free[F, α], Unit => Unit) \/ (Unit, α)]]] {
-      case (γ, fx) => fx match {
-        case Pair(p1, p2, f) =>
-          val p1_eq = γ.getOrElse(p1)(INil())
-          if(p1_eq.find(ep2 => eq2.hEqualK(ep2.value, p2)).isJust) M1.point(\/-(((), true)))
-          else deref1(p1) >>= (x => M1.map(deref2(p2))(y => -\/((γ.put(p1)(Exists(p2) :: p1_eq), f(x, y).unwrap, identity))))
-      }
-    }))(_._2)
+    M0.map(
+      unwrap.foldRunRecParM[M, Γ, Unit](
+        Γ(),
+        new (λ[α => (Γ, F[α])] ~> λ[α => M[(Γ, Free[F, α], Unit => Unit) \/ (Unit, α)]]) {
+          override def apply[A](fa: (Γ, F[A])) = fa match {
+            case (γ, fx) => fx match {
+              case Pair(p1, p2, f) =>
+                val p1_eq = γ.getOrElse(p1)(INil())
+                if(p1_eq.find(ep2 => eq2.hEqualK(ep2.value, p2)).isJust) M1.point(\/-(((), true)))
+                else deref1(p1) >>= (x => M1.map(deref2(p2))(y => -\/((γ.put(p1)(Exists(p2) :: p1_eq), f(x, y).unwrap, identity))))
+            }
+          }
+        },
+      )
+    )(_._2)
   }
 }
 

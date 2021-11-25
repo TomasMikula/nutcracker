@@ -48,5 +48,9 @@ object PropBranch extends FreePropagationToolkit with FreeBranchingToolkit with 
   def emptyK[K[_]]: StateK[K] = Prop.emptyK[K] :*: Branch.emptyK[K]
 
   def assess(s: State): Assessment[List[Prg[Unit]]] =
-    Branch.assess(s._2)(λ[Var ~> Id](ref => Prop.fetchK(ref, s._1)))
+    Branch.assess(s._2)(
+      new (Var ~> Id) {
+        override def apply[A](ref: Var[A]): A = Prop.fetchK(ref, s._1)
+      }
+    )
 }

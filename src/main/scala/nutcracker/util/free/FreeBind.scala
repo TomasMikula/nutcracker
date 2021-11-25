@@ -38,16 +38,20 @@ sealed abstract class FreeBind[F[_], A] {
   def mapF[G[_]](f: F ~> G): FreeBind[G, A] =
     handle(
       fa => LiftF(f(fa)),
-      λ[Bound ~> Const[FreeBind[G, A], *]] {
-        case (fz, g) => LiftF(f(fz)) flatMap (z => g(z).mapF[G](f))
+      new (Bound ~> Const[FreeBind[G, A], *]) {
+        override def apply[X](b: Bound[X]) = b match {
+          case (fz, g) => LiftF(f(fz)) flatMap (z => g(z).mapF[G](f))
+        }
       }
     )
 
   def foldMap[M[_]](f: F ~> M)(implicit M: BindRec[M]): M[A] =
     M.tailrecM(this)(_.handle[M[FreeBind[F, A] \/ A]](
       fa => f(fa) map (\/.right),
-      λ[Bound ~> Const[M[FreeBind[F, A] \/ A], *]] {
-        case (fz, g) => f(fz) map { z => \/.left(g(z)) }
+      new (Bound ~> Const[M[FreeBind[F, A] \/ A], *]) {
+        override def apply[X](b: Bound[X]) = b match {
+          case (fz, g) => f(fz) map { z => \/.left(g(z)) }
+        }
       }
     ))
 
@@ -74,8 +78,10 @@ sealed abstract class FreeBind[F[_], A] {
     M.tailrecM((s, this)) { case (s, fa) =>
       fa.handle[M[(S, FreeBind[F, A]) \/ (S, A)]](
         fa => f((s, fa)) map (\/.right),
-        λ[Bound ~> Const[M[(S, FreeBind[F, A]) \/ (S, A)], *]] {
-          case (fz, g) => f((s, fz)) map { case (s, z) => \/.left((s, g(z))) }
+        new (Bound ~> Const[M[(S, FreeBind[F, A]) \/ (S, A)], *]) {
+          override def apply[X](b: Bound[X]) = b match {
+            case (fz, g) => f((s, fz)) map { case (s, z) => \/.left((s, g(z))) }
+          }
         }
       )
     }
@@ -90,13 +96,17 @@ sealed abstract class FreeBind[F[_], A] {
     def X0[α, β](fα: FreeBind[F, α], l: AList[Tr, α, β]): X0[β] = APair[FreeBind[F, *], AList[Tr, *, β], α](fα, l)
 
     def applyTransitions[α, β](s: S, α: α, l: AList[Tr, α, β]): (S, X0[β]) \/ (S, β) =
-      l.foldLeftWhile[(S, *), λ[α => (S, FreeBind[F, α])]]((s, α))(λ[λ[α => APair[(S, *), Tr[*, α]]] ~> λ[α => (S, FreeBind[F, α]) \/ (S, α)]](p => {
-        val ((s, x), tr) = (p._1, p._2)
-        tr match {
-          case StateTr(f, ev) => \/-((f(s), ev(x)))
-          case FlatMap(f) => -\/((s, f(x)))
+      l.foldLeftWhile[(S, *), λ[α => (S, FreeBind[F, α])]]((s, α))(
+        new (λ[α => APair[(S, *), Tr[*, α]]] ~> λ[α => (S, FreeBind[F, α]) \/ (S, α)]) {
+          override def apply[Y](p: APair[(S, *), Tr[*, Y]]) = {
+            val ((s, x), tr) = (p._1, p._2)
+            tr match {
+              case StateTr(f, ev) => \/-((f(s), ev(x)))
+              case FlatMap(f) => -\/((s, f(x)))
+            }
+          }
         }
-      })).leftMap(p => (p._1._1, X0(p._1._2, p._2)))
+      ).leftMap(p => (p._1._1, X0(p._1._2, p._2)))
 
     type X = X0[A]
     def X(fa: FreeBind[F, A]): X = APair[FreeBind[F, *], AList[Tr, *, A], A](fa, AList.empty[Tr, A])
@@ -121,11 +131,15 @@ sealed abstract class FreeBind[F[_], A] {
   def foldRunRecParM[M[_], S1, S2](s: S1, f: λ[α => (S1, F[α])] ~> λ[α => M[(S1, FreeBind[F, α], S2 => S2) \/ (S2, α)]])(implicit M: BindRec[M], S2: Monoid[S2]): M[(S2, A)] = {
     import scalaz.syntax.monoid._
     type S = (S1, S2)
-    val g = λ[λ[α => (S, F[α])] ~> λ[α => M[(S, FreeBind[F, α], S => S) \/ (S, α)]]] {
-      case ((s1, s2), fa) =>
-        f((s1, fa)) map {
-          case -\/((s1_, fa, tr)) => -\/(((s1_, S2.zero), fa, { case (_, s2_) => (s1, s2 |+| tr(s2_)) }))
-          case \/-((s2_, a)) => \/-(((s1, s2 |+| s2_), a))
+    type SF[X] = (S, F[X])
+    val g = new (SF ~> λ[α => M[(S, FreeBind[F, α], S => S) \/ (S, α)]]) {
+      override def apply[X](sfx: SF[X]) =
+        sfx match {
+          case ((s1, s2), fa) =>
+            f((s1, fa)) map {
+              case -\/((s1_, fa, tr)) => -\/(((s1_, S2.zero), fa, { case (_, s2_) => (s1, s2 |+| tr(s2_)) }))
+              case \/-((s2_, a)) => \/-(((s1, s2 |+| s2_), a))
+            }
         }
     }
     foldRunRecM[M, (S1, S2)]((s, S2.zero), g) map { case ((s1, s2), a) => (s2, a) }

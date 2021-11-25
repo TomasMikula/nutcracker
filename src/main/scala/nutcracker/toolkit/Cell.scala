@@ -127,10 +127,14 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
         val pending = pending1 ::: pending0
 
         val blocked0 = blockedPendingObservers.mapValues[BlockedPendingObserver[up.NewValue, *]](
-          λ[BlockedPendingObserver[Value, *] ~> BlockedPendingObserver[up.NewValue, *]](_.addDelta(delta))
+          new (BlockedPendingObserver[Value, *] ~> BlockedPendingObserver[up.NewValue, *]) {
+            override def apply[A](o: BlockedPendingObserver[Value, A]) = o.addDelta(delta)
+          }
         )
         val blocked1 = blockedIdleObservers.mapValues[BlockedPendingObserver[up.NewValue, *]](
-          λ[BlockedIdleObserver[Value, *] ~> BlockedPendingObserver[up.NewValue, *]](_.addDelta(delta))
+          new (BlockedIdleObserver[Value, *] ~> BlockedPendingObserver[up.NewValue, *]) {
+            override def apply[A](o: BlockedIdleObserver[Value, A]) = o.addDelta(delta)
+          }
         )
         val blocked = blocked0 ++ blocked1
 

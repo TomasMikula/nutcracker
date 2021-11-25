@@ -50,10 +50,14 @@ trait InjectInstances1 extends InjectInstances2 {
 
 trait InjectInstances2 extends InjectInstances3 {
   implicit def freeLift[F[_]]: Inject[F, Free[F, *]] =
-    λ[Inject[F, Free[F, *]]].inj(fa => Free.liftF(fa))
+    new Inject[F, Free[F, *]] {
+      override def inj[A](fa: F[A]): Free[F, A] = Free.liftF(fa)
+    }
 
   implicit def freeKLift[F[_[_], _]]: Inject[F[FreeK[F, *], *], FreeK[F, *]] =
-    λ[Inject[F[FreeK[F, *], *], FreeK[F, *]]].inj(fa => FreeK.liftF(fa))
+    new Inject[F[FreeK[F, *], *], FreeK[F, *]] {
+      override def inj[A](fa: F[FreeK[F, *], A]): FreeK[F, A] = FreeK.liftF(fa)
+    }
 }
 
 trait InjectInstances3 extends InjectInstances4 {
