@@ -1,6 +1,6 @@
 package nutcracker.data
 
-import nutcracker.ops._
+import nutcracker.ops.Ops._
 import nutcracker.util.ops.iterator._
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
 import nutcracker.{Dom, Propagation, Subscription, UpdateResult}

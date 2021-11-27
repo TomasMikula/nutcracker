@@ -2,7 +2,7 @@ package nutcracker.demo
 
 import nutcracker.data.bool.Bool._
 import nutcracker.data.bool._
-import nutcracker.ops._
+import nutcracker.ops.Ops._
 import nutcracker.util.ops.applicative._
 import org.scalatest.funspec.AnyFunSpec
 import scalaz.Traverse

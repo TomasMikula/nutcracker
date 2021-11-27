@@ -3,7 +3,7 @@ package nutcracker.demo
 import nutcracker.data.Promises
 import nutcracker.data.bool.Bool._
 import nutcracker.data.bool._
-import nutcracker.ops._
+import nutcracker.ops.Ops._
 import nutcracker.toolkit.PropBranchToolkit
 import org.scalatest.freespec.AnyFreeSpec
 import scalaz.std.anyVal._

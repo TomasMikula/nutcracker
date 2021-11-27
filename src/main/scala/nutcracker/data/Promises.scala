@@ -1,6 +1,6 @@
 package nutcracker.data
 
-import nutcracker.ops._
+import nutcracker.ops.Ops._
 import nutcracker.{Dom, Final, Propagation}
 import scalaz.std.tuple._
 import scalaz.std.vector._

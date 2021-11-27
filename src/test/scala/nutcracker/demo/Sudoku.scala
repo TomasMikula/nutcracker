@@ -2,8 +2,8 @@ package nutcracker.demo
 
 import nutcracker.data.DecSet
 import nutcracker.data.DecSet._
-import nutcracker.ops._
-import nutcracker.util.ops._
+import nutcracker.ops.Ops._
+import nutcracker.util.ops.Ops._
 import org.scalatest.funsuite.AnyFunSuite
 import scalaz.std.anyVal._
 import scalaz.syntax.monad._

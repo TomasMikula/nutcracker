@@ -1,8 +1,8 @@
 package nutcracker.toolkit
 
-import nutcracker.ops._
+import nutcracker.ops.Ops._
 import nutcracker.util.{FreeK, Inject, Lst, MonadTellState, StateInterpreter, StratifiedMonoidAggregator}
-import nutcracker.util.ops._
+import nutcracker.util.ops.Ops._
 import nutcracker.{Assessment, BranchingPropagation, Propagation, Splittable, Subscription}
 import scalaz.Id.Id
 import scalaz.{Bind, Lens, ~>}

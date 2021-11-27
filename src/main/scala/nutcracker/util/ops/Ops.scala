@@ -1,6 +1,6 @@
-package nutcracker.util
+package nutcracker.util.ops
 
-package object ops
+object Ops
   extends ToLensOps
      with ToDescOps
      with ToFoldableOps

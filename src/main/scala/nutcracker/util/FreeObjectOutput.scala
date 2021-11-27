@@ -1,7 +1,7 @@
 package nutcracker.util
 
 import nutcracker.util.free.Free
-import nutcracker.util.ops.toFoldableOps
+import nutcracker.util.ops.Ops.toFoldableOps
 
 import scala.annotation.tailrec
 import scalaz.{-\/, Applicative, BindRec, Foldable, Monoid, Writer, \/, \/-, ~>, ===}

@@ -6,7 +6,7 @@ import scalaz.syntax.applicative._
 import scalaz.syntax.bind0._
 
 package object util {
-  import ops._
+  import ops.Ops._
 
   // workaround for https://issues.scala-lang.org/browse/SI-9453
   // suggested by Miles Sabin in the comments

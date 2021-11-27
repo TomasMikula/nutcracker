@@ -3,7 +3,7 @@ package nutcracker.toolkit
 import nutcracker.Defer
 import nutcracker.util.algebraic.{NonDecreasingMonoid, OrderPreservingMonoid}
 import nutcracker.util.{FreeK, Inject, Lst, MonadTellState, StateInterpreter, StratifiedMonoidAggregator}
-import nutcracker.util.ops._
+import nutcracker.util.ops.Ops._
 import scalaz.{Bind, Heap, Lens, Order}
 import scalaz.syntax.monoid._
 

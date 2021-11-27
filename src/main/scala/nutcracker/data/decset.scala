@@ -1,7 +1,7 @@
 package nutcracker.data
 
 import nutcracker.BranchingPropagation._
-import nutcracker.ops._
+import nutcracker.ops.Ops._
 import nutcracker.{BranchingPropagation, Final, RelativelyComplementedDom, Splittable, SplittableJoinDom, TerminalDom, UpdateResult}
 import scalaz.syntax.bind._
 import scalaz.{Bind, Cont}

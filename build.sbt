@@ -24,7 +24,7 @@ scalacOptions ++=
     "-Ypatmat-exhaust-depth", "40",
   ) ++ (
     CrossVersion.partialVersion(scalaVersion.value) match {
-      case _             => Seq("-Wunused:imports")
+      case Some((2, 13)) => Seq("-Wunused:imports", "-Xsource:3")
     }
   )
 

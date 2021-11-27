@@ -2,7 +2,7 @@ package nutcracker.data.bool
 
 import nutcracker.{BranchingPropagation, Dom, Subscription, UpdateResult}
 import nutcracker.data.bool.Bool._
-import nutcracker.ops._
+import nutcracker.ops.Ops._
 import scalaz.{Applicative, Apply, Bind, Monad, Traverse}
 import scalaz.std.list._
 import scalaz.syntax.apply._

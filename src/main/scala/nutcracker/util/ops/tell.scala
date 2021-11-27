@@ -1,5 +1,6 @@
 package nutcracker.util.ops
 
+import nutcracker.util.ops.iterator._
 import scala.language.implicitConversions
 import scalaz.MonadTell
 

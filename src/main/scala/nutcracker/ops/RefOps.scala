@@ -35,6 +35,8 @@ trait ToVarOps {
     VarOps(ref)
 }
 
+object VarOps extends ToVarOps
+
 final case class FinalValOps[M[_], Var[_], Val[_], D, U, Δ, A](ref: Val[D])(implicit dom: Dom.Aux[D, U, Δ], fin: Final.Aux[D, A], P: Propagation[M, Var, Val]) {
 
   def whenFinal(f: A => M[Unit]): M[Subscription[M]] =
@@ -73,6 +75,8 @@ trait ToFinalValOps {
     FinalValOps[M, Var, Val, D, dom.Update, dom.Delta, fin.Out](P.readOnly(ref))(dom, fin, P)
 }
 
+object FinalValOps extends ToFinalValOps
+
 final case class JoinValOps[M[_], Var[_], Val[_], D, U, Δ](ref: Val[D])(implicit dom: JoinDom.Aux[D, U, Δ], P: Propagation[M, Var, Val]) {
 
   def ==>(target: Var[D])(implicit M: Functor[M]): M[Subscription[M]] = {
@@ -86,7 +90,11 @@ trait ToJoinValOps {
     JoinValOps[M, Var, Val, D, dom.Update, dom.Delta](ref)(dom, P)
 }
 
+object JoinValOps extends ToJoinValOps
+
 final case class JoinVarOps[M[_], Var[_], Val[_], D, U, Δ](ref: Var[D])(implicit dom: JoinDom.Aux[D, U, Δ], P: Propagation[M, Var, Val]) {
+  import JoinValOps._
+  import VarOps._
 
   def set[A](a: A)(implicit fin: Final.Aux[D, A]): M[Unit] =
     P.update(ref).by(dom.toJoinUpdate(fin.embed(a)))
@@ -105,8 +113,13 @@ trait ToJoinVarOps {
     JoinVarOps[M, Var, Val, D, dom.Update, dom.Delta](ref)(dom, P)
 }
 
+object JoinVarOps extends ToJoinVarOps
+
 final case class RelativelyComplementedRefOps[Ref[_], D, U, Δ](ref: Ref[D])(implicit dom: RelativelyComplementedDom.Aux[D, U, Δ]) {
+  import FinalValOps._
+  import JoinVarOps._
   import RelativelyComplementedRefOps._
+  import VarOps._
 
   def exclude[M[_], Val[_]](d: D)(implicit P: Propagation[M, Ref, Val]): M[Unit] =
     excludeVal(ref, d)
@@ -144,7 +157,10 @@ final case class RelativelyComplementedRefOps[Ref[_], D, U, Δ](ref: Ref[D])(imp
   }
 }
 
-object RelativelyComplementedRefOps {
+object RelativelyComplementedRefOps extends ToRelativelyComplementedRefOps {
+  import FinalValOps._
+  import VarOps._
+
   def excludeVal[M[_], Var[_], Val[_], D](ref: Var[D], d: D)(implicit dom: RelativelyComplementedDom[D], P: Propagation[M, Var, Val]): M[Unit] =
     P.update(ref).by(dom.toComplementUpdate(d))
 
@@ -161,6 +177,8 @@ trait ToRelativelyComplementedRefOps {
 }
 
 final case class RelativelyComplementedRefSeqOps[Ref[_], D, U, Δ](refs: IndexedSeq[Ref[D]])(implicit dom: RelativelyComplementedDom.Aux[D, U, Δ]) {
+  import FinalValOps._
+  import RelativelyComplementedRefOps._
 
   private implicit val traverseIterable: Traverse[Iterable] = new Traverse[Iterable] {
     def traverseImpl[G[_], A, B](fa: Iterable[A])(f: A => G[B])(implicit G: Applicative[G]): G[Iterable[B]] = {

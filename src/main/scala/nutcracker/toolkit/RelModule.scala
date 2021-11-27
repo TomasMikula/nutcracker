@@ -2,7 +2,7 @@ package nutcracker.toolkit
 
 import nutcracker.Relations
 import nutcracker.util.{FreeK, Inject, Lst, MonadTellState, StateInterpreter, StratifiedMonoidAggregator}
-import nutcracker.util.ops._
+import nutcracker.util.ops.Ops._
 import scalaz.{Bind, Lens}
 
 trait RelModule extends Module {

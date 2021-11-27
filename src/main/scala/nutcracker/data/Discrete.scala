@@ -1,6 +1,6 @@
 package nutcracker.data
 
-import nutcracker.ops._
+import nutcracker.ops.Ops._
 import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput, Uninhabited}
 import nutcracker.{Final, Propagation, RDom, UpdateResult}
 import scalaz.Id.Id

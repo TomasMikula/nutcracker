@@ -1,6 +1,6 @@
-package nutcracker
+package nutcracker.ops
 
-package object ops
+object Ops
   extends ToValOps
     with ToVarOps
     with ToDomOps

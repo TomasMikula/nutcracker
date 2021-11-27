@@ -2,7 +2,7 @@ package nutcracker.toolkit
 
 import nutcracker.{IDom, OnDemandPropagation, SeqPreHandler, SeqTrigger, Subscription}
 import nutcracker.util.{FreeK, HOrderK, Inject, KMap, Lst, MonadTellState, ShowK, StateInterpreter, StratifiedMonoidAggregator}
-import nutcracker.util.ops._
+import nutcracker.util.ops.Ops._
 import scala.language.existentials
 import scalaz.syntax.equal._
 import scalaz.syntax.monoid._

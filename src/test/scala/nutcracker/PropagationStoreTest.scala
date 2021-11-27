@@ -3,7 +3,7 @@ package nutcracker
 import nutcracker.data.{DecSet, Promise}
 import nutcracker.data.DecSet._
 import nutcracker.data.listLog._
-import nutcracker.ops._
+import nutcracker.ops.Ops._
 import nutcracker.toolkit.{CellCycle, FinalizerId, ObserverId, PropagationStore, Token}
 import nutcracker.util.Lst
 import org.scalatest.funsuite.AnyFunSuite

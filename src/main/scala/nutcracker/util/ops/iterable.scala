@@ -1,7 +1,8 @@
 package nutcracker.util.ops
 
+import nutcracker.util.ops.iterator._
 import scala.language.implicitConversions
-import scalaz.{Applicative, ===}
+import scalaz.{===, Applicative}
 
 object iterable extends ToIterableOps
 
