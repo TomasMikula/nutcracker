@@ -2,11 +2,10 @@ name := "nutcracker"
 
 organization := "com.github.tomasmikula"
 
-lazy val scala212 = "2.12.15"
 lazy val scala213 = "2.13.7"
 
 scalaVersion := scala213
-crossScalaVersions := Seq(scala212, scala213)
+crossScalaVersions := Seq(scala213)
 
 autoCompilerPlugins := true
 addCompilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
@@ -25,7 +24,6 @@ scalacOptions ++=
     "-Ypatmat-exhaust-depth", "40",
   ) ++ (
     CrossVersion.partialVersion(scalaVersion.value) match {
-      case Some((2, 12)) => Seq("-Ywarn-unused-import", "-Ypartial-unification", "-Xfatal-warnings")
       case _             => Seq("-Wunused:imports")
     }
   )
@@ -34,14 +32,16 @@ testFrameworks += new TestFramework("scalaprops.ScalapropsFramework")
 
 Test / parallelExecution := false // currently, ScalaProps does not support parallel execution
 
+lazy val ScalazVersion = "7.4.0-M9"
+
 libraryDependencies ++= Seq(
   "org.typelevel" %% "algebra" % "2.2.3",
-  "org.scalaz" %% "scalaz-core" % "7.3.5",
+  "org.scalaz" %% "scalaz-core" % ScalazVersion,
   "com.github.scalaprops" %% "scalaprops" % "0.8.3",
 
   "org.scalatest" %% "scalatest" % "3.2.10" % "test",
   "org.scalatestplus" %% "scalacheck-1-15" % "3.2.10.0" % "test",
-  "org.scalaz" %% "scalaz-scalacheck-binding" % "7.3.5" % "test",
+  "org.scalaz" %% "scalaz-scalacheck-binding" % ScalazVersion % "test",
 )
 
 fork := true

@@ -37,7 +37,7 @@ class Sat extends AnyFunSpec {
       r <- promiseResults(a)
     } yield r.asVal
 
-    val solutions = solveDfs(problem).toStream.toList
+    val solutions = solveDfs(problem).asLazyList.toList
 
     it("should have 4 solutions") {
       assertResult(4)(solutions.size)

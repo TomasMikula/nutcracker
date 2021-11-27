@@ -46,7 +46,7 @@ class KnightsAndKnaves extends AnyFreeSpec {
       pr <- promiseResults(a, b, c)
     } yield pr.asVal
 
-    val solutions = solveDfs(problem).toStream.toList
+    val solutions = solveDfs(problem).asLazyList.toList
 
     "should have 2 solutions" in {
       assertResult(2)(solutions.size)
@@ -74,7 +74,7 @@ class KnightsAndKnaves extends AnyFreeSpec {
       pr <- promiseResults(a, b)
     } yield pr.asVal
 
-    val solutions = solveDfs(problem).toStream.toList
+    val solutions = solveDfs(problem).asLazyList.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
@@ -100,7 +100,7 @@ class KnightsAndKnaves extends AnyFreeSpec {
       pr <- promiseResults(a, b)
     } yield pr.asVal
 
-    val solutions = solveDfs(problem).toStream.toList
+    val solutions = solveDfs(problem).asLazyList.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }
@@ -131,7 +131,7 @@ class KnightsAndKnaves extends AnyFreeSpec {
       pr <- promiseResults(a, b)
     } yield pr.asVal
 
-    val solutions = solveDfs(problem).toStream.toList
+    val solutions = solveDfs(problem).asLazyList.toList
 
     "should have a unique solution" - {
       "check" in { assertResult(1)(solutions.size) }

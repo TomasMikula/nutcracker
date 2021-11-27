@@ -111,7 +111,7 @@ class PathSearch extends AnyFunSuite {
 
     type Stream[A] = StreamT[Id, A]
 
-    val paths = solveBfs(findPath("A", "K")).toStream.toList
+    val paths = solveBfs(findPath("A", "K")).asLazyList.toList
 
     assertResult(List(
       (path("A", "B", "D", "H", "K"), 15),
