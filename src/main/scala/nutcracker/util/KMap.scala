@@ -25,7 +25,7 @@ final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
     }
   def -(k: K[_]): KMap[K, V] = KMap[K, V](map - k)
   def mapValues[W[_]](f: V ~> W): KMap[K, W] =
-    KMap[K, W](map.iterator.map { case (k, v) => (k, f(v)) }.toMap[K[_], W[_]])
+    KMap[K, W](map.iterator.map { case (k, v) => (k, f(v.asInstanceOf[V[Any]])) }.toMap[K[_], W[_]])
   def ++(that: KMap[K, V]): KMap[K, V] =
     KMap[K, V](this.map ++ that.map)
   def iterator: Iterator[APair[K, V]] =
@@ -36,50 +36,50 @@ object KMap {
   def apply[K[_], V[_]](): KMap[K, V] = KMap[K, V](Map[K[_], V[_]]())
 }
 
-final case class HKMap[K[_[_]], V[_[_]]](map: Map[K[Any], V[Any]]) extends AnyVal {
+final case class HKMap[K[_[_]], V[_[_]]](map: Map[K[Nothing], V[Nothing]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
   def size: Int = map.size
   def head: APairK[K, V] = {
     val (k, v) = map.head
-    APairK[K, V, Any](k, v)
+    APairK[K, V, Nothing](k, v)
   }
   def tail: HKMap[K, V] = HKMap[K, V](map.tail)
-  def apply[A[_]](k: K[A]): V[A] = map(k.asInstanceOf[K[Any]]).asInstanceOf[V[A]]
-  def get[A[_]](k: K[A]): Option[V[A]] = map.get(k.asInstanceOf[K[Any]]).asInstanceOf[Option[V[A]]]
+  def apply[A[_]](k: K[A]): V[A] = map(k.asInstanceOf[K[Nothing]]).asInstanceOf[V[A]]
+  def get[A[_]](k: K[A]): Option[V[A]] = map.get(k.asInstanceOf[K[Nothing]]).asInstanceOf[Option[V[A]]]
   def getOrElse[A[_]](k: K[A])(default: => V[A]): V[A] = get(k).getOrElse(default)
-  def put[A[_]](k: K[A])(v: V[A]): HKMap[K, V] = HKMap[K, V](map.updated(k.asInstanceOf[K[Any]], v.asInstanceOf[V[Any]]))
+  def put[A[_]](k: K[A])(v: V[A]): HKMap[K, V] = HKMap[K, V](map.updated(k.asInstanceOf[K[Nothing]], v.asInstanceOf[V[Nothing]]))
   def updated[A[_]](k: K[A])(v: V[A])(combineIfPresent: (V[A], V[A]) => V[A]): HKMap[K, V] =
     get(k) match {
       case None => put(k)(v)
       case Some(v0) => put(k)(combineIfPresent(v0, v))
     }
-  def -(k: K[Any]): HKMap[K, V] = HKMap[K, V](map - k)
+  def -[F[_]](k: K[F]): HKMap[K, V] = HKMap[K, V](map - k.asInstanceOf[K[Nothing]])
 }
 
 object HKMap {
-  def apply[K[_[_]], V[_[_]]](): HKMap[K, V] = HKMap[K, V](Map[K[Any], V[Any]]())
+  def apply[K[_[_]], V[_[_]]](): HKMap[K, V] = HKMap[K, V](Map[K[Nothing], V[Nothing]]())
 }
 
-final case class HHKMap[K[_[_[_]]], V[_[_[_]]]](map: Map[K[Any], V[Any]]) extends AnyVal {
+final case class HHKMap[K[_[_[_]]], V[_[_[_]]]](map: Map[K[Nothing], V[Nothing]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
   def size: Int = map.size
   def tail: HHKMap[K, V] = HHKMap[K, V](map.tail)
-  def apply[A[_[_]]](k: K[A]): V[A] = map(k.asInstanceOf[K[Any]]).asInstanceOf[V[A]]
-  def get[A[_[_]]](k: K[A]): Option[V[A]] = map.get(k.asInstanceOf[K[Any]]).asInstanceOf[Option[V[A]]]
+  def apply[A[_[_]]](k: K[A]): V[A] = map(k.asInstanceOf[K[Nothing]]).asInstanceOf[V[A]]
+  def get[A[_[_]]](k: K[A]): Option[V[A]] = map.get(k.asInstanceOf[K[Nothing]]).asInstanceOf[Option[V[A]]]
   def getOrElse[A[_[_]]](k: K[A])(default: => V[A]): V[A] = get(k).getOrElse(default)
-  def put[A[_[_]]](k: K[A])(v: V[A]): HHKMap[K, V] = HHKMap[K, V](map.updated(k.asInstanceOf[K[Any]], v.asInstanceOf[V[Any]]))
+  def put[A[_[_]]](k: K[A])(v: V[A]): HHKMap[K, V] = HHKMap[K, V](map.updated(k.asInstanceOf[K[Nothing]], v.asInstanceOf[V[Nothing]]))
   def updated[A[_[_]]](k: K[A])(v: V[A])(combineIfPresent: (V[A], V[A]) => V[A]): HHKMap[K, V] =
     get(k) match {
       case None => put(k)(v)
       case Some(v0) => put(k)(combineIfPresent(v0, v))
     }
-  def -(k: K[Any]): HHKMap[K, V] = HHKMap[K, V](map - k)
+  def -[F[_[_]]](k: K[F]): HHKMap[K, V] = HHKMap[K, V](map - k.asInstanceOf[K[Nothing]])
 }
 
 object HHKMap {
-  def apply[K[_[_[_]]], V[_[_[_]]]](): HHKMap[K, V] = HHKMap[K, V](Map[K[Any], V[Any]]())
+  def apply[K[_[_[_]]], V[_[_[_]]]](): HHKMap[K, V] = HHKMap[K, V](Map[K[Nothing], V[Nothing]]())
 }
 
 /** KMap with an upper bound on the type parameter accepted by K[_], V[_]. */
