@@ -1,7 +1,8 @@
 package nutcracker.util.ops
 
+import nutcracker.util.{ContT, IndexedContT}
 import scala.language.implicitConversions
-import scalaz.{Bind, ContT, IndexedContT}
+import scalaz.Bind
 
 object contT extends ToContTOps
 
@@ -23,5 +24,5 @@ trait ToIndexedContTOps {
 
 final case class IndexedContTOps[R, O, F[_], A](self: IndexedContT[R, O, F, A]) extends AnyVal {
   def absorbEffect[B](implicit ev: A =:= F[B], F: Bind[F]): IndexedContT[R, O, F, B] =
-    self.flatMap(a => IndexedContT.liftM(ev(a)))
+    self.flatMap(a => ContT.liftM(ev(a)))
 }

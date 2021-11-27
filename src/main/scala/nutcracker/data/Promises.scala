@@ -1,11 +1,12 @@
 package nutcracker.data
 
 import nutcracker.ops.Ops._
+import nutcracker.util.{Cont, Id}
 import nutcracker.{Dom, Final, Propagation}
 import scalaz.std.tuple._
 import scalaz.std.vector._
 import scalaz.syntax.bind._
-import scalaz.{Apply, Bind, Cont, Equal}
+import scalaz.{Apply, Bind, Equal}
 
 /**
   * Convenience methods to work with promises.
@@ -22,7 +23,7 @@ object Promises {
     M.update(p).by(Promise.Completed(a))
 
   def promiseC[M[_], Var[_], Val[_], A: Equal](cont: Cont[M[Unit], A])(implicit M: Propagation[M, Var, Val], MB: Bind[M]): M[Var[Promise[A]]] =
-    promise[A]() >>= (pa => MB.map(cont(complete(pa, _)))((_: Unit) => pa))
+    promise[A]() >>= (pa => MB.map(cont(Id(a => Id(complete[M, Var, Val, A](pa, a)))).value)((_: Unit) => pa))
 
   // Scalac doesn't seem to always pick up the Applicative instance and syntax for Cont[M[Unit], ?],
   // so we provide this API for convenience.

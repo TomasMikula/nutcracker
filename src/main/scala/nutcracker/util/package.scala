@@ -1,7 +1,6 @@
 package nutcracker
 
-import scalaz.Id.Id
-import scalaz.{Applicative, Bind, ContT}
+import scalaz.{Applicative, Bind}
 import scalaz.syntax.applicative._
 import scalaz.syntax.bind0._
 
@@ -15,6 +14,23 @@ package object util {
   type ≈>[F[_[_]], G[_[_]]] = `FunctionK{(* -> *) -> *}`[F, G]
   type ≈~>[F[_[_], _], G[_[_], _]] = `FunctionK{(* -> *) -> * -> *}`[F, G]
 
+  type IndexedContT[R, O, M[_], A] = scalaz.IndexedContsT[Id, R, O, M, A]
+  object IndexedContT {
+    def apply[R, O, M[_], A](run: (A => M[O]) => M[R]): IndexedContT[R, O, M, A] =
+      scalaz.IndexedContsT[Id, R, O, M, A](f => run(f.value))
+  }
+
+  type ContT[R, M[_], A] = IndexedContT[R, R, M, A]
+  object ContT {
+    def apply[R, M[_], A](run: (A => M[R]) => M[R]): ContT[R, M, A] =
+      IndexedContT[R, R, M, A](run)
+
+    def liftM[R, M[_], A](a: M[A])(implicit M: Bind[M]): ContT[R, M, A] =
+      ContT { k => a.flatMap(k) }
+  }
+
+  type Cont[R, A] = ContT[R, Id, A]
+
   /** Continuation monad with result type `M[Unit]`. */
   type ContU[M[_], A] = ContT[Unit, M, A]
   object ContU {
@@ -27,17 +43,17 @@ package object util {
     def liftM[F[_]: Bind, A](fa: F[A]): ContU[F, A] =
       ContU(k => fa.flatMap(k))
     def wrapEffect[F[_]: Bind, A](a: F[ContU[F, A]]): ContU[F, A] =
-      ContU[F, A](f => a >>= { k => k(f) })
+      ContU[F, A](f => a >>= { k => k(Id(f)) })
     def absorbEffect[F[_]: Bind, A](a: ContU[F, F[A]]): ContU[F, A] =
       a.flatMap(liftM(_))
     def sequence[F[_]: Applicative, A](cs: ContU[F, A]*): ContU[F, A] =
       sequence(cs)
     def sequence[F[_]: Applicative, A](cs: Iterable[ContU[F, A]]): ContU[F, A] =
-      ContU(f => cs.foldRight(List[F[Unit]]())((c, fus) => c(f) :: fus).sequence_)
+      ContU(f => cs.foldRight(List[F[Unit]]())((c, fus) => c(Id(f)) :: fus).sequence_)
     def filter[F[_]: Applicative, A](c: ContU[F, A])(p: A => Boolean): ContU[F, A] =
-      ContU(f => c(a => if(p(a)) f(a) else ().point[F]))
+      ContU(f => c(Id(a => if(p(a)) f(a) else ().point[F])))
     def filterMap[F[_]: Applicative, A, B](c: ContU[F, A])(f: A => Option[B]): ContU[F, B] =
-      ContU(k => c(a => f(a).fold[F[Unit]](().point[F])(k(_))))
+      ContU(k => c(Id(a => f(a).fold[F[Unit]](().point[F])(k(_)))))
 
     def tuple2[F[_], A1, A2](c1: ContU[F, A1], c2: ContU[F, A2]): ContU[F, (A1, A2)] =
       for { a1 <- c1; a2 <- c2 } yield (a1, a2)
@@ -65,7 +81,7 @@ package object util {
   type WriterState[W, S, A] = WriterStateT[W, S, Id, A]
   object WriterState {
     def apply[W, S, A](run: S => (W, S, A)): WriterState[W, S, A] =
-      WriterStateT[W, S, Id, A](run)
+      WriterStateT[W, S, Id, A](s => Id(run(s)))
   }
 
   type Desc[Ptr[_]] = FreeObjectOutput[String, Ptr, Unit]

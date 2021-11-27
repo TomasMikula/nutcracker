@@ -2,10 +2,10 @@ package nutcracker.data
 
 import nutcracker.{Dom, OnDemandPropagation, Recipe, Relations, Subscription, SyncDom}
 import nutcracker.Rel.Rel3
-import nutcracker.util.{Choose, ContU, HOrderK}
+import nutcracker.util.{Choose, ContU, HOrderK, Id, IndexedContT}
 import nutcracker.util.HList.{::, HNil}
 import nutcracker.util.Nat.{_0, _1}
-import scalaz.{IndexedContT, Monad, \&/}
+import scalaz.{Monad, \&/}
 import scalaz.syntax.monad._
 
 /** Product of two cells.
@@ -43,7 +43,7 @@ object Tupled2 {
             ).map({
               case (sub1, rr)   => (P.sleep(P.continually((a, δa) => P.exclUpdate(rr).by(\&/.This(da.toPatch(a, δa))))), (sub1, rr))
             })
-          ).run({ case (sub2, (sub1, rr)) => P.addFinalizer(rr, sub1 and sub2).void })
+          ).run(Id { case (sub2, (sub1, rr)) => P.addFinalizer(rr, sub1 and sub2).void })
         )).map(rr => ra :: rb :: rr :: HNil)
       }
 

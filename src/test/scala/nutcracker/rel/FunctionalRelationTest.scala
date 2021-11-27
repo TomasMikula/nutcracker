@@ -5,10 +5,10 @@ import nutcracker.data.Tupled2
 import nutcracker.data.bool.Bool
 import nutcracker.toolkit.PropRel
 import nutcracker.util.HList.{::, HNil}
-import nutcracker.util.SummonHList
+import nutcracker.util.{Id, SummonHList}
 import org.scalatest.funsuite.AnyFunSuite
 import scala.collection.mutable
-import scalaz.{ContT, NonEmptyList, Order}
+import scalaz.{NonEmptyList, Order}
 import scalaz.syntax.monad._
 
 class FunctionalRelationTest extends AnyFunSuite {
@@ -16,7 +16,7 @@ class FunctionalRelationTest extends AnyFunSuite {
   import PropRel.propagationApi.{Val => _, readOnly =>_, _}
   import PropRel.relationsApi._
 
-  type ContU[A] = ContT[Unit, Prg, A]
+  type ContU[A] = nutcracker.util.ContU[Prg, A]
 
   test("blah") {
     type L = Val[Bool] :: Val[Bool] :: Val[(Bool, Bool)] :: HNil
@@ -38,7 +38,7 @@ class FunctionalRelationTest extends AnyFunSuite {
         .by(Tupled2.recipe[Bool, Bool, Var, Val, Prg].andThen(_ => (initializedTimes += 1).point[Prg]))
 
     def observe(cps: ContU[L]): Prg[Unit] =
-      cps(p => (observed.append(p.tail.tail.head): Unit).point[Prg])
+      cps(Id(p => (observed.append(p.tail.tail.head): Unit).point[Prg]))
 
     val pattern = Pattern[L].build({ case a::b::ab::HNil => NonEmptyList(paired(a, b, ab)) })
 

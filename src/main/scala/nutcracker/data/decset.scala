@@ -1,8 +1,9 @@
 package nutcracker.data
 
+import nutcracker.{BranchingPropagation, Final, RelativelyComplementedDom, Splittable, SplittableJoinDom, TerminalDom, UpdateResult}
 import nutcracker.BranchingPropagation._
 import nutcracker.ops.Ops._
-import nutcracker.{BranchingPropagation, Final, RelativelyComplementedDom, Splittable, SplittableJoinDom, TerminalDom, UpdateResult}
+import nutcracker.util.Id
 import scalaz.syntax.bind._
 import scalaz.{Bind, Cont}
 
@@ -59,7 +60,7 @@ object DecSet {
     * use [[init]] directly.
     */
   def branchC[M[_], Var[_], Val[_], A](as: Set[A])(implicit M: BranchingPropagation[M, Var, Val], B: Bind[M]): Cont[M[Unit], A] =
-    Cont(f => init(as) >>= { _.asCont_.run(f) })
+    Cont(f => init(as) >>= { _.asCont_.run(Id(f)) })
   def branchC[M[_], Var[_], Val[_], A](as: A*)(implicit M: BranchingPropagation[M, Var, Val], B: Bind[M]): Cont[M[Unit], A] =
     branchC(as.toSet)
 

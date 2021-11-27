@@ -3,8 +3,8 @@ package nutcracker.ops
 import scala.language.implicitConversions
 import nutcracker.{BranchingPropagation, Dom, Final, JoinDom, ObserveSyntaxHelper, Propagation, RelativelyComplementedDom, Subscription, Unchanged, Updated}
 import nutcracker.data.bool.Bool
-import nutcracker.util.ContU
-import scalaz.{Applicative, Apply, Bind, Functor, IndexedContT, Traverse}
+import nutcracker.util.{ContU, IndexedContT}
+import scalaz.{Applicative, Apply, Bind, Functor, Traverse}
 import scalaz.syntax.functor._
 import scalaz.syntax.apply0._
 import scalaz.syntax.bind0._

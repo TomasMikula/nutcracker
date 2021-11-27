@@ -1,8 +1,7 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{FreeK, HOrderK, Lst, ShowK, StateInterpreter, TwoLevel, WriterState, WriterStateT}
+import nutcracker.util.{FreeK, HOrderK, Id, Lst, ShowK, StateInterpreter, TwoLevel, WriterState, WriterStateT}
 import scala.language.implicitConversions
-import scalaz.Id.Id
 import scalaz.{StateT, ~>}
 
 /** A [[Toolkit]] whose representation of a program ([[Toolkit.Prg]]) is
@@ -33,7 +32,7 @@ trait FreeToolkit extends Toolkit {
     WriterStateT.recurse[Prg, Id, TwoLevel[Lst, *], Prg[Unit], State](freeKInterpreter)(identity[Prg[Unit]])
   }
 
-  def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p).run(s)
+  def interpret[A](p: Prg[A], s: State): (State, A) = interpreter(p).run(s).value
 }
 
 trait FreeRefToolkit extends FreeToolkit with RefToolkit {

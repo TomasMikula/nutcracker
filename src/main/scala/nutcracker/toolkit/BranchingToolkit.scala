@@ -2,7 +2,7 @@ package nutcracker.toolkit
 
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
 import nutcracker.{Assessment, BranchingPropagation, Final}
-import scalaz.Id._
+import nutcracker.util.Id
 import scalaz.std.anyVal._
 import scalaz.{-\/, BindRec, Monad, MonadTell, StreamT, Writer, WriterT, \/, \/-}
 
@@ -15,8 +15,8 @@ trait BranchingToolkit extends RefToolkit with StashToolkit {
   def solveDfs[A, B](p: Prg[A], f: (A, State) => Option[B]): StreamT[Id, B] =
     solveDfsM0[Id, A, B](p, f)
 
-  def solveDfs[D](p: Prg[Val[D]])(implicit fin: Final[D]): StreamT[Id, fin.Out] =
-    solveDfsM0[Id, D](p)
+  def solveDfs[D](p: Prg[Val[D]])(implicit fin: Final[D]): StreamT[scalaz.Id.Id, fin.Out] =
+    solveDfsM0[scalaz.Id.Id, D](p)
 
   def solveDfsAll[D](p: Prg[Val[D]])(implicit fin: Final[D]): List[fin.Out] =
     toList(solveDfs(p))
@@ -29,7 +29,7 @@ trait BranchingToolkit extends RefToolkit with StashToolkit {
   def solveDfsAll1[D](p: Prg[Val[D]])(implicit fin: Final[D]): (List[fin.Out], Int) =
     toList(solveDfs1(p)).run.swap
 
-  private implicit val mt: MonadTell[Writer[Int, *], Int] = WriterT.writerTMonadListen[Int, Id]
+  private implicit val mt: MonadTell[WriterT[Int, Id, *], Int] = WriterT.writerTMonadListen[Int, Id]
 
   private def solveDfsM[M[_], A, B](p: Prg[A], f: (A, State) => Option[B])(implicit M0: BindRec[M], M1: MonadTell[M, Int]): StreamT[M, B] = {
     val (s, a) = interpret(p, empty)

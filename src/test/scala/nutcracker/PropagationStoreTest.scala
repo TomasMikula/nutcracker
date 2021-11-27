@@ -5,7 +5,7 @@ import nutcracker.data.DecSet._
 import nutcracker.data.listLog._
 import nutcracker.ops.Ops._
 import nutcracker.toolkit.{CellCycle, FinalizerId, ObserverId, PropagationStore, Token}
-import nutcracker.util.Lst
+import nutcracker.util.{Id, Lst}
 import org.scalatest.funsuite.AnyFunSuite
 import scala.annotation.tailrec
 import scalaz.Monad
@@ -225,7 +225,7 @@ class OnDemandPropagationTest extends AnyFunSuite {
           }).apply(pi),
           exclRef
         ))
-      ).run({ case (sub, exclRef) => P.addFinalizer(exclRef, sub).void })
+      ).run(Id { case (sub, exclRef) => P.addFinalizer(exclRef, sub).void })
     })
     val (store1, ref) = interpret(prg1, store0)
 

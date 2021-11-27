@@ -1,7 +1,7 @@
 package nutcracker.data
 
 import nutcracker.ops.Ops._
-import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
+import nutcracker.util.{ContU, DeepEqual, DeepShow, Id, IsEqual, MonadObjectOutput}
 import nutcracker.{Dom, Propagation, Subscription, UpdateResult}
 import scalaz.{Applicative, Bind, Functor, IndexedContT, Monad}
 import scalaz.std.list._
@@ -100,7 +100,7 @@ class IncSets[F[_], Var[_], Val[_]](implicit P: Propagation[F, Var, Val]) {
     }).void
 
   def includeC[A](cps: ContU[F, A], ref: Var[IncSet[A]]): F[Unit] =
-    cps(a => insert(a, ref))
+    cps(Id(a => insert(a, ref)))
 
   def collect[A](cps: ContU[F, A])(implicit B: Bind[F]): F[Var[IncSet[A]]] = for {
     res <- init[A]

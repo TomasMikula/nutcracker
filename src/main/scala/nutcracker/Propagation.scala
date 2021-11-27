@@ -1,8 +1,9 @@
 package nutcracker
 
+import nutcracker.util.IndexedContT
 import nutcracker.util.ops.applicative._
 import scala.language.implicitConversions
-import scalaz.{Applicative, IndexedContT}
+import scalaz.{Applicative}
 
 trait Propagation[M[_], Var[_], Val0[_]] extends Observe[M] {
   type Val[A] = Val0[A]

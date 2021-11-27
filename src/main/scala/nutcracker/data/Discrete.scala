@@ -1,10 +1,9 @@
 package nutcracker.data
 
 import nutcracker.ops.Ops._
-import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput, Uninhabited}
+import nutcracker.util.{ContT, ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput, Uninhabited}
 import nutcracker.{Final, Propagation, RDom, UpdateResult}
-import scalaz.Id.Id
-import scalaz.{Bind, ContT, Functor, Monad, Show}
+import scalaz.{Bind, Functor, Monad, Show}
 import scalaz.syntax.contravariant._
 
 /** Marker wrapper meaning that any two distinct values of type `Discrete[A]`
@@ -44,7 +43,7 @@ object Discrete extends DiscreteInstances {
   } yield res
 
   def cellC[M[_], Var[_], Val[_], A](a: A)(implicit M: Propagation[M, Var, Val], MB: Bind[M]): ContT[Unit, M, Var[Discrete[A]]] =
-    ContT.liftM[Id, Unit, M, Var[Discrete[A]]](M.newCell(Discrete(a)))
+    ContT.liftM[Unit, M, Var[Discrete[A]]](M.newCell(Discrete(a)))
 
   implicit def domInstance[A]: RDom.Aux[Discrete[A], Update[A], Delta[A]] = new RDom[Discrete[A]] {
     type Update = Discrete.Update[A]

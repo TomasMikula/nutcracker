@@ -1,8 +1,8 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{ContU, FreeK, Inject}
+import nutcracker.util.{ContU, FreeK, Id, IndexedContT, Inject}
 import nutcracker.{Dom, IDom, OnDemandPropagation, SeqHandler, SeqPreHandler, SeqTrigger, Subscription}
-import scalaz.{-\/, IndexedContT, \/, \/-}
+import scalaz.{-\/, \/, \/-}
 import scalaz.syntax.functor._
 
 private[nutcracker] sealed trait PropagationLang[K[_], A]
@@ -150,7 +150,7 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit inj: Inject[Propa
     newCellF[F, D](d)
 
   def newAutoCellC[A](setup: IndexedContT[Unit, ExclRef[A], FreeK[F, *], A])(implicit dom: Dom[A]): FreeK[F, CellId[K, A]] = {
-    val setup1 = (r: AutoCellId[K, A], c: CellCycle[A]) => setup.run(a => supplyF(r)(c, a).as((r, c)))
+    val setup1 = (r: AutoCellId[K, A], c: CellCycle[A]) => setup.run(Id(a => supplyF(r)(c, a).as((r, c))))
     newAutoCellF(setup1)
   }
 
@@ -179,11 +179,11 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit inj: Inject[Propa
       ref match {
         case ref @ SimpleCellId(_) =>
           holdF[F, A](ref)((a: A, t: Token[A], oid: ObserverId) =>
-            f(a).run({ case (tr, b) => resumeF[F, A, dom.IDelta, A](ref, t, tr) >> k((subscription(ref, oid), b)) })
+            f(a).run(Id { case (tr, b) => resumeF[F, A, dom.IDelta, A](ref, t, tr) >> k((subscription(ref, oid), b)) })
           ).void
         case ref @ AutoCellId(_, _) =>
           holdAutoF[F, A](ref)((a: A, cycle: CellCycle[A], t: Token[A], oid: ObserverId) =>
-            f(a).run({ case (tr, b) => resumeAutoF[F, A, dom.IDelta, A](ref, cycle, t, tr) >> k((subscription(ref, cycle, oid), b)) })
+            f(a).run(Id { case (tr, b) => resumeAutoF[F, A, dom.IDelta, A](ref, cycle, t, tr) >> k((subscription(ref, cycle, oid), b)) })
           ).void
       })
 

@@ -2,7 +2,7 @@ package nutcracker.data
 
 import nutcracker.ops.Ops._
 import nutcracker.util.ops.iterator._
-import nutcracker.util.{ContU, DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
+import nutcracker.util.{ContU, DeepEqual, DeepShow, Id, IsEqual, MonadObjectOutput}
 import nutcracker.{Dom, Propagation, Subscription, UpdateResult}
 import scalaz.{Applicative, Bind, Functor, IndexedContT, Monad}
 import scalaz.std.list._
@@ -111,7 +111,7 @@ object CellSet {
     }).void
 
   def includeC[F[_], Var[_], Val[_], A](cps: ContU[F, Var[A]], ref: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], dom: Dom[A], F: Functor[F]): F[Unit] =
-    cps(a => insert(a, ref))
+    cps(Id(a => insert(a, ref)))
 
   def collect[F[_], Var[_], Val[_], A](cps: ContU[F, Var[A]])(implicit P: Propagation[F, Var, Val], dom: Dom[A], F: Bind[F]): F[Var[CellSet[Var, A]]] = for {
     res <- init[A]()
