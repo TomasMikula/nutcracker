@@ -26,9 +26,9 @@ sealed trait Promise[+A] {
 
 object Promise {
 
-  final case object Empty extends Promise[Nothing] // incomplete promise
-  final case class Completed[A](value: A) extends Promise[A]
-  final case object Conflict extends Promise[Nothing] // promise completed multiple times with different values
+  case object Empty extends Promise[Nothing] // incomplete promise
+  case class Completed[A](value: A) extends Promise[A]
+  case object Conflict extends Promise[Nothing] // promise completed multiple times with different values
 
   type Update[A] = Promise[A]
   type Delta[A] = Unit

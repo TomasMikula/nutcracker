@@ -44,29 +44,28 @@ trait `Forall{(* -> *) -> *}`[F[_[_]]] { self =>
   * `∀ K[_], A. F[K, A]`
   */
 trait `Forall{(* -> *) -> * -> *}`[F[_[_], _]] { self =>
-  import nutcracker.util.`Forall{(* -> *) -> * -> *}`._
-
   private lazy val value: F[Nothing, Nothing] = compute[Nothing, Nothing]
 
   protected def compute[K[_], A]: F[K, A]
 
   final def apply[K[_], A]: F[K, A] = value.asInstanceOf[F[K, A]]
-  final def papply[K[_]]: `Forall{* -> *}`[F[K, *]] = PApplied(this)
-  final def curried: `Forall{(* -> *) -> *}`[λ[K[_] => `Forall{* -> *}`[F[K, *]]]] = Curried(this)
+
+  type PApplied[K[_]] = `Forall{* -> *}`[F[K, *]]
+
+  final def papply[K[_]]: PApplied[K] =
+    new PApplied[K] {
+      override def compute[A]: F[K, A] = self.compute[K, A]
+    }
+
+  final def curried: `Forall{(* -> *) -> *}`[PApplied] =
+    new `Forall{(* -> *) -> *}`[PApplied] {
+      override def compute[K[_]]: PApplied[K] = papply[K]
+    }
 
   /** Transform this value by a universally quantified function
     * `f: ∀ K[_], A. F[K, A] => G[K, A]`
     */
   final def transform[G[_[_], _]](f: F ≈~> G): `Forall{(* -> *) -> * -> *}`[G] = new `Forall{(* -> *) -> * -> *}`[G] {
     def compute[K[_], A]: G[K, A] = f(self.compute[K, A])
-  }
-}
-
-object `Forall{(* -> *) -> * -> *}` {
-  private case class Curried[F[_[_], _]](run: `Forall{(* -> *) -> * -> *}`[F]) extends `Forall{(* -> *) -> *}`[λ[K[_] => `Forall{* -> *}`[F[K, *]]]] {
-    protected final def compute[K[_]]: `Forall{* -> *}`[F[K, *]] = run.papply[K]
-  }
-  private case class PApplied[F[_[_], _], K[_]](run: `Forall{(* -> *) -> * -> *}`[F]) extends `Forall{* -> *}`[F[K, *]] {
-    protected final def compute[A]: F[K, A] = run[K, A]
   }
 }

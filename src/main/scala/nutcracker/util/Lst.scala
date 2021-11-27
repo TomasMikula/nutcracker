@@ -143,10 +143,10 @@ sealed abstract class Lst[+A] {
 }
 
 object Lst {
-  private final case object Nil extends Lst[Nothing]
+  private case object Nil extends Lst[Nothing]
   private sealed abstract class NELst[+A] extends Lst[A]
-  private final case class Cons[A](h: A, t: Lst[A]) extends NELst[A]
-  private final case class Cat[A](fst: NELst[A], snd: NELst[A]) extends NELst[A]
+  private case class Cons[A](h: A, t: Lst[A]) extends NELst[A]
+  private case class Cat[A](fst: NELst[A], snd: NELst[A]) extends NELst[A]
 
   @inline
   def empty[A]: Lst[A] = Nil

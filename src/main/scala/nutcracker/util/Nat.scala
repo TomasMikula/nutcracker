@@ -10,7 +10,7 @@ object Nat {
   }
   type _0 = _0.N
 
-  case class Succ[N <: Nat](n: N) extends Nat {
+  case class Succ[N0 <: Nat](n: N0) extends Nat {
     type N = Succ[n.N]
   }
 

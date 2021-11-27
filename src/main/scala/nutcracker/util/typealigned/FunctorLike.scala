@@ -26,14 +26,14 @@ object FunctorLike {
     def map[A, B](fa: F[A])(f: B =>: A): F[B] = contramap(fa)(f)
   }
 
-  implicit def covariantSecond[=>:[_, _], X](implicit ev: Compose[=>:]): FunctorLike[X =>: *, =>:] =
-    new FromCovariant[X =>: *, =>:] {
+  implicit def covariantSecond[=>:[_, _], X](implicit ev: Compose[=>:]): FunctorLike[=>:[X, *], =>:] =
+    new FromCovariant[=>:[X, *], =>:] {
       def map[A, B](fa: X =>: A)(f: A =>: B): X =>: B =
         ev.compose(f, fa)
     }
 
-  implicit def contravariantFirst[=>:[_, _], X](implicit ev: Compose[=>:]): ContravariantLike[* =>: X, =>:] =
-    new FromContravariant[* =>: X, =>:] {
+  implicit def contravariantFirst[=>:[_, _], X](implicit ev: Compose[=>:]): ContravariantLike[=>:[*, X], =>:] =
+    new FromContravariant[=>:[*, X], =>:] {
       def contramap[A, B](fa: A =>: X)(f: B =>: A): B =>: X =
         ev.compose(fa, f)
     }

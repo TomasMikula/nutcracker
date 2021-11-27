@@ -10,8 +10,8 @@ import nutcracker.{Dom, Propagation, TerminalDom, UpdateResult}
 sealed trait Revocable[+A]
 
 object Revocable {
-  final case class Valid[A](value: A) extends Revocable[A]
-  final case object Revoked extends Revocable[Nothing]
+  case class Valid[A](value: A) extends Revocable[A]
+  case object Revoked extends Revocable[Nothing]
 
   /** Meaning of update is to revoke the value. */
   type Update = Unit

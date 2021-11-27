@@ -8,8 +8,8 @@ import nutcracker.{Dom, TerminalDom, UpdateResult}
 sealed trait Closeable[+A]
 
 object Closeable {
-  final case class Open[A](value: A) extends Closeable[A]
-  final case object Closed extends Closeable[Nothing]
+  case class Open[A](value: A) extends Closeable[A]
+  case object Closed extends Closeable[Nothing]
 
   sealed abstract class Update[+U]
   case class UpdateContent[U](value: U) extends Update[U]

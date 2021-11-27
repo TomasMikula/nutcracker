@@ -33,7 +33,7 @@ object Tupled2 {
       import P.{Val => _, _}
 
       override def create(ingredients: C[A, B, Val]): K[L[A, B, Val]] = {
-        implicit val dom = Dom.tuple2[A, B]
+        implicit val dom: Dom.Aux[(A, B), da.Update \&/ db.Update, da.Delta \&/ db.Delta] = Dom.tuple2[A, B]
         val ra :: rb :: HNil = ingredients
 
         newAutoCellC(IndexedContT((f: ((A, B)) => K[ExclRef[(A, B)]]) =>
