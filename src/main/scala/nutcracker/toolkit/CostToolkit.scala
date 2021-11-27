@@ -3,7 +3,7 @@ package nutcracker.toolkit
 import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
 import nutcracker.util.algebraic.NonDecreasingMonoid
 import nutcracker.{Assessment, CostApi, Final}
-import scalaz.Id.Id
+import scalaz.Id.{Id, id}
 import scalaz.{-\/, BindRec, Monad, StreamT, \/, \/-}
 
 trait CostToolkit[C] extends Toolkit {
@@ -15,7 +15,7 @@ trait CostToolkit[C] extends Toolkit {
   def assess(s: State): Assessment[List[Prg[Unit]]]
 
   def solveBfs[A, B](p: Prg[A], f: (A, State) => Option[B]): StreamT[Id, (B, C)] =
-    solveBfsM[Id, A, B](p, f)
+    solveBfsM[Id, A, B](p, f)(id)
 
   def solveBfsM[M[_], A, B](p: Prg[A], f: (A, State) => Option[B])(implicit M: Monad[M]): StreamT[M, (B, C)] = {
     val (s, a) = interpret(p, empty)
@@ -35,7 +35,7 @@ trait CostToolkit[C] extends Toolkit {
 trait CostRefToolkit[C] extends CostToolkit[C] with RefToolkit {
 
   def solveBfs[D](p: Prg[Val[D]])(implicit fin: Final[D]): StreamT[Id, (fin.Out, C)] =
-    solveBfsM[Id, D](p)
+    solveBfsM[Id, D](p)(fin, id, id)
 
   private def solveBfsM[M[_], D](p: Prg[Val[D]])(implicit fin: Final[D], M0: BindRec[M], M1: Monad[M]): StreamT[M, (fin.Out, C)] =
     solveBfsM[M, Val[D], fin.Out](p, (ref, s) => fetchResult(ref, s))

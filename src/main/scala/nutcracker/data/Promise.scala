@@ -3,7 +3,6 @@ package nutcracker.data
 import nutcracker.util.{DeepEqual, DeepShow, IsEqual, MonadObjectOutput}
 import nutcracker.{Final, JoinDom}
 import scalaz.Equal
-import scalaz.syntax.equal._
 
 /** For any type `A`, `Promise[A]` is a bounded lattice on the set `A ⊔ {0, 1}`
   * (where "⊔" means "disjoint union") with `0` being the least element, `1`
@@ -37,12 +36,12 @@ object Promise {
   def empty[A]: Promise[A] = Empty
   def completed[A](a: A): Promise[A] = Completed(a)
 
-  def meet[A: Equal](p1: Promise[A], p2: Promise[A]): Promise[A] = (p1, p2) match {
+  def meet[A](p1: Promise[A], p2: Promise[A])(implicit A: Equal[A]): Promise[A] = (p1, p2) match {
     case (Empty, _) => Empty
     case (_, Empty) => Empty
     case (Conflict, p2) => p2
     case (p1, Conflict) => p1
-    case (Completed(a1), Completed(a2)) => if(a1 === a2) p1 else Empty
+    case (Completed(a1), Completed(a2)) => if(A.equal(a1, a2)) p1 else Empty
   }
 
   implicit def finalInstance[A]: Final.Aux[Promise[A], A] = new Final[Promise[A]] {
@@ -77,9 +76,9 @@ object Promise {
       override def appendDeltas(d1: Unit, d2: Unit): Unit = ()
     }
 
-  implicit def equalInstance[A: Equal]: Equal[Promise[A]] = new Equal[Promise[A]] {
+  implicit def equalInstance[A](implicit A: Equal[A]): Equal[Promise[A]] = new Equal[Promise[A]] {
     def equal(p1: Promise[A], p2: Promise[A]): Boolean = (p1, p2) match {
-      case (Completed(a1), Completed(a2)) => a1 === a2
+      case (Completed(a1), Completed(a2)) => A.equal(a1, a2)
       case (Empty, Empty) => true
       case (Conflict, Conflict) => true
       case _ => false

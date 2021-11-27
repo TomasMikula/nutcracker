@@ -37,6 +37,7 @@ trait ObjectSerializer[A, S, Ptr[_]] { self =>
     decorateReference: String => String = ref => s"<ref $ref/>"
   )(implicit E: HEqualK[Ptr], ev: S === String): Show[A] =
     Show.shows[A] { a =>
+      implicit val id = scalaz.Id.id
       self.free(a).showAutoLabeled(deref, showRef)(decorateReferenced, decorateUnreferenced, decorateReference)
     }
 

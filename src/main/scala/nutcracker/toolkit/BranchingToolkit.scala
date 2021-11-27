@@ -4,7 +4,7 @@ import nutcracker.Assessment.{Done, Failed, Incomplete, Stuck}
 import nutcracker.{Assessment, BranchingPropagation, Final}
 import nutcracker.util.Id
 import scalaz.std.anyVal._
-import scalaz.{-\/, BindRec, Monad, MonadTell, StreamT, Writer, WriterT, \/, \/-}
+import scalaz.{-\/, BindRec, Monad, MonadTell, StreamT, WriterT, \/, \/-}
 
 trait BranchingToolkit extends RefToolkit with StashToolkit {
   implicit val branchingApi: BranchingPropagation[Prg, Var, Val]
@@ -16,18 +16,18 @@ trait BranchingToolkit extends RefToolkit with StashToolkit {
     solveDfsM0[Id, A, B](p, f)
 
   def solveDfs[D](p: Prg[Val[D]])(implicit fin: Final[D]): StreamT[scalaz.Id.Id, fin.Out] =
-    solveDfsM0[scalaz.Id.Id, D](p)
+    solveDfsM0[scalaz.Id.Id, D](p)(fin, scalaz.Id.id, scalaz.Id.id)
 
   def solveDfsAll[D](p: Prg[Val[D]])(implicit fin: Final[D]): List[fin.Out] =
-    toList(solveDfs(p))
+    toList(solveDfs(p))(scalaz.Id.id)
 
   /** Like [[solveDfs[D]*]], but also outputs the number of times it had to backtrack. */
-  def solveDfs1[D](p: Prg[Val[D]])(implicit fin: Final[D]): StreamT[Writer[Int, *], fin.Out] =
-    solveDfsM[Writer[Int, *], D](p)
+  def solveDfs1[D](p: Prg[Val[D]])(implicit fin: Final[D]): StreamT[WriterT[Int, Id, *], fin.Out] =
+    solveDfsM[WriterT[Int, Id, *], D](p)
 
   /** Like [[solveDfsAll]], but also returns the number of dead branches explored. */
   def solveDfsAll1[D](p: Prg[Val[D]])(implicit fin: Final[D]): (List[fin.Out], Int) =
-    toList(solveDfs1(p)).run.swap
+    toList(solveDfs1(p)).run.value.swap
 
   private implicit val mt: MonadTell[WriterT[Int, Id, *], Int] = WriterT.writerTMonadListen[Int, Id]
 

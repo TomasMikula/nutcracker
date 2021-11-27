@@ -70,7 +70,7 @@ final case class Free[F[_], A](unwrap: FreeBind[(Id :++: F)#Out, A]) extends Any
             }
           }
       },
-    )
+    )(scalaz.Id.id)
   }
 
   def foldRunRecParM[M[_], S1, S2](
@@ -130,7 +130,7 @@ trait FreeInstances1 {
 
   implicit def traverseInstance[F[_]](implicit F: Traverse[F]): Traverse[Free[F, *]] =
     new Traverse[Free[F, *]] {
-      val impl = FreeBind.traverseInstance[(Id :++: F)#Out](coproductTraverse[Id, F])
+      val impl = FreeBind.traverseInstance[(Id :++: F)#Out](coproductTraverse[Id, F](scalaz.Id.id, F))
       def traverseImpl[G[_], A, B](fa: Free[F, A])(f: A => G[B])(implicit G: Applicative[G]): G[Free[F, B]] =
         G.map(impl.traverse(fa.unwrap)(f))(Free.apply)
     }
