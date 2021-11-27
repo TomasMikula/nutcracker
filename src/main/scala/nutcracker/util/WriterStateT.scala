@@ -66,8 +66,8 @@ trait WriterStateTInstances extends WriterStateTInstances1 {
         WriterStateT(s => F.point((w, s, a)))
     }
 
-  implicit def monadTrans[W, S](implicit W: Monoid[W]): MonadTrans[WriterStateT[W, S, *[_], *]] =
-    new MonadTrans[WriterStateT[W, S, *[_], *]] {
+  implicit def monadTrans[W, S](implicit W: Monoid[W]): MonadTrans[({ type Out[M[_], A] = WriterStateT[W, S, M, A]})#Out] =
+    new MonadTrans[({ type Out[M[_], A] = WriterStateT[W, S, M, A]})#Out] {
       def liftM[G[_], A](ga: G[A])(implicit G: Monad[G]): WriterStateT[W, S, G, A] =
         WriterStateT(s => G.map(ga)(a => (W.zero, s, a)))
 

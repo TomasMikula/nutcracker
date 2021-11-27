@@ -112,8 +112,8 @@ object FreeT extends FreeTInstances {
   private[FreeT] def liftBind[F[_], M[_], Z, A](fz: F[Z], f: Z => FreeT[F, M, A]): FreeT[F, M, A] =
     liftF(fz).flatMap(f)
 
-  implicit def monadTransInstance[F[_]]: MonadTrans[FreeT[F, *[_], *]] =
-    new MonadTrans[FreeT[F, *[_], *]] {
+  implicit def monadTransInstance[F[_]]: MonadTrans[({ type Out[M[_], A] = FreeT[F, M, A] })#Out] =
+    new MonadTrans[({ type Out[M[_], A] = FreeT[F, M, A] })#Out] {
       def liftM[M[_], A](ma: M[A])(implicit M: Monad[M]): FreeT[F, M, A] = FreeT.liftM[F, M, A](ma)
       implicit def apply[M[_]](implicit M: Monad[M]): Monad[FreeT[F, M, *]] = monadBindRecInstance
     }
