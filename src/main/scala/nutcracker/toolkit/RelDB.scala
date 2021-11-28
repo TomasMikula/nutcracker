@@ -6,7 +6,7 @@ import scala.language.existentials
 import scalaz.Order
 
 private[toolkit] case class RelDB[K[_]] private (
-  private val tables: KMapB[Rel, λ[`L <: HList` => RelTable[K, L]], HList],
+  private val tables: KMapB[Rel, ({ type Out[L <: HList] = RelTable[K, L] })#Out, HList],
   private val patternTriggers: Map[PartiallyAssignedPattern[_], List[_ => K[Unit]]],
   private val relToPatterns: TransformedIndex[Rel[_ <: HList], PartiallyAssignedPattern[_ <: HList], PartiallyAssignedOrientedPattern[_ <: HList, _ <: HList]]
 ) {
@@ -132,7 +132,7 @@ private[toolkit] case class RelDB[K[_]] private (
 private[toolkit] object RelDB {
 
   def empty[K[_]]: RelDB[K] = RelDB(
-    KMapB[Rel, λ[`L <: HList` => RelTable[K, L]], HList](),
+    KMapB[Rel, ({ type Out[L <: HList] = RelTable[K, L] })#Out, HList](),
     Map.empty,
     TransformedIndex.empty(_.pattern.relations.map(_.rel), (pap, rel) => pap.orient(rel))
   )
