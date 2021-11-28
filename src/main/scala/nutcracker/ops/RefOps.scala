@@ -4,6 +4,7 @@ import scala.language.implicitConversions
 import nutcracker.{BranchingPropagation, Dom, Final, JoinDom, ObserveSyntaxHelper, Propagation, RelativelyComplementedDom, Subscription, Unchanged, Updated}
 import nutcracker.data.bool.Bool
 import nutcracker.util.{ContU, IndexedContT}
+import nutcracker.util.ops.FunctorWildcardOps.void
 import scalaz.{Applicative, Apply, Bind, Functor, Traverse}
 import scalaz.syntax.functor._
 import scalaz.syntax.apply0._
@@ -43,7 +44,7 @@ final case class FinalValOps[M[_], Var[_], Val[_], D, U, Δ, A](ref: Val[D])(imp
     P.observe(ref).threshold(d => fin.extract(d) map f)
 
   def _whenFinal(f: A => M[_])(implicit M: Functor[M]): M[Subscription[M]] =
-    whenFinal(a => M.map(f(a))(_ => ()))
+    whenFinal(a => void(f(a)))
 
   def whenFinal_(f: A => M[Unit])(implicit M: Functor[M]): M[Unit] =
     whenFinal(f).void
@@ -55,7 +56,7 @@ final case class FinalValOps[M[_], Var[_], Val[_], D, U, Δ, A](ref: Val[D])(imp
     )
 
   def _whenFinal0(f: D => M[_])(implicit M: Functor[M]): M[Subscription[M]] =
-    whenFinal0(d => M.map(f(d))(_ => ()))
+    whenFinal0(d => void(f(d)))
 
   def whenFinal0_(f: D => M[Unit])(implicit M: Functor[M]): M[Unit] =
     whenFinal0(f).void

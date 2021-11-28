@@ -51,7 +51,7 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
               val (s1, becameDirty) = s.update[upd.dom.Domain, upd.dom.Update, upd.dom.IDelta](upd.ref, upd.u)(upd.dom)
               val w = if(becameDirty) Lst.singleton(inj(execTriggers(upd.ref))) at 1 else W.zero
               (w, s0 set s1, ())
-            case exc: ExclUpdate[_, a, u, δ] =>
+            case exc: ExclUpdate[K, a, u, δ] =>
               val (s1, becameDirty) = s.exclUpdate[exc.dom.Domain, exc.dom.Update, exc.dom.IDelta](exc.ref, exc.cycle, exc.u)(exc.dom)
               val w = if(becameDirty) Lst.singleton(inj(execTriggersAuto(exc.ref, exc.cycle))) at 1 else W.zero
               (w, s0 set s1, ())
