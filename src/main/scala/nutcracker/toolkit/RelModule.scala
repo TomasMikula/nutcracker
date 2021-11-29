@@ -54,9 +54,11 @@ private[toolkit] object RelModuleImpl extends PersistentRelModule {
   def stashable = new RelListModule[Lang, StateK](this)
 }
 
-private[toolkit] class RelListModule[Lang[_[_], _], State0[_[_]]](base: PersistentRelModule.Aux[Lang, State0]) extends ListModule[Lang, State0](base) with StashRelModule {
-  def freeRelations[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]) = base.freeRelations[F]
+private[toolkit] class RelListModule[Lang0[_[_], _], State0[_[_]]](base: PersistentRelModule.Aux[Lang0, State0]) extends ListModule[Lang0, State0](base) with StashRelModule {
+  override type Lang[K[_], A] = Lang0[K, A]
 
-  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, *], S] =
+  def freeRelations[F[_[_], _]](implicit i: Inject[Lang0[FreeK[F, *], *], F[FreeK[F, *], *]]) = base.freeRelations[F]
+
+  def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang0[K, *], S] =
     base.interpreter[K, S](Lens.nelHeadLens[State0[K]].compose(lens))
 }

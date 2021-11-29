@@ -28,8 +28,10 @@ object PersistentCostModule {
   }
 }
 
-class CostListModule[C, Lang[_[_], _], State0[_[_]]](base: PersistentCostModule.Aux[C, Lang, State0])
-extends ListModule[Lang, State0](base) with CostModule[C] {
+class CostListModule[C, Lang0[_[_], _], State0[_[_]]](base: PersistentCostModule.Aux[C, Lang0, State0])
+extends ListModule[Lang0, State0](base) with CostModule[C] {
+  override type Lang[K[_], A] = Lang0[K, A]
+
   def freeCost[F[_[_], _]](implicit i: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]) = base.freeCost[F]
 
   def interpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, *], S] =

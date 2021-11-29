@@ -3,7 +3,6 @@ package nutcracker.toolkit
 import nutcracker.util.CoproductK.:++:
 import nutcracker.util.APairK._
 import nutcracker.{Assessment, BranchingPropagation, Propagation}
-import scala.language.existentials
 import scalaz.Id.Id
 import scalaz.{Monad, ~>}
 
@@ -19,7 +18,8 @@ object PropBranch extends FreePropagationToolkit with FreeBranchingToolkit with 
   type VarK[K[_], A] = Prop.VarK[K, A]
   type ValK[K[_], A] = Prop.ValK[K, A]
 
-  val Branch = PersistentBranchingModule.instance[VarK, ValK].stashable
+  val Branch: BranchingModule.Aux0[VarK, ValK] with StashModule =
+    PersistentBranchingModule.instance[VarK, ValK].stashable
 
   type Lang[K[_], A] = (Prop.Lang   :++: Branch.Lang  )#Out[K, A]
   type StateK[K[_]]  = (Prop.StateK :**: Branch.StateK)#Out[K]

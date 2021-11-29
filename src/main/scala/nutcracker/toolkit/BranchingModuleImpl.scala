@@ -73,5 +73,6 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
     if(s.hasFailedVars) Assessment.Failed
     else s.split(fetch)
 
-  def stashable = new BranchingListModule[VarK, ValK, Lang, StateK](this)
+  def stashable: BranchingListModule[VarK, ValK, Lang, StateK] =
+    new BranchingListModule[VarK, ValK, Lang, StateK](this)
 }

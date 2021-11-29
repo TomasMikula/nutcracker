@@ -22,9 +22,12 @@ trait BranchingModule extends Module {
 }
 
 object BranchingModule {
-  type AuxL[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _]] = BranchingModule {
+  type Aux0[Var0[_[_], _], Val0[_[_], _]] = BranchingModule {
     type VarK[K[_], A] = Var0[K, A]
     type ValK[K[_], A] = Val0[K, A]
+  }
+
+  type AuxL[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _]] = Aux0[Var0, Val0] {
     type Lang[K[_], A] = Lang0[K, A]
   }
 
@@ -38,6 +41,11 @@ trait PersistentBranchingModule extends BranchingModule with PersistentStateModu
 }
 
 object PersistentBranchingModule {
+  type Aux0[Var0[_[_], _], Val0[_[_], _]] = PersistentBranchingModule {
+    type VarK[K[_], A] = Var0[K, A]
+    type ValK[K[_], A] = Val0[K, A]
+  }
+
   type Aux[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _], State0[_[_]]] =
     BranchingModule.Aux[Var0, Val0, Lang0, State0] with PersistentBranchingModule
 
@@ -45,10 +53,11 @@ object PersistentBranchingModule {
     new BranchingModuleImpl[Var0, Val0]
 }
 
-class BranchingListModule[Var0[_[_], _], Val0[_[_], _], Lang[_[_], _], State0[_[_]]](base: PersistentBranchingModule.Aux[Var0, Val0, Lang, State0])
-extends ListModule[Lang, State0](base) with BranchingModule {
+class BranchingListModule[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _], State0[_[_]]](base: PersistentBranchingModule.Aux[Var0, Val0, Lang0, State0])
+extends ListModule[Lang0, State0](base) with BranchingModule {
   type VarK[K[_], A] = Var0[K, A]
   type ValK[K[_], A] = Val0[K, A]
+  override type Lang[K[_], A] = Lang0[K, A]
 
   override def freeBranchingPropagation[F[_[_], _]](implicit
     i: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]],

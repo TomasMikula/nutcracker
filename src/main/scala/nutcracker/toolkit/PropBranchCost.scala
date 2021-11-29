@@ -4,7 +4,6 @@ import nutcracker.util.CoproductK._
 import nutcracker.util.APairK._
 import nutcracker.util.algebraic.NonDecreasingMonoid
 import nutcracker.{Assessment, BranchingPropagation, CostApi, Propagation}
-import scala.language.existentials
 import scalaz.Id._
 import scalaz.{Monad, ~>}
 
@@ -16,7 +15,8 @@ object PropBranchCostToolkit {
 
 final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBranchCostToolkit[C] with FreePropagationToolkit with FreeBranchingToolkit {
   val Prop = PersistentPropagationModule.instance.stashable
-  val Branch = PersistentBranchingModule.instance[Prop.VarK, Prop.ValK].stashable
+  val Branch: BranchingModule.Aux0[Prop.VarK, Prop.ValK] with StashModule =
+    PersistentBranchingModule.instance[Prop.VarK, Prop.ValK].stashable
   val Cost: CostModule[C] with StashModule = CostModule.instance[C].stashable
 
   override def prgMonad: Monad[Prg] = Monad[Prg]

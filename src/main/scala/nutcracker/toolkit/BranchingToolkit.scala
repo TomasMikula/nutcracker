@@ -27,7 +27,7 @@ trait BranchingToolkit extends RefToolkit with StashToolkit {
 
   /** Like [[solveDfsAll]], but also returns the number of dead branches explored. */
   def solveDfsAll1[D](p: Prg[Val[D]])(implicit fin: Final[D]): (List[fin.Out], Int) =
-    toList(solveDfs1(p)).run.value.swap
+    toList[WriterT[Int, Id, *], fin.Out](solveDfs1(p)).run.value.swap
 
   private implicit val mt: MonadTell[WriterT[Int, Id, *], Int] = WriterT.writerTMonadListen[Int, Id]
 
