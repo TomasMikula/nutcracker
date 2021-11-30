@@ -122,8 +122,8 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
   def update(u: Update)(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[SimpleCell[K, D]] =
     dom.update(value, u) match {
       case up @ Updated(newVal, delta) =>
-        val pending0 = pendingObservers.map(_.addDelta(delta))
-        val pending1 = idleObservers.map(_.addDelta(delta))
+        val pending0: List[PendingObserver[up.NewValue]] = pendingObservers.map(_.addDelta(delta))
+        val pending1: List[PendingObserver[up.NewValue]] = idleObservers.map(_.addDelta(delta))
         val pending = pending1 ::: pending0
 
         val blocked0 = blockedPendingObservers.mapValues[BlockedPendingObserver[up.NewValue, *]](
@@ -138,7 +138,7 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
         )
         val blocked = blocked0 ++ blocked1
 
-        val cell = SimpleCell[K, D, Update, Delta, D](newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[up.NewValue, *]](), blocked, lastObserverId, lastToken)
+        val cell = SimpleCell[K, D, Update, Delta, up.NewValue](newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[up.NewValue, *]](), blocked, lastObserverId, lastToken)
         val becameDirty = !this.hasPendingObservers && cell.hasPendingObservers
         CellUpdated(cell, becameDirty)
 

@@ -2,6 +2,7 @@ package nutcracker.toolkit
 
 import nutcracker.util.CoproductK._
 import nutcracker.util.APairK._
+import nutcracker.util.{FreeK, Inject}
 import nutcracker.util.algebraic.NonDecreasingMonoid
 import nutcracker.{Assessment, BranchingPropagation, CostApi, Propagation}
 import scalaz.Id._
@@ -34,6 +35,12 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   implicit def varShowK[K[_]] = Prop.varShowK
   implicit def valOrderK[K[_]] = Prop.valOrderK
   implicit def valShowK[K[_]] = Prop.valShowK
+
+  private implicit val injBranch: Inject[Branch.Lang[FreeK[Lang, *], *], Lang[FreeK[Lang, *], *]] =
+    Inject.injectRightRec(Inject.injectLeft)
+
+  private implicit val injCost: Inject[Cost.Lang[FreeK[Lang, *], *], Lang[FreeK[Lang, *], *]] =
+    Inject.injectRightRec(Inject.injectRight)
 
   implicit val propagationApi: Propagation[Prg, Var, Val] =
     Prop.freePropagation[Lang]
