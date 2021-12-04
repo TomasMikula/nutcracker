@@ -36,23 +36,10 @@ object HEqual {
   *
   * Note that (heterogeneous) equality between `A` and `B` is not required to compare `F[A]` to `F[B]`.
   */
-trait HEqualK[F[_]] extends EqualK[F] with Equal[F[_]] {
+trait HEqualK[F[_]] extends EqualK[F] {
   def hEqualK[A, B](fa: F[A], fb: F[B]): Boolean
 
   override def equalK[A](f1: F[A], f2: F[A]): Boolean = hEqualK(f1, f2)
-
-  override def equal(f1: F[_], f2: F[_]): Boolean = {
-    // unsafe casts needed because of https://github.com/lampepfl/dotty/issues/14008
-    hEqualK(
-      f1.asInstanceOf[F[Any]],
-      f2.asInstanceOf[F[Any]],
-    )
-  }
-
-  def homogenize: EqualK[F] = new EqualK[F] {
-    override def equalK[A](f1: F[A], f2: F[A]): Boolean =
-      hEqualK(f1, f2)
-  }
 
   def hSpecialize[A, B]: HEqual[F[A], F[B]] =
     (fa, fb) => hEqualK(fa, fb)

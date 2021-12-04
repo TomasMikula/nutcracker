@@ -122,9 +122,9 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     val step = (s1: S1) =>
       new (Ptr ~> λ[α => (S1, S2 => (S2, Decoration[R])) \/ (S2, R)]) {
         override def apply[X](px: Ptr[X]) = {
-          if(s1.exists(p => E.equal(p.value, px))) \/-((Lst.singleton(Exists(px)), showReference(px)))
+          if(s1.exists(p => E.hEqualK(p.value, px))) \/-((Lst.singleton(Exists(px)), showReference(px)))
           else -\/((Exists(px) :: s1, s2 => {
-            val s21 = s2.filterNot(p => E.equal(p.value, px))
+            val s21 = s2.filterNot(p => E.hEqualK(p.value, px))
             val dec = if(s21.size < s2.size) decorateReferenced(px) else decorateUnreferenced(px)
             (s21, dec)
           }))
@@ -209,7 +209,7 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     val step = (s: S) =>
       new (Ptr ~> λ[α => (S, Decoration[R]) \/ R]) {
         override def apply[X](px: Ptr[X]) =
-          if (s.exists(p => E.equal(p.value, px))) \/-(showReference(px))
+          if (s.exists(p => E.hEqualK(p.value, px))) \/-(showReference(px))
           else -\/((Exists(px) :: s, decorateContent(px)))
       }
 

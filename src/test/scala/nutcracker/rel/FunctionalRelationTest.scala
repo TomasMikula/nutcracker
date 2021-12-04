@@ -27,11 +27,8 @@ class FunctionalRelationTest extends AnyFunSuite {
 
     val paired = Tupled2[Bool, Bool, Val]()
 
-    val orderVal: scalaz.Order[Val[_]] =
-      (x: Val[_], y: Val[_]) => valOrder.order(x, y)
-
-    implicit val orders: SummonHList[Order[Val[_]] :: Order[Val[_]] :: Order[Val[_]] :: HNil] =
-      orderVal :: orderVal :: orderVal :: SummonHList.hnilWrapper
+    implicit val orders: SummonHList[Order[Val[Bool]] :: Order[Val[Bool]] :: Order[Val[(Bool, Bool)]] :: HNil] =
+      valOrder.specialize[Bool] :: valOrder.specialize[Bool] :: valOrder.specialize[(Bool, Bool)] :: SummonHList.hnilWrapper
 
     def init(a: Val[Bool], b: Val[Bool]) =
       establish(paired).matching2(a, b)

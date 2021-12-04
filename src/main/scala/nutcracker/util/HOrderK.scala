@@ -1,18 +1,13 @@
 package nutcracker.util
 
-import scalaz.{Order, Ordering}
+import scalaz.Ordering
 
-trait HOrderK[F[_]] extends HEqualK[F] with Order[F[_]] {
+trait HOrderK[F[_]] extends HEqualK[F] with OrderK[F] {
   def hOrderK[A, B](fa: F[A], fb: F[B]): Ordering
 
-  override def order(x: F[_], y: F[_]): Ordering = {
-    // unsafe casts needed because of https://github.com/lampepfl/dotty/issues/14008
-    hOrderK(
-      x.asInstanceOf[F[Any]],
-      y.asInstanceOf[F[Any]],
-    )
-  }
+  override def orderK[A](f1: F[A], f2: F[A]): Ordering =
+    hOrderK(f1, f2)
 
-  override def hEqualK[A, B](fa: F[A], fb: F[B]): Boolean = hOrderK(fa, fb) == Ordering.EQ
-  override def equal(x: F[_], y: F[_]): Boolean = order(x, y) == Ordering.EQ
+  override def hEqualK[A, B](fa: F[A], fb: F[B]): Boolean =
+    hOrderK(fa, fb) == Ordering.EQ
 }
