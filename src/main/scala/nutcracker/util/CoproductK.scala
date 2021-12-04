@@ -6,13 +6,25 @@ object CoproductK {
 
   sealed trait Builder {
     type Out[_[_], _]
+
+    def or[G[_[_], _]]: Builder.Aux[Out, G] =
+      Builder.coproduct[Out, G]
   }
 
-  sealed trait :++:[F[_[_], _], G[_[_], _]] extends Builder {
-    type Out[K[_], A] = Coproduct[F[K, *], G[K, *], A]
+  object Builder {
+    type Aux[F[_[_], _], G[_[_], _]] =
+      Builder {
+        type Out[K[_], A] = Coproduct[F[K, *], G[K, *], A]
+      }
+
+    def coproduct[F[_[_], _], G[_[_], _]]: Builder.Aux[F, G] =
+      new Builder {
+        type Out[K[_], A] = Coproduct[F[K, *], G[K, *], A]
+      }
   }
 
-  sealed trait :+:[F[_[_], _], B <: Builder] extends Builder {
-    type Out[K[_], A] = Coproduct[F[K, *], B#Out[K, *], A]
+  object zero {
+    def or[F[_[_], _]]: Builder { type Out[K[_], A] = F[K, A] } =
+      new Builder { type Out[K[_], A] = F[K, A] }
   }
 }

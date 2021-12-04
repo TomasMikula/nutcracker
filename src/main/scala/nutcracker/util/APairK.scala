@@ -16,16 +16,25 @@ object APairK {
     type A[P] = X[P]
   }
 
-  sealed trait Builder { // linter:ignore UnextendedSealedTrait
+  sealed trait Builder {
     type Out[A[_]]
+
+    def and[H[_[_]]]: Builder.Aux[Out, H] =
+      Builder.pair[Out, H]
   }
 
-  type :**:[F[_[_]], G[_[_]]] = Builder {
-    type Out[A[_]] = Pair[F, G, A]
+  object Builder {
+    type Aux[F[_[_]], G[_[_]]] = Builder { type Out[A[_]] = Pair[F, G, A] }
+
+    def pair[F[_[_]], G[_[_]]]: Builder.Aux[F, G] =
+      new Builder {
+        type Out[A[_]] = Pair[F, G, A]
+      }
   }
 
-  type :*:[F[_[_]], B <: Builder] = Builder {
-    type Out[A[_]] = Pair[F, B#Out, A]
+  object unit {
+    def and[F[_[_]]]: Builder { type Out[A[_]] = F[A] } =
+      new Builder { type Out[A[_]] = F[A] }
   }
 
   implicit def fstLens[F[_[_]], G[_[_]], A[_]]: Lens[Pair[F, G, A], F[A]] =

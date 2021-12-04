@@ -26,8 +26,11 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   type VarK[K[_], A] = Prop.VarK[K, A]
   type ValK[K[_], A] = Prop.ValK[K, A]
 
-  type Lang[K[_], A] = (Prop.Lang   :+: Branch.Lang   :++: Cost.Lang  )#Out[K, A]
-  type StateK[K[_]]  = (Prop.StateK :*: Branch.StateK :**: Cost.StateK)#Out[K]
+  val lang   = zero.or [Prop.Lang]  .or [Branch.Lang]  .or [Cost.Lang]
+  val stateK = unit.and[Prop.StateK].and[Branch.StateK].and[Cost.StateK]
+
+  type Lang[K[_], A] = lang.Out[K, A]
+  type StateK[K[_]]  = stateK.Out[K]
 
   override def readOnlyK[K[_], A](ref: VarK[K, A]): ValK[K, A] = Prop.readOnlyK(ref)
 
@@ -36,11 +39,14 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   implicit def valOrderK[K[_]] = Prop.valOrderK
   implicit def valShowK[K[_]] = Prop.valShowK
 
+  private implicit val injProp: Inject[Prop.Lang[FreeK[Lang, *], *], Lang[FreeK[Lang, *], *]] =
+    Inject.injectLeftRec(Inject.injectLeft)
+
   private implicit val injBranch: Inject[Branch.Lang[FreeK[Lang, *], *], Lang[FreeK[Lang, *], *]] =
-    Inject.injectRightRec(Inject.injectLeft)
+    Inject.injectLeftRec(Inject.injectRight)
 
   private implicit val injCost: Inject[Cost.Lang[FreeK[Lang, *], *], Lang[FreeK[Lang, *], *]] =
-    Inject.injectRightRec(Inject.injectRight)
+    Inject.injectRight
 
   implicit val propagationApi: Propagation[Prg, Var, Val] =
     Prop.freePropagation[Lang]
@@ -57,23 +63,23 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   def stashRestoreK[K[_]]: StashRestore[StateK[K]] = StashRestore.kPairInstance
 
   def emptyK[K[_]]: StateK[K] =
-    Prop.emptyK[K] :*: Branch.emptyK[K] :*: Cost.emptyK[K]
+    (Prop.emptyK[K] :*: Branch.emptyK[K]) :*: Cost.emptyK[K]
 
   def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] =
-    Prop.fetchK(ref, s._1)
+    Prop.fetchK(ref, s._1._1)
 
   def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A =
-    Prop.fetchK(ref, s._1)
+    Prop.fetchK(ref, s._1._1)
 
-  val stepInterpreter = Prop.stepInterpreterK[Prg, State] :+: Branch.stepInterpreter[Prg, State] :+: Cost.interpreter[Prg, State]
+  val stepInterpreter = (Prop.stepInterpreterK[Prg, State] :+: Branch.stepInterpreter[Prg, State]) :+: Cost.interpreter[Prg, State]
 
   def assess(s: State): Assessment[List[Prg[Unit]]] =
-    Branch.assess(s._2._1)(
+    Branch.assess(s._1._2)(
       new (Var ~> Id) {
-        override def apply[A](ref: Var[A]): A = Prop.fetchK(ref, s._1)
+        override def apply[A](ref: Var[A]): A = Prop.fetchK(ref, s._1._1)
       }
     )
 
-  def getCost(s: State): C = Cost.getCost(s._2._2)
+  def getCost(s: State): C = Cost.getCost(s._2)
 }
 

@@ -2,11 +2,10 @@ package nutcracker.util.free
 
 import scala.annotation.tailrec
 import scalaz.{-\/, Applicative, ApplicativePlus, BindRec, Foldable, Monad, MonadPlus, MonadTrans, Monoid, Plus, Traverse, \/, \/-, ~>}
-import scalaz.Id.Id
 import scalaz.syntax.applicative._
 
-final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A]) extends AnyVal {
-  type F1[X] = (M :++: F)#Out[X]
+final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[({ type Out[a] = Either[M[a], F[a]] })#Out, A]) extends AnyVal {
+  type F1[X] = Either[M[X], F[X]]
 
   def flatMap[B](f: A => FreeT[F, M, B]): FreeT[F, M, B] =
     FreeT(unwrap.flatMap(a => f(a).unwrap))
@@ -18,10 +17,10 @@ final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A
     flatMap[A0](ev)
 
   def hoist[N[_]](f: M ~> N): FreeT[F, N, A] =
-    FreeT(unwrap.mapF[(N :++: F)#Out](Coproduct.injectLeft[M, N, F](f)))
+    FreeT(unwrap.mapF[({ type Out[a] = Either[N[a], F[a]] })#Out](Coproduct.injectLeft[M, N, F](f)))
 
   def interpret[G[_]](f: F ~> G): FreeT[G, M, A] =
-    FreeT(unwrap.mapF[(M :++: G)#Out](Coproduct.injectRight[M, F, G](f)))
+    FreeT(unwrap.mapF[({ type Out[a] = Either[M[a], G[a]] })#Out](Coproduct.injectRight[M, F, G](f)))
 
   def foldMap(f: F ~> M)(implicit M: BindRec[M]): M[A] =
     unwrap.foldMap(
@@ -69,7 +68,7 @@ final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[(M :++: F)#Out, A
   def plus(that: FreeT[F, M, A])(implicit M0: Plus[M], M1: BindRec[M], M2: Applicative[M]): FreeT[F, M, A] =
     FreeT.rollM(M0.plus(this.flattenM, that.flattenM))
 
-  def toFree(implicit ev: FreeBind[(M :++: F)#Out, A] =:= FreeBind[(Id :++: F)#Out, A]): Free[F, A] =
+  def toFree(implicit ev: FreeBind[F1, A] =:= FreeBind[({ type Out[a] = Either[a, F[a]] })#Out, A]): Free[F, A] =
     Free(ev(unwrap))
 
   /** Flatten all `M`s occuring prior to the first `F`
@@ -100,11 +99,15 @@ object FreeT extends FreeTInstances {
   def point[F[_], M[_]: Applicative, A](a: A): FreeT[F, M, A] =
     liftM(a.point[M])
 
-  def liftF[F[_], M[_], A](fa: F[A]): FreeT[F, M, A] =
-    FreeT(FreeBind.liftF[(M :++: F)#Out, A](Right(fa)))
+  def liftF[F[_], M[_], A](fa: F[A]): FreeT[F, M, A] = {
+    type MF[a] = Either[M[a], F[a]]
+    FreeT(FreeBind.liftF[MF, A](Right(fa)))
+  }
 
-  def liftM[F[_], M[_], A](ma: M[A]): FreeT[F, M, A] =
-    FreeT(FreeBind.liftF[(M :++: F)#Out, A](Left(ma)))
+  def liftM[F[_], M[_], A](ma: M[A]): FreeT[F, M, A] = {
+    type MF[a] = Either[M[a], F[a]]
+    FreeT(FreeBind.liftF[MF, A](Left(ma)))
+  }
 
   def rollM[F[_], M[_], A](ma: M[FreeT[F, M, A]]): FreeT[F, M, A] =
     liftM[F, M, FreeT[F, M, A]](ma).flatten

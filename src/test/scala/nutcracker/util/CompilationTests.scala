@@ -16,8 +16,10 @@ object CompilationTests {
     trait BarS[K[_]]
     trait BazS[K[_]]
 
-    type FooBarBazL[K[_], A] = (FooL :+: BarL :++: BazL)#Out[K, A]
-    type FooBarBazS[K[_]]    = (FooS :*: BarS :**: BazS)#Out[K]
+    val fooBarBazL = zero.or[FooL].or[BarL].or[BazL]
+    val fooBarBazS = unit.and[FooS].and[BarS].and[BazS]
+    type FooBarBazL[K[_], A] = fooBarBazL.Out[K, A]
+    type FooBarBazS[K[_]]    = fooBarBazS.Out[K]
 
     def fooIntr[K[_], S](implicit lens: Lens[S, FooS[K]]): StateInterpreter[K, FooL[K, *], S] = ???
     def barIntr[K[_], S](implicit lens: Lens[S, BarS[K]]): StateInterpreter[K, BarL[K, *], S] = ???
@@ -33,8 +35,10 @@ object CompilationTests {
     type QuxL[K[_], A] = QuuxL[Int, K, A]
     type QuxS[K[_]]    = QuuxS[Int, K]
 
-    type FooBarQuxL[K[_], A] = (FooL :+: BarL :++: QuxL)#Out[K, A]
-    type FooBarQuxS[K[_]]    = (FooS :*: BarS :**: QuxS)#Out[K]
+    val fooBarQuxL = zero.or[FooL].or[BarL].or[QuxL]
+    val fooBarQuxS = unit.and[FooS].and[BarS].and[QuxS]
+    type FooBarQuxL[K[_], A] = fooBarQuxL.Out[K, A]
+    type FooBarQuxS[K[_]]    = fooBarQuxS.Out[K]
 
     type Prg2[A] = FreeK[FooBarQuxL, A]
 

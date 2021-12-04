@@ -4,8 +4,8 @@ import scalaz.{-\/, Applicative, BindRec, Monad, Monoid, Traverse, \/, \/-, ~>}
 import scalaz.Id.Id
 import scalaz.syntax.applicative._
 
-final case class Free[F[_], A](unwrap: FreeBind[(Id :++: F)#Out, A]) extends AnyVal {
-  private type F1[X] = (Id :++: F)#Out[X]
+final case class Free[F[_], A](unwrap: FreeBind[({ type Out[a] = Either[a, F[a]] })#Out, A]) extends AnyVal {
+  private type F1[X] = Either[X, F[X]]
 
   def flatMap[B](f: A => Free[F, B]): Free[F, B] =
     Free(unwrap.flatMap(a => f(a).unwrap))
@@ -102,9 +102,9 @@ final case class Free[F[_], A](unwrap: FreeBind[(Id :++: F)#Out, A]) extends Any
 }
 
 object Free extends FreeInstances {
-  def point[F[_], A](a: A): Free[F, A] = Free(FreeBind.liftF[(Id :++: F)#Out, A](Left(a)))
+  def point[F[_], A](a: A): Free[F, A] = Free(FreeBind.liftF[({ type Out[a] = Either[a, F[a]] })#Out, A](Left(a)))
 
-  def liftF[F[_], A](fa: F[A]): Free[F, A] = Free(FreeBind.liftF[(Id :++: F)#Out, A](Right(fa)))
+  def liftF[F[_], A](fa: F[A]): Free[F, A] = Free(FreeBind.liftF[({ type Out[a] = Either[a, F[a]] })#Out, A](Right(fa)))
 
   def roll[F[_], A](ffa: F[Free[F, A]]): Free[F, A] =
     liftF(ffa).flatMap(x => x)
@@ -130,7 +130,7 @@ trait FreeInstances1 {
 
   implicit def traverseInstance[F[_]](implicit F: Traverse[F]): Traverse[Free[F, *]] =
     new Traverse[Free[F, *]] {
-      val impl = FreeBind.traverseInstance[(Id :++: F)#Out](coproductTraverse[Id, F](scalaz.Id.id, F))
+      val impl = FreeBind.traverseInstance[({ type Out[a] = Either[a, F[a]] })#Out](coproductTraverse[Id, F](scalaz.Id.id, F))
       def traverseImpl[G[_], A, B](fa: Free[F, A])(f: A => G[B])(implicit G: Applicative[G]): G[Free[F, B]] =
         G.map(impl.traverse(fa.unwrap)(f))(Free.apply)
     }
