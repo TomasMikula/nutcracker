@@ -9,7 +9,7 @@ import scalaz.~>
 
 private[nutcracker] case class BranchStore[Ref[_], K[_]](
   unresolvedVars: KMap[Ref, Splittable],
-  failedVars: Set[Ref[_]]
+  failedVars: Set[Ref[Nothing]]
 ) {
   def addUnresolved[D](ref: Ref[D], ev: Splittable[D]): BranchStore[Ref, K] =
     copy[Ref, K](unresolvedVars = unresolvedVars.put(ref)(ev))
@@ -18,7 +18,7 @@ private[nutcracker] case class BranchStore[Ref[_], K[_]](
     copy[Ref, K](unresolvedVars = unresolvedVars - ref)
 
   def addFailed[D](ref: Ref[D]): BranchStore[Ref, K] =
-    copy[Ref, K](failedVars = failedVars + ref)
+    copy[Ref, K](failedVars = failedVars + ref.asInstanceOf[Ref[Nothing]])
 
   def split[Val[_]](fetch: Ref ~> Id)(implicit K: Propagation[K, Ref, Val]): Assessment[List[K[Unit]]] =
     if(unresolvedVars.isEmpty) Done
@@ -41,5 +41,5 @@ private[nutcracker] case class BranchStore[Ref[_], K[_]](
 
 object BranchStore {
   def apply[Ref[_], K[_]](): BranchStore[Ref, K] =
-    BranchStore[Ref, K](KMap[Ref, Splittable](), Set.empty[Ref[_]])
+    BranchStore[Ref, K](KMap[Ref, Splittable](), Set.empty[Ref[Nothing]])
 }

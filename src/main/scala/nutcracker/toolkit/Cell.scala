@@ -1,6 +1,6 @@
 package nutcracker.toolkit
 
-import nutcracker.util.{KMap, Lst}
+import nutcracker.util.{Exists, KMap, Lst}
 import nutcracker.{IDom, SeqHandler, SeqPreHandler, SeqTrigger, Subscription}
 import scala.annotation.tailrec
 import scalaz.syntax.equal._
@@ -81,7 +81,7 @@ private[nutcracker] object Cell {
     go(Nil, l)
   }
 
-  def mapRemoveFirst[Key[_], V[_]](m: KMap[Key, V])(p: V[_] => Boolean): Option[KMap[Key, V]] =
+  def mapRemoveFirst[Key[_], V[_]](m: KMap[Key, V])(p: Exists[V] => Boolean): Option[KMap[Key, V]] =
     m.find(p).map(m - _._1)
 }
 
@@ -188,9 +188,9 @@ private[nutcracker] abstract class SimpleCell[K[_], D] extends Cell[K, D] {
       case Some(idles) => copy(idleObservers = idles)
       case None => listRemoveFirst(pendingObservers)(_.id === oid) match {
         case Some(pendings) => copy(pendingObservers = pendings)
-        case None => mapRemoveFirst(blockedIdleObservers)(_.id === oid) match {
+        case None => mapRemoveFirst(blockedIdleObservers)(_.value.id === oid) match {
           case Some(blockedIdles) => copy(blockedIdleObservers = blockedIdles)
-          case None => mapRemoveFirst(blockedPendingObservers)(_.id === oid) match {
+          case None => mapRemoveFirst(blockedPendingObservers)(_.value.id === oid) match {
             case Some(blockedPendings) => copy(blockedPendingObservers = blockedPendings)
             case None => this
           }

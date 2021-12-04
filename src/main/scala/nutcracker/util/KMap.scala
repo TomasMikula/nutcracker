@@ -1,9 +1,10 @@
 package nutcracker.util
 
+import nutcracker.util.Exists
 import nutcracker.util.typealigned.{APair, BoundedAPair}
 import scalaz.~>
 
-final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
+final case class KMap[K[_], V[_]](map: Map[K[Any], V[Any]]) extends AnyVal {
   def isEmpty: Boolean = map.isEmpty
   def nonEmpty: Boolean = map.nonEmpty
   def size: Int = map.size
@@ -12,20 +13,20 @@ final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
     APair(k, v)
   }
   def tail: KMap[K, V] = KMap[K, V](map.tail)
-  def apply[A](k: K[A]): V[A] = map(k).asInstanceOf[V[A]]
-  def get[A](k: K[A]): Option[V[A]] = map.get(k).asInstanceOf[Option[V[A]]]
-  def find(p: V[_] => Boolean): Option[APair[K, V]] =
-    map.find(kv => p(kv._2)).asInstanceOf[Option[(K[Any], V[Any])]].map { case (k, v) => APair(k, v) }
+  def apply[A](k: K[A]): V[A] = map(k.asInstanceOf[K[Any]]).asInstanceOf[V[A]]
+  def get[A](k: K[A]): Option[V[A]] = map.get(k.asInstanceOf[K[Any]]).asInstanceOf[Option[V[A]]]
+  def find(p: Exists[V] => Boolean): Option[APair[K, V]] =
+    map.find(kv => p(Exists(kv._2))).map { case (k, v) => APair(k, v) }
   def getOrElse[A](k: K[A])(default: => V[A]): V[A] = get(k).getOrElse(default)
-  def put[A](k: K[A])(v: V[A]): KMap[K, V] = KMap[K, V](map.updated(k, v))
+  def put[A](k: K[A])(v: V[A]): KMap[K, V] = KMap[K, V](map.updated(k.asInstanceOf[K[Any]], v.asInstanceOf[V[Any]]))
   def updated[A](k: K[A])(v: V[A])(combineIfPresent: (V[A], V[A]) => V[A]): KMap[K, V] =
     get(k) match {
       case None => put(k)(v)
       case Some(v0) => put(k)(combineIfPresent(v0, v))
     }
-  def -(k: K[_]): KMap[K, V] = KMap[K, V](map - k)
+  def -(k: K[_]): KMap[K, V] = KMap[K, V](map - k.asInstanceOf[K[Any]])
   def mapValues[W[_]](f: V ~> W): KMap[K, W] =
-    KMap[K, W](map.iterator.map { case (k, v) => (k, f(v.asInstanceOf[V[Any]])) }.toMap[K[_], W[_]])
+    KMap[K, W](map.iterator.map { case (k, v) => (k, f(v.asInstanceOf[V[Any]])) }.toMap[K[Any], W[Any]])
   def ++(that: KMap[K, V]): KMap[K, V] =
     KMap[K, V](this.map ++ that.map)
   def iterator: Iterator[APair[K, V]] =
@@ -33,7 +34,7 @@ final case class KMap[K[_], V[_]](map: Map[K[_], V[_]]) extends AnyVal {
 }
 
 object KMap {
-  def apply[K[_], V[_]](): KMap[K, V] = KMap[K, V](Map[K[_], V[_]]())
+  def apply[K[_], V[_]](): KMap[K, V] = KMap[K, V](Map[K[Any], V[Any]]())
 }
 
 final case class HKMap[K[_[_]], V[_[_]]](map: Map[K[Nothing], V[Nothing]]) extends AnyVal {

@@ -116,15 +116,15 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     M0: BindRec[M],
     M1: Applicative[M]
   ): M[Tree[R]] = {
-    type S1 = List[Ptr[_]] // context, i.e. all parents
-    type S2 = Lst[Ptr[_]]  // referenced within the subgraph
+    type S1 = List[Exists[Ptr]] // context, i.e. all parents
+    type S2 = Lst[Exists[Ptr]]  // referenced within the subgraph
 
     val step = (s1: S1) =>
       new (Ptr ~> λ[α => (S1, S2 => (S2, Decoration[R])) \/ (S2, R)]) {
         override def apply[X](px: Ptr[X]) = {
-          if(s1.exists(E.equal(_, px))) \/-((Lst.singleton(px), showReference(px)))
-          else -\/((px :: s1, s2 => {
-            val s21 = s2.filterNot(E.equal(_, px))
+          if(s1.exists(p => E.equal(p.value, px))) \/-((Lst.singleton(Exists(px)), showReference(px)))
+          else -\/((Exists(px) :: s1, s2 => {
+            val s21 = s2.filterNot(p => E.equal(p.value, px))
             val dec = if(s21.size < s2.size) decorateReferenced(px) else decorateUnreferenced(px)
             (s21, dec)
           }))
@@ -204,13 +204,13 @@ final class FreeObjectOutput[R, Ptr[_], A] private[FreeObjectOutput] (private va
     M0: BindRec[M],
     M1: Applicative[M]
   ): M[Tree[R]] = {
-    type S = List[Ptr[_]] // context, i.e. all parents
+    type S = List[Exists[Ptr]] // context, i.e. all parents
 
     val step = (s: S) =>
       new (Ptr ~> λ[α => (S, Decoration[R]) \/ R]) {
         override def apply[X](px: Ptr[X]) =
-          if (s.exists(E.equal(_, px))) \/-(showReference(px))
-          else -\/((px :: s, decorateContent(px)))
+          if (s.exists(p => E.equal(p.value, px))) \/-(showReference(px))
+          else -\/((Exists(px) :: s, decorateContent(px)))
       }
 
     foldState[S, M](Nil)(step)(deref)

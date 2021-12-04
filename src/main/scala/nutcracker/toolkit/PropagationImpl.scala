@@ -80,13 +80,15 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
               def resume[D, Δ[_, _], D0 <: D](s: StateK[K])(ref: SimpleCellId[K, D], token: Token[D0], trigger: s.Trigger[D, Δ, D0]): (PropagationStore[K], Lst[K[Unit]], Boolean) =
                 s.resume[D, Δ, D0](ref, token, trigger)
               val (s1, ks, becameDirty) =
-                resume[res.Domain, res.Delta, res.Arg](s)(res.ref, res.token, res.trigger)
+                // resume[res.Domain, res.Delta, res.Arg](s)(res.ref, res.token, res.trigger)
+                resume[res.Domain, res.Delta, res.Domain](s)(res.ref, res.token.asInstanceOf[Token[res.Domain]], res.trigger.asInstanceOf[s.Trigger[res.Domain, res.Delta, res.Domain]])
               val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggers(res.ref))) at 1) else (ks at 0)
               (w, s0 set s1, ())
             case res: ResumeAuto[k, d, δ, d0] =>
               def resume[D, Δ[_, _], D0 <: D](s: StateK[K])(ref: AutoCellId[K, D], cycle: CellCycle[D], token: Token[D0], trigger: s.Trigger[D, Δ, D0]): (PropagationStore[K], Lst[K[Unit]], Boolean) =
                 s.resume(ref, cycle, token, trigger)
-              val (s1, ks, becameDirty) = resume[res.Domain, res.Delta, res.Arg](s)(res.ref, res.cycle, res.token, res.trigger)
+              // val (s1, ks, becameDirty) = resume[res.Domain, res.Delta, res.Arg](s)(res.ref, res.cycle, res.token, res.trigger)
+              val (s1, ks, becameDirty) = resume[res.Domain, res.Delta, res.Domain](s)(res.ref, res.cycle, res.token.asInstanceOf[Token[res.Domain]], res.trigger.asInstanceOf[s.Trigger[res.Domain, res.Delta, res.Domain]])
               val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggersAuto(res.ref, res.cycle))) at 1) else (ks at 0)
               (w, s0 set s1, ())
 
