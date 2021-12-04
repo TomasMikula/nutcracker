@@ -60,6 +60,6 @@ object Assignment {
       Assignment(Vector.fill(nToInt())(Option.empty))
 
     def from[OL <: HList](ol: OL)(implicit m: Mapped.Aux[L, Option, OL]): Assignment[L] =
-      Assignment(m.toList(ol).toVector)
+      Assignment(m.toList(ol).map(_.value).toVector)
   }
 }
