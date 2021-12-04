@@ -15,7 +15,7 @@ import scalaz.syntax.contravariant._
   * @see [[Revocable]] which in addition has a top element.
   * @see [[Promise]] which in addition has bottom and top elements.
   */
-final case class Discrete[A](value: A) extends AnyVal
+final case class Discrete[A](value: A)
 
 object Discrete extends DiscreteInstances {
 

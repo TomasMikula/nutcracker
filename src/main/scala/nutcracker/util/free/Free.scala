@@ -4,7 +4,7 @@ import scalaz.{-\/, Applicative, BindRec, Monad, Monoid, Traverse, \/, \/-, ~>}
 import scalaz.Id.Id
 import scalaz.syntax.applicative._
 
-final case class Free[F[_], A](unwrap: FreeBind[({ type Out[a] = Either[a, F[a]] })#Out, A]) extends AnyVal {
+final case class Free[F[_], A](unwrap: FreeBind[({ type Out[a] = Either[a, F[a]] })#Out, A]) {
   private type F1[X] = Either[X, F[X]]
 
   def flatMap[B](f: A => Free[F, B]): Free[F, B] =

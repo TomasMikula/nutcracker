@@ -4,7 +4,7 @@ import scala.annotation.tailrec
 import scalaz.{-\/, Applicative, ApplicativePlus, BindRec, Foldable, Monad, MonadPlus, MonadTrans, Monoid, Plus, Traverse, \/, \/-, ~>}
 import scalaz.syntax.applicative._
 
-final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[({ type Out[a] = Either[M[a], F[a]] })#Out, A]) extends AnyVal {
+final case class FreeT[F[_], M[_], A] private(unwrap: FreeBind[({ type Out[a] = Either[M[a], F[a]] })#Out, A]) {
   type F1[X] = Either[M[X], F[X]]
 
   def flatMap[B](f: A => FreeT[F, M, B]): FreeT[F, M, B] =

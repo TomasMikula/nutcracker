@@ -12,6 +12,8 @@ trait ToIteratorOps {
 }
 
 final case class IteratorOps[A](it: Iterator[A]) extends AnyVal {
+  import IteratorOps._
+
   def toMultiMap[K, V](implicit ev: A =:= (K, V)): Map[K, List[V]] = {
     val builder = MMap[K, List[V]]()
     while(it.hasNext) {
@@ -97,8 +99,11 @@ final case class IteratorOps[A](it: Iterator[A]) extends AnyVal {
 
     l.reduceLeftOption((acc, b) => B.append(b, acc))
   }
+}
 
-  private def applicativeSemigroup[F[_], B](implicit F: Applicative[F]): Semigroup[F[B]] = new Semigroup[F[B]] {
-    def append(f1: F[B], f2: => F[B]): F[B] = F.apply2(f1, f2)((_, a) => a)
-  }
+object IteratorOps {
+  private[IteratorOps] def applicativeSemigroup[F[_], B](implicit F: Applicative[F]): Semigroup[F[B]] =
+    new Semigroup[F[B]] {
+      def append(f1: F[B], f2: => F[B]): F[B] = F.apply2(f1, f2)((_, a) => a)
+    }
 }

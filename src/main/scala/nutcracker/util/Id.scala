@@ -2,7 +2,7 @@ package nutcracker.util
 
 import scalaz.{-\/, BindRec, Comonad, Monad, \/, \/-}
 
-case class Id[A](value: A) extends AnyVal
+case class Id[A](value: A)
 
 object Id {
   implicit val id: Monad[Id] with BindRec[Id] with Comonad[Id] =
