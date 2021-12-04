@@ -15,12 +15,12 @@ class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Va
 
   def and(x: Var[Bool], y: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
     res <- newVar[Bool]
-    _ <- x._whenFinal({ r =>
-      if (r) y <=> res
+    _ <- x.whenFinal({ r =>
+      if (r) (y <=> res).void
       else res.set(false)
     })
-    _ <- y._whenFinal({ r =>
-      if (r) x <=> res
+    _ <- y.whenFinal({ r =>
+      if (r) (x <=> res).void
       else res.set(false)
     })
     _ <- res._whenFinal({ r =>
@@ -33,11 +33,11 @@ class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Va
     res <- newVar[Bool]
     _ <- x._whenFinal({ r =>
       if (r) res.set(true)
-      else y <=> res
+      else (y <=> res).void
     })
     _ <- y._whenFinal({ r =>
       if (r) res.set(true)
-      else x <=> res
+      else (x <=> res).void
     })
     _ <- res._whenFinal({ r =>
       if (r) M.pure(())
