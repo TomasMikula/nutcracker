@@ -1,8 +1,6 @@
 package nutcracker.util
 
 import org.scalatest.funsuite.AnyFunSuite
-
-import scalaz.Id.Id
 import scalaz.NaturalTransformation
 
 class DeepEqualTest extends AnyFunSuite {
@@ -15,7 +13,7 @@ class DeepEqualTest extends AnyFunSuite {
 
     val res = listEqual.deepEqual(l, l)(NaturalTransformation.refl[Id], NaturalTransformation.refl[Id])
 
-    assert(res)
+    assert(res.value)
   }
 
   test("cycles") {
@@ -25,12 +23,12 @@ class DeepEqualTest extends AnyFunSuite {
 
     implicit val de: DeepEqual[Lst, Lst, Id, Id] = new DeepEqual[Lst, Lst, Id, Id] {
       def equal(l1: Lst, l2: Lst) =
-        IsEqual[Id, Id, Int, Int](l1.i, l2.i) && IsEqual.refs[Id, Id, Lst, Lst](l1.tail, l2.tail)(this)
+        IsEqual[Id, Id, Int, Int](l1.i, l2.i) && IsEqual.refs[Id, Id, Lst, Lst](Id(l1.tail), Id(l2.tail))(this)
     }
 
     val res = de.deepEqual(l, l)(NaturalTransformation.refl[Id], NaturalTransformation.refl[Id])
 
-    assert(res)
+    assert(res.value)
   }
 
   test("set") {
@@ -39,6 +37,6 @@ class DeepEqualTest extends AnyFunSuite {
 
     val res = setEqual.deepEqual(s1, s2)(NaturalTransformation.refl[Id], NaturalTransformation.refl[Id])
 
-    assert(res)
+    assert(res.value)
   }
 }

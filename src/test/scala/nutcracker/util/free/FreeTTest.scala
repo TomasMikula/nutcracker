@@ -18,7 +18,7 @@ class FreeTTest extends TestSuite {
       Gen.choose(0, 2).flatMap(Gen.listOfN(_, freeTListOptionArb[A].arbitrary))
     ))
 
-  val headOpt = λ[List ~> Option](_.headOption)
+  val headOpt = new (List ~> Option){ override def apply[A](l: List[A]) = l.headOption }
   implicit def freeTListOptionEq[A](implicit A: Equal[A]): Equal[FreeTListOption[A]] = new Equal[FreeTListOption[A]] {
     def equal(a: FreeTListOption[A], b: FreeTListOption[A]) =
       Equal[Option[A]].equal(a.foldMap(headOpt), b.foldMap(headOpt))
@@ -72,7 +72,7 @@ class FreeTTest extends TestSuite {
       Equal[FreeTListOption[Unit]].equal(expected, result)
     }
 
-    "hoist" ! forAll { a: FreeTListOption[Int] =>
+    "hoist" ! forAll { (a: FreeTListOption[Int]) =>
       val b = a.hoist(NaturalTransformation.refl)
       Equal[FreeTListOption[Int]].equal(a, b)
     }
@@ -85,7 +85,7 @@ class FreeTTest extends TestSuite {
       val b = a.hoist(NaturalTransformation.refl) // used to overflow
     }
 
-    "interpret" ! forAll { a: FreeTListOption[Int] =>
+    "interpret" ! forAll { (a: FreeTListOption[Int]) =>
       val b = a.interpret(NaturalTransformation.refl)
       Equal[FreeTListOption[Int]].equal(a, b)
     }
@@ -112,7 +112,7 @@ class FreeTTest extends TestSuite {
     def monad[S[_]: Functor, F[_]: Applicative] = Monad[FreeT[S, F, *]]
     def plus[S[_]: Functor, F[_]: Applicative: BindRec: Plus] = Plus[FreeT[S, F, *]]
     def monadPlus[S[_]: Functor, F[_]: ApplicativePlus: BindRec] = MonadPlus[FreeT[S, F, *]]
-    def monadTrans[S[_]: Functor] = MonadTrans[FreeT[S, *[_], *]]
+    def monadTrans[S[_]: Functor] = MonadTrans[({ type Out[F[_], A] = FreeT[S, F, A] })#Out]
 
     // checking absence of ambiguity
     def functor[S[_]: Traverse, F[_]: Traverse: Applicative: BindRec] = Functor[FreeT[S, F, *]]

@@ -4,7 +4,6 @@ import nutcracker.util.FreeObjectOutput.Decoration
 import org.scalatest.funsuite.AnyFunSuite
 
 import scalaz.{NaturalTransformation, ~>}
-import scalaz.Id.Id
 import scalaz.syntax.monad._
 
 class DeepShowTest extends AnyFunSuite {
@@ -18,7 +17,7 @@ class DeepShowTest extends AnyFunSuite {
       is match {
         case Nil => ev.empty
         case i :: Nil => ev.write(i.toString)
-        case i :: is => ev.write(i.toString) >> ev.write(",") >> ev.writeObject(is)(this)
+        case i :: is => ev.write(i.toString) >> ev.write(",") >> ev.writeObject(Id(is))(this)
       }
   }
 
@@ -28,7 +27,7 @@ class DeepShowTest extends AnyFunSuite {
     val res = listShow.free(l).showAutoLabeled(NaturalTransformation.refl[Id], idShowK)()
     val expected = l.mkString(",")
 
-    assertResult(expected)(res)
+    assertResult(expected)(res.value)
   }
 
   test("cycles") {
@@ -38,17 +37,18 @@ class DeepShowTest extends AnyFunSuite {
 
     implicit val ds: DeepShow[Lst, Id] = new DeepShow.FromSerialize[Lst, Id] {
       def serialize[M[_]](is: Lst)(implicit ev: MonadObjectOutput[M, String, Id]): M[Unit] =
-        ev.write(is.i.toString + ",") >> ev.writeObject(is.tail)(this)
+        ev.write(is.i.toString + ",") >> ev.writeObject(Id(is.tail))(this)
     }
 
+    type Const[A, B] = A
     val s = ds.free(l).showAutoLabeled(NaturalTransformation.refl[Id], idShowK)(
-      decorateReferenced = λ[Id ~> λ[α => Decoration[String]]](ref => Decoration("", "")),
+      decorateReferenced = new (Id ~> Const[Decoration[String], *]) { override def apply[A](ref: Id[A]) = Decoration("", "") },
       decorateReference = ref => "@"
     )
 
     val expected = "1,1,@"
 
-    assertResult(expected)(s)
+    assertResult(expected)(s.value)
   }
 
   test("tree") {
@@ -62,7 +62,7 @@ class DeepShowTest extends AnyFunSuite {
                      |    3
                      |    ,
                      |      4""".stripMargin
-    assertResult(expected1)(res1)
+    assertResult(expected1)(res1.value)
 
     val res2 = listShow.free(l).printTree(NaturalTransformation.refl[Id], idShowK, lineLimit = 4, tab = "  ", newLine = "\n")()
     val expected2 = """1
@@ -70,6 +70,6 @@ class DeepShowTest extends AnyFunSuite {
                       |  2
                       |  ,
                       |    3,4""".stripMargin
-    assertResult(expected2)(res2)
+    assertResult(expected2)(res2.value)
   }
 }

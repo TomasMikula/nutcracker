@@ -26,4 +26,17 @@ object Id {
       def bind[A, B](fa: Id[A])(f: A => Id[B]): Id[B] =
         f(fa.value)
     }
+
+  /** Reference comparison of the wrapped values.
+    * For value types might return `false` even for equal values,
+    * since they must be boxed before reference comparison can take place.
+    */
+  implicit val referenceEquality: HEqualK[Id] =
+    new HEqualK[Id] {
+      def hEqualK[A, B](fa: Id[A], fb: Id[B]): Boolean = {
+        val a: A = fa.value
+        val b: B = fb.value
+        a.asInstanceOf[AnyRef] eq b.asInstanceOf[AnyRef]
+      }
+    }
 }

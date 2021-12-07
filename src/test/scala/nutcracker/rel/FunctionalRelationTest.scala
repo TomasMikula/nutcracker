@@ -6,6 +6,7 @@ import nutcracker.data.bool.Bool
 import nutcracker.toolkit.PropRel
 import nutcracker.util.HList.{::, HNil}
 import nutcracker.util.{Id, SummonHList}
+import nutcracker.util.Pointers0._
 import org.scalatest.funsuite.AnyFunSuite
 import scala.collection.mutable
 import scalaz.{NonEmptyList, Order}

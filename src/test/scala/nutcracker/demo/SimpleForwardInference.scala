@@ -3,6 +3,7 @@ package nutcracker.demo
 import nutcracker.Pattern
 import nutcracker.Rel.Rel2
 import nutcracker.util.HList.{::, HNil}
+import nutcracker.util.Pointers0._
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers._
 import scalaz.NonEmptyList
