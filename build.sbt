@@ -3,28 +3,26 @@ name := "nutcracker"
 organization := "com.github.tomasmikula"
 
 lazy val scala213 = "2.13.7"
+lazy val scala3   = "3.1.0"
 
-scalaVersion := scala213
-crossScalaVersions := Seq(scala213)
+scalaVersion := scala3
+crossScalaVersions := Seq(scala213, scala3)
 
 autoCompilerPlugins := true
-addCompilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
 
 scalacOptions ++=
   Seq(
-    "-language:higherKinds",
-    "-Xlint:-unused,_", // Exclude "unused", because:
-                        //  - it produces some false positives;
-                        //  - sometimes we use them as just implicit evidence.
     "-unchecked",
     "-deprecation",
     "-feature",
-    "-Ywarn-numeric-widen",
-    "-Ywarn-value-discard",
-    "-Ypatmat-exhaust-depth", "40",
   ) ++ (
     CrossVersion.partialVersion(scalaVersion.value) match {
-      case Some((2, 13)) => Seq("-Wunused:imports", "-Xsource:3")
+      case Some((3, _)) =>
+        Seq("-Ykind-projector")
+      case Some((2, 13)) =>
+        Seq("-language:higherKinds", "-Wunused:imports", "-Xsource:3")
+      case other =>
+        sys.error(s"Unexpected Scala version $other")
     }
   )
 
@@ -42,7 +40,12 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.2.10" % "test",
   "org.scalatestplus" %% "scalacheck-1-15" % "3.2.10.0" % "test",
   "org.scalaz" %% "scalaz-scalacheck-binding" % ScalazVersion % "test",
-)
+) ++ (CrossVersion.partialVersion(scalaVersion.value) match {
+  case Some((2, 13)) =>
+    Seq(compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full))
+  case _ =>
+    Seq()
+})
 
 fork := true
 
