@@ -46,10 +46,6 @@ object CompilationTests {
 
     fooIntr[Prg2, FooBarQuxS[Prg2]] :+: barIntr[Prg2, FooBarQuxS[Prg2]] :+: quxIntr[Prg2, FooBarQuxS[Prg2]]
 
-    implicitly[Inject[FooL[Prg2, *], FooBarQuxL[Prg2, *]]]
-    implicitly[Inject[BarL[Prg2, *], FooBarQuxL[Prg2, *]]]
-    implicitly[Inject[QuxL[Prg2, *], FooBarQuxL[Prg2, *]]]
-
     implicitly[Lens[FooBarQuxS[List], FooS[List]]]
     implicitly[Lens[FooBarQuxS[List], BarS[List]]]
     implicitly[Lens[FooBarQuxS[List], QuxS[List]]]
