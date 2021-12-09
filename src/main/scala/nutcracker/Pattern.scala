@@ -1,9 +1,9 @@
 package nutcracker
 
 import nutcracker.Pattern.Orientation
-import nutcracker.util.{HList, Nat, Pointers, ValuedPointers}
-import nutcracker.util.HList.Length
-import nutcracker.util.Nat.ToInt
+import nutcracker.util.{HList, HListPtr, Nat, Pointers, ValuedPointers}
+import nutcracker.util.HList.{::, HNil, Length}
+import nutcracker.util.Nat.{Succ, ToInt, _0}
 import scala.annotation.tailrec
 import scalaz.{ICons, IList, INil, NonEmptyList}
 
@@ -78,7 +78,57 @@ object Pattern {
       PartiallyAssignedPattern(Pattern.build(f(ptrs)), asg)
   }
 
+  abstract class Builder[V[_ <: HList] <: HList, Ptrs[_ <: HList, _ <: HList], N[_ <: Nat] <: Nat] { self =>
+    type Next[B, T <: HList] = V[B :: T]
+    type NextPtrs[B, T <: HList, PT <: HList] = Ptrs[B :: T, HListPtr.Aux[V[B :: T], N[_0], B] :: PT]
+    type NextN[M <: Nat] = N[Succ[M]]
+
+    protected def pointers[T <: HList, PT <: HList](pt: PT): Ptrs[T, PT]
+
+    protected def ptr[T <: HList, I <: Nat, X](implicit ptr: HListPtr.Aux[T, I, X]): HListPtr.Aux[V[T], N[I], X]
+
+    protected def length[T <: HList](implicit lt: Length[T]): HList.Length.Aux[V[T], N[lt.Out]]
+
+    protected def nToInt[M <: Nat](implicit m: ToInt[M]): ToInt[N[M]]
+
+    def apply[B]: Builder[({ type Out[T <: HList] = Next[B, T] })#Out, ({ type Out[T <: HList, PT <: HList] = NextPtrs[B, T, PT] })#Out, NextN] =
+      new Builder[({ type Out[T <: HList] = Next[B, T] })#Out, ({ type Out[T <: HList, PT <: HList] = NextPtrs[B, T, PT] })#Out, NextN] {
+        override def length[T <: HList](implicit lt: Length[T]): Length.Aux[V[B :: T], N[Succ[lt.Out]]] =
+          self.length[B :: T](Length.consLength[B, T, lt.Out](lt))
+
+        override def nToInt[M <: Nat](implicit m: ToInt[M]): ToInt[N[Succ[M]]] =
+          self.nToInt[Succ[M]]
+
+        override def ptr[T <: HList, I <: Nat, X](implicit ptr: HListPtr.Aux[T, I, X]): HListPtr.Aux[V[B :: T], N[Succ[I]], X] =
+          self.ptr[B :: T, Succ[I], X]
+
+        override def pointers[T <: HList, PT <: HList](pt: PT): Ptrs[B :: T, HListPtr.Aux[V[B :: T], N[_0], B] :: PT] =
+          self.pointers[B :: T, HListPtr.Aux[V[B :: T], N[_0], B] :: PT](self.ptr[B :: T, _0, B] :: pt)
+      }
+
+    def build(
+      f: Ptrs[HNil, HNil] => NonEmptyList[RelChoice[V[HNil], _ <: HList]],
+    ): Pattern[V[HNil]] =
+      Pattern.build[V[HNil], N[_0]](f(pointers[HNil, HNil](HNil)))(length[HNil], nToInt[_0]): Pattern[V[HNil]]
+  }
+
   def apply[V <: HList](implicit ptrs: Pointers[V]): PatternBuilder[V, ptrs.Out] = PatternBuilder(ptrs.get)
+
+  /** An alternative to [[apply]] that does not require implicit [[Pointers]], and thus is more robust. */
+  def on[A]: Builder[({ type Out[T <: HList] = A :: T })#Out, ({ type Out[T <: HList, PT <: HList] = HListPtr.Aux[A :: T, _0, A] :: PT })#Out, Succ] =
+    new Builder[({ type Out[T <: HList] = A :: T })#Out, ({ type Out[T <: HList, PT <: HList] = HListPtr.Aux[A :: T, _0, A] :: PT })#Out, Succ] {
+      override def pointers[T <: HList, PT <: HList](pt: PT): HListPtr.Aux[A :: T, _0, A] :: PT =
+        HListPtr.hlistAtZero[A, T] :: pt
+
+      override def length[T <: HList](implicit lt: Length[T]): Length.Aux[A :: T, Succ[lt.Out]] =
+        Length.consLength[A, T, lt.Out](lt)
+
+      override def nToInt[M <: Nat](implicit m: ToInt[M]): ToInt[Succ[M]] =
+        ToInt.succToInt[M]
+
+      override def ptr[T <: HList, I <: Nat, X](implicit ptr: HListPtr.Aux[T, I, X]): HListPtr.Aux[A :: T, Succ[I], X] =
+        HListPtr.hlistAtN(ptr)
+    }
 
   private case class ComponentId private(value: Int) extends AnyVal {
     def next = ComponentId(value + 1)

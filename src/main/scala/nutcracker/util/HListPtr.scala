@@ -4,7 +4,7 @@ import nutcracker.util.HList.::
 import nutcracker.util.Nat.{_0, Succ}
 import scala.language.implicitConversions
 
-trait HListPtr[L <: HList, N <: Nat] {
+sealed trait HListPtr[L <: HList, N <: Nat] {
   type Out
 
   def index: Int

@@ -18,37 +18,51 @@ class PatternTest extends AnyFlatSpec {
 
   "Disconnected pattern" should "throw an exception" in {
     a [IllegalArgumentException] should be thrownBy {
-      Pattern[ISBISB].build({ case i1 :: s1 :: b1 :: i2 :: s2 :: b2 :: HNil => NonEmptyList(
-        R_II(i1, i1),
-        R_IS(i2, s2)
-      ) })
+      Pattern
+        .on[Int][String][Boolean][Int][String][Boolean]
+        .build { case i1 :: s1 :: b1 :: i2 :: s2 :: b2 :: HNil =>
+          NonEmptyList(
+            R_II(i1, i1),
+            R_IS(i2, s2)
+          )
+        }
     }
   }
 
   "Pattern (0, 3), (3, 4), (0, 3, 5), (5)" should "have vertex set {0, 3, 4, 5}" in {
-    val p = Pattern[ISBISB].build({ case i1 :: s1 :: b1 :: i2 :: s2 :: b2 :: HNil => NonEmptyList(
-      R_II(i1, i2),
-      R_IS(i2, s2),
-      R_IIB(i1, i2, b2),
-      R_B(b2)
-    ) })
+    val p = Pattern
+      .on[Int][String][Boolean][Int][String][Boolean]
+      .build { case i1 :: s1 :: b1 :: i2 :: s2 :: b2 :: HNil =>
+        NonEmptyList(
+          R_II(i1, i2),
+          R_IS(i2, s2),
+          R_IIB(i1, i2, b2),
+          R_B(b2)
+        )
+      }
     p.vertexSet should be (Set(0, 3, 4, 5))
   }
 
   "Trying to build ill-typed pattern" should "not typecheck" in {
     """
-      Pattern[ISBISB].build({ case i1 :: s1 :: b1 :: i2 :: s2 :: b2 :: HNil => NonEmptyList(
-        R_II(i1 :: s1 :: HNil)
-      ) })
+      Pattern
+        .on[Int][String][Boolean][Int][String][Boolean]
+        .build { case i1 :: s1 :: b1 :: i2 :: s2 :: b2 :: HNil =>
+          NonEmptyList(R_II(i1 :: s1 :: HNil))
+        }
     """ shouldNot typeCheck
   }
 
 
   object p extends Rel2[Int, Int]
   object q extends Rel2[Int, Int]
-  val pat = Pattern[Int::Int::Int::Int::Int::Int::Int::Int::HNil].build({ case a::b::c::d::e::f::g::h::HNil => NonEmptyList(
-    p(a, b), p(b, c), q(c, d), q(d, e), q(e, f), q(f, g), q(g, h), q(h, a)
-  ) })
+  val pat = Pattern
+    .on[Int][Int][Int][Int][Int][Int][Int][Int]
+    .build { case a::b::c::d::e::f::g::h::HNil =>
+      NonEmptyList(
+        p(a, b), p(b, c), q(c, d), q(d, e), q(e, f), q(f, g), q(g, h), q(h, a)
+      )
+    }
   val ppat = pat.orient(p)
 
   "Orienting { p(a, b), p(b, c), q(c, d), q(d, e), q(e, f), q(f, g), q(g, h), q(h, a) } towards p" should "yield two results" in {
@@ -70,10 +84,10 @@ class PatternTest extends AnyFlatSpec {
   }
 
   "Two patterns with different order of relations" should "be viewed as equal" in {
-    val pat1 = Pattern[Int::Int::Int::Int::Int::Int::Int::Int::HNil].build({ case a::b::c::d::e::f::g::h::HNil => NonEmptyList(
+    val pat1 = Pattern.on[Int][Int][Int][Int][Int][Int][Int][Int].build({ case a::b::c::d::e::f::g::h::HNil => NonEmptyList(
       p(a, b), p(b, c), q(c, d), q(d, e), q(e, f), q(f, g), q(g, h), q(h, a)
     ) })
-    val pat2 = Pattern[Int::Int::Int::Int::Int::Int::Int::Int::HNil].build({ case a::b::c::d::e::f::g::h::HNil => NonEmptyList(
+    val pat2 = Pattern.on[Int][Int][Int][Int][Int][Int][Int][Int].build({ case a::b::c::d::e::f::g::h::HNil => NonEmptyList(
       q(g, h), q(h, a), p(a, b), q(f, g), p(b, c), q(e, f), q(c, d), q(d, e)
     ) })
 
