@@ -24,12 +24,12 @@ object Closeable {
       type Update = Closeable.Update[A.Update]
       type Delta = Closeable.Delta[A.Delta]
 
-      override def update[D0 <: Closeable[A]](d: D0, u: Update): UpdateResult[Closeable[A], IDelta, D0] = d match {
+      override def update(d: Closeable[A], u: Update): UpdateResult[Closeable[A], Delta] = d match {
         case Open(a) => u match {
           case UpdateContent(ua) => A.update(a, ua).map(Open(_), ContentUpdated(_))
-          case Terminate => UpdateResult(Closed, Terminated)
+          case Terminate => UpdateResult.updated(Closed, Terminated)
         }
-        case Closed => UpdateResult()
+        case Closed => UpdateResult.unchanged
       }
 
       override def appendDeltas(d1: Delta, d2: Delta): Delta =

@@ -14,7 +14,7 @@ trait PropagationModule extends Module {
   implicit def varShowK[K[_]]: ShowK[VarK[K, *]]
   implicit def valOrderK[K[_]]: HOrderK[ValK[K, *]]
   implicit def valShowK[K[_]]: ShowK[ValK[K, *]]
-  implicit def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]): Propagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
+  implicit def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]): Propagation.Aux[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
 
   def stepInterpreterK[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, *], S]
   def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A
@@ -62,7 +62,7 @@ extends ListModule[Lang0, State0](base) with StashPropagationModule {
   override implicit def valOrderK[K[_]]: HOrderK[ValK[K, *]] = base.valOrderK
   override implicit def valShowK[K[_]]: ShowK[ValK[K, *]] = base.valShowK
 
-  implicit def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]): Propagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] = base.freePropagation
+  implicit def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]): Propagation.Aux[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] = base.freePropagation
 
   def stepInterpreterK[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, *], S] =
     base.stepInterpreterK[K, S](Lens.nelHeadLens[State0[K]].compose(lens))
@@ -72,7 +72,7 @@ extends ListModule[Lang0, State0](base) with StashPropagationModule {
 }
 
 trait OnDemandPropagationModule extends PropagationModule {
-  implicit override def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]): OnDemandPropagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
+  implicit override def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]): OnDemandPropagation.Aux[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
 }
 
 object OnDemandPropagationModule {
@@ -99,5 +99,5 @@ object StashOnDemandPropagationModule {
 
 class OnDemandPropagationListModule[Var0[_[_], _], Val0[_[_], _], Lang0[_[_], _], State0[_[_]]](base: PersistentOnDemandPropagationModule.Aux[Var0, Val0, Lang0, State0])
 extends PropagationListModule[Var0, Val0, Lang0, State0](base) with StashOnDemandPropagationModule {
-  override implicit def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]): OnDemandPropagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] = base.freePropagation
+  override implicit def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]): OnDemandPropagation.Aux[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] = base.freePropagation
 }

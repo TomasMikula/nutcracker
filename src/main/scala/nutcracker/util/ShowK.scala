@@ -12,6 +12,11 @@ trait ShowK[F[_]] extends (F ~> λ[α => String]) {
 }
 
 object ShowK {
+  def apply[F[_]](f: [a] => F[a] => String): ShowK[F] =
+    new ShowK[F] {
+      override def shows[A](fa: F[A]): String = f(fa)
+    }
+
   def fromToString[F[_]]: ShowK[F] = new ShowK[F] {
     def shows[A](fa: F[A]): String = fa.toString
   }

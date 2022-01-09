@@ -35,7 +35,7 @@ object PropBranch extends FreePropagationToolkit with FreeBranchingToolkit with 
   override def readOnlyK[K[_], A](ref: VarK[K, A]): ValK[K, A] = Prop.readOnlyK(ref)
   override def prgMonad: Monad[Prg] = implicitly
 
-  implicit val propagationApi: Propagation[Prg, Var, Val] =
+  implicit val propagationApi: Propagation.Aux[Prg, Var, Val] =
     Prop.freePropagation[Lang]
 
   implicit val branchingApi: BranchingPropagation[Prg, Var, Val] =

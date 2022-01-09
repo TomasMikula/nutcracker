@@ -11,7 +11,7 @@ trait ToDomOps {
 }
 
 final class DomOps[D, U, Δ](d: D)(val dom: Dom.Aux[D, U, Δ]) {
-  def update(u: U): UpdateResult[D, dom.IDelta, D] = dom.update(d, u)
+  def update(u: U): UpdateResult[D, Δ] = dom.update(d, u)
   def update_(u: U): D = dom.update_(d, u)
   def isFailed: Boolean = dom.isFailed(d)
 }

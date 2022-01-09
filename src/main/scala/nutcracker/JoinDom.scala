@@ -11,14 +11,11 @@ trait JoinDom[D] extends SyncDom[D] {
     * the result is different from the left argument, `Unchanged` if the
     * result is the same as the left argument.
     */
-  def ljoin[D0 <: D](d1: D0, d2: D): UpdateResult[D, IDelta, D0] =
+  def ljoin(d1: D, d2: D): UpdateResult[D, Delta] =
     update(d1, toJoinUpdate(d2))
 
   /** Join operation (as in join-semilattice). */
-  def join(d1: D, d2: D): D = ljoin(d1, d2) match {
-    case Updated(d, _) => d
-    case Unchanged()   => d1
-  }
+  def join(d1: D, d2: D): D = ljoin(d1, d2).newValueOr(d1)
 }
 
 object JoinDom {
@@ -36,9 +33,9 @@ object JoinDom {
 
     override def toJoinUpdate(d: D) = d
 
-    override def update[D0 <: D](d: D0, u: Update): UpdateResult[D, IDelta, D0] = ljoin0(d, u) match {
-      case Some(d) => UpdateResult(d, ())
-      case None    => UpdateResult()
+    override def update(d: D, u: Update): UpdateResult[D, Delta] = ljoin0(d, u) match {
+      case Some(d) => UpdateResult.updated(d, ())
+      case None    => UpdateResult.unchanged
     }
 
     override def appendDeltas(d1: Unit, d2: Unit): Unit = ()
@@ -61,7 +58,7 @@ trait RelativelyComplementedDom[D] extends JoinDom[D] {
     */
   def toComplementUpdate(d: D): Update
 
-  def exclude[D0 <: D](d1: D0, d2: D): UpdateResult[D, IDelta, D0] =
+  def exclude(d1: D, d2: D): UpdateResult[D, Delta] =
     update(d1, toComplementUpdate(d2))
 }
 

@@ -16,10 +16,10 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
 
   implicit def freeBranchingPropagation[F[_[_], _]](implicit
     i: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]],
-    P: Propagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
+    P: Propagation.Aux[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
   ): BranchingPropagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] =
     new BranchingPropagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] {
-      override val propagation: Propagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] = P
+      override val propagation: Propagation.Aux[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] = P
 
       def newVar[A](a: A)(implicit ev: Splittable[A]): FreeK[F, VarK[FreeK[F, *], A]] =
         for {
@@ -69,7 +69,7 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
       })
   }
 
-  def assess[K[_]](s: StateK[K])(fetch: VarK[K, *] ~> Id)(implicit K: Propagation[K, VarK[K, *], ValK[K, *]]): Assessment[List[K[Unit]]] =
+  def assess[K[_]](s: StateK[K])(fetch: VarK[K, *] ~> Id)(implicit K: Propagation.Aux[K, VarK[K, *], ValK[K, *]]): Assessment[List[K[Unit]]] =
     if(s.hasFailedVars) Assessment.Failed
     else s.split(fetch)
 

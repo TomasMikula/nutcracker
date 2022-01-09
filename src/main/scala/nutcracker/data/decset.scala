@@ -76,7 +76,7 @@ object DecSet {
         case _ => Unrefined(() => Some(d.toList map (x => Join(singleton(x))))) // split into singleton sets
       }
 
-      override def update[S <: DecSet[A]](s: S, u: Update): UpdateResult[DecSet[A], IDelta, S] = u match {
+      override def update(s: DecSet[A], u: Update): UpdateResult[DecSet[A], Delta] = u match {
         case Join(m) => intersect(s, m)
         case Diff(d) => diff(s, d)
       }
@@ -90,17 +90,17 @@ object DecSet {
       override def terminate: Update = Join(DecSet())
 
       @inline
-      private def intersect[D <: DecSet[A]](a: DecSet[A], b: DecSet[A]): UpdateResult[DecSet[A], IDelta, D] = {
+      private def intersect(a: DecSet[A], b: DecSet[A]): UpdateResult[DecSet[A], Delta] = {
         val res = a intersect b
-        if(res.size < a.size) UpdateResult(res, Removed(a.value diff b.value))
-        else UpdateResult()
+        if(res.size < a.size) UpdateResult.updated(res, Removed(a.value diff b.value))
+        else UpdateResult.unchanged
       }
 
       @inline
-      private def diff[D <: DecSet[A]](a: DecSet[A], b: DecSet[A]): UpdateResult[DecSet[A], IDelta, D] = {
+      private def diff(a: DecSet[A], b: DecSet[A]): UpdateResult[DecSet[A], Delta] = {
         val res = a diff b
-        if(res.size < a.size) UpdateResult(res, Removed(a.value intersect b.value))
-        else UpdateResult()
+        if(res.size < a.size) UpdateResult.updated(res, Removed(a.value intersect b.value))
+        else UpdateResult.unchanged
       }
     }
 

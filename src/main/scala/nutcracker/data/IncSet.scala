@@ -40,10 +40,10 @@ object IncSet {
 
     override def isFailed(d: IncSet[A]): Boolean = false
 
-    override def update[S <: IncSet[A]](s: S, u: Update): UpdateResult[IncSet[A], IDelta, S] = {
+    override def update(s: IncSet[A], u: Update): UpdateResult[IncSet[A], Delta] = {
       val res = s union u.value
-      if(res.size > s.size) UpdateResult(res, Added(u.value.value diff s.value))
-      else UpdateResult()
+      if(res.size > s.size) UpdateResult.updated(res, Added(u.value.value diff s.value))
+      else UpdateResult.unchanged
     }
 
     override def appendDeltas(d1: Delta, d2: Delta): Delta =
@@ -63,7 +63,7 @@ object IncSet {
 }
 
 
-class IncSets[F[_], Var[_], Val[_]](implicit P: Propagation[F, Var, Val]) {
+class IncSets[F[_], Var[_], Val[_]](implicit P: Propagation.Aux[F, Var, Val]) {
   import IncSet._
 
   def init[A]: F[Var[IncSet[A]]] =

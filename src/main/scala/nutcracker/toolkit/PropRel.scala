@@ -33,7 +33,7 @@ object PropRel extends FreePropagationToolkit with PropRelToolkit {
 
   override def prgMonad: Monad[Prg] = implicitly
 
-  implicit val propagationApi: OnDemandPropagation[Prg, Var, Val] =
+  implicit val propagationApi: OnDemandPropagation.Aux[Prg, Var, Val] =
     Prop.freePropagation[Lang]
 
   implicit val relationsApi: Relations[Prg] =

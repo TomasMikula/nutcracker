@@ -22,18 +22,18 @@ object Discrete extends DiscreteInstances {
   type Update[A] = Uninhabited
   type Delta[A] = Uninhabited
 
-  def map[M[_], Var[_], Val[_], A, B](refC: ContU[M, Var[Discrete[A]]])(f: A => B)(implicit M: Propagation[M, Var, Val], MB: Bind[M]): ContU[M, Var[Discrete[B]]] = for {
+  def map[M[_], Var[_], Val[_], A, B](refC: ContU[M, Var[Discrete[A]]])(f: A => B)(implicit M: Propagation.Aux[M, Var, Val], MB: Bind[M]): ContU[M, Var[Discrete[B]]] = for {
     ref <- refC
     a   <- ref.asCont_
     res <- cellC(f(a))
   } yield res
 
-  def mapC[M[_], Var[_], Val[_], A, B](ref: Var[Discrete[A]])(f: A => ContU[M, Var[Discrete[B]]])(implicit P: Propagation[M, Var, Val], M: Functor[M]): ContU[M, Var[Discrete[B]]] = for {
+  def mapC[M[_], Var[_], Val[_], A, B](ref: Var[Discrete[A]])(f: A => ContU[M, Var[Discrete[B]]])(implicit P: Propagation.Aux[M, Var, Val], M: Functor[M]): ContU[M, Var[Discrete[B]]] = for {
     a   <- ref.asCont_
     res <- f(a)
   } yield res
 
-  def filterMap[M[_], Var[_], Val[_], A, B](refC: ContT[Unit, M, Var[Discrete[A]]])(f: A => Option[B])(implicit P: Propagation[M, Var, Val], M: Monad[M]): ContT[Unit, M, Var[Discrete[B]]] = for {
+  def filterMap[M[_], Var[_], Val[_], A, B](refC: ContT[Unit, M, Var[Discrete[A]]])(f: A => Option[B])(implicit P: Propagation.Aux[M, Var, Val], M: Monad[M]): ContT[Unit, M, Var[Discrete[B]]] = for {
     ref <- refC
     a   <- ref.asCont_
     res <- f(a) match {
@@ -42,14 +42,14 @@ object Discrete extends DiscreteInstances {
     }
   } yield res
 
-  def cellC[M[_], Var[_], Val[_], A](a: A)(implicit M: Propagation[M, Var, Val], MB: Bind[M]): ContT[Unit, M, Var[Discrete[A]]] =
+  def cellC[M[_], Var[_], Val[_], A](a: A)(implicit M: Propagation.Aux[M, Var, Val], MB: Bind[M]): ContT[Unit, M, Var[Discrete[A]]] =
     ContT.liftM[Unit, M, Var[Discrete[A]]](M.newCell(Discrete(a)))
 
   implicit def domInstance[A]: RDom.Aux[Discrete[A], Update[A], Delta[A]] = new RDom[Discrete[A]] {
     type Update = Discrete.Update[A]
     type Delta = Discrete.Delta[A]
 
-    def update[D <: Discrete[A]](d: D, u: Update): UpdateResult[Discrete[A], IDelta, D] = sys.error("unreachable code")
+    def update(d: Discrete[A], u: Update): UpdateResult[Discrete[A], Delta] = sys.error("unreachable code")
     def appendDeltas(d1: Delta, d2: Delta): Delta = sys.error("unreachable code")
     def isFailed(d: Discrete[A]): Boolean = false
     def recur(δ: Delta): Update = δ

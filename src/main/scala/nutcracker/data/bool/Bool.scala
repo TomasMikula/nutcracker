@@ -53,13 +53,13 @@ object Bool {
         case Contradiction => Failed
         case _ => Refined
       }
-      override def update[B <: Bool](d: B, u: Update): UpdateResult[Bool, IDelta, B] = {
+      override def update(d: Bool, u: Update): UpdateResult[Bool, Delta] = {
         val res = Bool(d.intValue &  u.value.intValue)
-        if(res == d) UpdateResult() else UpdateResult(res, ())
+        if(res == d) UpdateResult.unchanged else UpdateResult.updated(res, ())
       }
       override def toJoinUpdate(d: Bool): Update = Join(d)
       override def toComplementUpdate(d: Bool): Update = Join(Bool(Anything.intValue & ~d.intValue))
-      override def ljoin[B <: Bool](d1: B, d2: Bool): UpdateResult[Bool, IDelta, B] = update(d1, Join(d2))
+      override def ljoin(d1: Bool, d2: Bool): UpdateResult[Bool, Delta] = update(d1, Join(d2))
       override def appendDeltas(d1: Delta, d2: Delta): Delta = ()
       override def bottom: Bool = Anything
       override def terminate: Update = Join(Bool.Contradiction)

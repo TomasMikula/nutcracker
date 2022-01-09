@@ -48,7 +48,7 @@ final class PropBranchCost[C](implicit C: NonDecreasingMonoid[C]) extends PropBr
   private implicit val injCost: Inject[Cost.Lang[FreeK[Lang, *], *], Lang[FreeK[Lang, *], *]] =
     Inject.injectRight
 
-  implicit val propagationApi: Propagation[Prg, Var, Val] =
+  implicit val propagationApi: Propagation.Aux[Prg, Var, Val] =
     Prop.freePropagation[Lang]
 
   implicit val branchingApi: BranchingPropagation[Prg, Var, Val] =

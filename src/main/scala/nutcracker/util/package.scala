@@ -11,6 +11,7 @@ package object util {
   // suggested by Miles Sabin in the comments
   type Uninhabited = Nothing { type T = Unit }
 
+  type Forall[F[_]] = `Forall{* -> *}`[F]
   type ≈>[F[_[_]], G[_[_]]] = `FunctionK{(* -> *) -> *}`[F, G]
   type ≈~>[F[_[_], _], G[_[_], _]] = `FunctionK{(* -> *) -> * -> *}`[F, G]
 

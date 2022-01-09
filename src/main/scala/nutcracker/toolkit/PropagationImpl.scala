@@ -1,7 +1,7 @@
 package nutcracker.toolkit
 
 import nutcracker.{IDom, OnDemandPropagation, SeqPreHandler, SeqTrigger, Subscription}
-import nutcracker.util.{FreeK, HOrderK, Inject, KMap, Lst, MonadTellState, ShowK, StateInterpreter, StratifiedMonoidAggregator}
+import nutcracker.util.{Exists, ExistsOption, ENone, ESome, FreeK, HKMap, HOrderK, Inject, Lst, MonadTellState, ShowK, StateInterpreter, StratifiedMonoidAggregator}
 import nutcracker.util.ops.Ops._
 import scala.language.existentials
 import scalaz.syntax.equal._
@@ -9,22 +9,25 @@ import scalaz.syntax.monoid._
 import scalaz.{-\/, Bind, Equal, Lens, Monad, Ordering, Show, \/-}
 
 private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with FreeOnDemandPropagationToolkit { self =>
-  type VarK[K[_], A] = SimpleCellId[K, A]
-  type ValK[K[_], A] = CellId[K, A]
+  type VarK[K[_], A] = SimpleCellId[K, [i] =>> A]
+  type ValK[K[_], A] = CellId[K, [i] =>> A]
   type Lang[K[_], A] = PropagationLang[K, A]
   type StateK[K[_]] = PropagationStore[K]
 
-  override def varOrderK[K[_]]: HOrderK[VarK[K, *]] = SimpleCellId.orderKInstance
-  override def varShowK[K[_]]: ShowK[VarK[K, *]] = SimpleCellId.showKInstance
-  override def valOrderK[K[_]]: HOrderK[ValK[K, *]] = CellId.orderKInstance
-  override def valShowK[K[_]]: ShowK[ValK[K, *]] = CellId.showKInstance
+  override def varOrderK[K[_]]: HOrderK[VarK[K, *]] = HOrderK([a, b] => (a: VarK[K, a], b: VarK[K, b]) => SimpleCellId.order(a, b))
+  override def varShowK[K[_]]: ShowK[VarK[K, *]]    = ShowK([a] => (a: VarK[K, a]) => SimpleCellId.show(a))
+  override def valOrderK[K[_]]: HOrderK[ValK[K, *]] = HOrderK([a, b] => (a: ValK[K, a], b: ValK[K, b]) => CellId.order(a, b))
+  override def valShowK[K[_]]: ShowK[ValK[K, *]]    = ShowK([a] => (a: ValK[K, a]) => CellId.show(a))
 
-  override def readOnlyK[K[_], A](ref: SimpleCellId[K, A]): CellId[K, A] = ref
+  override def readOnlyK[K[_], A](ref: VarK[K, A]): ValK[K, A] = ref
   override def prgMonad: Monad[FreeK[Lang, *]] = implicitly
-  override implicit def freePropagation[F[_[_], _]](implicit inj: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]]): OnDemandPropagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] =
-    PropagationLang.freePropagation[F]
 
-  override val propagationApi: OnDemandPropagation[Prg, Var, Val] =
+  override implicit def freePropagation[F[_[_], _]](implicit
+    inj: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]],
+  ): OnDemandPropagation.Aux[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] =
+    PropagationLang.freePropagation[F](inj)
+
+  override val propagationApi: OnDemandPropagation.Aux[Prg, Var, Val] =
     PropagationLang.freePropagation[Lang]
 
   override def emptyK[K[_]]: PropagationStore[K] =
@@ -37,83 +40,81 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
     new StateInterpreter[K, Lang[K, *], S] {
       import PropagationLang._
 
-      private def execTriggers[A](ref: SimpleCellId[K, A]): PropagationLang[K, Unit] =
-        PropagationLang.execTriggers[K, A](ref)
+      private def execTriggers[D[_]](ref: SimpleCellId[K, D]): PropagationLang[K, Unit] =
+        PropagationLang.execTriggers[K, D](ref)
 
-      private def execTriggersAuto[A](ref: AutoCellId[K, A], cycle: CellCycle[A]): PropagationLang[K, Unit] =
+      private def execTriggersAuto[A[_]](ref: AutoCellId[K, A], cycle: CellCycle[A]): PropagationLang[K, Unit] =
         PropagationLang.ExecTriggersAuto(ref, cycle)
 
       override def apply[M[_], W, A](p: PropagationLang[K, A])(implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[PropagationLang[K, *], K], K: Bind[K]): M[A] =
         M.writerState[A](s0 => {
           val s = lens.get(s0)
           p match {
-            case upd: Update[k, d, u, δ] =>
-              val (s1, becameDirty) = s.update[upd.dom.Domain, upd.dom.Update, upd.dom.IDelta](upd.ref, upd.u)(upd.dom)
+            case upd: Update[k, d, u, δ, j] =>
+              val (s1, becameDirty) = s.update[d, u, δ, j](upd.ref, upd.u)(upd.dom)
               val w = if(becameDirty) Lst.singleton(inj(execTriggers(upd.ref))) at 1 else W.zero
               (w, s0 set s1, ())
-            case exc: ExclUpdate[K, a, u, δ] =>
-              val (s1, becameDirty) = s.exclUpdate[exc.dom.Domain, exc.dom.Update, exc.dom.IDelta](exc.ref, exc.cycle, exc.u)(exc.dom)
+            case exc: ExclUpdate[k, d, u, δ, j] =>
+              val (s1, becameDirty) = s.exclUpdate[d, u, δ, j](exc.ref, exc.cycle, exc.u)(exc.dom)
               val w = if(becameDirty) Lst.singleton(inj(execTriggersAuto(exc.ref, exc.cycle))) at 1 else W.zero
               (w, s0 set s1, ())
 
-            case ext: ExecTriggers[K, _] =>
+            case ext: ExecTriggers[k, _] =>
               val (s1, ks) = s.execTriggers(ext.ref)
               (ks at 0, s0 set s1, ())
-            case eta: ExecTriggersAuto[K, _] =>
+            case eta: ExecTriggersAuto[k, _] =>
               val (s1, ks) = s.execTriggers(eta.ref, eta.cycle)
               (ks at 0, s0 set s1, ())
 
             case obs: Observe[k, d, u, δ] =>
-              val (ks, s1, oid) = s.observe[obs.dom.Domain, obs.dom.Update, obs.dom.IDelta](obs.ref, obs.f)(obs.dom)
+              val (ks, s1, oid) = s.observe[d, u, δ](obs.ref, obs.f)(obs.dom)
               (ks at 0, s0 set s1, oid)
             case oba: ObserveAuto[k, d, u, δ] =>
-              val (ks, s1, oid) = s.observe[oba.dom.Domain, oba.dom.Update, oba.dom.IDelta](oba.ref, oba.f)(oba.dom)
+              val (ks, s1, oid) = s.observe[d, u, δ](oba.ref, oba.f)(oba.dom)
               (ks at 0, s0 set s1, oid)
 
-            case h: Hold[K, d] =>
+            case h: Hold[k, d] =>
               val (s1, oid, ks) = s.hold(h.ref)(h.f)
               (ks at 0, s0 set s1, oid)
-            case ha: HoldAuto[K, d] =>
-              val (s1, cycle, oid, ks) = s.hold(ha.ref)(ha.f) // linter:ignore UndesirableTypeInference
+            case ha: HoldAuto[k, d] =>
+              val (s1, cycle, oid, ks) = s.hold(ha.ref)(ha.f)
               (ks at 0, s0 set s1, oid)
             case res: Resume[k, d, δ, d0] =>
-              def resume[D, Δ[_, _], D0 <: D](s: StateK[K])(ref: SimpleCellId[K, D], token: Token[D0], trigger: s.Trigger[D, Δ, D0]): (PropagationStore[K], Lst[K[Unit]], Boolean) =
-                s.resume[D, Δ, D0](ref, token, trigger)
+              def resume[D[_], Δ[_, _], I](s: StateK[K])(ref: SimpleCellId[K, D], token: Token[I], trigger: s.Trigger[D, Δ, I]): (PropagationStore[K], Lst[K[Unit]], Boolean) =
+                s.resume[D, Δ, I](ref, token, trigger)
               val (s1, ks, becameDirty) =
-                // resume[res.Domain, res.Delta, res.Arg](s)(res.ref, res.token, res.trigger)
-                resume[res.Domain, res.Delta, res.Domain](s)(res.ref, res.token.asInstanceOf[Token[res.Domain]], res.trigger.asInstanceOf[s.Trigger[res.Domain, res.Delta, res.Domain]])
+                resume[res.Domain, res.Delta, res.Idx](s)(res.ref, res.token, res.trigger)
               val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggers(res.ref))) at 1) else (ks at 0)
               (w, s0 set s1, ())
             case res: ResumeAuto[k, d, δ, d0] =>
-              def resume[D, Δ[_, _], D0 <: D](s: StateK[K])(ref: AutoCellId[K, D], cycle: CellCycle[D], token: Token[D0], trigger: s.Trigger[D, Δ, D0]): (PropagationStore[K], Lst[K[Unit]], Boolean) =
+              def resume[D[_], Δ[_, _], I](s: StateK[K])(ref: AutoCellId[K, D], cycle: CellCycle[D], token: Token[I], trigger: s.Trigger[D, Δ, I]): (PropagationStore[K], Lst[K[Unit]], Boolean) =
                 s.resume(ref, cycle, token, trigger)
-              // val (s1, ks, becameDirty) = resume[res.Domain, res.Delta, res.Arg](s)(res.ref, res.cycle, res.token, res.trigger)
-              val (s1, ks, becameDirty) = resume[res.Domain, res.Delta, res.Domain](s)(res.ref, res.cycle, res.token.asInstanceOf[Token[res.Domain]], res.trigger.asInstanceOf[s.Trigger[res.Domain, res.Delta, res.Domain]])
+              val (s1, ks, becameDirty) = resume[res.Domain, res.Delta, res.Idx](s)(res.ref, res.cycle, res.token, res.trigger)
               val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggersAuto(res.ref, res.cycle))) at 1) else (ks at 0)
               (w, s0 set s1, ())
 
-            case nc: NewCell[K, d, u, δ] =>
+            case nc: NewCell[k, d, u, δ, i] =>
               val (s1, ref) = s.newCell(nc.d)(nc.dom)
               (W.zero, s0 set s1, ref)
-            case nac: NewAutoCell[K, _] =>
-              val (s1, ref) = s.newAutoCell(nac.setup) // linter:ignore UndesirableTypeInference
+            case nac: NewAutoCell[k, d] =>
+              val (s1, ref) = s.newAutoCell(nac.setup)
               (W.zero, s0 set s1, ref)
 
-            case sup: Supply[K, d] =>
+            case sup: Supply[k, d, i] =>
               val (s1, ks) = s.supply(sup.ref)(sup.cycle, sup.value)
               (ks at 0, s0 set s1, ())
 
-            case rmo: RmObserver[K, d] =>
+            case rmo: RmObserver[k, d] =>
               val (s1, ks) = s.rmObserver(rmo.ref, rmo.oid)
               (ks at 0, s0 set s1, ())
-            case rao: RmAutoObserver[K, d] =>
+            case rao: RmAutoObserver[k, d] =>
               val (s1, ks) = s.rmObserver(rao.ref, rao.cycle, rao.oid)
               (ks at 0, s0 set s1, ())
 
-            case add: AddFinalizer[K, _] =>
+            case add: AddFinalizer[k, _] =>
               val (ks, s1, fid) = s.addFinalizer(add.ref, add.cycle, add.value)
               (ks at 0, s0 set s1, fid)
-            case rmf: RemoveFinalizer[K, _] =>
+            case rmf: RemoveFinalizer[k, _] =>
               val s1 = s.removeFinalizer(rmf.ref, rmf.cycle, rmf.id)
               (W.zero, s0 set s1, ())
           }
@@ -121,10 +122,13 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
     }
 
   override def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] =
-    s.tryFetch(ref)
+    s.tryFetch(ref) match {
+      case ESome(a) => Some(a)
+      case ENone()  => None
+    }
 
   override def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A =
-    s.fetch(ref)
+    s.fetch(ref).value
 
   override def stashable: StashOnDemandPropagationModule.AuxL[self.VarK, self.ValK, self.Lang] =
     new OnDemandPropagationListModule[self.VarK, self.ValK, self.Lang, self.StateK](this)
@@ -134,38 +138,43 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
 private[nutcracker] case class PropagationStore[K[_]] private(
   lastCellId: CellIdCounter,
   lastCellCycle: CellCycle[_],
-  simpleCells: KMap[SimpleCellId[K, *], SimpleCell[K, *]],
-  autoCells: KMap[AutoCellId[K, *], OnDemandCell[K, *]]
+  simpleCells: HKMap[[d[_]] =>> SimpleCellId[K, d], [d[_]] =>> SimpleCell[K, d]],
+  autoCells: HKMap[[d[_]] =>> AutoCellId[K, d], [d[_]] =>> OnDemandCell[K, d]]
 ) {
-  type CellIncarnationId[A] = Cell.IncarnationId[K, A]
-  type Tok[D, D0] = (CellIncarnationId[D], Token[D0])
-  type PreHandler[D, Δ[_, _]] = SeqPreHandler[Tok[D, *], K, D, Δ]
-  type Trigger[D, Δ[_, _], D0] = SeqTrigger[Tok[D, *], K, D, Δ, D0]
+  type CellIncarnationId[D[_]] = Cell.IncarnationId[K, D]
+  type Tok[D[_], I] = (CellIncarnationId[D], Token[I])
+  type PreHandler[D[_], Δ[_, _]] = SeqPreHandler[Tok[D, *], K, D, Δ]
+  type Trigger[D[_], Δ[_, _], I] = SeqTrigger[Tok[D, *], K, D, Δ, I]
 
   // helpers for testing
-  def fire[D](k: K[Unit])(implicit dom: IDom[D]): Trigger[D, dom.IDelta, D] = SeqTrigger.Fire[Tok[D, *], K, D, dom.IDelta, D](k)
-  def once[D](f: D => K[Unit])(implicit dom: IDom[D]): PreHandler[D, dom.IDelta] = SeqPreHandler[Tok[D, *], K, D, dom.IDelta](d => fire[D](f(d)))
+  def fire[D[_], I](k: K[Unit])(implicit dom: IDom[D]): Trigger[D, dom.IDelta, I] = SeqTrigger.Fire[Tok[D, *], K, D, dom.IDelta, I](k)
+  def once[D[_]](f: [i] => D[i] => K[Unit])(implicit dom: IDom[D]): PreHandler[D, dom.IDelta] = SeqPreHandler[Tok[D, *], K, D, dom.IDelta]([i] => (d: D[i]) => fire[D, i](f[i](d)))
 
-  def newCell[D](d: D)(implicit dom: IDom[D]): (PropagationStore[K], SimpleCellId[K, D]) = {
+  def newCell[D[_], I](d: D[I])(implicit dom: IDom[D]): (PropagationStore[K], SimpleCellId[K, D]) = {
     val ref = lastCellId.inc[K, D]
     val simpleCells1 = simpleCells.put(ref)(SimpleCell.init(d))
     (copy(lastCellId = ref.counter, simpleCells = simpleCells1), ref)
   }
 
-  def newAutoCell[D](setup: (AutoCellId[K, D], CellCycle[D]) => K[Unit]): (PropagationStore[K], AutoCellId[K, D]) = {
+  def newAutoCell[D[_]](setup: (AutoCellId[K, D], CellCycle[D]) => K[Unit]): (PropagationStore[K], AutoCellId[K, D]) = {
     val ref = lastCellId.inc[K, D](setup)
     (copy(lastCellId = ref.counter), ref)
   }
 
-  def tryFetch[D](ref: CellId[K, D]): Option[D] = ref match {
-    case r @ SimpleCellId(_) => Some(simpleCells(r).value)
-    case r @ AutoCellId(_, _) => autoCells.get(r).flatMap(_.getValue)
+  def tryFetch[D[_]](ref: CellId[K, D]): ExistsOption[D] = ref match {
+    case r @ SimpleCellId(_)  =>
+      ESome(simpleCells(r).value)
+    case r @ AutoCellId(_, _) =>
+      autoCells.get(r) match {
+        case Some(cell) => ExistsOption.fromOption(cell.getValue)
+        case None       => ENone()
+      }
   }
 
   // unsafe, should only be allowed on simple cells
-  def fetch[D](ref: CellId[K, D]): D = tryFetch(ref).get
+  def fetch[D[_]](ref: CellId[K, D]): Exists[D] = tryFetch(ref).unsafeGet
 
-  def update[D, U, Δ[_, _]](ref: SimpleCellId[K, D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Boolean) =
+  def update[D[_], U[_], Δ[_, _], J](ref: SimpleCellId[K, D], u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Boolean) =
     simpleCells(ref).infer.update(u) match {
       case CellUpdated(cell, becameDirty) =>
         val domains1 = simpleCells.put(ref)(cell)
@@ -174,7 +183,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         (this, false)
     }
 
-  def exclUpdate[D, U, Δ[_, _]](ref: AutoCellId[K, D], cycle: CellCycle[D], u: U)(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Boolean) =
+  def exclUpdate[D[_], U[_], Δ[_, _], J](ref: AutoCellId[K, D], cycle: CellCycle[D], u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Boolean) =
     autoCells.get(ref) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
         cell0.infer.exclUpdate(u) match {
@@ -188,16 +197,16 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         (this, false)
     }
 
-  def observe[D, U, Δ[_, _]](ref: SimpleCellId[K, D], f: PreHandler[D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (Lst[K[Unit]], PropagationStore[K], Option[ObserverId]) = {
+  def observe[D[_], U[_], Δ[_, _]](ref: SimpleCellId[K, D], f: PreHandler[D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (Lst[K[Unit]], PropagationStore[K], Option[ObserverId]) = {
     val (cell, oid, ks) = simpleCells(ref).infer.observe(-\/(ref), f)
     (ks, copy(simpleCells = simpleCells.put(ref)(cell)), oid)
   }
 
   // convenience method for testing
-  def observeOnce[D](ref: AutoCellId[K, D], f: D => K[Unit])(implicit dom: IDom[D]): (Lst[K[Unit]], PropagationStore[K], Option[(CellCycle[D], ObserverId)]) =
-    observe[D, dom.Update, dom.IDelta](ref, once(f))(dom)
+  def observeOnce[D[_]](ref: AutoCellId[K, D], f: [i] => D[i] => K[Unit])(implicit dom: IDom[D]): (Lst[K[Unit]], PropagationStore[K], Option[(CellCycle[D], ObserverId)]) =
+    observe[D, dom.IUpdate, dom.IDelta](ref, once[D](f))(dom)
 
-  def observe[D, U, Δ[_, _]](ref: AutoCellId[K, D], f: PreHandler[D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (Lst[K[Unit]], PropagationStore[K], Option[(CellCycle[D], ObserverId)]) =
+  def observe[D[_], U[_], Δ[_, _]](ref: AutoCellId[K, D], f: PreHandler[D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (Lst[K[Unit]], PropagationStore[K], Option[(CellCycle[D], ObserverId)]) =
     autoCells.get(ref) match {
       case Some(cell0) =>
         val (cell, oid, ks) = cell0.infer.observe(\/-((ref, cell0.cycle)), f)
@@ -208,12 +217,12 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         (Lst.singleton(ref.setup(newCycle)), copy(autoCells = autoCells.put(ref)(cell), lastCellCycle = newCycle), Some((newCycle, obsId)))
     }
 
-  def hold[D](ref: SimpleCellId[K, D])(f: (D, Token[D], ObserverId) => K[Unit]): (PropagationStore[K], ObserverId, Lst[K[Unit]]) = {
+  def hold[D[_]](ref: SimpleCellId[K, D])(f: [i] => (D[i], Token[i], ObserverId) => K[Unit]): (PropagationStore[K], ObserverId, Lst[K[Unit]]) = {
     val (cell, obsId, ks) = simpleCells(ref).hold(f)
     (copy(simpleCells = simpleCells.put(ref)(cell)), obsId, ks)
   }
 
-  def hold[D](ref: AutoCellId[K, D])(f: (D, CellCycle[D], Token[D], ObserverId) => K[Unit]): (PropagationStore[K], CellCycle[D], ObserverId, Lst[K[Unit]]) = {
+  def hold[D[i]](ref: AutoCellId[K, D])(f: [i] => (D[i], CellCycle[D], Token[i], ObserverId) => K[Unit]): (PropagationStore[K], CellCycle[D], ObserverId, Lst[K[Unit]]) = {
     autoCells.get(ref) match {
       case Some(cell0) =>
         val (cell, obsId, ks) = cell0.hold(f)
@@ -225,7 +234,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     }
   }
 
-  def supply[D](ref: AutoCellId[K, D])(cycle: CellCycle[D], value: D): (PropagationStore[K], Lst[K[Unit]]) =
+  def supply[D[_], I](ref: AutoCellId[K, D])(cycle: CellCycle[D], value: D[I]): (PropagationStore[K], Lst[K[Unit]]) =
     autoCells.get(ref) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
         val (cell, ks) = cell0.supply(\/-((ref, cycle)), value)
@@ -237,12 +246,12 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         (this, Lst.empty)
     }
 
-  def resume[D, Δ[_, _], D0 <: D](ref: SimpleCellId[K, D], token: Token[D0], trigger: Trigger[D, Δ, D0]): (PropagationStore[K], Lst[K[Unit]], Boolean) = {
+  def resume[D[_], Δ[_, _], I](ref: SimpleCellId[K, D], token: Token[I], trigger: Trigger[D, Δ, I]): (PropagationStore[K], Lst[K[Unit]], Boolean) = {
     val (cell, ks, becameDirty) = simpleCells(ref).asInstanceOf[SimpleCell.AuxD[K, D, Δ]].resume(-\/(ref), token, trigger)
     (copy(simpleCells = simpleCells.put(ref)(cell)), ks, becameDirty)
   }
 
-  def resume[D, Δ[_, _], D0 <: D](ref: AutoCellId[K, D], cycle: CellCycle[D], token: Token[D0], trigger: Trigger[D, Δ, D0]): (PropagationStore[K], Lst[K[Unit]], Boolean) =
+  def resume[D[_], Δ[_, _], I](ref: AutoCellId[K, D], cycle: CellCycle[D], token: Token[I], trigger: Trigger[D, Δ, I]): (PropagationStore[K], Lst[K[Unit]], Boolean) =
     autoCells.get(ref) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
         val (cell, ks) = cell0.asInstanceOf[OnDemandCell.AuxD[K, D, Δ]].resume(\/-((ref, cycle)), token, trigger)
@@ -256,12 +265,12 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         (this, Lst.empty, false)
     }
 
-  def rmObserver[D](ref: SimpleCellId[K, D], oid: ObserverId): (PropagationStore[K], Lst[K[Unit]]) = {
+  def rmObserver[D[_]](ref: SimpleCellId[K, D], oid: ObserverId): (PropagationStore[K], Lst[K[Unit]]) = {
     val (cell, ks) = simpleCells(ref).rmObserver(oid)
     (copy(simpleCells = simpleCells.put(ref)(cell)), ks)
   }
 
-  def rmObserver[D](ref: AutoCellId[K, D], cycle: CellCycle[D], oid: ObserverId): (PropagationStore[K], Lst[K[Unit]]) =
+  def rmObserver[D[_]](ref: AutoCellId[K, D], cycle: CellCycle[D], oid: ObserverId): (PropagationStore[K], Lst[K[Unit]]) =
     autoCells.get(ref) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
         val (cell, ks) = cell0.rmObserver(oid)
@@ -273,7 +282,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         (this, Lst.empty)
     }
 
-  def addFinalizer[A](ref: AutoCellId[K, A], cycle: CellCycle[A], sub: Subscription[K]): (Lst[K[Unit]], PropagationStore[K], Option[FinalizerId]) =
+  def addFinalizer[D[_]](ref: AutoCellId[K, D], cycle: CellCycle[D], sub: Subscription[K]): (Lst[K[Unit]], PropagationStore[K], Option[FinalizerId]) =
     autoCells.get(ref) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
         val (ks, cell, fid) = cell0.addFinalizer(sub)
@@ -282,7 +291,7 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         (sub.unsubscribe, this, None)
     }
 
-  def removeFinalizer[A](ref: AutoCellId[K, A], cycle: CellCycle[A], fid: FinalizerId): PropagationStore[K] =
+  def removeFinalizer[D[_]](ref: AutoCellId[K, D], cycle: CellCycle[D], fid: FinalizerId): PropagationStore[K] =
     autoCells.get(ref) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
         val cell = cell0.removeFinalizer(fid)
@@ -291,12 +300,12 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         this
     }
 
-  def execTriggers[A](r: SimpleCellId[K, A]): (PropagationStore[K], Lst[K[Unit]]) = {
+  def execTriggers[D[_]](r: SimpleCellId[K, D]): (PropagationStore[K], Lst[K[Unit]]) = {
     val (cell, ks) = simpleCells(r).triggerPendingObservers(-\/(r))
     (copy(simpleCells = simpleCells.put(r)(cell)), ks)
   }
 
-  def execTriggers[A](r: AutoCellId[K, A], cycle: CellCycle[A]): (PropagationStore[K], Lst[K[Unit]]) = {
+  def execTriggers[D[_]](r: AutoCellId[K, D], cycle: CellCycle[D]): (PropagationStore[K], Lst[K[Unit]]) = {
     autoCells.get(r) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
         val (cell, ks) = cell0.triggerPendingObservers(\/-((r, cell0.cycle)))
@@ -316,23 +325,23 @@ object PropagationStore {
   def empty[K[_]]: PropagationStore[K] = PropagationStore[K](
     lastCellId = CellIdCounter.zero,
     lastCellCycle = CellCycle.zero[Nothing],
-    simpleCells = KMap[SimpleCellId[K, *], SimpleCell[K, *]](),
-    autoCells = KMap[AutoCellId[K, *], OnDemandCell[K, *]]()
+    simpleCells = HKMap[[d[_]] =>> SimpleCellId[K, d], [d[_]] =>> SimpleCell[K, d]](),
+    autoCells = HKMap[[d[_]] =>> AutoCellId[K, d], [d[_]] =>> OnDemandCell[K, d]]()
   )
 }
 
 private[nutcracker] final case class CellIdCounter(lastId: Long) extends AnyVal {
-  def inc[K[_], A]: SimpleCellId[K, A] = SimpleCellId[K, A](lastId + 1)
-  def inc[K[_], A](setup: (AutoCellId[K, A], CellCycle[A]) => K[Unit]): AutoCellId[K, A] = AutoCellId[K, A](lastId + 1, setup)
+  def inc[K[_], D[_]]: SimpleCellId[K, D] = SimpleCellId[K, D](lastId + 1)
+  def inc[K[_], D[_]](setup: (AutoCellId[K, D], CellCycle[D]) => K[Unit]): AutoCellId[K, D] = AutoCellId[K, D](lastId + 1, setup)
 }
 
 private[nutcracker] object CellIdCounter {
   def zero: CellIdCounter = CellIdCounter(0L)
 }
 
-private[nutcracker] sealed abstract class CellId[K[_], A] {
-  type Domain = A
-  type Update
+private[nutcracker] sealed abstract class CellId[K[_], A[_]] {
+  type Domain[I] = A[I]
+  type Update[J]
   type Delta[_, _]
 
   val domainId: Long
@@ -351,55 +360,43 @@ private[nutcracker] sealed abstract class CellId[K[_], A] {
 }
 
 private[nutcracker] object CellId {
-  type Aux[K[_], A, U, Δ[_, _]] = CellId[K, A] { type Update = U; type Delta[D1, D2] = Δ[D1, D2] }
+  type Aux[K[_], D[_], U[_], Δ[_, _]] = CellId[K, D] { type Update[J] = U[J]; type Delta[I, J] = Δ[I, J] }
 
-  def order[K[_], A, B](fa: CellId[K, A], fb: CellId[K, B]): Ordering =
+  def order[K[_], A[_], B[_]](fa: CellId[K, A], fb: CellId[K, B]): Ordering =
     if(fa.domainId < fb.domainId) Ordering.LT
     else if(fa.domainId == fb.domainId) Ordering.EQ
     else Ordering.GT
 
-  implicit def orderKInstance[K[_]]: HOrderK[CellId[K, *]] = new HOrderK[CellId[K, *]] {
-    override def hOrderK[A, B](fa: CellId[K, A], fb: CellId[K, B]): Ordering =
-      CellId.order(fa, fb)
-  }
-
-  implicit def showKInstance[K[_]]: ShowK[CellId[K, *]] = new ShowK[CellId[K, *]] {
-    def shows[A](ref: CellId[K, A]): String = s"cell${ref.domainId}"
-  }
+  def show[K[_], D[_]](ref: CellId[K, D]): String =
+    s"cell${ref.domainId}"
 }
 
-private[nutcracker] final case class SimpleCellId[K[_], D](domainId: Long) extends CellId[K, D] {
+private[nutcracker] final case class SimpleCellId[K[_], D[_]](domainId: Long) extends CellId[K, D] {
   override def aux: SimpleCellId.Aux[K, Domain, Update, Delta] = this
 }
 
 private[nutcracker] object SimpleCellId {
-  type Aux[K[_], D, U, Δ[_, _]] = SimpleCellId[K, D] { type Update = U; type Delta[D1, D2] = Δ[D1, D2] }
+  type Aux[K[_], D[_], U[_], Δ[_, _]] = SimpleCellId[K, D] { type Update[J] = U[J]; type Delta[I, J] = Δ[I, J] }
 
-  implicit def orderKInstance[K[_]]: HOrderK[SimpleCellId[K, *]] = new HOrderK[SimpleCellId[K, *]] {
-    override def hOrderK[A, B](fa: SimpleCellId[K, A], fb: SimpleCellId[K, B]): Ordering =
-      CellId.order(fa, fb)
-  }
+  def order[K[_], A[_], B[_]](fa: SimpleCellId[K, A], fb: SimpleCellId[K, B]): Ordering =
+    CellId.order(fa, fb)
 
-  implicit def showInstance[K[_], D]: Show[SimpleCellId[K, D]] =
-    Show.shows[SimpleCellId[K, D]](ref => s"ref${ref.domainId}")
-
-  implicit def showKInstance[K[_]]: ShowK[SimpleCellId[K, *]] = new ShowK[SimpleCellId[K, *]] {
-    def shows[A](ref: SimpleCellId[K, A]): String = s"cell${ref.domainId}"
-  }
+  def show[K[_], D[_]](ref: SimpleCellId[K, D]): String =
+    s"ref${ref.domainId}"
 }
 
-private[nutcracker] final case class AutoCellId[K[_], A](domainId: Long, runSetup: (AutoCellId[K, A], CellCycle[A]) => K[Unit]) extends CellId[K, A] {
-  def setup(cycle: CellCycle[A]): K[Unit] = runSetup(this, cycle)
+private[nutcracker] final case class AutoCellId[K[_], D[_]](domainId: Long, runSetup: (AutoCellId[K, D], CellCycle[D]) => K[Unit]) extends CellId[K, D] {
+  def setup(cycle: CellCycle[D]): K[Unit] = runSetup(this, cycle)
 }
 
-private[nutcracker] final class CellCycle[A] private(val value: Long) extends AnyVal {
-  def inc[B]: CellCycle[B] = new CellCycle[B](value + 1)
+private[nutcracker] final class CellCycle[D[_]] private(val value: Long) extends AnyVal {
+  def inc[E[_]]: CellCycle[E] = new CellCycle[E](value + 1)
 }
 
 private[nutcracker] object CellCycle {
-  def zero[A]: CellCycle[A] = new CellCycle(0)
+  def zero[D[_]]: CellCycle[D] = new CellCycle(0)
 
-  implicit def equalInstance[A]: Equal[CellCycle[A]] = new Equal[CellCycle[A]] {
-    def equal(a1: CellCycle[A], a2: CellCycle[A]): Boolean = a1.value == a2.value
+  implicit def equalInstance[D[_]]: Equal[CellCycle[D]] = new Equal[CellCycle[D]] {
+    def equal(a1: CellCycle[D], a2: CellCycle[D]): Boolean = a1.value == a2.value
   }
 }

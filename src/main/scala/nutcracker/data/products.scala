@@ -28,7 +28,7 @@ object Tupled2 {
     ra: Val[A],
     rb: Val[B],
   )(implicit
-    P: OnDemandPropagation[K, Var, Val],
+    P: OnDemandPropagation.Aux[K, Var, Val],
     R: Relations[K],
     O: HOrderK[Val],
     K: Monad[K],
@@ -44,7 +44,7 @@ object Tupled2 {
       .map(_.tail.tail.head)
   }
 
-  def recipe[A, B, Var[_], Val[_], K[_]](implicit P: OnDemandPropagation[K, Var, Val], K: Monad[K], da: SyncDom[A], db: SyncDom[B]): Recipe[L[A, B, Val], C[A, B, Val], K] =
+  def recipe[A, B, Var[_], Val[_], K[_]](implicit P: OnDemandPropagation.Aux[K, Var, Val], K: Monad[K], da: SyncDom[A], db: SyncDom[B]): Recipe[L[A, B, Val], C[A, B, Val], K] =
     new Recipe[L[A, B, Val], C[A, B, Val], K](_0 :: _1 :: Choose[L[A, B, Val]]) {
       import P.{Val => _, _}
 

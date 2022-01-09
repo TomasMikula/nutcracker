@@ -3,9 +3,8 @@ package nutcracker
 import scalaz.{Leibniz, Semigroup, \&/, ===}
 import scalaz.Isomorphism.<=>
 
-trait IDom[D] {
-  type Domain = D
-  type Update
+trait IDom[D[_]] {
+  type IUpdate[_]
   type IDelta[_, _]
 
   /** Applies the monotonic update `u` to `d`, obtaining `d1 ≥ d`
@@ -14,61 +13,56 @@ trait IDom[D] {
     * updates also have to be _commutative_ and _idempotent_ (when
     * the deltas are combined using [[composeDeltas]]).
     */
-  def update[D0 <: D](d: D0, u: Update): UpdateResult[D, IDelta, D0]
+  def iUpdate[I, J](d: D[I], u: IUpdate[J]): IUpdateResult[D, IDelta, I, J]
 
   def composeDeltas[D1, D2, D3](δ1: IDelta[D2, D3], δ2: IDelta[D1, D2]): IDelta[D1, D3]
 
-  def isFailed(d: D): Boolean
+  def iIsFailed[I](d: D[I]): Boolean
 
-  final def aux: IDom.Aux[D, Update, IDelta] = this
+  final def aux: IDom.Aux[D, IUpdate, IDelta] = this
 }
 
 object IDom {
-  type Aux[D, U, Δ[_, _]] = IDom[D] { type Update = U; type IDelta[D1, D2] = Δ[D1, D2] }
+  type Aux[D[_], U[_], Δ[_, _]] = IDom[D] { type IUpdate[I] = U[I]; type IDelta[D1, D2] = Δ[D1, D2] }
 }
 
-sealed abstract class UpdateResult[D, Δ[_, _], D0] {
-  type NewValue
+sealed abstract class IUpdateResult[D[_], Δ[_, _], I, J] {
+  def map[E[_], Δ2[_, _]](f: [i] => D[i] => E[i], g: [i, j] => Δ[i, j] => Δ2[i, j]): IUpdateResult[E, Δ2, I, J]
 
-  def map[E, Δ2, E0 <: E](f: D => E, g: Δ[D0, NewValue] => Δ2): UpdateResult[E, λ[(α, β) => Δ2], E0]
+  def map_[E, Δ2](f: [i] => D[i] => E, g: [i, j] => Δ[i, j] => Δ2): UpdateResult[E, Δ2] =
+    UpdateResult(map[[i] =>> E, [i, j] =>> Δ2](f, g))
 }
-case class Unchanged[D, Δ[_, _], D0]() extends UpdateResult[D, Δ, D0] {
-  type NewValue = Nothing
-  def map[E, Δ2, E0 <: E](f: D => E, g: Δ[D0, NewValue] => Δ2): UpdateResult[E, λ[(α, β) => Δ2], E0] =
-    UpdateResult()
+case class Unchanged[D[_], Δ[_, _], I]() extends IUpdateResult[D, Δ, I, I] {
+  override def map[E[_], Δ2[_, _]](f: [i] => D[i] => E[i], g: [i, j] => Δ[i, j] => Δ2[i, j]): IUpdateResult[E, Δ2, I, I] =
+    IUpdateResult.unchanged
 }
-case class Updated[D, Δ[_, _], D0, D1 <: D](newValue: D1, delta: Δ[D0, D1]) extends UpdateResult[D, Δ, D0] {
-  type NewValue = D1
-  def map[E, Δ2, E0 <: E](f: D => E, g: Δ[D0, NewValue] => Δ2): UpdateResult[E, λ[(α, β) => Δ2], E0] =
-    UpdateResult(f(newValue), g(delta))
+case class Updated[D[_], Δ[_, _], I, J](newValue: D[J], delta: Δ[I, J]) extends IUpdateResult[D, Δ, I, J] {
+  override def map[E[_], Δ2[_, _]](f: [i] => D[i] => E[i], g: [i, j] => Δ[i, j] => Δ2[i, j]): IUpdateResult[E, Δ2, I, J] =
+    Updated(f(newValue), g(delta))
 }
 
-object UpdateResult {
+object IUpdateResult {
   private val _unchanged = Unchanged()
 
-  def unchanged[D, Δ[_, _], D0]: UpdateResult[D, Δ, D0] =
-    _unchanged.asInstanceOf[UpdateResult[D, Δ, D0]]
+  def unchanged[D[_], Δ[_, _], I]: IUpdateResult[D, Δ, I, I] =
+    _unchanged.asInstanceOf[IUpdateResult[D, Δ, I, I]]
 
-  def updated[D, Δ[_, _], D0, D1 <: D](newVal: D1, δ: Δ[D0, D1]): UpdateResult[D, Δ, D0] =
+  def updated[D[_], Δ[_, _], I, J](newVal: D[J], δ: Δ[I, J]): IUpdateResult[D, Δ, I, J] =
     Updated(newVal, δ)
-
-  def apply[D, Δ, D0](): UpdateResult[D, λ[(α, β) => Δ], D0] =
-    unchanged[D, λ[(α, β) => Δ], D0]
-
-  def apply[D, Δ, D0](newValue: D, δ: Δ): UpdateResult[D, λ[(α, β) => Δ], D0] =
-    updated[D, λ[(α, β) => Δ], D0, D](newValue, δ)
-
-  def apply[D, Δ, D0](res: Option[(D, Δ)]): UpdateResult[D, λ[(α, β) => Δ], D0] = res match {
-    case Some((d, δ)) => UpdateResult(d, δ)
-    case None         => UpdateResult()
-  }
 }
 
-trait Dom[D] extends IDom[D] {
+trait Dom[D] extends IDom[[i] =>> D] {
+  type Domain = D
   type Update
   type Delta
 
-  type IDelta[D1, D2] = Delta
+  type IUpdate[I] = Update
+  type IDelta[I, J] = Delta
+
+  def update(d: D, u: Update): UpdateResult[D, Delta]
+
+  override def iUpdate[I, J](d: D, u: Update): IUpdateResult[[i] =>> D, IDelta, I, J] =
+    update(d, u).at[I, J]
 
   /** Associative, idempotent and monotonic (non-decreasing) operation
     * to combine diffs.
@@ -78,12 +72,14 @@ trait Dom[D] extends IDom[D] {
   final override def composeDeltas[D1, D2, D3](δ1: IDelta[D2, D3], δ2: IDelta[D1, D2]): IDelta[D1, D3] =
     appendDeltas(δ2, δ1)
 
+  def isFailed(d: D): Boolean
+
+  override def iIsFailed[I](d: D): Boolean =
+    isFailed(d)
+
   /** A variation on [[update]] that always returns the updated value,
     * whether changed or unchaged. */
-  def update_(d: D, u: Update): D = update(d, u) match {
-    case Updated(d1, _) => d1
-    case Unchanged()    => d
-  }
+  def update_(d: D, u: Update): D = update(d, u).newValueOr(d)
 
   def deltaSemigroup: Semigroup[Delta] = new Semigroup[Delta] {
     def append(d1: Delta, d2: => Delta): Delta = appendDeltas(d1, d2)
@@ -106,11 +102,8 @@ object Dom {
       type Update = domB.Update
       type Delta = domB.Delta
 
-      def update[A0 <: A](a: A0, u: Update): UpdateResult[A, IDelta, A0] =
-        domB.update(iso.to(a), u) match {
-          case Updated(b, δ) => UpdateResult(iso.from(b), δ)
-          case Unchanged()   => UpdateResult()
-        }
+      def update(a: A, u: Update): UpdateResult[A, Delta] =
+        domB.update(iso.to(a), u).mapDomain(iso.from)
 
       def appendDeltas(d1: Delta, d2: Delta): Delta =
         domB.appendDeltas(d1, d2)
@@ -124,21 +117,18 @@ object Dom {
       type Update = dom1.Update \&/ dom2.Update
       type Delta = dom1.Delta \&/ dom2.Delta
 
-      def update[D12 <: (D1, D2)](d: D12, u: Update): UpdateResult[(D1, D2), IDelta, D12] = u match {
-        case \&/.This(u1) => dom1.update(d._1, u1) match {
-          case Updated(d1, δ1) => UpdateResult((d1, d._2), \&/.This(δ1))
-          case Unchanged()     => UpdateResult()
-        }
-        case \&/.That(u2) => dom2.update(d._2, u2) match {
-          case Updated(d2, δ2) => UpdateResult((d._1, d2), \&/.That(δ2))
-          case Unchanged()     => UpdateResult()
-        }
-        case \&/.Both(u1, u2) => (dom1.update(d._1, u1), dom2.update(d._2, u2)) match {
-          case (Updated(d1, δ1), Updated(d2, δ2)) => UpdateResult((d1, d2  ), \&/.Both(δ1, δ2))
-          case (Updated(d1, δ1), Unchanged()    ) => UpdateResult((d1, d._2), \&/.This(δ1))
-          case (Unchanged()    , Updated(d2, δ2)) => UpdateResult((d._1, d2), \&/.That(δ2))
-          case (Unchanged()    , Unchanged()    ) => UpdateResult()
-        }
+      def update(d: (D1, D2), u: Update): UpdateResult[(D1, D2), Delta] = u match {
+        case \&/.This(u1) =>
+          dom1.update(d._1, u1).map((_, d._2), \&/.This(_))
+        case \&/.That(u2) =>
+          dom2.update(d._2, u2).map((d._1, _), \&/.That(_))
+        case \&/.Both(u1, u2) =>
+          (dom1.update(d._1, u1).at[Any, Any], dom2.update(d._2, u2).at[Any, Any]) match {
+            case (Updated(d1, δ1), Updated(d2, δ2)) => UpdateResult.updated((d1, d2  ), \&/.Both(δ1, δ2))
+            case (Updated(d1, δ1), Unchanged()    ) => UpdateResult.updated((d1, d._2), \&/.This(δ1))
+            case (Unchanged()    , Updated(d2, δ2)) => UpdateResult.updated((d._1, d2), \&/.That(δ2))
+            case (Unchanged()    , Unchanged()    ) => UpdateResult.unchanged
+          }
       }
 
       def appendDeltas(δ1: Delta, δ2: Delta): Delta =

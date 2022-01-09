@@ -41,15 +41,15 @@ object CellSet {
 
     override def isFailed(d: CellSet[Ref, A]): Boolean = false
 
-    override def update[S <: CellSet[Ref, A]](s: S, u: Update): UpdateResult[CellSet[Ref, A], IDelta, S] = u match {
+    override def update(s: CellSet[Ref, A], u: Update): UpdateResult[CellSet[Ref, A], Delta] = u match {
       case Insert(refs) =>
         val res = wrap(s.value union refs)
-        if(res.size > s.size) UpdateResult(res, Added(refs diff s.value))
-        else UpdateResult()
+        if(res.size > s.size) UpdateResult.updated(res, Added(refs diff s.value))
+        else UpdateResult.unchanged
       case RemoveFailed(ref) =>
         val refs = s.value - ref
-        if(refs.size < s.value.size) UpdateResult(wrap(refs), Added(Set())) // we don't publish auto-cleaned refs
-        else UpdateResult()
+        if(refs.size < s.value.size) UpdateResult.updated(wrap(refs), Added(Set())) // we don't publish auto-cleaned refs
+        else UpdateResult.unchanged
     }
 
     override def appendDeltas(d1: Delta, d2: Delta): Delta =
@@ -70,14 +70,14 @@ object CellSet {
   def init[A]: InitSyntaxHelper[A] = new InitSyntaxHelper[A]
 
   final class InitSyntaxHelper[A] {
-    def apply[F[_], Var[_], Val[_]]()(implicit P: Propagation[F, Var, Val]): F[Var[CellSet[Var, A]]] =
+    def apply[F[_], Var[_], Val[_]]()(implicit P: Propagation.Aux[F, Var, Val]): F[Var[CellSet[Var, A]]] =
       P.newCell(CellSet.empty[Var, A])
   }
 
   /** Returns the given set in a CPS style, executing any subsequently
     * given callback for every current and future element of that set.
     */
-  def forEach[F[_], Var[_], Val[_], A](set: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], F: Applicative[F]): IndexedContT[Subscription[F], Unit, F, Var[A]] = {
+  def forEach[F[_], Var[_], Val[_], A](set: Var[CellSet[Var, A]])(implicit P: Propagation.Aux[F, Var, Val], F: Applicative[F]): IndexedContT[Subscription[F], Unit, F, Var[A]] = {
     import scalaz.syntax.traverse._
     IndexedContT(f => set.observe.by(as => {
       val now = as.toList.traverse_(f)
@@ -86,12 +86,12 @@ object CellSet {
     }))
   }
 
-  def forEach_[F[_], Var[_], Val[_], A](set: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], F: Applicative[F]): ContU[F, Var[A]] = {
+  def forEach_[F[_], Var[_], Val[_], A](set: Var[CellSet[Var, A]])(implicit P: Propagation.Aux[F, Var, Val], F: Applicative[F]): ContU[F, Var[A]] = {
     val cps = forEach(set)
     ContU(f => cps(f).void)
   }
 
-  def insert[F[_], Var[_], Val[_], A](ref: Var[A], into: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], dom: Dom[A], F: Functor[F]): F[Unit] =
+  def insert[F[_], Var[_], Val[_], A](ref: Var[A], into: Var[CellSet[Var, A]])(implicit P: Propagation.Aux[F, Var, Val], dom: Dom[A], F: Functor[F]): F[Unit] =
     ref.observe.by(a =>
       if(dom.isFailed(a)) P.discard
       else P.reconsider(P.update(into).by(Insert(Set(ref))) map { (_: Unit) => P.sleep(P.threshold1(a =>
@@ -100,31 +100,31 @@ object CellSet {
       )) })
     ).void
 
-  def insertAll[F[_], Var[_], Val[_], A](add: Set[Var[A]], into: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], dom: Dom[A], F: Applicative[F]): F[Unit] =
+  def insertAll[F[_], Var[_], Val[_], A](add: Set[Var[A]], into: Var[CellSet[Var, A]])(implicit P: Propagation.Aux[F, Var, Val], dom: Dom[A], F: Applicative[F]): F[Unit] =
     add.iterator.traverse_(ra => insert(ra, into))
 
-  def include[F[_], Var[_], Val[_], A](sub: Var[CellSet[Var, A]], sup: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], dom: Dom[A], F: Applicative[F]): F[Unit] =
+  def include[F[_], Var[_], Val[_], A](sub: Var[CellSet[Var, A]], sup: Var[CellSet[Var, A]])(implicit P: Propagation.Aux[F, Var, Val], dom: Dom[A], F: Applicative[F]): F[Unit] =
     sub.observe.by((sa: CellSet[Var, A]) => {
       val now = insertAll(sa.value, sup)
       val onChange = P.continually((sa: CellSet[Var, A], delta: Added[Var, A]) => insertAll(delta.value, sup))
       P.fireReload(now, onChange)
     }).void
 
-  def includeC[F[_], Var[_], Val[_], A](cps: ContU[F, Var[A]], ref: Var[CellSet[Var, A]])(implicit P: Propagation[F, Var, Val], dom: Dom[A], F: Functor[F]): F[Unit] =
+  def includeC[F[_], Var[_], Val[_], A](cps: ContU[F, Var[A]], ref: Var[CellSet[Var, A]])(implicit P: Propagation.Aux[F, Var, Val], dom: Dom[A], F: Functor[F]): F[Unit] =
     cps(Id(a => insert(a, ref)))
 
-  def collect[F[_], Var[_], Val[_], A](cps: ContU[F, Var[A]])(implicit P: Propagation[F, Var, Val], dom: Dom[A], F: Bind[F]): F[Var[CellSet[Var, A]]] = for {
+  def collect[F[_], Var[_], Val[_], A](cps: ContU[F, Var[A]])(implicit P: Propagation.Aux[F, Var, Val], dom: Dom[A], F: Bind[F]): F[Var[CellSet[Var, A]]] = for {
     res <- init[A]()
     _   <- includeC(cps, res)
   } yield res
 
-  def collectAll[F[_], Var[_], Val[_], A](cps: ContU[F, Var[A]]*)(implicit P: Propagation[F, Var, Val], dom: Dom[A], F: Monad[F]): F[Var[CellSet[Var, A]]] =
+  def collectAll[F[_], Var[_], Val[_], A](cps: ContU[F, Var[A]]*)(implicit P: Propagation.Aux[F, Var, Val], dom: Dom[A], F: Monad[F]): F[Var[CellSet[Var, A]]] =
     collectAll(cps)
 
-  def collectAll[F[_], Var[_], Val[_], A](cps: Iterable[ContU[F, Var[A]]])(implicit P: Propagation[F, Var, Val], dom: Dom[A], F: Monad[F]): F[Var[CellSet[Var, A]]] =
+  def collectAll[F[_], Var[_], Val[_], A](cps: Iterable[ContU[F, Var[A]]])(implicit P: Propagation.Aux[F, Var, Val], dom: Dom[A], F: Monad[F]): F[Var[CellSet[Var, A]]] =
     collect(ContU.sequence(cps))
 
-  def relBind[F[_], Var[_], Val[_], A, B](sref: Val[CellSet[Var, A]])(f: Var[A] => F[Var[CellSet[Var, B]]])(implicit P: Propagation[F, Var, Val], domB: Dom[B], M: Monad[F]): F[Var[CellSet[Var, B]]] = {
+  def relBind[F[_], Var[_], Val[_], A, B](sref: Val[CellSet[Var, A]])(f: Var[A] => F[Var[CellSet[Var, B]]])(implicit P: Propagation.Aux[F, Var, Val], domB: Dom[B], M: Monad[F]): F[Var[CellSet[Var, B]]] = {
     import scalaz.syntax.foldable0._
     for {
       res <- init[B]()

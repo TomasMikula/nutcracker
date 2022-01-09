@@ -5,14 +5,14 @@ import nutcracker.util.ops.applicative._
 import scala.language.implicitConversions
 import scalaz.{Applicative}
 
-trait Propagation[M[_], Var[_], Val0[_]] extends Observe[M] {
-  type Val[A] = Val0[A]
+trait Propagation[M[_]] extends Observe[M] {
+  type Var[A]
 
   implicit def readOnly[A](a: Var[A]): Val[A]
 
   def newCell[D](d: D)(implicit dom: Dom[D]): M[Var[D]]
 
-  def updateImpl[D, U, Δ[_, _]](ref: Var[D])(u: U)(implicit dom: IDom.Aux[D, U, Δ]): M[Unit]
+  def updateImpl[D, U, Δ](ref: Var[D])(u: U)(implicit dom: Dom.Aux[D, U, Δ]): M[Unit]
 
 
   def newCell[D](implicit dom: DomWithBottom[D]): M[Var[D]] =
@@ -22,7 +22,7 @@ trait Propagation[M[_], Var[_], Val0[_]] extends Observe[M] {
     new UpdateSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
 
   final class UpdateSyntaxHelper[D, U, Δ](ref: Var[D])(implicit dom: Dom.Aux[D, U, Δ]) {
-    def by(u: U): M[Unit] = updateImpl[D, U, λ[(α, β) => Δ]](ref)(u)
+    def by(u: U): M[Unit] = updateImpl[D, U, Δ](ref)(u)
   }
 
   def cells[D](d: D, n: Int)(implicit dom: Dom[D], M: Applicative[M]): M[Vector[Var[D]]] =
@@ -30,10 +30,12 @@ trait Propagation[M[_], Var[_], Val0[_]] extends Observe[M] {
 }
 
 object Propagation {
-  def apply[M[_], Ref[_], Val[_]](implicit M: Propagation[M, Ref, Val]): Propagation[M, Ref, Val] = M
+  type Aux[M[_], Var0[_], Val0[_]] = Propagation[M] { type Var[A] = Var0[A]; type Val[A] = Val0[A] }
+
+  def apply[M[_], Ref[_], Val[_]](implicit M: Propagation.Aux[M, Ref, Val]): Propagation.Aux[M, Ref, Val] = M
 }
 
-trait OnDemandPropagation[M[_], Var[_], Val[_]] extends Propagation[M, Var, Val] {
+trait OnDemandPropagation[M[_]] extends Propagation[M] {
   type ExclRef[A]
 
   /** Creates a cell that will setup itself when the first observer is registered.
@@ -58,12 +60,16 @@ trait OnDemandPropagation[M[_], Var[_], Val[_]] extends Propagation[M, Var, Val]
     */
   def addFinalizer[A](ref: ExclRef[A], value: Subscription[M]): M[Subscription[M]]
 
-  def exclUpdateImpl[A, U, Δ[_, _]](ref: ExclRef[A], u: U)(implicit dom: IDom.Aux[A, U, Δ]): M[Unit]
+  def exclUpdateImpl[A, U, Δ](ref: ExclRef[A], u: U)(implicit dom: Dom.Aux[A, U, Δ]): M[Unit]
 
   def exclUpdate[D](ref: ExclRef[D])(implicit dom: Dom[D]): ExclUpdateSyntaxHelper[D, dom.Update, dom.Delta] =
     new ExclUpdateSyntaxHelper[D, dom.Update, dom.Delta](ref)(dom)
 
   final class ExclUpdateSyntaxHelper[D, U, Δ](ref: ExclRef[D])(implicit dom: Dom.Aux[D, U, Δ]) {
-    def by(u: U): M[Unit] = exclUpdateImpl[D, U, λ[(α, β) => Δ]](ref, u)
+    def by(u: U): M[Unit] = exclUpdateImpl[D, U, Δ](ref, u)
   }
+}
+
+object OnDemandPropagation {
+  type Aux[M[_], Var0[_], Val0[_]] = OnDemandPropagation[M] with Propagation.Aux[M, Var0, Val0]
 }

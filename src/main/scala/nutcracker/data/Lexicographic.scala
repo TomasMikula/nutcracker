@@ -12,7 +12,7 @@ object Lexicographic {
       type Update = A.Update \/ B.Update
       type Delta = A.Delta \&/ B.Delta
 
-      override def update[D0 <: Lexicographic[A, B]](d: D0, u: Update): UpdateResult[Lexicographic[A, B], IDelta, D0] =
+      override def update(d: Lexicographic[A, B], u: Update): UpdateResult[Lexicographic[A, B], Delta] =
         u match {
           case -\/(ua) => A.update(d._1, ua).map(Lexicographic(_, B.bottom), This(_))
           case \/-(ub) => B.update(d._2, ub).map(Lexicographic(d._1, _),     That(_))

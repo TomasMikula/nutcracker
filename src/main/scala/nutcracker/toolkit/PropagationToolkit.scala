@@ -3,7 +3,7 @@ package nutcracker.toolkit
 import nutcracker.{OnDemandPropagation, Propagation}
 
 trait PropagationToolkit extends RefToolkit {
-  implicit val propagationApi: Propagation[Prg, Var, Val]
+  implicit val propagationApi: Propagation.Aux[Prg, Var, Val]
 }
 
 object PropagationToolkit {
@@ -17,7 +17,7 @@ object FreePropagationToolkit {
 }
 
 trait OnDemandPropagationToolkit extends PropagationToolkit {
-  override implicit val propagationApi: OnDemandPropagation[Prg, Var, Val]
+  override implicit val propagationApi: OnDemandPropagation.Aux[Prg, Var, Val]
 }
 
 object OnDemandPropagationToolkit {

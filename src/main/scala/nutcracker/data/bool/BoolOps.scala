@@ -175,19 +175,19 @@ private[bool] object Watched {
     type Update = Watched.Update
     type Delta = Watched.Delta
 
-    override def update[D0 <: Watched](d: D0, u: Update): UpdateResult[Watched, IDelta, D0] = d match {
+    override def update(d: Watched, u: Update): UpdateResult[Watched, Delta] = d match {
       case Watching(i, j) => u match {
-        case Satisfied => UpdateResult(Done, DoNothing)
+        case Satisfied => UpdateResult.updated(Done, DoNothing)
         case Failed(k) =>
           assert(k == i || k == j)
           val l = i + j - k
-          if(i == 0 || j == 0) UpdateResult(Done, ToSatisfy(l))
+          if(i == 0 || j == 0) UpdateResult.updated(Done, ToSatisfy(l))
           else {
             val k1 = math.min(i, j) - 1
-            UpdateResult(Watching(k1, l), ToWatch(k1 :: Nil))
+            UpdateResult.updated(Watching(k1, l), ToWatch(k1 :: Nil))
           }
       }
-      case Done => UpdateResult()
+      case Done => UpdateResult.unchanged
     }
 
     override def appendDeltas(d1: Delta, d2: Delta): Watched.Delta = (d1, d2) match {

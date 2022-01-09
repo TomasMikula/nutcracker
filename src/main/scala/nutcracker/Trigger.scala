@@ -31,17 +31,15 @@ object TriggerF {
   case class Reconsider[F[_], D, Δ, A](cont: F[A]) extends TriggerF[F, D, Δ, A]
 }
 
-private[nutcracker] sealed trait SeqTrigger[Tok[_], K[_], D, Δ[_, _], D1] {
+private[nutcracker] sealed trait SeqTrigger[Tok[_], K[_], D[_], Δ[_, _], I] {
   import SeqTrigger._
-
-  def specialize[D2 <: D1]: SeqTrigger[Tok, K, D, Δ, D2] = this.asInstanceOf[SeqTrigger[Tok, K, D, Δ, D2]]
 
   def fold[B](
     caseDiscard: => B,
-    caseSleep: SeqHandler[Tok, K, D, Δ, D1] => B,
+    caseSleep: SeqHandler[Tok, K, D, Δ, I] => B,
     caseFire: K[Unit] => B,
-    caseFireReload: (K[Unit], SeqHandler[Tok, K, D, Δ, D1]) => B,
-    caseReconsider: (Tok[D1] => K[Unit]) => B
+    caseFireReload: (K[Unit], SeqHandler[Tok, K, D, Δ, I]) => B,
+    caseReconsider: (Tok[I] => K[Unit]) => B
   ): B = this match {
     case Discard() => caseDiscard
     case Sleep(h) => caseSleep(h)
@@ -53,37 +51,35 @@ private[nutcracker] sealed trait SeqTrigger[Tok[_], K[_], D, Δ[_, _], D1] {
 
 private[nutcracker] object SeqTrigger {
 
-  case class Discard[Tok[_], K[_], D, Δ[_, _], D1]() extends SeqTrigger[Tok, K, D, Δ, D1]
+  case class Discard[Tok[_], K[_], D[_], Δ[_, _], J]() extends SeqTrigger[Tok, K, D, Δ, J]
 
-  case class Sleep[Tok[_], K[_], D, Δ[_, _], D1](h: SeqHandler[Tok, K, D, Δ, D1]) extends SeqTrigger[Tok, K, D, Δ, D1]
+  case class Sleep[Tok[_], K[_], D[_], Δ[_, _], J](h: SeqHandler[Tok, K, D, Δ, J]) extends SeqTrigger[Tok, K, D, Δ, J]
 
-  case class Fire[Tok[_], K[_], D, Δ[_, _], D1](cont: K[Unit]) extends SeqTrigger[Tok, K, D, Δ, D1]
+  case class Fire[Tok[_], K[_], D[_], Δ[_, _], J](cont: K[Unit]) extends SeqTrigger[Tok, K, D, Δ, J]
 
-  case class FireReload[Tok[_], K[_], D, Δ[_, _], D1](cont: K[Unit], h: SeqHandler[Tok, K, D, Δ, D1]) extends SeqTrigger[Tok, K, D, Δ, D1]
+  case class FireReload[Tok[_], K[_], D[_], Δ[_, _], J](cont: K[Unit], h: SeqHandler[Tok, K, D, Δ, J]) extends SeqTrigger[Tok, K, D, Δ, J]
 
-  case class Reconsider[Tok[_], K[_], D, Δ[_, _], D1](cont: Tok[D1] => K[Unit]) extends SeqTrigger[Tok, K, D, Δ, D1]
+  case class Reconsider[Tok[_], K[_], D[_], Δ[_, _], J](cont: Tok[J] => K[Unit]) extends SeqTrigger[Tok, K, D, Δ, J]
 
 }
 
-private[nutcracker] trait SeqHandler[Tok[_], K[_], D, Δ[_, _], D1] { self =>
-  def handle[D2 <: D](d2: D2, δ: Δ[D1, D2]): SeqTrigger[Tok, K, D, Δ, D2]
-
-  def specialize[D2 <: D1]: SeqHandler[Tok, K, D, Δ, D2] = this.asInstanceOf[SeqHandler[Tok, K, D, Δ, D2]]
+private[nutcracker] trait SeqHandler[Tok[_], K[_], D[_], Δ[_, _], I] { self =>
+  def handle[J](d2: D[J], δ: Δ[I, J]): SeqTrigger[Tok, K, D, Δ, J]
 }
 
 private[nutcracker] object SeqHandler {
-  def apply[Tok[_], K[_], D, Δ](h: (D, Δ) => SeqTrigger[Tok, K, D, λ[(α, β) => Δ], D]): SeqHandler[Tok, K, D, λ[(α, β) => Δ], D] =
-    new SeqHandler[Tok, K, D, λ[(α, β) => Δ], D] {
-      override def handle[D2 <: D](d2: D2, δ: Δ): SeqTrigger[Tok, K, D, λ[(α, β) => Δ], D2] = h(d2, δ).specialize[D2]
+  def apply[Tok[_], K[_], D[_], Δ[_, _], I](h: [j] => (D[j], Δ[I, j]) => SeqTrigger[Tok, K, D, Δ, j]): SeqHandler[Tok, K, D, Δ, I] =
+    new SeqHandler[Tok, K, D, Δ, I] {
+      override def handle[J](d2: D[J], δ: Δ[I, J]): SeqTrigger[Tok, K, D, Δ, J] = h[J](d2, δ)
     }
 }
 
-private[nutcracker] trait SeqPreHandler[Tok[_], K[_], D, Δ[_, _]] { self =>
-  def handle[D0 <: D](d: D0): SeqTrigger[Tok, K, D, Δ, D0]
+private[nutcracker] trait SeqPreHandler[Tok[_], K[_], D[_], Δ[_, _]] { self =>
+  def handle[I](d: D[I]): SeqTrigger[Tok, K, D, Δ, I]
 }
 
 private[nutcracker] object SeqPreHandler {
-  def apply[Tok[_], K[_], D, Δ[_, _]](h: D => SeqTrigger[Tok, K, D, Δ, D]): SeqPreHandler[Tok, K, D, Δ] = new SeqPreHandler[Tok, K, D, Δ] {
-    def handle[D0 <: D](d: D0): SeqTrigger[Tok, K, D, Δ, D0] = h(d).specialize[D0]
+  def apply[Tok[_], K[_], D[_], Δ[_, _]](h: [i] => D[i] => SeqTrigger[Tok, K, D, Δ, i]): SeqPreHandler[Tok, K, D, Δ] = new SeqPreHandler[Tok, K, D, Δ] {
+    override def handle[I](d: D[I]): SeqTrigger[Tok, K, D, Δ, I] = h[I](d)
   }
 }
