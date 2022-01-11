@@ -1,6 +1,7 @@
 package nutcracker.toolkit
 
 import nutcracker.{IDom, OnDemandPropagation, SeqPreHandler, SeqTrigger, Subscription}
+import nutcracker.Propagation.IUpdateRes
 import nutcracker.util.{Exists, ExistsOption, ENone, ESome, FreeK, HKMap, HOrderK, Inject, Lst, MonadTellState, ShowK, StateInterpreter, StratifiedMonoidAggregator}
 import nutcracker.util.ops.Ops._
 import scala.language.existentials
@@ -51,9 +52,9 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
           val s = lens.get(s0)
           p match {
             case upd: Update[k, d, u, δ, j] =>
-              val (s1, becameDirty) = s.update[d, u, δ, j](upd.ref, upd.u)(upd.dom)
+              val (s1, res, becameDirty) = s.update[d, u, δ, j](upd.ref, upd.u)(upd.dom)
               val w = if(becameDirty) Lst.singleton(inj(execTriggers(upd.ref))) at 1 else W.zero
-              (w, s0 set s1, ())
+              (w, s0 set s1, res)
             case exc: ExclUpdate[k, d, u, δ, j] =>
               val (s1, becameDirty) = s.exclUpdate[d, u, δ, j](exc.ref, exc.cycle, exc.u)(exc.dom)
               val w = if(becameDirty) Lst.singleton(inj(execTriggersAuto(exc.ref, exc.cycle))) at 1 else W.zero
@@ -174,23 +175,23 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   // unsafe, should only be allowed on simple cells
   def fetch[D[_]](ref: CellId[K, D]): Exists[D] = tryFetch(ref).unsafeGet
 
-  def update[D[_], U[_], Δ[_, _], J](ref: SimpleCellId[K, D], u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Boolean) =
+  def update[D[_], U[_], Δ[_, _], J](ref: SimpleCellId[K, D], u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], IUpdateRes[D, Δ, J], Boolean) =
     simpleCells(ref).infer.update(u) match {
-      case CellUpdated(cell, becameDirty) =>
+      case CellUpdated(cell, delta, newValue, becameDirty) =>
         val domains1 = simpleCells.put(ref)(cell)
-        (copy(simpleCells = domains1), becameDirty)
-      case CellUnchanged =>
-        (this, false)
+        (copy(simpleCells = domains1), IUpdateRes.Updated(delta, newValue), becameDirty)
+      case CellUnchanged(value) =>
+        (this, IUpdateRes.Unchanged(value), false)
     }
 
   def exclUpdate[D[_], U[_], Δ[_, _], J](ref: AutoCellId[K, D], cycle: CellCycle[D], u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Boolean) =
     autoCells.get(ref) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
         cell0.infer.exclUpdate(u) match {
-          case CellUpdated(cell, becameDirty) =>
+          case CellUpdated(cell, delta, newValue, becameDirty) =>
             val autoCells1 = autoCells.put(ref)(cell)
             (copy(autoCells = autoCells1), becameDirty)
-          case CellUnchanged =>
+          case CellUnchanged(value) =>
             (this, false)
         }
       case _ =>

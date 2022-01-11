@@ -119,7 +119,7 @@ private[nutcracker] abstract class SimpleCell[K[_], D[_]] extends Cell[K, D] {
 
   private def hasPendingObservers: Boolean = pendingObservers.nonEmpty
 
-  def update[J](u: Update[J])(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[SimpleCell.Aux1[K, D, Update, Delta, J]] =
+  def update[J](u: Update[J])(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[SimpleCell.Aux1[K, D, Update, Delta, J], D, Delta, J] =
     dom.iUpdate(value, u) match {
       case up @ Updated(newVal, delta) =>
         val pending0: List[PendingObserver[J]] = pendingObservers.map(_.addDelta(delta))
@@ -140,9 +140,10 @@ private[nutcracker] abstract class SimpleCell[K[_], D[_]] extends Cell[K, D] {
 
         val cell = SimpleCell[K, D, Update, Delta, J](newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[*, J]](), blocked, lastObserverId, lastToken)
         val becameDirty = !this.hasPendingObservers && cell.hasPendingObservers
-        CellUpdated(cell, becameDirty)
+        CellUpdated(cell, delta, newVal, becameDirty)
 
-      case Unchanged() => CellUnchanged
+      case Unchanged() =>
+        CellUnchanged(value)
     }
 
   def observe(self: CellIncarnationId, f: PreHandler): (SimpleCell.Aux1[K, D, Update, Delta, Idx], Option[ObserverId], Lst[K[Unit]]) = {
@@ -344,7 +345,7 @@ private[nutcracker] sealed abstract class OnDemandCell[K[_], D[_]] extends Cell[
 
   def supply[I](self: CellIncarnationId, value: D[I]): (Option[OnDemandCell[K, D]], Lst[K[Unit]])
 
-  def exclUpdate[J](u: Update[J])(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[OnDemandCell[K, D]]
+  def exclUpdate[J](u: Update[J])(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[OnDemandCell[K, D], D, Delta, J]
 
   def addFinalizer(sub: Subscription[K]): (Lst[K[Unit]], OnDemandCell[K, D], FinalizerId)
 
@@ -428,7 +429,7 @@ private[nutcracker] case class InitializingCell[K[_], D[_], U[_], Δ[_, _]](
     }
   }
 
-  override def exclUpdate[J](u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D]] = {
+  override def exclUpdate[J](u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D], D, Δ, J] = {
     sys.error("Unreachable code: no one has access to the current cycle yet")
   }
 
@@ -539,10 +540,17 @@ private[nutcracker] case class ActiveCell[K[_], D[_], U[_], Δ[_, _], I](
     else (None, ks ++ collectFinalizers)
   }
 
-  override def exclUpdate[J](u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D]] = {
+  override def exclUpdate[J](u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D], D, Δ, J] = {
     impl.update(u) match {
-      case CellUpdated(cell, becameDirty) => CellUpdated(ActiveCell[K, D, cell.Update, cell.Delta, J](cycle, cell, finalizers, lastFinalizerId), becameDirty)
-      case CellUnchanged => CellUnchanged
+      case CellUpdated(cell, delta, newValue, becameDirty) =>
+        CellUpdated(
+          ActiveCell[K, D, cell.Update, cell.Delta, J](cycle, cell, finalizers, lastFinalizerId),
+          delta,
+          newValue,
+          becameDirty,
+        )
+      case CellUnchanged(value) =>
+        CellUnchanged(value)
     }
   }
 
@@ -558,9 +566,18 @@ private[nutcracker] case class ActiveCell[K[_], D[_], U[_], Δ[_, _], I](
     finalizers.valuesIterator.foldLeft(Lst.empty[K[Unit]])((ks, sub) => sub.unsubscribe ++ ks)
 }
 
-private[toolkit] sealed abstract class CellUpdateResult[+C]
-private[toolkit] case class CellUpdated[C](cell: C, becameDirty: Boolean) extends CellUpdateResult[C]
-private[toolkit] case object CellUnchanged extends CellUpdateResult[Nothing]
+private[toolkit] sealed abstract class CellUpdateResult[+C, D[_], Δ[_, _], J]
+
+private[toolkit] case class CellUpdated[C, D[_], Δ[_, _], I, J](
+  cell: C,
+  delta: Δ[I, J],
+  newValue: D[J],
+  becameDirty: Boolean,
+) extends CellUpdateResult[C, D, Δ, J]
+
+private[toolkit] case class CellUnchanged[D[_], Δ[_, _], J](
+  value: D[J],
+) extends CellUpdateResult[Nothing, D, Δ, J]
 
 private[nutcracker] final class Token[A] private(val id: Long) extends AnyVal {
   def inc[B]: Token[B] = new Token(id + 1)

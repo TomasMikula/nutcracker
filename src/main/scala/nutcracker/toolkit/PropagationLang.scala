@@ -1,8 +1,9 @@
 package nutcracker.toolkit
 
+import nutcracker.Propagation.IUpdateRes
 import nutcracker.util.{ContU, Forall, FreeK, Id, IndexedContT, Inject}
 import nutcracker.{Dom, IDom, OnDemandPropagation, SeqHandler, SeqPreHandler, SeqTrigger, Subscription}
-import scalaz.{-\/, \/, \/-}
+import scalaz.{-\/, \/, \/-, Monad}
 import scalaz.syntax.functor._
 
 private[nutcracker] sealed trait PropagationLang[K[_], A]
@@ -14,7 +15,7 @@ private[nutcracker] object PropagationLang {
 
   // constructors (the instruction set of a free program)
   case class NewCell[K[_], D[_], U[_], Δ[_, _], I](d: D[I], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[K, SimpleCellId[K, D]]
-  case class Update[K[_], D[_], U[_], Δ[_, _], J](ref: SimpleCellId[K, D], u: U[J], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[K, Unit]
+  case class Update[K[_], D[_], U[_], Δ[_, _], J](ref: SimpleCellId[K, D], u: U[J], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[K, IUpdateRes[D, Δ, J]]
   case class Observe[K[_], D[_], U[_], Δ[_, _]](ref: SimpleCellId[K, D], f: SeqPreHandler[TokK[K, D, *], K, D, Δ], dom: IDom.Aux[D, U, Δ]) extends PropagationLang[K, Option[ObserverId]]
   case class Hold[K[_], D[_]](ref: SimpleCellId[K, D], f: [i] => (D[i], Token[i], ObserverId) => K[Unit]) extends PropagationLang[K, ObserverId]
   case class Resume[K[_], D[_], Δ[_, _], I](ref: SimpleCellId[K, D], token: Token[I], trigger: SeqTrigger[TokK[K, D, *], K, D, Δ, I]) extends PropagationLang[K, Unit] {
@@ -44,7 +45,7 @@ private[nutcracker] object PropagationLang {
   // constructors returning less specific types, and curried to help with type inference
   def newCell[K[_], D[_], I](d: D[I])(implicit dom: IDom[D]): PropagationLang[K, SimpleCellId[K, D]] =
     NewCell[K, D, dom.IUpdate, dom.IDelta, I](d, dom)
-  def update[K[_], D[_], U[_], Δ[_, _], J](ref: SimpleCellId[K, D])(u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): PropagationLang[K, Unit] =
+  def update[K[_], D[_], U[_], Δ[_, _], J](ref: SimpleCellId[K, D])(u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): PropagationLang[K, IUpdateRes[D, Δ, J]] =
     Update[K, D, U, Δ, J](ref, u, dom)
   def observe[K[_], D[_], U[_], Δ[_, _]](ref: SimpleCellId[K, D])(f: SeqPreHandler[TokK[K, D, *], K, D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): PropagationLang[K, Option[ObserverId]] =
     Observe[K, D, U, Δ](ref, f, dom)
@@ -83,7 +84,7 @@ private[nutcracker] object PropagationLang {
   def newCellF[F[_[_], _], D[_], I](d: D[I])(implicit dom: IDom[D], inj: Inject[PropagationLang[FreeK[F, *], *], F[FreeK[F, *], *]]): FreeK[F, SimpleCellId[FreeK[F, *], D]] =
     FreeK.liftF(inj(newCell[FreeK[F, *], D, I](d)))
 
-  def updateF[F[_[_], _], D[_], U[_], Δ[_, _], J](ref: SimpleCellId[FreeK[F, *], D])(u: U[J])(implicit dom: IDom.Aux[D, U, Δ], inj: Inject[PropagationLang[FreeK[F, *], *], F[FreeK[F, *], *]]): FreeK[F, Unit] =
+  def updateF[F[_[_], _], D[_], U[_], Δ[_, _], J](ref: SimpleCellId[FreeK[F, *], D])(u: U[J])(implicit dom: IDom.Aux[D, U, Δ], inj: Inject[PropagationLang[FreeK[F, *], *], F[FreeK[F, *], *]]): FreeK[F, IUpdateRes[D, Δ, J]] =
     FreeK.liftF(inj(update[FreeK[F, *], D, U, Δ, J](ref)(u)))
 
   def observeF[F[_[_], _], D[_], U[_], Δ[_, _]](ref: SimpleCellId[FreeK[F, *], D])(f: SeqPreHandler[TokF[F, D, *], FreeK[F, *], D, Δ])(implicit dom: IDom.Aux[D, U, Δ], inj: Inject[PropagationLang[FreeK[F, *], *], F[FreeK[F, *], *]]): FreeK[F, Option[ObserverId]] =
@@ -142,7 +143,7 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit
 
   type K[A] = FreeK[F, A]
 
-  override type Var[A] = SimpleCellId[K, [i] =>> A]
+  override type IVar[A[_]] = SimpleCellId[K, A]
   override type Val[A] = CellId[K, [i] =>> A]
 
   type CellCycleId[A] = Var[A] \/ (AutoCellId[K, [i] =>> A], CellCycle[[i] =>> A])
@@ -151,6 +152,9 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit
   type TriggerI[A, Δ, I] = SeqTrigger[Tok[A, *], K, [i] =>> A, [i, j] =>> Δ, I]
   type Trigger[A, Δ] = Forall[TriggerI[A, Δ, *]]
   type ExclRef[A] = (AutoCellId[K, [i] =>> A], CellCycle[[i] =>> A])
+
+  override def M: Monad[FreeK[F, *]] =
+    FreeK.freeKMonad[F]
 
   override def readOnly[A](ref: Var[A]): Val[A] = ref
 
@@ -168,8 +172,8 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit
       case None      => Subscription()
     }
 
-  override def updateImpl[D, U, Δ](ref: Var[D])(u: U)(implicit dom: Dom.Aux[D, U, Δ]): FreeK[F, Unit] =
-    updateF[F, [i] =>> D, [i] =>> U, [i, j] =>> Δ, Any](ref)(u)
+  override def iUpdate[D[_], U[_], Δ[_, _], J](ref: IVar[D])(u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): FreeK[F, IUpdateRes[D, Δ, J]] =
+    updateF[F, D, U, Δ, J](ref)(u)
 
   override def exclUpdateImpl[A, U, Δ](ref: ExclRef[A], u: U)(implicit dom: Dom.Aux[A, U, Δ]): FreeK[F, Unit] =
     exclUpdateF[F, [i] =>> A, [i] =>> U, [i, j] =>> Δ, Any](ref._1, ref._2, u)
