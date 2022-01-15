@@ -21,10 +21,10 @@ object Revocable {
 
   def apply[A](a: A): Revocable[A] = Valid(a)
 
-  def init[F[_], Var[_], Val[_], A](a: A)(implicit P: Propagation.Aux[F, Var, Val]): F[Var[Revocable[A]]] =
+  def init[F[_], Var[_], A](a: A)(implicit P: Propagation.Aux0[F, Var]): F[Var[Revocable[A]]] =
     P.newCell(Revocable(a))
 
-  def revoke[F[_], Var[_], Val[_], A](ref: Var[Revocable[A]])(implicit P: Propagation.Aux[F, Var, Val]): F[Unit] =
+  def revoke[F[_], Var[_], A](ref: Var[Revocable[A]])(implicit P: Propagation.Aux0[F, Var]): F[Unit] =
     P.update(ref).by(())
 
   implicit def domInstance[A]: Dom.Aux[Revocable[A], Update, Delta] with TerminalDom[Revocable[A]] =

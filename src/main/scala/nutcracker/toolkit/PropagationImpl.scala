@@ -10,10 +10,11 @@ import scalaz.syntax.monoid._
 import scalaz.{-\/, Bind, Equal, Lens, Monad, Ordering, Show, \/-}
 
 private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with FreeOnDemandPropagationToolkit { self =>
-  type VarK[K[_], A] = SimpleCellId[K, [i] =>> A]
-  type ValK[K[_], A] = CellId[K, [i] =>> A]
-  type Lang[K[_], A] = PropagationLang[K, A]
-  type StateK[K[_]] = PropagationStore[K]
+  override type VarK[K[_], A] = SimpleCellId[K, [i] =>> A]
+  override type ValK[K[_], A] = CellId[K, [i] =>> A]
+  override type OutK[K[_], A] = nutcracker.toolkit.Out[[a] =>> SimpleCellId[K, [i] =>> a], A]
+  override type Lang[K[_], A] = PropagationLang[K, A]
+  override type StateK[K[_]] = PropagationStore[K]
 
   override def varOrderK[K[_]]: HOrderK[VarK[K, *]] = HOrderK([a, b] => (a: VarK[K, a], b: VarK[K, b]) => SimpleCellId.order(a, b))
   override def varShowK[K[_]]: ShowK[VarK[K, *]]    = ShowK([a] => (a: VarK[K, a]) => SimpleCellId.show(a))
@@ -21,14 +22,14 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
   override def valShowK[K[_]]: ShowK[ValK[K, *]]    = ShowK([a] => (a: ValK[K, a]) => CellId.show(a))
 
   override def readOnlyK[K[_], A](ref: VarK[K, A]): ValK[K, A] = ref
-  override def prgMonad: Monad[FreeK[Lang, *]] = implicitly
+  override def prgMonad: Monad[FreeK[Lang, *]] = FreeK.freeKMonad
 
   override implicit def freePropagation[F[_[_], _]](implicit
     inj: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]],
-  ): OnDemandPropagation.Aux[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] =
+  ): OnDemandPropagation.Aux[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *], OutK[FreeK[F, *], *]] =
     PropagationLang.freePropagation[F](inj)
 
-  override val propagationApi: OnDemandPropagation.Aux[Prg, Var, Val] =
+  override val propagationApi: FreePropagation[Lang] with OnDemandPropagation.Aux[Prg, Var, Val, Out] =
     PropagationLang.freePropagation[Lang]
 
   override def emptyK[K[_]]: PropagationStore[K] =
@@ -131,8 +132,17 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
   override def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A =
     s.fetch(ref).value
 
-  override def stashable: StashOnDemandPropagationModule.AuxL[self.VarK, self.ValK, self.Lang] =
-    new OnDemandPropagationListModule[self.VarK, self.ValK, self.Lang, self.StateK](this)
+  override def readOutK[K[_], A](a: OutK[K, A], s: StateK[K]): A =
+    a match {
+      case Out.Const(a)      => a
+      case Out.WrapVar(va)   => fetchK(va, s)
+      case Out.Mapped(x, f)  => f(readOutK(x, s))
+      case Out.Pair(x, y)    => (readOutK(x, s), readOutK(y, s))
+      case Out.FlatMap(x, f) => readOutK(f(readOutK(x, s)), s)
+    }
+
+  override def stashable: StashOnDemandPropagationModule.AuxL[self.VarK, self.ValK, self.OutK, self.Lang] =
+    new OnDemandPropagationListModule[self.VarK, self.ValK, self.OutK, self.Lang, self.StateK](this)
 }
 
 

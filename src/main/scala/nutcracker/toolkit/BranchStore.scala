@@ -20,7 +20,7 @@ private[nutcracker] case class BranchStore[Ref[_], K[_]](
   def addFailed[D](ref: Ref[D]): BranchStore[Ref, K] =
     copy[Ref, K](failedVars = failedVars + ref.asInstanceOf[Ref[Nothing]])
 
-  def split[Val[_]](fetch: Ref ~> Id)(implicit K: Propagation.Aux[K, Ref, Val]): Assessment[List[K[Unit]]] =
+  def split(fetch: Ref ~> Id)(implicit K: Propagation.Aux0[K, Ref]): Assessment[List[K[Unit]]] =
     if(unresolvedVars.isEmpty) Done
     else {
       def splitDomain[D](ref: Ref[D])(implicit ev: Splittable[D]): Option[List[K[Unit]]] = {

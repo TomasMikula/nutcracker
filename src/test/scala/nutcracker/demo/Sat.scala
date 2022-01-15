@@ -12,10 +12,10 @@ import scalaz.syntax.monad._
 
 class Sat extends AnyFunSpec {
   import nutcracker.toolkit.PropBranchToolkit.instance._
-  import nutcracker.toolkit.PropBranchToolkit.instance.branchingApi.{propagation => _, _}
+  import nutcracker.toolkit.PropBranchToolkit.instance.branchingApi.{M => _, propagation => _, _}
   import nutcracker.data.Promises._
 
-  val B = BoolOps[Prg, Var, Val]
+  val B = BoolOps[Prg]
   import B._
 
 

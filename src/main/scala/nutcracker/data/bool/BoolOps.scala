@@ -8,22 +8,21 @@ import scalaz.std.list._
 import scalaz.syntax.apply._
 import scalaz.syntax.bind0._
 
-class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Val]) {
+class BoolOps[M[_], BP <: BranchingPropagation[M]](implicit val BP: BP) {
   import BP._
-  val P = BP.propagation
-  import P._
+  import BP.propagation._
 
   def and(x: Var[Bool], y: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
     res <- newVar[Bool]
-    _ <- x.whenFinal({ r =>
+    _ <- x.whenFinal({ (r: Boolean) =>
       if (r) (y <=> res).void
       else res.set(false)
     })
-    _ <- y.whenFinal({ r =>
+    _ <- y.whenFinal({ (r: Boolean) =>
       if (r) (x <=> res).void
       else res.set(false)
     })
-    _ <- res._whenFinal({ r =>
+    _ <- res._whenFinal({ (r: Boolean) =>
       if (r) x.set(true) >> y.set(true)
       else M.pure(())
     })
@@ -31,15 +30,15 @@ class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Va
 
   def or(x: Var[Bool], y: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
     res <- newVar[Bool]
-    _ <- x._whenFinal({ r =>
+    _ <- x._whenFinal({ (r: Boolean) =>
       if (r) res.set(true)
       else (y <=> res).void
     })
-    _ <- y._whenFinal({ r =>
+    _ <- y._whenFinal({ (r: Boolean) =>
       if (r) res.set(true)
       else (x <=> res).void
     })
-    _ <- res._whenFinal({ r =>
+    _ <- res._whenFinal({ (r: Boolean) =>
       if (r) M.pure(())
       else x.set(false) >> y.set(false)
     })
@@ -47,11 +46,11 @@ class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Va
 
   def neg(x: Var[Bool])(implicit M: Monad[M]): M[Var[Bool]] = for {
     res <- newVar[Bool]
-    _ <- x.whenFinal({ r =>
+    _ <- x.whenFinal({ (r: Boolean) =>
       if (r) res.set(false)
       else res.set(true)
     })
-    _ <- res.whenFinal({ r =>
+    _ <- res.whenFinal({ (r: Boolean) =>
       if (r) x.set(false)
       else x.set(true)
     })
@@ -64,11 +63,11 @@ class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Va
     x.set(false)
 
   def imp(x: Var[Bool], y: Var[Bool])(implicit M: Applicative[M]): M[Unit] = {
-    x.whenFinal({ r =>
+    x.whenFinal({ (r: Boolean) =>
       if (r) y.set(true)
       else M.pure(())
     }) *>
-    y.whenFinal_({ r =>
+    y.whenFinal_({ (r: Boolean) =>
       if (r) M.pure(())
       else x.set(false)
     })
@@ -147,7 +146,7 @@ class BoolOps[M[_], Var[_], Val[_]](implicit BP: BranchingPropagation[M, Var, Va
 }
 
 object BoolOps {
-  def apply[M[_], Var[_], Val[_]](implicit P: BranchingPropagation[M, Var, Val]): BoolOps[M, Var, Val] = new BoolOps()
+  def apply[M[_]](implicit P: BranchingPropagation[M]): BoolOps[M, P.type] = new BoolOps()
 }
 
 // Auxiliary domain for implementing Two Watched Variables

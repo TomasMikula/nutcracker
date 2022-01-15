@@ -3,9 +3,11 @@ package nutcracker
 import nutcracker.util.{ContU, HList, Mapped, MappedListBuilder, SummonHList}
 import nutcracker.util.HList.{::, HNil}
 import scalaz.syntax.bind._
-import scalaz.{Bind, Order}
+import scalaz.{Order, Monad}
 
 trait Relations[M[_]] {
+  implicit def M: Monad[M]
+
   def relateImpl[L <: HList, OrderL <: HList](rel: Rel[L], values: L)(implicit m: Mapped.Aux[L, Order, OrderL], os: SummonHList[OrderL]): M[Unit]
   def onPatternMatch[V <: HList](p: Pattern[V], a: Assignment[V])(h: V => M[Unit]): M[Unit]
 
@@ -32,7 +34,7 @@ trait Relations[M[_]] {
   }
 
   final class ConstrainSyntaxHelper[L <: HList, OS <: HList](con: Constraint[L, M])(implicit m: Mapped.Aux[L, Order, OS]) {
-    def values(vals: L)(implicit os: SummonHList[OS], M: Bind[M]): M[Unit] =
+    def values(vals: L)(implicit os: SummonHList[OS]): M[Unit] =
       relateImpl(con.rel, vals) >> con.setup(vals)
   }
 

@@ -36,6 +36,7 @@ trait Toolkit {
 trait RefToolkit extends Toolkit {
   type Var[_]
   type Val[_]
+  type Out[_]
 
   implicit def varOrder: HOrderK[Var]
   implicit def varShow: ShowK[Var]
@@ -46,6 +47,7 @@ trait RefToolkit extends Toolkit {
 
   def fetch[A](ref: Val[A], s: State): Option[A]
   def fetch[A](ref: Var[A], s: State): A
+  def readOut[A](a: Out[A], s: State): A
 
   def fetchResult[A](ref: Val[A], s: State)(implicit fin: Final[A]): Option[fin.Out] =
     fetch(ref, s).flatMap(fin.extract(_))

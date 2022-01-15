@@ -22,28 +22,41 @@ object Discrete extends DiscreteInstances {
   type Update[A] = Uninhabited
   type Delta[A] = Uninhabited
 
-  def map[M[_], Var[_], Val[_], A, B](refC: ContU[M, Var[Discrete[A]]])(f: A => B)(implicit M: Propagation.Aux[M, Var, Val], MB: Bind[M]): ContU[M, Var[Discrete[B]]] = for {
-    ref <- refC
-    a   <- ref.asCont_
-    res <- cellC(f(a))
-  } yield res
+  def map[M[_], Var[_], A, B](refC: ContU[M, Var[Discrete[A]]])(f: A => B)(implicit P: Propagation.Aux0[M, Var]): ContU[M, Var[Discrete[B]]] =
+    for {
+      ref <- refC
+      a   <- ref.asCont_
+      res <- cellC(f(a))
+    } yield res
 
-  def mapC[M[_], Var[_], Val[_], A, B](ref: Var[Discrete[A]])(f: A => ContU[M, Var[Discrete[B]]])(implicit P: Propagation.Aux[M, Var, Val], M: Functor[M]): ContU[M, Var[Discrete[B]]] = for {
-    a   <- ref.asCont_
-    res <- f(a)
-  } yield res
+  def mapC[M[_], Var[_], A, B](ref: Var[Discrete[A]])(f: A => ContU[M, Var[Discrete[B]]])(implicit P: Propagation.Aux0[M, Var]): ContU[M, Var[Discrete[B]]] =
+    for {
+      a   <- ref.asCont_
+      res <- f(a)
+    } yield res
 
-  def filterMap[M[_], Var[_], Val[_], A, B](refC: ContT[Unit, M, Var[Discrete[A]]])(f: A => Option[B])(implicit P: Propagation.Aux[M, Var, Val], M: Monad[M]): ContT[Unit, M, Var[Discrete[B]]] = for {
-    ref <- refC
-    a   <- ref.asCont_
-    res <- f(a) match {
-      case Some(b) => ContU.liftM(P.newCell(Discrete(b)))
-      case None    => ContU.noop[M, Var[Discrete[B]]]
-    }
-  } yield res
+  def filterMap[M[_], Var[_], A, B](
+    refC: ContT[Unit, M, Var[Discrete[A]]]
+  )(
+    f: A => Option[B]
+  )(implicit
+    P: Propagation.Aux0[M, Var],
+  ): ContT[Unit, M, Var[Discrete[B]]] = {
+    import P.M
+    for {
+      ref <- refC
+      a   <- ref.asCont_
+      res <- f(a) match {
+        case Some(b) => ContU.liftM(P.newCell(Discrete(b)))
+        case None    => ContU.noop[M, Var[Discrete[B]]]
+      }
+    } yield res
+  }
 
-  def cellC[M[_], Var[_], Val[_], A](a: A)(implicit M: Propagation.Aux[M, Var, Val], MB: Bind[M]): ContT[Unit, M, Var[Discrete[A]]] =
-    ContT.liftM[Unit, M, Var[Discrete[A]]](M.newCell(Discrete(a)))
+  def cellC[M[_], Var[_], Val[_], A](a: A)(implicit P: Propagation.Aux1[M, Var, Val]): ContT[Unit, M, Var[Discrete[A]]] = {
+    import P.M
+    ContT.liftM[Unit, M, Var[Discrete[A]]](P.newCell(Discrete(a)))
+  }
 
   implicit def domInstance[A]: RDom.Aux[Discrete[A], Update[A], Delta[A]] = new RDom[Discrete[A]] {
     type Update = Discrete.Update[A]

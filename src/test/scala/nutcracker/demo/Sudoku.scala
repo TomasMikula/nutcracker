@@ -49,7 +49,7 @@ class Sudoku extends AnyFunSuite {
           else if(ys.size == 1) Some(xPos.set(cell))
           else None
         )}).sequence_
-        _ <- xPos.whenFinal(cell => cell.set(x))
+        _ <- xPos.whenFinal((cell: Cell) => cell.set(x))
       } yield ()
     }
 

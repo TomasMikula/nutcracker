@@ -20,10 +20,10 @@ import scalaz.syntax.monad._
 class KnightsAndKnaves extends AnyFreeSpec {
   val tk = PropBranchToolkit.instance
   import tk._
-  import tk.branchingApi.{propagation => _, _}
+  import tk.branchingApi.{M => _, propagation => _, _}
   import Promises._
 
-  val B = BoolOps[Prg, Var, Val]
+  val B = BoolOps[Prg]
 
   import B._
 

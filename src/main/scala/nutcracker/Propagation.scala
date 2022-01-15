@@ -11,6 +11,8 @@ trait Propagation[M[_]] extends Observe[M] {
 
   type IVar[A[_]]
 
+  type Out[_]
+
   type Var[A] = IVar[[i] =>> A]
 
   implicit def M: Monad[M]
@@ -37,12 +39,38 @@ trait Propagation[M[_]] extends Observe[M] {
 
   def cells[D](d: D, n: Int)(implicit dom: Dom[D]): M[Vector[Var[D]]] =
     newCell(d).replicate(n)
+
+  def out[D](v: Var[D]): Out[D]
+
+  def constOut[A](a: A): Out[A]
+
+  def pairOut[A, B](a: Out[A], b: Out[B]): Out[(A, B)]
+
+  def mapOut[A, B](a: Out[A])(f: A => B): Out[B]
+
+  def flatMapOut[A, B](a: Out[A])(f: A => Out[B]): Out[B]
+
+  implicit def monadOut: Monad[Out] =
+    new Monad[Out] {
+      override def point[A](a: => A): Out[A] =
+        constOut(a)
+
+      override def bind[A, B](a: Out[A])(f: A => Out[B]): Out[B] =
+        flatMapOut(a)(f)
+    }
 }
 
 object Propagation {
-  type Aux[M[_], Var0[_], Val0[_]] = Propagation[M] { type Var[A] = Var0[A]; type Val[A] = Val0[A] }
+  type Aux0[M[_], Var0[_]] =
+    Propagation[M] { type Var[A] = Var0[A] }
 
-  def apply[M[_], Ref[_], Val[_]](implicit M: Propagation.Aux[M, Ref, Val]): Propagation.Aux[M, Ref, Val] = M
+  type Aux1[M[_], Var[_], Val0[_]] =
+    Propagation.Aux0[M, Var] { type Val[A] = Val0[A] }
+
+  type Aux[M[_], Var[_], Val[_], Out0[_]] =
+    Propagation.Aux1[M, Var, Val] { type Out[A] = Out0[A] }
+
+  def apply[M[_], Ref[_], Val[_], Out[_]](implicit M: Propagation.Aux[M, Ref, Val, Out]): Propagation.Aux[M, Ref, Val, Out] = M
 
   sealed trait IUpdateRes[D[_], Δ[_, _], J]
   object IUpdateRes {
@@ -87,5 +115,7 @@ trait OnDemandPropagation[M[_]] extends Propagation[M] {
 }
 
 object OnDemandPropagation {
-  type Aux[M[_], Var0[_], Val0[_]] = OnDemandPropagation[M] with Propagation.Aux[M, Var0, Val0]
+  type Aux1[M[_], Var0[_], Val0[_]] = OnDemandPropagation[M] with Propagation.Aux1[M, Var0, Val0]
+
+  type Aux[M[_], Var0[_], Val0[_], Out0[_]] = OnDemandPropagation.Aux1[M, Var0, Val0] { type Out[A] = Out0[A] }
 }

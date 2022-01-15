@@ -38,9 +38,11 @@ trait FreeToolkit extends Toolkit {
 trait FreeRefToolkit extends FreeToolkit with RefToolkit {
   type VarK[K[_], A]
   type ValK[K[_], A]
+  type OutK[K[_], A]
 
-  type Var[A] = VarK[Prg, A]
-  type Val[A] = ValK[Prg, A]
+  override type Var[A] = VarK[Prg, A]
+  override type Val[A] = ValK[Prg, A]
+  override type Out[A] = OutK[Prg, A]
 
   def varOrderK[K[_]]: HOrderK[VarK[K, *]]
   def varShowK[K[_]]:  ShowK[VarK[K, *]]
@@ -54,9 +56,11 @@ trait FreeRefToolkit extends FreeToolkit with RefToolkit {
 
   def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A]
   def fetchK[K[_], A](ref: VarK[K, A], s: StateK[K]): A
+  def readOutK[K[_], A](a: OutK[K, A], s: StateK[K]): A
 
   override def fetch[A](ref: Val[A], s: State): Option[A] = fetchK(ref, s)
   override def fetch[A](ref: Var[A], s: State): A = fetchK(ref, s)
+  override def readOut[A](a: Out[A], s: State): A = readOutK(a, s)
 
   def readOnlyK[K[_], A](ref: VarK[K, A]): ValK[K, A]
 

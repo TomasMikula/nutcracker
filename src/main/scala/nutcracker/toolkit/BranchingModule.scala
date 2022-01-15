@@ -13,12 +13,12 @@ trait BranchingModule extends Module {
 
   implicit def freeBranchingPropagation[F[_[_], _]](implicit
     i: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]],
-    P: Propagation.Aux[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
-  ): BranchingPropagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
+    P: Propagation.Aux1[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
+  ): BranchingPropagation.Aux1[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
 
   def emptyK[K[_]]: StateK[K]
   def stepInterpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, *], S]
-  def assess[K[_]](s: StateK[K])(fetch: VarK[K, *] ~> Id)(implicit K: Propagation.Aux[K, VarK[K, *], ValK[K, *]]): Assessment[List[K[Unit]]]
+  def assess[K[_]](s: StateK[K])(fetch: VarK[K, *] ~> Id)(implicit K: Propagation.Aux0[K, VarK[K, *]]): Assessment[List[K[Unit]]]
 }
 
 object BranchingModule {
@@ -61,13 +61,13 @@ extends ListModule[Lang0, State0](base) with BranchingModule {
 
   override def freeBranchingPropagation[F[_[_], _]](implicit
     i: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]],
-    P: Propagation.Aux[FreeK[F, *], Var0[FreeK[F, *], *], Val0[FreeK[F, *], *]]
-  ): BranchingPropagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] =
+    P: Propagation.Aux1[FreeK[F, *], Var0[FreeK[F, *], *], Val0[FreeK[F, *], *]]
+  ): BranchingPropagation.Aux1[FreeK[F, *], VarK[FreeK[F, *], *], Val0[FreeK[F, *], *]] =
     base.freeBranchingPropagation[F](i, P)
 
   override def stepInterpreter[K[_], S](implicit lens: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, *], S] =
     base.stepInterpreter[K, S](Lens.nelHeadLens[State0[K]].compose(lens))
 
-  override def assess[K[_]](s: StateK[K])(fetch: VarK[K, *] ~> Id)(implicit K: Propagation.Aux[K, VarK[K, *], ValK[K, *]]): Assessment[List[K[Unit]]] =
+  override def assess[K[_]](s: StateK[K])(fetch: VarK[K, *] ~> Id)(implicit K: Propagation.Aux0[K, VarK[K, *]]): Assessment[List[K[Unit]]] =
     base.assess[K](s.head)(fetch)
 }

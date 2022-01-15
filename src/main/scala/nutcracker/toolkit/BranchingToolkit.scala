@@ -7,7 +7,7 @@ import scalaz.std.anyVal._
 import scalaz.{-\/, BindRec, Monad, MonadTell, StreamT, WriterT, \/, \/-}
 
 trait BranchingToolkit extends RefToolkit with StashToolkit {
-  implicit val branchingApi: BranchingPropagation[Prg, Var, Val]
+  implicit val branchingApi: BranchingPropagation.Aux1[Prg, Var, Val]
   implicit def stashRestore: StashRestore[State]
 
   def assess(s: State): Assessment[List[Prg[Unit]]]

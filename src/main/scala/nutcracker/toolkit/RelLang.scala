@@ -2,7 +2,7 @@ package nutcracker.toolkit
 
 import nutcracker.{Assignment, Pattern, Recipe, Rel, Relations}
 import nutcracker.util.{ContU, FreeK, HList, Inject, Mapped, MappedListBuilder, SummonHList}
-import scalaz.Order
+import scalaz.{Order, Monad}
 import scalaz.std.option._
 
 private[toolkit] sealed trait RelLang[K[_], A]
@@ -25,6 +25,9 @@ private[toolkit] object RelLang {
 
   implicit def relationsInstance[F[_[_], _]](implicit inj: Inject[RelLang[FreeK[F, *], *], F[FreeK[F, *], *]]): Relations[FreeK[F, *]] =
     new Relations[FreeK[F, *]] {
+      override def M: Monad[FreeK[F, *]] =
+        FreeK.freeKMonad
+
       def relateImpl[L <: HList, OrderL <: HList](rel: Rel[L], values: L)(implicit m: Mapped.Aux[L, Order, OrderL], os: SummonHList[OrderL]): FreeK[F, Unit] =
         FreeK.liftF(inj(RelLang.relate[FreeK[F, *], L, OrderL](rel, values)(m, os)))
 

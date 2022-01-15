@@ -131,7 +131,7 @@ private[nutcracker] object PropagationLang {
 
   implicit def freePropagation[F[_[_], _]](implicit
     inj: Inject[PropagationLang[FreeK[F, *], *], F[FreeK[F, *], *]],
-  ): OnDemandPropagation.Aux[FreeK[F, *], [a] =>> SimpleCellId[FreeK[F, *], [i] =>> a], [a] =>> CellId[FreeK[F, *], [i] =>> a]] =
+  ): FreePropagation[F] =
     new FreePropagation[F]
 }
 
@@ -145,6 +145,8 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit
 
   override type IVar[A[_]] = SimpleCellId[K, A]
   override type Val[A] = CellId[K, [i] =>> A]
+
+  override type Out[A] = nutcracker.toolkit.Out[[a] =>> SimpleCellId[K, [i] =>> a], A]
 
   type CellCycleId[A] = Var[A] \/ (AutoCellId[K, [i] =>> A], CellCycle[[i] =>> A])
   type Tok[A, I] = (CellCycleId[A], Token[I])
@@ -242,4 +244,28 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit
           case \/-((r, c)) => action >>= (tr => resumeAutoF[F, [i] =>> A, [i, j] =>> Δ, I](r, c, tok._2, tr[I]))
         })
     }
+
+  override def out[A](a: Var[A]): Out[A] =
+    Out.WrapVar(a)
+
+  override def constOut[A](a: A): Out[A] =
+    Out.Const(a)
+
+  override def mapOut[A, B](a: Out[A])(f: A => B): Out[B] =
+    Out.Mapped(a, f)
+
+  override def pairOut[A, B](a: Out[A], b: Out[B]): Out[(A, B)] =
+    Out.Pair(a, b)
+
+  override def flatMapOut[A, B](a: Out[A])(f: A => Out[B]): Out[B] =
+    Out.FlatMap(a, f)
+}
+
+private[nutcracker] sealed trait Out[Var[_], A]
+private[nutcracker] object Out {
+  case class Const[Var[_], A](value: A) extends Out[Var, A]
+  case class WrapVar[Var[_], A](v: Var[A]) extends Out[Var, A]
+  case class Mapped[Var[_], A, B](v: Out[Var, A], f: A => B) extends Out[Var, B]
+  case class Pair[Var[_], A, B](a: Out[Var, A], b: Out[Var, B]) extends Out[Var, (A, B)]
+  case class FlatMap[Var[_], A, B](a: Out[Var, A], f: A => Out[Var, B]) extends Out[Var, B]
 }

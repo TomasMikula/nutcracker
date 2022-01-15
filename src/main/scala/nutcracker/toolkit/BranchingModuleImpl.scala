@@ -9,17 +9,19 @@ import scalaz.{Bind, Lens, ~>}
 import scalaz.syntax.functor._
 
 private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] extends PersistentBranchingModule {
-  type VarK[K[_], A] = Var0[K, A]
-  type ValK[K[_], A] = Val0[K, A]
-  type Lang[K[_], A] = BranchLang[Var0[K, *], K, A]
-  type StateK[K[_]] = BranchStore[Var0[K, *], K]
+  override type VarK[K[_], A] = Var0[K, A]
+  override type ValK[K[_], A] = Val0[K, A]
+  override type Lang[K[_], A] = BranchLang[Var0[K, *], K, A]
+  override type StateK[K[_]] = BranchStore[Var0[K, *], K]
 
-  implicit def freeBranchingPropagation[F[_[_], _]](implicit
+  override implicit def freeBranchingPropagation[F[_[_], _]](implicit
     i: Inject[Lang[FreeK[F, *], *], F[FreeK[F, *], *]],
-    P: Propagation.Aux[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
-  ): BranchingPropagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] =
-    new BranchingPropagation[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] {
-      override val propagation: Propagation.Aux[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] = P
+    P: Propagation.Aux1[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]]
+  ): BranchingPropagation.Aux1[FreeK[F, *], VarK[FreeK[F, *], *], ValK[FreeK[F, *], *]] =
+    new BranchingPropagation[FreeK[F, *]] {
+      override type Propagation = P.type
+
+      override val propagation: Propagation = P
 
       def newVar[A](a: A)(implicit ev: Splittable[A]): FreeK[F, VarK[FreeK[F, *], A]] =
         for {
@@ -54,9 +56,9 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
         BranchLang.addFailedF[VarK[FreeK[F, *], *], F, A](ref)
     }
 
-  def emptyK[K[_]]: StateK[K] = BranchStore()
+  override def emptyK[K[_]]: StateK[K] = BranchStore()
 
-  def stepInterpreter[K[_], S](implicit l: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, *], S] = new StateInterpreter[K, Lang[K, *], S] {
+  override def stepInterpreter[K[_], S](implicit l: Lens[S, StateK[K]]): StateInterpreter[K, Lang[K, *], S] = new StateInterpreter[K, Lang[K, *], S] {
 
     def apply[M[_], W, A](fa: BranchLang[Var0[K, *], K, A])(implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[BranchLang[Var0[K, *], K, *], K], K: Bind[K]): M[A] =
       M.writerState[A](s0 => {
@@ -69,10 +71,10 @@ private[nutcracker] class BranchingModuleImpl[Var0[_[_], _], Val0[_[_], _]] exte
       })
   }
 
-  def assess[K[_]](s: StateK[K])(fetch: VarK[K, *] ~> Id)(implicit K: Propagation.Aux[K, VarK[K, *], ValK[K, *]]): Assessment[List[K[Unit]]] =
+  override def assess[K[_]](s: StateK[K])(fetch: VarK[K, *] ~> Id)(implicit K: Propagation.Aux0[K, VarK[K, *]]): Assessment[List[K[Unit]]] =
     if(s.hasFailedVars) Assessment.Failed
     else s.split(fetch)
 
-  def stashable: BranchingListModule[VarK, ValK, Lang, StateK] =
+  override def stashable: BranchingListModule[VarK, ValK, Lang, StateK] =
     new BranchingListModule[VarK, ValK, Lang, StateK](this)
 }

@@ -36,7 +36,7 @@ class IteratorOpsTest extends AnyFunSuite {
 
   test("balanced reduction") {
     val n = 1000000
-    val it = Iterator.range(0, n).map[Tree](Leaf)
+    val it = Iterator.range(0, n).map[Tree](Leaf(_))
     val res = it.balancedReduce.get
 
     def log2ceil(x: Int): Int = math.ceil(math.log(x.toDouble) / math.log(2)).toInt
