@@ -52,8 +52,8 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
         M.writerState[A](s0 => {
           val s = lens.get(s0)
           p match {
-            case upd: Update[k, d, u, δ, j] =>
-              val (s1, res, becameDirty) = s.update[d, u, δ, j](upd.ref, upd.u)(upd.dom)
+            case upd: Update[k, d, u, ch, j] =>
+              val (s1, res, becameDirty) = s.update[d, u, j](upd.ref, upd.u)(upd.dom)
               val w = if(becameDirty) Lst.singleton(inj(execTriggers(upd.ref))) at 1 else W.zero
               (w, s0 set s1, res)
             case exc: ExclUpdate[k, d, u, δ, j] =>
@@ -95,7 +95,7 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
               val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggersAuto(res.ref, res.cycle))) at 1) else (ks at 0)
               (w, s0 set s1, ())
 
-            case nc: NewCell[k, d, u, δ, i] =>
+            case nc: NewCell[k, d, i] =>
               val (s1, ref) = s.newCell(nc.d)(nc.dom)
               (W.zero, s0 set s1, ref)
             case nac: NewAutoCell[k, d] =>
@@ -185,11 +185,11 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   // unsafe, should only be allowed on simple cells
   def fetch[D[_]](ref: CellId[K, D]): Exists[D] = tryFetch(ref).unsafeGet
 
-  def update[D[_], U[_], Δ[_, _], J](ref: SimpleCellId[K, D], u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], IUpdateRes[D, Δ, J], Boolean) =
+  def update[D[_], U[_], J](ref: SimpleCellId[K, D], u: U[J])(implicit dom: IDom.Aux0[D, U]): (PropagationStore[K], IUpdateRes[D, dom.IChange, J, ?], Boolean) =
     simpleCells(ref).infer.update(u) match {
-      case CellUpdated(cell, delta, newValue, becameDirty) =>
+      case CellUpdated(cell, change, newValue, becameDirty) =>
         val domains1 = simpleCells.put(ref)(cell)
-        (copy(simpleCells = domains1), IUpdateRes.Updated(delta, newValue), becameDirty)
+        (copy(simpleCells = domains1), IUpdateRes.Updated(change, newValue), becameDirty)
       case CellUnchanged(value) =>
         (this, IUpdateRes.Unchanged(value), false)
     }

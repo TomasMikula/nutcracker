@@ -2,26 +2,26 @@ package object nutcracker {
 
   type ObserveVal[M[_], Val0[_]] = Observe[M] { type Val[A] = Val0[A] }
 
-  opaque type UpdateResult[D, Δ] = IUpdateResult[[i] =>> D, [i, j] =>> Δ, ?, ?]
+  opaque type UpdateResult[D, Δ] = IUpdateResult[[i] =>> D, [i, j, k] =>> Δ, ?, ?, ?]
 
   object UpdateResult {
     def unchanged[D, Δ]: UpdateResult[D, Δ] =
-      IUpdateResult.unchanged[[i] =>> D, [i, j] =>> Δ, Any]
+      IUpdateResult.unchanged[[i] =>> D, [i, j, k] =>> Δ, Any, Any]
 
     def updated[D, Δ](newValue: D, δ: Δ): UpdateResult[D, Δ] =
-      IUpdateResult.updated[[i] =>> D, [i, j] =>> Δ, Any, Any](newValue, δ)
+      IUpdateResult.updated[[i] =>> D, [i, j, k] =>> Δ, Any, Any, Any](newValue, δ)
 
     def apply[D, Δ](res: Option[(D, Δ)]): UpdateResult[D, Δ] = res match {
       case Some((d, δ)) => updated(d, δ)
       case None         => unchanged[D, Δ]
     }
 
-    def apply[D, Δ](iRes: IUpdateResult[[i] =>> D, [i, j] =>> Δ, ?, ?]): UpdateResult[D, Δ] =
+    def apply[D, Δ](iRes: IUpdateResult[[i] =>> D, [i, j, k] =>> Δ, ?, ?, ?]): UpdateResult[D, Δ] =
       iRes
 
     extension [D, Δ](r: UpdateResult[D, Δ]) {
-      def at[I, J]: IUpdateResult[[i] =>> D, [i, j] =>> Δ, I, J] =
-        r.asInstanceOf[IUpdateResult[[i] =>> D, [i, j] =>> Δ, I, J]]
+      def at[I, J, K]: IUpdateResult[[i] =>> D, [i, j, k] =>> Δ, I, J, K] =
+        r.asInstanceOf[IUpdateResult[[i] =>> D, [i, j, k] =>> Δ, I, J, K]]
 
       def newValueOr(default: D): D =
         r match {

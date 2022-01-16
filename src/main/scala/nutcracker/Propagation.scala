@@ -21,10 +21,10 @@ trait Propagation[M[_]] extends Observe[M] {
 
   def newCell[D](d: D)(implicit dom: Dom[D]): M[Var[D]]
 
-  def iUpdate[D[_], U[_], Δ[_, _], J](ref: IVar[D])(u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): M[IUpdateRes[D, Δ, J]]
+  def iUpdate[D[_], U[_], J](ref: IVar[D])(u: U[J])(implicit dom: IDom.Aux0[D, U]): M[IUpdateRes[D, dom.IChange, J, ?]]
 
   final def updateImpl[D, U, Δ](ref: Var[D])(u: U)(implicit dom: Dom.Aux[D, U, Δ]): M[Unit] =
-    iUpdate[[i] =>> D, [j] =>> U, [i, j] =>> Δ, Any](ref)(u)(dom).void
+    iUpdate[[i] =>> D, [j] =>> U, Any](ref)(u)(dom).void
 
 
   def newCell[D](implicit dom: DomWithBottom[D]): M[Var[D]] =
@@ -72,10 +72,10 @@ object Propagation {
 
   def apply[M[_], Ref[_], Val[_], Out[_]](implicit M: Propagation.Aux[M, Ref, Val, Out]): Propagation.Aux[M, Ref, Val, Out] = M
 
-  sealed trait IUpdateRes[D[_], Δ[_, _], J]
+  sealed trait IUpdateRes[D[_], Δ[_, _, _], J, K]
   object IUpdateRes {
-    case class Updated[D[_], Δ[_, _], I, J](delta: Δ[I, J], newValue: D[J]) extends IUpdateRes[D, Δ, J]
-    case class Unchanged[D[_], Δ[_, _], J](value: D[J]) extends IUpdateRes[D, Δ, J]
+    case class Updated[D[_], Δ[_, _, _], I, J, K](delta: Δ[I, J, K], newValue: D[K]) extends IUpdateRes[D, Δ, J, K]
+    case class Unchanged[D[_], Δ[_, _, _], J, K](value: D[K]) extends IUpdateRes[D, Δ, J, K]
   }
 }
 

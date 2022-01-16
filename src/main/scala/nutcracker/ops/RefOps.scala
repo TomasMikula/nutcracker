@@ -157,7 +157,7 @@ object RelativelyComplementedRefOps {
         res <- P.newVar[Bool]
         _ <- res.whenFinal((r: Boolean) => if (r) ref =!= that else (ref <=> that).void)
         _ <- ref.whenFinal0_(r1 => that.whenFinal0_(r2 => {
-          val r = dom.ljoin(r1, r2).at[Any, Any] match {
+          val r = dom.ljoin(r1, r2).at[Any, Any, Any] match {
             case Unchanged() => false
             case Updated(x, _) => dom.isFailed(x)
           }

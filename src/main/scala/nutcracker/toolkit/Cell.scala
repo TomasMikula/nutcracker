@@ -119,28 +119,32 @@ private[nutcracker] abstract class SimpleCell[K[_], D[_]] extends Cell[K, D] {
 
   private def hasPendingObservers: Boolean = pendingObservers.nonEmpty
 
-  def update[J](u: Update[J])(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[SimpleCell.Aux1[K, D, Update, Delta, J], D, Delta, J] =
+  def update[J](u: Update[J])(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[SimpleCell[K, D], D, dom.IChange, J, ?] =
     dom.iUpdate(value, u) match {
-      case up @ Updated(newVal, delta) =>
-        val pending0: List[PendingObserver[J]] = pendingObservers.map(_.addDelta(delta))
-        val pending1: List[PendingObserver[J]] = idleObservers.map(_.addDelta(delta))
-        val pending = pending1 ::: pending0
+      case Updated(newVal, change) =>
+        def go[J1](newVal: D[J1], change: dom.IChange[Idx, J, J1]): CellUpdateResult[SimpleCell[K, D], D, dom.IChange, J, J1] = {
+          val delta: Delta[Idx, J1] = dom.changeToDelta(change)
+          val pending0: List[PendingObserver[J1]] = pendingObservers.map(_.addDelta(delta))
+          val pending1: List[PendingObserver[J1]] = idleObservers.map(_.addDelta(delta))
+          val pending = pending1 ::: pending0
 
-        val blocked0 = blockedPendingObservers.mapValues[BlockedPendingObserver[*, J]](
-          new (BlockedPendingObserver[*, Idx] ~> BlockedPendingObserver[*, J]) {
-            override def apply[I0](o: BlockedPendingObserver[I0, Idx]) = o.addDelta(delta)
-          }
-        )
-        val blocked1 = blockedIdleObservers.mapValues[BlockedPendingObserver[*, J]](
-          new (BlockedIdleObserver[*, Idx] ~> BlockedPendingObserver[*, J]) {
-            override def apply[I0](o: BlockedIdleObserver[I0, Idx]) = o.addDelta(delta)
-          }
-        )
-        val blocked = blocked0 ++ blocked1
+          val blocked0 = blockedPendingObservers.mapValues[BlockedPendingObserver[*, J1]](
+            new (BlockedPendingObserver[*, Idx] ~> BlockedPendingObserver[*, J1]) {
+              override def apply[I0](o: BlockedPendingObserver[I0, Idx]) = o.addDelta(delta)
+            }
+          )
+          val blocked1 = blockedIdleObservers.mapValues[BlockedPendingObserver[*, J1]](
+            new (BlockedIdleObserver[*, Idx] ~> BlockedPendingObserver[*, J1]) {
+              override def apply[I0](o: BlockedIdleObserver[I0, Idx]) = o.addDelta(delta)
+            }
+          )
+          val blocked = blocked0 ++ blocked1
 
-        val cell = SimpleCell[K, D, Update, Delta, J](newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[*, J]](), blocked, lastObserverId, lastToken)
-        val becameDirty = !this.hasPendingObservers && cell.hasPendingObservers
-        CellUpdated(cell, delta, newVal, becameDirty)
+          val cell = SimpleCell[K, D, Update, Delta, J1](newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[*, J1]](), blocked, lastObserverId, lastToken)
+          val becameDirty = !this.hasPendingObservers && cell.hasPendingObservers
+          CellUpdated(cell, change, newVal, becameDirty)
+        }
+        go(newVal, change)
 
       case Unchanged() =>
         CellUnchanged(value)
@@ -345,7 +349,7 @@ private[nutcracker] sealed abstract class OnDemandCell[K[_], D[_]] extends Cell[
 
   def supply[I](self: CellIncarnationId, value: D[I]): (Option[OnDemandCell[K, D]], Lst[K[Unit]])
 
-  def exclUpdate[J](u: Update[J])(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[OnDemandCell[K, D], D, Delta, J]
+  def exclUpdate[J](u: Update[J])(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[OnDemandCell[K, D], D, dom.IChange, J, ?]
 
   def addFinalizer(sub: Subscription[K]): (Lst[K[Unit]], OnDemandCell[K, D], FinalizerId)
 
@@ -429,7 +433,7 @@ private[nutcracker] case class InitializingCell[K[_], D[_], U[_], Δ[_, _]](
     }
   }
 
-  override def exclUpdate[J](u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D], D, Δ, J] = {
+  override def exclUpdate[J](u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D], D, dom.IChange, J, ?] = {
     sys.error("Unreachable code: no one has access to the current cycle yet")
   }
 
@@ -540,12 +544,12 @@ private[nutcracker] case class ActiveCell[K[_], D[_], U[_], Δ[_, _], I](
     else (None, ks ++ collectFinalizers)
   }
 
-  override def exclUpdate[J](u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D], D, Δ, J] = {
+  override def exclUpdate[J](u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D], D, dom.IChange, J, ?] = {
     impl.update(u) match {
-      case CellUpdated(cell, delta, newValue, becameDirty) =>
+      case CellUpdated(cell, change, newValue, becameDirty) =>
         CellUpdated(
-          ActiveCell[K, D, cell.Update, cell.Delta, J](cycle, cell, finalizers, lastFinalizerId),
-          delta,
+          ActiveCell[K, D, cell.Update, cell.Delta, cell.Idx](cycle, cell, finalizers, lastFinalizerId),
+          change,
           newValue,
           becameDirty,
         )
@@ -566,18 +570,18 @@ private[nutcracker] case class ActiveCell[K[_], D[_], U[_], Δ[_, _], I](
     finalizers.valuesIterator.foldLeft(Lst.empty[K[Unit]])((ks, sub) => sub.unsubscribe ++ ks)
 }
 
-private[toolkit] sealed abstract class CellUpdateResult[+C, D[_], Δ[_, _], J]
+private[toolkit] sealed abstract class CellUpdateResult[+C, D[_], Ch[_, _, _], J, J1]
 
-private[toolkit] case class CellUpdated[C, D[_], Δ[_, _], I, J](
+private[toolkit] case class CellUpdated[C, D[_], Δ[_, _, _], I, J, J1](
   cell: C,
-  delta: Δ[I, J],
-  newValue: D[J],
+  change: Δ[I, J, J1],
+  newValue: D[J1],
   becameDirty: Boolean,
-) extends CellUpdateResult[C, D, Δ, J]
+) extends CellUpdateResult[C, D, Δ, J, J1]
 
-private[toolkit] case class CellUnchanged[D[_], Δ[_, _], J](
-  value: D[J],
-) extends CellUpdateResult[Nothing, D, Δ, J]
+private[toolkit] case class CellUnchanged[D[_], Δ[_, _, _], I, J](
+  value: D[I],
+) extends CellUpdateResult[Nothing, D, Δ, J, I]
 
 private[nutcracker] final class Token[A] private(val id: Long) extends AnyVal {
   def inc[B]: Token[B] = new Token(id + 1)
