@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.util.IndexedContT
+import nutcracker.util.{Exists, IndexedContT}
 import nutcracker.util.ops.applicative._
 import scala.language.implicitConversions
 import scalaz.Monad
@@ -15,11 +15,17 @@ trait Propagation[M[_]] extends Observe[M] {
 
   type Var[A] = IVar[[i] =>> A]
 
-  implicit def M: Monad[M]
+  override implicit def M: Monad[M]
 
-  implicit def readOnly[A](a: Var[A]): Val[A]
+  def iReadOnly[D[_]](a: IVar[D]): IVal[D]
 
-  def newCell[D](d: D)(implicit dom: Dom[D]): M[Var[D]]
+  implicit def readOnly[A](ref: Var[A]): Val[A] =
+    iReadOnly[[i] =>> A](ref)
+
+  def newICell[D[_], I](d: D[I])(implicit dom: IDom[D]): M[IVar[D]]
+
+  final def newCell[D](d: D)(implicit dom: Dom[D]): M[Var[D]] =
+    newICell[[i] =>> D, Any](d)
 
   def iUpdate[D[_], U[_], J](ref: IVar[D])(u: U[J])(implicit dom: IDom.Aux0[D, U]): M[IUpdateRes[D, dom.IChange, J, ?]]
 
@@ -40,7 +46,13 @@ trait Propagation[M[_]] extends Observe[M] {
   def cells[D](d: D, n: Int)(implicit dom: Dom[D]): M[Vector[Var[D]]] =
     newCell(d).replicate(n)
 
-  def out[D](v: Var[D]): Out[D]
+  def iOut[D[_], B](v: IVar[D], f: [i] => D[i] => B): Out[B]
+
+  def iOut[D[_]](v: IVar[D]): Out[Exists[D]] =
+    iOut[D, Exists[D]](v, [i] => (d: D[i]) => Exists(d))
+
+  def out[D](v: Var[D]): Out[D] =
+    iOut[[i] =>> D, D](v, [i] => (d: D) => d)
 
   def constOut[A](a: A): Out[A]
 

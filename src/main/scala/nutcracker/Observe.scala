@@ -1,6 +1,6 @@
 package nutcracker
 
-import nutcracker.util.ContU
+import nutcracker.util.{ContU, Forall}
 import scalaz.{Bind, Functor, IndexedContT, Leibniz, ===}
 import scalaz.syntax.functor._
 import scalaz.syntax.bind0._
@@ -9,13 +9,22 @@ import scalaz.syntax.bind0._
   * for changes to a (mutable) value of type `A` (for any `A`).
   */
 trait Observe[M[_]] extends Observers[M] { self =>
-  type Val[_]
+  type IVal[_[_]]
 
-  def observeImpl[A, U, Δ](src: Val[A])(f: A => Trigger[A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]]
+  type Val[A] = IVal[[i] =>> A]
+
+  def iObserve[D[_], Δ[_, _]](src: IVal[D], f: [i] => D[i] => ITrigger[D, Δ, i])(implicit dom: IDom.AuxΔ[D, Δ]): M[Subscription[M]]
+
+  def iObserve[D[_]](src: IVal[D])(using dom: IDom[D]): IObserveSyntaxHelper[D, dom.IDelta] =
+    new IObserveSyntaxHelper(src)
+
+  def observeImpl[A, U, Δ](src: Val[A])(f: A => Trigger[A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]] =
+    iObserve[[i] =>> A, [i, j] =>> Δ](src, [i] => (a: A) => f(a)[i])
+
   def observeImplC[A, U, Δ, B](src: Val[A])(f: A => ContU[M, (Trigger[A, Δ], B)])(implicit dom: Dom.Aux[A, U, Δ]): ContU[M, (Subscription[M], B)]
 
-  def observe[A](src: Val[A])(implicit dom: Dom[A]): ObserveSyntaxHelper[M, A, dom.Update, dom.Delta, Trigger] =
-    new ObserveSyntaxHelper[M, A, dom.Update, dom.Delta, Trigger](observable(src))(dom)
+  def observe[A](src: Val[A])(implicit dom: Dom[A]): ObserveSyntaxHelper[A, dom.Delta] =
+    new ObserveSyntaxHelper(observable(src))
 
   def peek_[A](ref: Val[A])(f: A => M[Unit])(implicit dom: Dom[A], M: Functor[M]): M[Unit] =
     observe(ref).by(d => fire(f(d))).map((_: Subscription[M]) => ())
@@ -72,12 +81,94 @@ trait Observe[M[_]] extends Observers[M] { self =>
       (_ => onStop)
     )
 
-  def observable[A](src: Val[A]): Observable.Aux[M, A, Trigger] = new DelegateObservers[M, Trigger](self) with Observable[M, A] {
-    def observeImpl[U, Δ](f: A => Trigger[A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]] =
+  def observable[A](src: Val[A])(using da: Dom[A]): Observable[A, da.Delta] = new Observable[A, da.Delta] {
+    override given dom: Dom.AuxΔ[A, da.Delta] = da
+
+    override def observeImpl(f: A => Trigger[A, da.Delta]): M[Subscription[M]] =
       self.observeImpl(src)(f)
 
-    def observeImplC[U, Δ, B](f: A => ContU[M, (Trigger[A, Δ], B)])(implicit dom: Dom.Aux[A, U, Δ]): ContU[M, (Subscription[M], B)] =
+    override def observeImplC[B](f: A => ContU[M, (Trigger[A, da.Delta], B)]): ContU[M, (Subscription[M], B)] =
       self.observeImplC(src)(f)
+  }
+
+  class IObserveSyntaxHelper[D[_], Δ[_, _]](src: IVal[D])(using dom: IDom.AuxΔ[D, Δ]) {
+    def by(f: [i] => D[i] => ITrigger[D, Δ, i]): M[Subscription[M]] =
+      iObserve(src, f)
+
+    def by_(f: [i] => D[i] => ITrigger[D, Δ, i]): M[Unit] =
+      by(f).void
+  }
+
+  final class ObserveSyntaxHelper[A, Δ](src: Observable[A, Δ])(using dom: Dom.AuxΔ[A, Δ]) {
+    def by(f: A => Trigger[A, Δ]): M[Subscription[M]] = src.observeImpl(f)
+    def by_(f: A => Trigger[A, Δ]): M[Unit] = by(f).void
+
+    def byC[B](f: A => ContU[M, (Trigger[A, Δ], B)]): ContU[M, (Subscription[M], B)] = src.observeImplC(f)
+    def byC_[B](f: A => ContU[M, (Trigger[A, Δ], B)]): ContU[M, B] = byC(f).map(_._2)
+
+    def byM[B](f: A => M[(Trigger[A, Δ], B)])(implicit M: Bind[M]): ContU[M, (Subscription[M], B)] = byC(a => ContU.liftM(f(a)))
+    def byM_[B](f: A => M[(Trigger[A, Δ], B)])(implicit M: Bind[M]): ContU[M, B] = byM(f).map(_._2)
+
+    def threshold(f: A => Option[M[Unit]]): M[Subscription[M]] = src.observeImpl(self.threshold(f))
+    def threshold_(f: A => Option[M[Unit]]): M[Unit] = threshold(f).void
+
+    def thresholdOpt(f: A => Option[Option[M[Unit]]]): M[Subscription[M]] = src.observeImpl(self.thresholdOpt(f))
+    def thresholdOpt_(f: A => Option[Option[M[Unit]]]): M[Unit] = thresholdOpt(f).void
+
+    def thresholdTransition(f: A => Option[Trigger[A, Δ]]): M[Subscription[M]] = src.observeImpl(self.thresholdTransition(f))
+    def thresholdTransition_(f: A => Option[Trigger[A, Δ]]): M[Unit] = thresholdTransition(f).void
+
+    def untilRight(f: A => Either[M[Unit], M[Unit]]): M[Subscription[M]] = src.observeImpl(self.untilRight(f))
+    def untilRight_(f: A => Either[M[Unit], M[Unit]]): M[Unit] = untilRight(f).void
+
+    def untilRightSeq(f: A => Either[M[Unit], M[Unit]]): M[Subscription[M]] = src.observeImpl(self.untilRightSeq(f))
+    def untilRightSeq_(f: A => Either[M[Unit], M[Unit]]): M[Unit] = untilRightSeq(f).void
+
+    def untilRightS[S](init: A => Either[M[S], M[Unit]], trans: (S, A, Δ) => Either[M[S], M[Unit]]): M[Subscription[M]] =
+      src.observeImpl(self.untilRightS(init, trans))
+  }
+
+  sealed trait Observable[A, Δ] { self =>
+    given dom: Dom.AuxΔ[A, Δ]
+
+    def observeImpl(f: A => Trigger[A, Δ]): M[Subscription[M]]
+    def observeImplC[B](f: A => ContU[M, (Trigger[A, Δ], B)]): ContU[M, (Subscription[M], B)]
+
+    def observe: ObserveSyntaxHelper[A, Δ] =
+      new ObserveSyntaxHelper(this)
+
+    def map[B](f: A => B): MapSyntaxHelper[B] =
+      new MapSyntaxHelper(f)
+
+    final class MapSyntaxHelper[B](f: A => B) {
+      def deltas[ΔB](g: Δ => ΔB)(implicit db: Dom.AuxΔ[B, ΔB]): Observable[B, ΔB] =
+        new Observable[B, ΔB] {
+          override given dom: Dom.AuxΔ[B, ΔB] = db
+
+          override def observeImpl(h: B => Trigger[B, ΔB]): M[Subscription[M]] =
+            self.observeImpl(a => h(f(a)).contramap(f, g))
+
+          override def observeImplC[C](h: B => ContU[M, (Trigger[B, ΔB], C)]): ContU[M, (Subscription[M], C)] =
+            self.observeImplC(a => h(f(a)).map { case (t, c) => (t.contramap(f, g), c) })
+        }
+    }
+
+    def asCont(implicit fin: Final[A]): IndexedContT[Subscription[M], Unit, M, fin.Out] =
+      IndexedContT { whenFinal.exec(_) }
+
+    def whenFinal(implicit fin: Final[A]): WhenFinalSyntaxHelper[fin.Out] =
+      new WhenFinalSyntaxHelper(fin)
+
+    final class WhenFinalSyntaxHelper[A0] private[nutcracker](fin: Final.Aux[A, A0]) {
+      def exec(f: A0 => M[Unit]): M[Subscription[M]] =
+        observe.by(threshold(a => fin.extract(a) map f))
+
+      def exec0(f: A => M[Unit]): M[Subscription[M]] =
+        observe.by(threshold(a =>
+          if(fin.isFinal(a)) Some(f(a))
+          else None
+        ))
+    }
   }
 }
 
@@ -96,128 +187,97 @@ trait RelObserve[F[_], G[_]] {
   def apply[M[_]](implicit F: ObserveVal[M, F]): ObserveVal[M, G]
 }
 
-/** Can be observed for changes to a (mutable) value of type `A`, under effects `M`.
-  * Can be seen as an `F[A]` bundled with an instance of `Observe[M, F]`, for some `F[_]`.
-  */
-trait Observable[M[_], A] extends Observers[M] { self =>
-  type Trigger[a, δ]
+trait RelObservable[F[_], A, Δ] {
+  def apply[M[_]](implicit M: ObserveVal[M, F]): M.Observable[A, Δ]
 
-  def observeImpl[U, Δ](f: A => Trigger[A, Δ])(implicit dom: Dom.Aux[A, U, Δ]): M[Subscription[M]]
-  def observeImplC[U, Δ, B](f: A => ContU[M, (Trigger[A, Δ], B)])(implicit dom: Dom.Aux[A, U, Δ]): ContU[M, (Subscription[M], B)]
+  def map[B](f: A => B): MapSyntaxHelper[B] =
+    new MapSyntaxHelper(f)
 
-  def observe(implicit dom: Dom[A]): ObserveSyntaxHelper[M, A, dom.Update, dom.Delta, Trigger] =
-    new ObserveSyntaxHelper[M, A, dom.Update, dom.Delta, Trigger](this)(dom)
-
-  def map[B](f: A => B)(implicit da: Dom[A], db: Dom[B]): MapSyntaxHelper[B, da.Update, da.Delta, db.Update, db.Delta] =
-    new MapSyntaxHelper(f)(da, db)
-
-  final class MapSyntaxHelper[B, UA, DA, UB, DB](f: A => B)(implicit da: Dom.Aux[A, UA, DA], db: Dom.Aux[B, UB, DB]) {
-    def deltas(g: DA => DB)(implicit M: Functor[M]): Observable[M, B] = new Observable[M, B] {
-      type Trigger[b, δb] = (B === b, DB === δb) => self.Trigger[A, DA]
-
-      def observeImpl[U, Δ](h: B => Trigger[B, Δ])(implicit dom: Dom.Aux[B, U, Δ]): M[Subscription[M]] =
-        self.observeImpl(a => h(f(a))(Leibniz.refl[B], Dom.relateDeltas(db, dom)))
-
-      def observeImplC[U, Δ, C](h: B => ContU[M, (Trigger[B, Δ], C)])(implicit dom: Dom.Aux[B, U, Δ]): ContU[M, (Subscription[M], C)] =
-        self.observeImplC(a => h(f(a)).map({ case (t, c) => (t(Leibniz.refl[B], Dom.relateDeltas(db, dom)), c) }))
-
-      override def discard[b, δb]: (B === b, DB === δb) => self.Trigger[A, DA] =
-        (_, _) => self.discard
-      override def fire[b, δb](action: M[Unit]): (B === b, DB === δb) => self.Trigger[A, DA] =
-        (_, _) => self.fire(action)
-      override def sleep[b, δb](next: (b, δb) => (B === b, DB === δb) => self.Trigger[A, DA]): (B === b, DB === δb) => self.Trigger[A, DA] =
-        (evb, evδ) => self.sleep((a, δa) => next(evb(f(a)), evδ(g(δa)))(evb, evδ))
-      override def fireReload[b, δb](action: M[Unit], next: (b, δb) => (B === b, DB === δb) => self.Trigger[A, DA]): (B === b, DB === δb) => self.Trigger[A, DA] =
-        (evb, evδ) => self.fireReload(action, (a, δa) => next(evb(f(a)), evδ(g(δa)))(evb, evδ))
-      override def reconsider[b, δb](action: M[(B === b, DB === δb) => self.Trigger[A, DA]]): (B === b, DB === δb) => self.Trigger[A, DA] =
-        (evb, evδ) => self.reconsider(action.map(_(evb, evδ)))
+  final class MapSyntaxHelper[B](f: A => B) {
+    def deltas[ΔB](g: Δ => ΔB)(using db: Dom.AuxΔ[B, ΔB]): RelObservable[F, B, ΔB] = new RelObservable[F, B, ΔB] {
+      override def apply[M[_]](implicit M: ObserveVal[M, F]): M.Observable[B, ΔB] =
+        RelObservable.this.apply[M].map(f).deltas(g)
     }
   }
 
-  def asCont(implicit fin: Final[A], dom: Dom[A]): IndexedContT[Subscription[M], Unit, M, fin.Out] =
-    IndexedContT { whenFinal.exec(_) }
-
-  def whenFinal(implicit fin: Final[A], dom: Dom[A]): WhenFinalSyntaxHelper[fin.Out] =
-    new WhenFinalSyntaxHelper(fin)
-
-  final class WhenFinalSyntaxHelper[A0] private[nutcracker](fin: Final.Aux[A, A0])(implicit dom: Dom[A]) {
-    def exec(f: A0 => M[Unit]): M[Subscription[M]] =
-      observe.by(threshold(a => fin.extract(a) map f))
-
-    def exec0(f: A => M[Unit]): M[Subscription[M]] =
-      observe.by(threshold(a =>
-        if(fin.isFinal(a)) Some(f(a))
-        else None
-      ))
-  }
-}
-
-object Observable {
-  type Aux[M[_], A, T[_, _]] = Observable[M, A] { type Trigger[a, δ] = T[a, δ] }
-}
-
-/** Relative [[Observable]]: whenever `Observe[M, F]`, then this can be converted to `Observable[M, A]`. */
-trait RelObservable[F[_], A] {
-  def apply[M[_]](implicit F: ObserveVal[M, F], M: Functor[M]): Observable[M, A]
-
-  def map[B](f: A => B)(implicit da: Dom[A], db: Dom[B]): MapSyntaxHelper[B, da.Update, da.Delta, db.Update, db.Delta] =
-    new MapSyntaxHelper(f)(da, db)
-
-  final class MapSyntaxHelper[B, UA, DA, UB, DB](f: A => B)(implicit da: Dom.Aux[A, UA, DA], db: Dom.Aux[B, UB, DB]) {
-    def deltas(g: DA => DB): RelObservable[F, B] = new RelObservable[F, B] {
-      def apply[M[_]](implicit F: ObserveVal[M, F], M: Functor[M]): Observable[M, B] = RelObservable.this.apply[M].map(f).deltas(g)
-    }
-  }
-
-  def asCont[M[_]](implicit fin: Final[A], da: Dom[A], F: ObserveVal[M, F], M: Functor[M]): IndexedContT[Subscription[M], Unit, M, fin.Out] =
+  def asCont[M[_]](implicit fin: Final[A], M: ObserveVal[M, F]): IndexedContT[Subscription[M], Unit, M, fin.Out] =
     apply[M].asCont
 }
 
 object RelObservable {
-  def lift[F[_], A](fa: F[A]): RelObservable[F, A] = new RelObservable[F, A] {
-    def apply[M[_]](implicit F: ObserveVal[M, F], M: Functor[M]): Observable[M, A] = F.observable(fa)
-  }
-}
-
-final class ObserveSyntaxHelper[M[_], A, U, Δ, Tr[_, _]](src: Observable[M, A] { type Trigger[a, δ] = Tr[a, δ] })(implicit dom: Dom.Aux[A, U, Δ]) {
-  def by(f: A => Tr[A, Δ]): M[Subscription[M]] = src.observeImpl(f)
-  def by_(f: A => Tr[A, Δ])(implicit M: Functor[M]): M[Unit] = by(f).void
-
-  def byC[B](f: A => ContU[M, (Tr[A, Δ], B)]): ContU[M, (Subscription[M], B)] = src.observeImplC(f)
-  def byC_[B](f: A => ContU[M, (Tr[A, Δ], B)]): ContU[M, B] = byC(f).map(_._2)
-
-  def byM[B](f: A => M[(Tr[A, Δ], B)])(implicit M: Bind[M]): ContU[M, (Subscription[M], B)] = byC(a => ContU.liftM(f(a)))
-  def byM_[B](f: A => M[(Tr[A, Δ], B)])(implicit M: Bind[M]): ContU[M, B] = byM(f).map(_._2)
-
-  def threshold(f: A => Option[M[Unit]]): M[Subscription[M]] = src.observeImpl(src.threshold(f))
-  def threshold_(f: A => Option[M[Unit]])(implicit M: Functor[M]): M[Unit] = threshold(f).void
-
-  def thresholdOpt(f: A => Option[Option[M[Unit]]]): M[Subscription[M]] = src.observeImpl(src.thresholdOpt(f))
-  def thresholdOpt_(f: A => Option[Option[M[Unit]]])(implicit M: Functor[M]): M[Unit] = thresholdOpt(f).void
-
-  def thresholdTransition(f: A => Option[Tr[A, Δ]]): M[Subscription[M]] = src.observeImpl(src.thresholdTransition(f))
-  def thresholdTransition_(f: A => Option[Tr[A, Δ]])(implicit M: Functor[M]): M[Unit] = thresholdTransition(f).void
-
-  def untilRight(f: A => Either[M[Unit], M[Unit]]): M[Subscription[M]] = src.observeImpl(src.untilRight(f))
-  def untilRight_(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Unit] = untilRight(f).void
-
-  def untilRightSeq(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Subscription[M]] = src.observeImpl(src.untilRightSeq(f))
-  def untilRightSeq_(f: A => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): M[Unit] = untilRightSeq(f).void
-
-  def untilRightS[S](init: A => Either[M[S], M[Unit]], trans: (S, A, Δ) => Either[M[S], M[Unit]])(implicit M: Functor[M]): M[Subscription[M]] =
-    src.observeImpl(src.untilRightS(init, trans))
+  def lift[F[_], A](fa: F[A])(using dom: Dom[A]): RelObservable[F, A, dom.Delta] =
+    new RelObservable[F, A, dom.Delta] {
+      override def apply[M[_]](implicit M: ObserveVal[M, F]): M.Observable[A, dom.Delta] =
+        M.observable(fa)
+    }
 }
 
 trait Observers[M[_]] {
-  type Trigger[A, Δ]
+  type ITrigger[D[_], Δ[_, _], I]
 
-  def discard[A, Δ]: Trigger[A, Δ]
-  def sleep[A, Δ](next: (A, Δ) => Trigger[A, Δ]): Trigger[A, Δ]
-  def fire[A, Δ](action: M[Unit]): Trigger[A, Δ]
-  def fireReload[A, Δ](action: M[Unit], next: (A, Δ) => Trigger[A, Δ]): Trigger[A, Δ]
-  def reconsider[A, Δ](action: M[Trigger[A, Δ]]): Trigger[A, Δ]
+  final type Trigger[A, Δ] = Forall[ITrigger[[i] =>> A, [i, j] =>> Δ, *]]
 
-  def observerS[D, Δ, S](s: S)(f: S => TriggerF[M, D, Δ, S])(implicit M: Functor[M]): Trigger[D, Δ] =
+  implicit def M: Functor[M]
+
+  def iDiscard[D[_], Δ[_, _], I]: ITrigger[D, Δ, I]
+  def iSleep[D[_], Δ[_, _], I](next: [j] => (D[j], Δ[I, j]) => ITrigger[D, Δ, j]): ITrigger[D, Δ, I]
+  def iFire[D[_], Δ[_, _], I](action: M[Unit]): ITrigger[D, Δ, I]
+  def iFireReload[D[_], Δ[_, _], I](action: M[Unit], next: [j] => (D[j], Δ[I, j]) => ITrigger[D, Δ, j]): ITrigger[D, Δ, I]
+  def iReconsider[D[_], Δ[_, _], I](action: M[ITrigger[D, Δ, I]]): ITrigger[D, Δ, I]
+
+  extension [D[_], Δ[_, _], I](t: ITrigger[D, Δ, I]) {
+    def contramap[C[_], Γ[_, _]](
+      f: [i] => C[i] => D[i],
+      g: [i, j] => Γ[i, j] => Δ[i, j],
+    ): ITrigger[C, Γ, I]
+  }
+
+  extension [D, Δ](t: Trigger[D, Δ]) {
+    def contramap[C, Γ](
+      f: C => D,
+      g: Γ => Δ,
+    ): Trigger[C, Γ] =
+      new Forall[ITrigger[[i] =>> C, [i, j] =>> Γ, *]] {
+        override def compute[I] =
+          t[I].contramap(
+            [i] => (c: C) => f(c),
+            [i, j] => (γ: Γ) => g(γ),
+          )
+      }
+  }
+
+  def discard[A, Δ]: Trigger[A, Δ] =
+    new Forall[ITrigger[[i] =>> A, [i, j] =>> Δ, *]] {
+      override def compute[I] =
+        iDiscard
+    }
+
+  def sleep[A, Δ](next: (A, Δ) => Trigger[A, Δ]): Trigger[A, Δ] =
+    new Forall[ITrigger[[i] =>> A, [i, j] =>> Δ, *]] {
+      override def compute[I] =
+        iSleep([j] => (a: A, δ: Δ) => next(a, δ)[j])
+    }
+
+  def fire[A, Δ](action: M[Unit]): Trigger[A, Δ] =
+    new Forall[ITrigger[[i] =>> A, [i, j] =>> Δ, *]] {
+      override def compute[I] =
+        iFire(action)
+    }
+
+  def fireReload[A, Δ](action: M[Unit], next: (A, Δ) => Trigger[A, Δ]): Trigger[A, Δ] =
+    new Forall[ITrigger[[i] =>> A, [i, j] =>> Δ, *]] {
+      override def compute[I] =
+        iFireReload(action, [j] => (a: A, δ: Δ) => next(a, δ)[j])
+    }
+
+  def reconsider[A, Δ](action: M[Trigger[A, Δ]]): Trigger[A, Δ] =
+    new Forall[ITrigger[[i] =>> A, [i, j] =>> Δ, *]] {
+      override def compute[I] =
+        iReconsider(action.map(_[I]))
+    }
+
+
+  def observerS[D, Δ, S](s: S)(f: S => TriggerF[M, D, Δ, S]): Trigger[D, Δ] =
     fix(f(s) map (observerS(_)(f)))
 
   private def fix[A, Δ](t: TriggerF[M, A, Δ, Trigger[A, Δ]]): Trigger[A, Δ] = {
@@ -291,13 +351,13 @@ trait Observers[M[_]] {
       }
     }
 
-  def untilRightSeq[D, Δ](f: D => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): D => Trigger[D, Δ] =
+  def untilRightSeq[D, Δ](f: D => Either[M[Unit], M[Unit]]): D => Trigger[D, Δ] =
     d => f(d) match {
       case Left(k) => reconsider(k.as(sleep(untilRightSeq((d, δ) => f(d)))))
       case Right(k) => fire(k)
     }
 
-  def untilRightSeq[D, Δ](f: (D, Δ) => Either[M[Unit], M[Unit]])(implicit M: Functor[M]): (D, Δ) => Trigger[D, Δ] =
+  def untilRightSeq[D, Δ](f: (D, Δ) => Either[M[Unit], M[Unit]]): (D, Δ) => Trigger[D, Δ] =
     new ((D, Δ) => Trigger[D, Δ]) {
       def apply(d: D, δ: Δ): Trigger[D, Δ] = f(d, δ) match {
         case Left(k) => reconsider(k.as(sleep(this)))
@@ -305,37 +365,23 @@ trait Observers[M[_]] {
       }
     }
 
-  def untilRightS[S, D, Δ](init: D => Either[M[S], M[Unit]], trans: (S, D, Δ) => Either[M[S], M[Unit]])(implicit M: Functor[M]): D => Trigger[D, Δ] =
+  def untilRightS[S, D, Δ](init: D => Either[M[S], M[Unit]], trans: (S, D, Δ) => Either[M[S], M[Unit]]): D => Trigger[D, Δ] =
     d => init(d) match {
       case Left(ms) => reconsider(ms.map(s => sleep(untilRightS(s)(trans))))
       case Right(k) => fire(k)
     }
 
-  def untilRightS[S, D, Δ](s: S)(f: (S, D, Δ) => Either[M[S], M[Unit]])(implicit M: Functor[M]): (D, Δ) => Trigger[D, Δ] =
+  def untilRightS[S, D, Δ](s: S)(f: (S, D, Δ) => Either[M[S], M[Unit]]): (D, Δ) => Trigger[D, Δ] =
     (d, δ) => f(s, d, δ) match {
       case Left(ms) => reconsider(ms.map(s => sleep(untilRightS(s)(f))))
       case Right(k) => fire(k)
     }
 
-  def continually[D, Δ](f: D => M[Unit])(implicit M: Functor[M]): D => Trigger[D, Δ] =
+  def continually[D, Δ](f: D => M[Unit]): D => Trigger[D, Δ] =
     d => reconsider(f(d).as(sleep(continually((d, δ) => f(d)))))
 
-  def continually[D, Δ](f: (D, Δ) => M[Unit])(implicit M: Functor[M]): (D, Δ) => Trigger[D, Δ] =
+  def continually[D, Δ](f: (D, Δ) => M[Unit]): (D, Δ) => Trigger[D, Δ] =
     new ((D, Δ) => Trigger[D, Δ]) {
       def apply(d: D, δ: Δ): Trigger[D, Δ] = reconsider(f(d, δ).as(sleep(this)))
     }
-}
-
-object Observers {
-  type Aux[M[_], Tr[_, _]] = Observers[M] { type Trigger[a, δ] = Tr[a, δ] }
-}
-
-private[nutcracker] class DelegateObservers[M[_], Tr[_, _]](base: Observers.Aux[M, Tr]) extends Observers[M] {
-  type Trigger[a, δ] = Tr[a, δ]
-
-  override def discard[A, Δ]: Tr[A, Δ] = base.discard
-  override def sleep[A, Δ](next: (A, Δ) => Tr[A, Δ]): Tr[A, Δ] = base.sleep(next)
-  override def fire[A, Δ](action: M[Unit]): Tr[A, Δ] = base.fire(action)
-  override def fireReload[A, Δ](action: M[Unit], next: (A, Δ) => Tr[A, Δ]): Tr[A, Δ] = base.fireReload(action, next)
-  override def reconsider[A, Δ](action: M[Tr[A, Δ]]): Tr[A, Δ] = base.reconsider(action)
 }

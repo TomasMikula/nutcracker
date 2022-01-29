@@ -47,6 +47,18 @@ private[nutcracker] sealed trait SeqTrigger[K[_], D[_], Δ[_, _], I] {
     case FireReload(k, h) => caseFireReload(k, h)
     case Reconsider(f) => caseReconsider(f)
   }
+
+  def contramap[C[_], Γ[_, _]](
+      f: [i] => C[i] => D[i],
+      g: [i, j] => Γ[i, j] => Δ[i, j],
+  ): SeqTrigger[K, C, Γ, I] =
+    this match {
+      case Discard() => Discard()
+      case Sleep(h) => Sleep(h.contramap(f, g))
+      case Fire(k) => Fire(k)
+      case FireReload(k, h) => FireReload(k, h.contramap(f, g))
+      case Reconsider(cont) => Reconsider(k => cont(tr => k(tr.contramap(f, g))))
+    }
 }
 
 private[nutcracker] object SeqTrigger {
@@ -61,10 +73,26 @@ private[nutcracker] object SeqTrigger {
 
   case class Reconsider[K[_], D[_], Δ[_, _], J](cont: (SeqTrigger[K, D, Δ, J] => K[Unit]) => K[Unit]) extends SeqTrigger[K, D, Δ, J]
 
+  def contramap[K[_], D[_], Δ[_, _], I, C[_], Γ[_, _]](
+    trigger: SeqTrigger[K, D, Δ, I],
+  )(
+    f: [i] => C[i] => D[i],
+    g: [i, j] => Γ[i, j] => Δ[i, j],
+  ): SeqTrigger[K, C, Γ, I] =
+    trigger.contramap(f, g)
 }
 
 private[nutcracker] trait SeqHandler[K[_], D[_], Δ[_, _], I] { self =>
   def handle[J](d2: D[J], δ: Δ[I, J]): SeqTrigger[K, D, Δ, J]
+
+  def contramap[C[_], Γ[_, _]](
+    f: [i] => C[i] => D[i],
+    g: [i, j] => Γ[i, j] => Δ[i, j],
+  ): SeqHandler[K, C, Γ, I] =
+    new SeqHandler[K, C, Γ, I] {
+      override def handle[J](c2: C[J], γ: Γ[I, J]): SeqTrigger[K, C, Γ, J] =
+        self.handle(f(c2), g(γ)).contramap(f, g)
+    }
 }
 
 private[nutcracker] object SeqHandler {

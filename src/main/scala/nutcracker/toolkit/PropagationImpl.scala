@@ -12,7 +12,7 @@ import scalaz.{-\/, Bind, Equal, Lens, Monad, Ordering, Show, \/-}
 private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagationModule with FreeOnDemandPropagationToolkit { self =>
   override type VarK[K[_], A] = SimpleCellId[K, [i] =>> A]
   override type ValK[K[_], A] = CellId[K, [i] =>> A]
-  override type OutK[K[_], A] = nutcracker.toolkit.Out[[a] =>> SimpleCellId[K, [i] =>> a], A]
+  override type OutK[K[_], A] = nutcracker.toolkit.Out[[d[_]] =>> SimpleCellId[K, d], A]
   override type Lang[K[_], A] = PropagationLang[K, A]
   override type StateK[K[_]] = PropagationStore[K]
 
@@ -156,11 +156,11 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
 
   override def readOutK[K[_], A](a: OutK[K, A], s: StateK[K]): A =
     a match {
-      case Out.Const(a)      => a
-      case Out.WrapVar(va)   => fetchK(va, s)
-      case Out.Mapped(x, f)  => f(readOutK(x, s))
-      case Out.Pair(x, y)    => (readOutK(x, s), readOutK(y, s))
-      case Out.FlatMap(x, f) => readOutK(f(readOutK(x, s)), s)
+      case Out.Const(a)        => a
+      case Out.WrapIVar(vx, f) => f(s.fetch(vx).value)
+      case Out.Mapped(x, f)    => f(readOutK(x, s))
+      case Out.Pair(x, y)      => (readOutK(x, s), readOutK(y, s))
+      case Out.FlatMap(x, f)   => readOutK(f(readOutK(x, s)), s)
     }
 
   override def stashable: StashOnDemandPropagationModule.AuxL[self.VarK, self.ValK, self.OutK, self.Lang] =

@@ -1,7 +1,7 @@
 package nutcracker.ops
 
 import scala.language.implicitConversions
-import nutcracker.{BranchingPropagation, Dom, Final, JoinDom, ObserveSyntaxHelper, Propagation, RelativelyComplementedDom, Subscription, Unchanged, Updated}
+import nutcracker.{BranchingPropagation, Dom, Final, JoinDom, Propagation, RelativelyComplementedDom, Subscription, Unchanged, Updated}
 import nutcracker.data.bool.Bool
 import nutcracker.util.{ContU, IndexedContT}
 import scalaz.{Applicative, Apply, Bind, Functor, Traverse}
@@ -10,7 +10,7 @@ import scalaz.syntax.apply0._
 import scalaz.syntax.bind0._
 
 final case class ValOps[Val[_], D](ref: Val[D]) extends AnyVal {
-  def observe[M[_], Var[_]](implicit P: Propagation.Aux1[M, Var, Val], dom: Dom[D]): ObserveSyntaxHelper[M, D, dom.Update, dom.Delta, P.Trigger] =
+  def observe[M[_], Var[_]](implicit P: Propagation.Aux1[M, Var, Val], dom: Dom[D]): P.ObserveSyntaxHelper[D, dom.Delta] =
     P.observe(ref)
 
   def peekC[M[_], Var[_]](implicit P: Propagation.Aux1[M, Var, Val], dom: Dom[D], M: Functor[M]): ContU[M, D] =

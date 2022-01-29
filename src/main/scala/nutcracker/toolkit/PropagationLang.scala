@@ -141,24 +141,27 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit
   type K[A] = FreeK[F, A]
 
   override type IVar[A[_]] = SimpleCellId[K, A]
-  override type Val[A] = CellId[K, [i] =>> A]
+  override type IVal[A[_]] = CellId[K, A]
 
-  override type Out[A] = nutcracker.toolkit.Out[[a] =>> SimpleCellId[K, [i] =>> a], A]
+  override type Out[A] = nutcracker.toolkit.Out[[d[_]] =>> SimpleCellId[K, d], A]
 
-  type CellCycleId[A] = Var[A] \/ (AutoCellId[K, [i] =>> A], CellCycle[[i] =>> A])
-  type Tok[A, I] = (CellCycleId[A], Token[I])
+  type CellCycleId[D[_]] = IVar[D] \/ (AutoCellId[K, D], CellCycle[D])
+  type Tok[D[_], I] = (CellCycleId[D], Token[I])
 
-  type TriggerI[A, Δ, I] = SeqTrigger[K, [i] =>> A, [i, j] =>> Δ, I]
-  type Trigger[A, Δ] = Forall[TriggerI[A, Δ, *]]
-  type ExclRef[A] = (AutoCellId[K, [i] =>> A], CellCycle[[i] =>> A])
+  override type ITrigger[D[_], Δ[_, _], I] = SeqTrigger[K, D, Δ, I]
+  override type ExclRef[A] = (AutoCellId[K, [i] =>> A], CellCycle[[i] =>> A])
 
   override def M: Monad[FreeK[F, *]] =
     FreeK.freeKMonad[F]
 
-  override def readOnly[A](ref: Var[A]): Val[A] = ref
+  override def iReadOnly[D[_]](ref: IVar[D]): IVal[D] =
+    ref
 
-  override def newCell[D](d: D)(implicit dom: Dom[D]): FreeK[F, Var[D]] =
-    newCellF[F, [i] =>> D, Any](d)
+  override def readOnly[A](ref: Var[A]): Val[A] =
+    iReadOnly[[i] =>> A](ref)
+
+  override def newICell[D[_], I](d: D[I])(implicit dom: IDom[D]): FreeK[F, IVar[D]] =
+    newCellF(d)
 
   override def newAutoCellC[A](setup: IndexedContT[Unit, ExclRef[A], K, A])(implicit dom: Dom[A]): FreeK[F, Val[A]] = {
     val setup1 = (r: AutoCellId[K, [i] =>> A], c: CellCycle[[i] =>> A]) => setup.run(Id(a => supplyF(r)(c, a).as((r, c))))
@@ -177,11 +180,11 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit
   override def exclUpdateImpl[A, U, Δ](ref: ExclRef[A], u: U)(implicit dom: Dom.Aux[A, U, Δ]): FreeK[F, Unit] =
     exclUpdateF[F, [i] =>> A, [i] =>> U, [i, j] =>> Δ, Any](ref._1, ref._2, u)
 
-  override def observeImpl[D, U, Δ](ref: Val[D])(f: D => Trigger[D, Δ])(implicit dom: Dom.Aux[D, U, Δ]): FreeK[F, Subscription[K]] = {
-    val h = SeqPreHandler[FreeK[F, *], [i] =>> D, dom.IDelta]([i] => (d: D) => f(d)[i])
+  override def iObserve[D[_], Δ[_, _]](ref: IVal[D], f: [i] => D[i] => ITrigger[D, Δ, i])(using dom: IDom.AuxΔ[D, Δ]): FreeK[F, Subscription[K]] = {
+    val h = SeqPreHandler[FreeK[F, *], D, Δ](f)
     ref match {
-      case ref @ SimpleCellId(_) => observeF[F, [i] =>> D, [i] =>> U, dom.IDelta](ref)(h).map(_.fold(Subscription[FreeK[F, *]]())(subscription(ref, _)))
-      case ref @ AutoCellId(_, _) => observeAutoF[F, [i] =>> D, [i] =>> U, dom.IDelta](ref)(h).map(_.fold(Subscription[FreeK[F, *]]())({ case (c, oid) => subscription(ref, c, oid) }))
+      case ref @ SimpleCellId(_) => observeF[F, D, dom.IUpdate, Δ](ref)(h).map(_.fold(Subscription[FreeK[F, *]]())(subscription(ref, _)))
+      case ref @ AutoCellId(_, _) => observeAutoF[F, D, dom.IUpdate, Δ](ref)(h).map(_.fold(Subscription[FreeK[F, *]]())({ case (c, oid) => subscription(ref, c, oid) }))
     }
   }
 
@@ -200,47 +203,46 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit
           ).void
       })
 
-  private def subscription[D](ref: Var[D], oid: ObserverId): Subscription[FreeK[F, *]] =
+  private def subscription[D[_]](ref: IVar[D], oid: ObserverId): Subscription[FreeK[F, *]] =
     Subscription(rmObserverF(ref, oid))
 
-  private def subscription[D](ref: AutoCellId[K, [i] =>> D], cycle: CellCycle[[i] =>> D], oid: ObserverId): Subscription[FreeK[F, *]] =
+  private def subscription[D[_]](ref: AutoCellId[K, D], cycle: CellCycle[D], oid: ObserverId): Subscription[FreeK[F, *]] =
     Subscription(rmAutoObserverF(ref, cycle, oid))
 
-  override def discard[A, Δ]: Trigger[A, Δ] =
-    new Forall[TriggerI[A, Δ, *]] {
-      override def compute[I]: TriggerI[A, Δ, I] = SeqTrigger.Discard[FreeK[F, *], [i] =>> A, [i, j] =>> Δ, I]()
-    }
-  override def fire[A, Δ](action: FreeK[F, Unit]): Trigger[A, Δ] =
-    new Forall[TriggerI[A, Δ, *]] {
-      override def compute[I]: TriggerI[A, Δ, I] = SeqTrigger.Fire[FreeK[F, *], [i] =>> A, [i, j] =>> Δ, I](action)
-    }
-  override def sleep[A, Δ](next: (A, Δ) => Trigger[A, Δ]): Trigger[A, Δ] =
-    new Forall[TriggerI[A, Δ, *]] {
-      override def compute[I]: TriggerI[A, Δ, I] =
-        SeqTrigger.Sleep[FreeK[F, *], [i] =>> A, [i, j] =>> Δ, I](
-          SeqHandler[K, [i] =>> A, [i, j] =>> Δ, I](
-            [j] => (a: A, δ: Δ) => next(a, δ)[j]
-          )
-        )
-    }
-  override def fireReload[A, Δ](action: FreeK[F, Unit], next: (A, Δ) => Trigger[A, Δ]): Trigger[A, Δ] =
-    new Forall[TriggerI[A, Δ, *]] {
-      override def compute[I]: TriggerI[A, Δ, I] =
-        SeqTrigger.FireReload[FreeK[F, *], [i] =>> A, [i, j] =>> Δ, I](
-          action,
-          SeqHandler[K, [i] =>> A, [i, j] =>> Δ, I](
-            [j] => (a: A, δ: Δ) => next(a, δ)[j]
-          )
-        )
-    }
-  override def reconsider[A, Δ](action: FreeK[F, Trigger[A, Δ]]): Trigger[A, Δ] =
-    new Forall[TriggerI[A, Δ, *]] {
-      override def compute[I]: TriggerI[A, Δ, I] =
-        SeqTrigger.Reconsider[FreeK[F, *], [i] =>> A, [i, j] =>> Δ, I](f => action >>= (tr => f(tr[I])))
-    }
+  override def iDiscard[A[_], Δ[_, _], I]: ITrigger[A, Δ, I] =
+    SeqTrigger.Discard[FreeK[F, *], A, Δ, I]()
 
-  override def out[A](a: Var[A]): Out[A] =
-    Out.WrapVar(a)
+  override def iFire[A[_], Δ[_, _], I](action: FreeK[F, Unit]): ITrigger[A, Δ, I] =
+    SeqTrigger.Fire[FreeK[F, *], A, Δ, I](action)
+
+  override def iSleep[A[_], Δ[_, _], I](next: [j] => (A[j], Δ[I, j]) => ITrigger[A, Δ, j]): ITrigger[A, Δ, I] =
+    SeqTrigger.Sleep[FreeK[F, *], A, Δ, I](
+      SeqHandler[K, A, Δ, I](
+        next
+      )
+    )
+
+  override def iFireReload[A[_], Δ[_, _], I](action: FreeK[F, Unit], next: [j] => (A[j], Δ[I, j]) => ITrigger[A, Δ, j]): ITrigger[A, Δ, I] =
+    SeqTrigger.FireReload[FreeK[F, *], A, Δ, I](
+      action,
+      SeqHandler[K, A, Δ, I](
+        next
+      )
+    )
+
+  override def iReconsider[A[_], Δ[_, _], I](action: FreeK[F, ITrigger[A, Δ, I]]): ITrigger[A, Δ, I] =
+    SeqTrigger.Reconsider[FreeK[F, *], A, Δ, I](f => action >>= (tr => f(tr)))
+
+  extension [D[_], Δ[_, _], I](t: ITrigger[D, Δ, I]) {
+    def contramap[C[_], Γ[_, _]](
+      f: [i] => C[i] => D[i],
+      g: [i, j] => Γ[i, j] => Δ[i, j],
+    ): ITrigger[C, Γ, I] =
+      SeqTrigger.contramap(t)(f, g)
+  }
+
+  override def iOut[A[_], B](a: IVar[A], f: [i] => A[i] => B): Out[B] =
+    Out.WrapIVar(a, f)
 
   override def constOut[A](a: A): Out[A] =
     Out.Const(a)
@@ -255,11 +257,11 @@ private[nutcracker] class FreePropagation[F[_[_], _]](implicit
     Out.FlatMap(a, f)
 }
 
-private[nutcracker] sealed trait Out[Var[_], A]
+private[nutcracker] sealed trait Out[IVar[_[_]], A]
 private[nutcracker] object Out {
-  case class Const[Var[_], A](value: A) extends Out[Var, A]
-  case class WrapVar[Var[_], A](v: Var[A]) extends Out[Var, A]
-  case class Mapped[Var[_], A, B](v: Out[Var, A], f: A => B) extends Out[Var, B]
-  case class Pair[Var[_], A, B](a: Out[Var, A], b: Out[Var, B]) extends Out[Var, (A, B)]
-  case class FlatMap[Var[_], A, B](a: Out[Var, A], f: A => Out[Var, B]) extends Out[Var, B]
+  case class Const[IVar[_[_]], A](value: A) extends Out[IVar, A]
+  case class WrapIVar[IVar[_[_]], A[_], B](v: IVar[A], f: [i] => A[i] => B) extends Out[IVar, B]
+  case class Mapped[IVar[_[_]], A, B](v: Out[IVar, A], f: A => B) extends Out[IVar, B]
+  case class Pair[IVar[_[_]], A, B](a: Out[IVar, A], b: Out[IVar, B]) extends Out[IVar, (A, B)]
+  case class FlatMap[IVar[_[_]], A, B](a: Out[IVar, A], f: A => Out[IVar, B]) extends Out[IVar, B]
 }

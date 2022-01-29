@@ -53,7 +53,7 @@ object Discrete extends DiscreteInstances {
     } yield res
   }
 
-  def cellC[M[_], Var[_], Val[_], A](a: A)(implicit P: Propagation.Aux1[M, Var, Val]): ContT[Unit, M, Var[Discrete[A]]] = {
+  def cellC[M[_], Var[_], A](a: A)(implicit P: Propagation.Aux0[M, Var]): ContT[Unit, M, Var[Discrete[A]]] = {
     import P.M
     ContT.liftM[Unit, M, Var[Discrete[A]]](P.newCell(Discrete(a)))
   }

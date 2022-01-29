@@ -31,6 +31,7 @@ trait IDom[D[_]] {
 
 object IDom {
   type Aux0[D[_], U[_]] = IDom[D] { type IUpdate[I] = U[I] }
+  type AuxΔ[D[_], Δ[_, _]] = IDom[D] { type IDelta[I, J] = Δ[I, J] }
   type Aux[D[_], U[_], Δ[_, _]] = Aux0[D, U] { type IDelta[I, J] = Δ[I, J] }
   type Aux1[D[_], U[_], Ch[_, _, _]] = Aux0[D, U] { type IChange[I, J, K] = Ch[I, J, K] }
 }
@@ -100,6 +101,7 @@ trait Dom[D] extends IDom[[i] =>> D] {
 }
 
 object Dom {
+  type AuxΔ[D, Δ] = Dom[D] { type Delta = Δ }
   type Aux[D, U, Δ] = Dom[D] { type Update = U; type Delta = Δ }
 
   def apply[D](implicit dom: Dom[D]): Dom.Aux[D, dom.Update, dom.Delta] = dom
