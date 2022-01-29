@@ -4,8 +4,8 @@ import nutcracker.data.{DecSet, Promise}
 import nutcracker.data.DecSet._
 import nutcracker.data.listLog._
 import nutcracker.ops.Ops._
-import nutcracker.toolkit.{CellCycle, FinalizerId, ObserverId, PropagationStore, Token}
-import nutcracker.util.{ENone, Id, Lst}
+import nutcracker.toolkit.{AutoCellId, CellCycle, FinalizerId, ObserverId, PropagationStore, Token}
+import nutcracker.util.{ENone, Exists, Id, Lst}
 import org.scalatest.funsuite.AnyFunSuite
 import scala.annotation.tailrec
 import scalaz.Monad
@@ -74,6 +74,8 @@ class PropagationStoreTest extends AnyFunSuite {
       Prg(s => fa.run(s) match { case (s, a) => f(a).run(s) })
   }
 
+  type Trigger[D[_], Δ[_, _], I] = SeqTrigger[Prg, D, Δ, I]
+
   private def unconsLoop(s: PropagationStore[Prg]): PropagationStore[Prg] =
     interpretAll(s, Lst.empty)
 
@@ -83,6 +85,13 @@ class PropagationStoreTest extends AnyFunSuite {
       case Some((p, ps)) => interpretAll(p.run(s)._1, ps)
       case None => s
     }
+
+  val unexpectedReconsider =
+    [δ[_, _], i] => (tk: Token[i], tr: Trigger[[j] =>> Promise[Int], δ, i]) => sys.error("unexpected")
+
+  def unexpectedReconsider2 =
+    [i] => (c: CellCycle[[j] =>> Promise[Int]], tk: Token[i], tr: Trigger[[j] =>> Promise[Int], Promise.IDelta[Int, *, *], i]) =>
+      sys.error("unexpected")
 
   test("resume respects cycle") {
 
@@ -107,8 +116,20 @@ class PropagationStoreTest extends AnyFunSuite {
     }
 
     def resume[I](s: PropagationStore[Prg], cyc: CellCycle[[i] =>> Promise[Int]], tok: Token[I]): PropagationStore[Prg] = {
-      val (s1, ks, becameDirty) = s.resume[[i] =>> Promise[Int], Promise.IDelta[Int, *, *], I](ref, cyc, tok, s.fire[[i] =>> Promise[Int], I](Prg(s => { observed = true; (s, ()) })))
-      val (s2, ks2) = if(becameDirty) s.execTriggers(ref, cyc) else (s1, ks)
+      val (s1, ks, becameDirty) =
+        s.resume[[i] =>> Promise[Int], Promise.IDelta[Int, *, *], I](
+          ref,
+          cyc,
+          tok,
+          s.fire[[i] =>> Promise[Int], I](Prg(s => { observed = true; (s, ()) })),
+          onReconsidered = unexpectedReconsider[Promise.IDelta[Int, *, *], I],
+        )
+      val (s2, ks2) =
+        if(becameDirty) {
+          s.execTriggers(ref, cyc, unexpectedReconsider)
+        } else {
+          (s1, ks)
+        }
       interpretAll(s2, ks2)
     }
 
@@ -119,7 +140,13 @@ class PropagationStoreTest extends AnyFunSuite {
     assertResult(0)(holdCallbacksRun.size)
 
     // supply value
-    val s4 = interpretAll(s3, Lst.singleton(Prg(s => s.supply(ref)(cycle1, Promise.empty[Int])).flatMap(_.sequence_)))
+    val s4 = interpretAll(
+      s3,
+      Lst.singleton(
+        Prg(s => s.supply(ref)(cycle1, Promise.empty[Int], unexpectedReconsider))
+          .flatMap(_.sequence_)
+      )
+    )
 
     // check that we now have a token, but observer was not triggered yet
     assertResult(1)(tokens.size)
@@ -137,7 +164,7 @@ class PropagationStoreTest extends AnyFunSuite {
     assertResult(2)(setupCalled)
 
     // supply value
-    val s9 = interpretAll(s7, Lst.singleton(Prg(s => s.supply(ref)(cycle2, Promise.empty[Int])).flatMap(_.sequence_)))
+    val s9 = interpretAll(s7, Lst.singleton(Prg(s => s.supply(ref)(cycle2, Promise.empty[Int], unexpectedReconsider)).flatMap(_.sequence_)))
 
     assertResult(2)(holdCallbacksRun.size)
     assertResult(2)(holdCallbacksRun(1))
@@ -161,10 +188,14 @@ class PropagationStoreTest extends AnyFunSuite {
     val s0 = PropagationStore.empty[Prg]
 
     // create cell
-    val (s1, ref) = s0.newAutoCell[[i] =>> Promise[Int]]((ref, cyc) => Prg(s => s.supply(ref)(cyc, Promise.completed(42))).flatMap(_.sequence_))
+    val (s1, ref) =
+      s0.newAutoCell[[i] =>> Promise[Int]] { (ref, cyc) =>
+        Prg(s => s.supply(ref)(cyc, Promise.completed(42), unexpectedReconsider))
+          .flatMap(_.sequence_)
+      }
 
     // observe cell to trigger setup
-    val (ks, s2, Some((cycle, oid))) = s1.observeOnce[[i] =>> Promise[Int]](ref, [i] => (pi: Promise[Int]) => ().point[Prg])
+    val (ks, s2, Some((cycle, oid))) = s1.observeOnce[[i] =>> Promise[Int]](ref, [i] => (pi: Promise[Int]) => ().point[Prg])(unexpectedReconsider2)
     val s3 = interpretAll(s2, ks)
 
     // check that cell has already been cleaned up, because once-observer should have fired
@@ -172,7 +203,7 @@ class PropagationStoreTest extends AnyFunSuite {
 
     // these should be no-ops, but cause no error
     s3.exclUpdate[[i] =>> Promise[Int], [j] =>> Promise.Update[Int], Promise.IDelta[Int, *, *], Any](ref, cycle, Promise.completed(77))
-    s3.supply(ref)(cycle, Promise.completed(77))
+    s3.supply(ref)(cycle, Promise.completed(77), unexpectedReconsider)
     s3.addFinalizer(ref, cycle, Subscription())
     s3.removeFinalizer(ref, cycle, FinalizerId.zero)
   }
@@ -181,13 +212,24 @@ class PropagationStoreTest extends AnyFunSuite {
     val s0 = PropagationStore.empty[Prg]
 
     // create cell
-    val (s1, ref) = s0.newAutoCell[[i] =>> Promise[Int]]((ref, cyc) => Prg(s => s.supply(ref)(cyc, Promise.completed(42))).flatMap(_.sequence_))
+    val (s1, ref) =
+      s0.newAutoCell[[i] =>> Promise[Int]] { (ref, cyc) =>
+        Prg(s => s.supply(ref)(cyc, Promise.completed(42), unexpectedReconsider))
+          .flatMap(_.sequence_)
+      }
 
     // hold and snoop the token
-    var token: Option[Token[_]] = None
-    val (s2, cycle, oid, ks1) = s1.hold(ref)([i] => (pi: Promise[Int], cyc: CellCycle[[i] =>> Promise[Int]], tok: Token[i], oid: ObserverId) => { token = Some(tok); ().point[Prg] })
+    var tokenOpt: Option[Exists[Token]] = None
+    val (s2, cycle, oid, ks1) =
+      s1.hold(ref)(
+        [i] => (pi: Promise[Int], cyc: CellCycle[[i] =>> Promise[Int]], tok: Token[i], oid: ObserverId) => {
+          tokenOpt = Some(Exists(tok))
+          ().point[Prg]
+        }
+      )
     val s3 = interpretAll(s2, ks1)
-    assert(token.isDefined)
+    assert(tokenOpt.isDefined)
+    val token = tokenOpt.get
 
     // remove observer, check that cell has been cleaned up
     val (s4, ks2) = s3.rmObserver(ref, cycle, oid)
@@ -196,7 +238,7 @@ class PropagationStoreTest extends AnyFunSuite {
 
     // these should be no-ops, but cause no error
     s5.rmObserver(ref, cycle, oid)
-    s5.resume(ref, cycle, token.get, s5.fire(().point[Prg]))
+    s5.resume(ref, cycle, token.value, s5.fire(().point[Prg]), unexpectedReconsider[Promise.IDelta[Int, *, *], token.X])
   }
 }
 

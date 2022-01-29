@@ -48,7 +48,27 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
       private def execTriggersAuto[A[_]](ref: AutoCellId[K, A], cycle: CellCycle[A]): PropagationLang[K, Unit] =
         PropagationLang.ExecTriggersAuto(ref, cycle)
 
-      override def apply[M[_], W, A](p: PropagationLang[K, A])(implicit M: MonadTellState[M, W, S], W: StratifiedMonoidAggregator[W, Lst[K[Unit]]], inj: Inject[PropagationLang[K, *], K], K: Bind[K]): M[A] =
+      override def apply[M[_], W, A](p: PropagationLang[K, A])(implicit
+        M: MonadTellState[M, W, S],
+        W: StratifiedMonoidAggregator[W, Lst[K[Unit]]],
+        inj: Inject[PropagationLang[K, *], K],
+        K: Bind[K],
+      ): M[A] = {
+        def resumeSimple[D[_]](cellId: SimpleCellId[K, D]): [δ[_, _], i] => (Token[i], SeqTrigger[K, D, δ, i]) => K[Unit] =
+          [δ[_, _], i] => (tk: Token[i], tr: SeqTrigger[K, D, δ, i]) =>
+            inj(PropagationLang.resume(cellId, tk, tr))
+        def resumeSimple_[D[_], Δ[_, _]](cellId: SimpleCellId[K, D]): [i] => (Token[i], SeqTrigger[K, D, Δ, i]) => K[Unit] =
+          [i] => (tk: Token[i], tr: SeqTrigger[K, D, Δ, i]) =>
+            resumeSimple(cellId)(tk, tr)
+
+        def resumeAuto[D[_]](cellId: AutoCellId[K, D], cycle: CellCycle[D]): [δ[_, _], i] => (Token[i], SeqTrigger[K, D, δ, i]) => K[Unit] =
+          [δ[_, _], i] => (tk: Token[i], tr: SeqTrigger[K, D, δ, i]) =>
+            inj(PropagationLang.resumeAuto(cellId, cycle, tk, tr))
+
+        def resumeAuto_[D[_], Δ[_, _]](cellId: AutoCellId[K, D]): [i] => (CellCycle[D], Token[i], SeqTrigger[K, D, Δ, i]) => K[Unit] =
+          [i] => (cycle: CellCycle[D], tk: Token[i], tr: SeqTrigger[K, D, Δ, i]) =>
+            resumeAuto(cellId, cycle)(tk, tr)
+
         M.writerState[A](s0 => {
           val s = lens.get(s0)
           p match {
@@ -62,17 +82,18 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
               (w, s0 set s1, ())
 
             case ext: ExecTriggers[k, _] =>
-              val (s1, ks) = s.execTriggers(ext.ref)
+              val cellId = ext.ref
+              val (s1, ks) = s.execTriggers(cellId, resumeSimple(cellId))
               (ks at 0, s0 set s1, ())
             case eta: ExecTriggersAuto[k, _] =>
-              val (s1, ks) = s.execTriggers(eta.ref, eta.cycle)
+              val (s1, ks) = s.execTriggers(eta.ref, eta.cycle, resumeAuto(eta.ref, eta.cycle))
               (ks at 0, s0 set s1, ())
 
             case obs: Observe[k, d, u, δ] =>
-              val (ks, s1, oid) = s.observe[d, u, δ](obs.ref, obs.f)(obs.dom)
+              val (ks, s1, oid) = s.observe[d](obs.ref)(using obs.dom)(obs.f, resumeSimple_[d, obs.dom.IDelta](obs.ref))
               (ks at 0, s0 set s1, oid)
             case oba: ObserveAuto[k, d, u, δ] =>
-              val (ks, s1, oid) = s.observe[d, u, δ](oba.ref, oba.f)(oba.dom)
+              val (ks, s1, oid) = s.observe[d, u, δ](oba.ref, oba.f, resumeAuto_[d, δ](oba.ref))(oba.dom)
               (ks at 0, s0 set s1, oid)
 
             case h: Hold[k, d] =>
@@ -83,14 +104,14 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
               (ks at 0, s0 set s1, oid)
             case res: Resume[k, d, δ, d0] =>
               def resume[D[_], Δ[_, _], I](s: StateK[K])(ref: SimpleCellId[K, D], token: Token[I], trigger: s.Trigger[D, Δ, I]): (PropagationStore[K], Lst[K[Unit]], Boolean) =
-                s.resume[D, Δ, I](ref, token, trigger)
+                s.resume[D, Δ, I](ref, token, trigger, resumeSimple(ref)[Δ, I])
               val (s1, ks, becameDirty) =
                 resume[res.Domain, res.Delta, res.Idx](s)(res.ref, res.token, res.trigger)
               val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggers(res.ref))) at 1) else (ks at 0)
               (w, s0 set s1, ())
             case res: ResumeAuto[k, d, δ, d0] =>
               def resume[D[_], Δ[_, _], I](s: StateK[K])(ref: AutoCellId[K, D], cycle: CellCycle[D], token: Token[I], trigger: s.Trigger[D, Δ, I]): (PropagationStore[K], Lst[K[Unit]], Boolean) =
-                s.resume(ref, cycle, token, trigger)
+                s.resume(ref, cycle, token, trigger, resumeAuto(ref, cycle)[Δ, I])
               val (s1, ks, becameDirty) = resume[res.Domain, res.Delta, res.Idx](s)(res.ref, res.cycle, res.token, res.trigger)
               val w = if(becameDirty) (ks at 0) |+| (Lst.singleton(inj(execTriggersAuto(res.ref, res.cycle))) at 1) else (ks at 0)
               (w, s0 set s1, ())
@@ -103,7 +124,7 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
               (W.zero, s0 set s1, ref)
 
             case sup: Supply[k, d, i] =>
-              val (s1, ks) = s.supply(sup.ref)(sup.cycle, sup.value)
+              val (s1, ks) = s.supply(sup.ref)(sup.cycle, sup.value, resumeAuto(sup.ref, sup.cycle))
               (ks at 0, s0 set s1, ())
 
             case rmo: RmObserver[k, d] =>
@@ -121,6 +142,7 @@ private[nutcracker] object PropagationImpl extends PersistentOnDemandPropagation
               (W.zero, s0 set s1, ())
           }
         })
+      }
     }
 
   override def fetchK[K[_], A](ref: ValK[K, A], s: StateK[K]): Option[A] =
@@ -152,14 +174,12 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   simpleCells: HKMap[[d[_]] =>> SimpleCellId[K, d], [d[_]] =>> SimpleCell[K, d]],
   autoCells: HKMap[[d[_]] =>> AutoCellId[K, d], [d[_]] =>> OnDemandCell[K, d]]
 ) {
-  type CellIncarnationId[D[_]] = Cell.IncarnationId[K, D]
-  type Tok[D[_], I] = (CellIncarnationId[D], Token[I])
-  type PreHandler[D[_], Δ[_, _]] = SeqPreHandler[Tok[D, *], K, D, Δ]
-  type Trigger[D[_], Δ[_, _], I] = SeqTrigger[Tok[D, *], K, D, Δ, I]
+  type PreHandler[D[_], Δ[_, _]] = SeqPreHandler[K, D, Δ]
+  type Trigger[D[_], Δ[_, _], I] = SeqTrigger[K, D, Δ, I]
 
   // helpers for testing
-  def fire[D[_], I](k: K[Unit])(implicit dom: IDom[D]): Trigger[D, dom.IDelta, I] = SeqTrigger.Fire[Tok[D, *], K, D, dom.IDelta, I](k)
-  def once[D[_]](f: [i] => D[i] => K[Unit])(implicit dom: IDom[D]): PreHandler[D, dom.IDelta] = SeqPreHandler[Tok[D, *], K, D, dom.IDelta]([i] => (d: D[i]) => fire[D, i](f[i](d)))
+  def fire[D[_], I](k: K[Unit])(implicit dom: IDom[D]): Trigger[D, dom.IDelta, I] = SeqTrigger.Fire[K, D, dom.IDelta, I](k)
+  def once[D[_]](f: [i] => D[i] => K[Unit])(implicit dom: IDom[D]): PreHandler[D, dom.IDelta] = SeqPreHandler[K, D, dom.IDelta]([i] => (d: D[i]) => fire[D, i](f[i](d)))
 
   def newCell[D[_], I](d: D[I])(implicit dom: IDom[D]): (PropagationStore[K], SimpleCellId[K, D]) = {
     val ref = lastCellId.inc[K, D]
@@ -208,19 +228,41 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         (this, false)
     }
 
-  def observe[D[_], U[_], Δ[_, _]](ref: SimpleCellId[K, D], f: PreHandler[D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (Lst[K[Unit]], PropagationStore[K], Option[ObserverId]) = {
-    val (cell, oid, ks) = simpleCells(ref).infer.observe(-\/(ref), f)
+  def observe[D[_]](
+    ref: SimpleCellId[K, D],
+  )(using
+    dom: IDom[D],
+  )(
+    f: PreHandler[D, dom.IDelta],
+    onReconsidered: [i] => (Token[i], Trigger[D, dom.IDelta, i]) => K[Unit],
+  ): (Lst[K[Unit]], PropagationStore[K], Option[ObserverId]) = {
+    val cell0 = simpleCells(ref).infer
+    val (cell, oid, ks) = cell0.observe(-\/(ref), f, onReconsidered[cell0.Idx])
     (ks, copy(simpleCells = simpleCells.put(ref)(cell)), oid)
   }
 
   // convenience method for testing
-  def observeOnce[D[_]](ref: AutoCellId[K, D], f: [i] => D[i] => K[Unit])(implicit dom: IDom[D]): (Lst[K[Unit]], PropagationStore[K], Option[(CellCycle[D], ObserverId)]) =
-    observe[D, dom.IUpdate, dom.IDelta](ref, once[D](f))(dom)
+  def observeOnce[D[_]](
+    ref: AutoCellId[K, D],
+    f: [i] => D[i] => K[Unit],
+  )(using
+    dom: IDom[D],
+  )(
+    onReconsidered: [i] => (CellCycle[D], Token[i], Trigger[D, dom.IDelta, i]) => K[Unit],
+  ): (Lst[K[Unit]], PropagationStore[K], Option[(CellCycle[D], ObserverId)]) =
+    observe[D, dom.IUpdate, dom.IDelta](ref, once[D](f), onReconsidered)(dom)
 
-  def observe[D[_], U[_], Δ[_, _]](ref: AutoCellId[K, D], f: PreHandler[D, Δ])(implicit dom: IDom.Aux[D, U, Δ]): (Lst[K[Unit]], PropagationStore[K], Option[(CellCycle[D], ObserverId)]) =
+  def observe[D[_], U[_], Δ[_, _]](
+    ref: AutoCellId[K, D],
+    f: PreHandler[D, Δ],
+    onReconsidered: [i] => (CellCycle[D], Token[i], Trigger[D, Δ, i]) => K[Unit],
+  )(implicit
+    dom: IDom.Aux[D, U, Δ],
+  ): (Lst[K[Unit]], PropagationStore[K], Option[(CellCycle[D], ObserverId)]) =
     autoCells.get(ref) match {
       case Some(cell0) =>
-        val (cell, oid, ks) = cell0.infer.observe(\/-((ref, cell0.cycle)), f)
+        val cell1 = cell0.infer
+        val (cell, oid, ks) = cell1.observe(\/-((ref, cell1.cycle)), f, onReconsidered[cell1.Idx](cell1.cycle, _, _))
         (ks, copy(autoCells = autoCells.put(ref)(cell)), oid.map((cell.cycle, _)))
       case None =>
         val newCycle = lastCellCycle.inc[D]
@@ -245,10 +287,14 @@ private[nutcracker] case class PropagationStore[K[_]] private(
     }
   }
 
-  def supply[D[_], I](ref: AutoCellId[K, D])(cycle: CellCycle[D], value: D[I]): (PropagationStore[K], Lst[K[Unit]]) =
+  def supply[D[_], I](ref: AutoCellId[K, D])(
+    cycle: CellCycle[D],
+    value: D[I],
+    onReconsidered: [δ[_, _], i] => (Token[i], Trigger[D, δ, i]) => K[Unit],
+  ): (PropagationStore[K], Lst[K[Unit]]) =
     autoCells.get(ref) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
-        val (cell, ks) = cell0.supply(\/-((ref, cycle)), value)
+        val (cell, ks) = cell0.supply(\/-((ref, cycle)), value, onReconsidered[cell0.Delta, I])
         cell match {
           case Some(cell) => (copy(autoCells = autoCells.put(ref)(cell)), ks)
           case None       => (copy(autoCells = autoCells - ref),          ks)
@@ -257,15 +303,30 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         (this, Lst.empty)
     }
 
-  def resume[D[_], Δ[_, _], I](ref: SimpleCellId[K, D], token: Token[I], trigger: Trigger[D, Δ, I]): (PropagationStore[K], Lst[K[Unit]], Boolean) = {
-    val (cell, ks, becameDirty) = simpleCells(ref).asInstanceOf[SimpleCell.AuxD[K, D, Δ]].resume(-\/(ref), token, trigger)
+  def resume[D[_], Δ[_, _], I](
+    ref: SimpleCellId[K, D],
+    token: Token[I],
+    trigger: Trigger[D, Δ, I],
+    onReconsidered: (Token[I], Trigger[D, Δ, I]) => K[Unit],
+  ): (PropagationStore[K], Lst[K[Unit]], Boolean) = {
+    val cell0 = simpleCells(ref).asInstanceOf[SimpleCell.AuxD[K, D, Δ]]
+    val (cell, ks, becameDirty) = cell0.resume(-\/(ref), token, trigger, onReconsidered)
     (copy(simpleCells = simpleCells.put(ref)(cell)), ks, becameDirty)
   }
 
-  def resume[D[_], Δ[_, _], I](ref: AutoCellId[K, D], cycle: CellCycle[D], token: Token[I], trigger: Trigger[D, Δ, I]): (PropagationStore[K], Lst[K[Unit]], Boolean) =
+  def resume[D[_], Δ[_, _], I](
+    ref: AutoCellId[K, D],
+    cycle: CellCycle[D],
+    token: Token[I],
+    trigger: Trigger[D, Δ, I],
+    onReconsidered: (Token[I], Trigger[D, Δ, I]) => K[Unit],
+  ): (PropagationStore[K], Lst[K[Unit]], Boolean) =
     autoCells.get(ref) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
-        val (cell, ks) = cell0.asInstanceOf[OnDemandCell.AuxD[K, D, Δ]].resume(\/-((ref, cycle)), token, trigger)
+        val (cell, ks) =
+          cell0
+            .asInstanceOf[OnDemandCell.AuxD[K, D, Δ]]
+            .resume(\/-((ref, cycle)), token, trigger, onReconsidered)
         cell match {
           case Some((cell, becameDirty)) =>
             (copy(autoCells = autoCells.put(ref)(cell)), ks, becameDirty)
@@ -311,15 +372,23 @@ private[nutcracker] case class PropagationStore[K[_]] private(
         this
     }
 
-  def execTriggers[D[_]](r: SimpleCellId[K, D]): (PropagationStore[K], Lst[K[Unit]]) = {
-    val (cell, ks) = simpleCells(r).triggerPendingObservers(-\/(r))
+  def execTriggers[D[_]](
+    r: SimpleCellId[K, D],
+    onReconsidered: [δ[_, _], i] => (Token[i], Trigger[D, δ, i]) => K[Unit],
+  ): (PropagationStore[K], Lst[K[Unit]]) = {
+    val cell0 = simpleCells(r)
+    val (cell, ks) = cell0.triggerPendingObservers(-\/(r), onReconsidered[cell0.Delta, cell0.Idx])
     (copy(simpleCells = simpleCells.put(r)(cell)), ks)
   }
 
-  def execTriggers[D[_]](r: AutoCellId[K, D], cycle: CellCycle[D]): (PropagationStore[K], Lst[K[Unit]]) = {
+  def execTriggers[D[_]](
+    r: AutoCellId[K, D],
+    cycle: CellCycle[D],
+    onReconsidered: [δ[_, _], i] => (Token[i], Trigger[D, δ, i]) => K[Unit],
+  ): (PropagationStore[K], Lst[K[Unit]]) = {
     autoCells.get(r) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
-        val (cell, ks) = cell0.triggerPendingObservers(\/-((r, cell0.cycle)))
+        val (cell, ks) = cell0.triggerPendingObservers(\/-((r, cell0.cycle)), onReconsidered[cell0.Delta, cell0.Idx])
         cell match {
           case Some(cell) =>
             (copy(autoCells = autoCells.put(r)(cell)), ks)
@@ -387,6 +456,7 @@ private[nutcracker] final case class SimpleCellId[K[_], D[_]](domainId: Long) ex
 }
 
 private[nutcracker] object SimpleCellId {
+  type AuxΔ[K[_], D[_], Δ[_, _]] = SimpleCellId[K, D] { type Delta[I, J] = Δ[I, J] }
   type Aux[K[_], D[_], U[_], Δ[_, _]] = SimpleCellId[K, D] { type Update[J] = U[J]; type Delta[I, J] = Δ[I, J] }
 
   def order[K[_], A[_], B[_]](fa: SimpleCellId[K, A], fb: SimpleCellId[K, B]): Ordering =
@@ -398,6 +468,10 @@ private[nutcracker] object SimpleCellId {
 
 private[nutcracker] final case class AutoCellId[K[_], D[_]](domainId: Long, runSetup: (AutoCellId[K, D], CellCycle[D]) => K[Unit]) extends CellId[K, D] {
   def setup(cycle: CellCycle[D]): K[Unit] = runSetup(this, cycle)
+}
+
+private[nutcracker] object AutoCellId {
+  type AuxΔ[K[_], D[_], Δ[_, _]] = AutoCellId[K, D] { type Delta[I, J] = Δ[I, J] }
 }
 
 private[nutcracker] final class CellCycle[D[_]] private(val value: Long) extends AnyVal {
