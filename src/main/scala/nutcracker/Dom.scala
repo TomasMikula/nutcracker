@@ -36,6 +36,7 @@ object IDom {
   type AuxΔ[D[_], Δ[_, _]] = IDom[D] { type IDelta[I, J] = Δ[I, J] }
   type Aux[D[_], U[_], Δ[_, _]] = Aux0[D, U] { type IDelta[I, J] = Δ[I, J] }
   type Aux1[D[_], U[_], R[_, _]] = Aux0[D, U] { type IUpdateRes[I, J] = R[I, J] }
+  type Aux2[D[_], U[_], R[_, _], Δ[_, _]] = Aux1[D, U, R] { type IDelta[I, K] = Δ[I, K] }
 }
 
 sealed abstract class IUpdateResult[D[_], Δ[_, _], I, J] {

@@ -8,6 +8,18 @@ sealed abstract class Exists[F[_]] {
 
   def map[G[_]](f: F ~> G): Exists[G] =
     Exists(f(value))
+
+  override def toString: String =
+    s"∃($value)"
+
+  override def equals(that: Any): Boolean =
+    that match {
+      case that: Exists[_] => this.value == that.value
+      case _               => false
+    }
+
+  override def hashCode: Int =
+    value.hashCode
 }
 
 object Exists {

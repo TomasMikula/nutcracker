@@ -5,7 +5,16 @@ import scalaz.{Leibniz, ===}
 /** Similar to `Option[F[A, B]]`, but the empty case witnesses type equality
   * between `A` and `B`.
   */
-sealed abstract class AOption[F[_, _], A, B]
+sealed abstract class AOption[F[_, _], A, B] {
+  def fold[R](
+    caseSome: F[A, B] => R,
+    caseNone: A === B => R,
+  ): R =
+    this match {
+      case ASome(f)  => caseSome(f)
+      case ANone(ev) => caseNone(ev)
+    }
+}
 
 /**
   * The empty case contains evidence of type equality

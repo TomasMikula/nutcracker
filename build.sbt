@@ -2,7 +2,7 @@ name := "nutcracker"
 
 organization := "com.github.tomasmikula"
 
-lazy val scala3   = "3.1.0"
+lazy val scala3 = "3.1.1"
 
 scalaVersion := scala3
 crossScalaVersions := Seq(scala3)
