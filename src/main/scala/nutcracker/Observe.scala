@@ -377,11 +377,29 @@ trait Observers[M[_]] {
       case Right(k) => fire(k)
     }
 
-  def continually[D, Δ](f: D => M[Unit]): D => Trigger[D, Δ] =
-    d => reconsider(f(d).as(sleep(continually((d, δ) => f(d)))))
+  def iContinually[D[_], Δ[_, _]](f: [i] => D[i] => M[Unit]): [i] => D[i] => ITrigger[D, Δ, i] =
+    [i] => (d: D[i]) =>
+      iReconsider[D, Δ, i](f(d).as(iSleep(iContinually[D, Δ, i]([j, k] => (d: D[k], δ: Δ[j, k]) => f(d)))))
 
-  def continually[D, Δ](f: (D, Δ) => M[Unit]): (D, Δ) => Trigger[D, Δ] =
-    new ((D, Δ) => Trigger[D, Δ]) {
-      def apply(d: D, δ: Δ): Trigger[D, Δ] = reconsider(f(d, δ).as(sleep(this)))
+  def iContinually[D[_], Δ[_, _], I](f: [i, j] => (D[j], Δ[i, j]) => M[Unit]): [j] => (D[j], Δ[I, j]) => ITrigger[D, Δ, j] =
+    [j] => (d: D[j], δ: Δ[I, j]) =>
+      iReconsider[D, Δ, j](f(d, δ).map(_ => iSleep[D, Δ, j](iContinually[D, Δ, j](f))))
+
+  def continually[D, Δ](f: D => M[Unit]): D => Trigger[D, Δ] = {
+    val res0: [i] => D => ITrigger[[x] =>> D, [x, y] =>> Δ, i] =
+      iContinually[[i] =>> D, [i, j] =>> Δ]([i] => (d: D) => f(d))
+
+    d => new Trigger[D, Δ] {
+      override def compute[I] = res0[I](d)
     }
+  }
+
+  def continually[D, Δ](f: (D, Δ) => M[Unit]): (D, Δ) => Trigger[D, Δ] = {
+    val res0: [i] => (D, Δ) => ITrigger[[x] =>> D, [x, y] =>> Δ, i] =
+      iContinually[[i] =>> D, [i, j] =>> Δ, Any]([i, j] => (d: D, δ: Δ) => f(d, δ))
+
+    (d, δ) => new Trigger[D, Δ] {
+      override def compute[I] = res0[I](d, δ)
+    }
+  }
 }
