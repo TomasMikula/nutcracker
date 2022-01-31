@@ -1,7 +1,6 @@
 package nutcracker.toolkit
 
 import nutcracker.{IDom, OnDemandPropagation, SeqPreHandler, SeqTrigger, Subscription}
-import nutcracker.Propagation.IUpdateRes
 import nutcracker.util.{Exists, ExistsOption, ENone, ESome, FreeK, HKMap, HOrderK, Inject, Lst, MonadTellState, ShowK, StateInterpreter, StratifiedMonoidAggregator}
 import nutcracker.util.ops.Ops._
 import scala.language.existentials
@@ -205,20 +204,20 @@ private[nutcracker] case class PropagationStore[K[_]] private(
   // unsafe, should only be allowed on simple cells
   def fetch[D[_]](ref: CellId[K, D]): Exists[D] = tryFetch(ref).unsafeGet
 
-  def update[D[_], U[_], J](ref: SimpleCellId[K, D], u: U[J])(implicit dom: IDom.Aux0[D, U]): (PropagationStore[K], IUpdateRes[D, dom.IChange, J, ?], Boolean) =
+  def update[D[_], U[_], J](ref: SimpleCellId[K, D], u: U[J])(implicit dom: IDom.Aux0[D, U]): (PropagationStore[K], Exists[dom.IUpdateRes[*, J]], Boolean) =
     simpleCells(ref).infer.update(u) match {
-      case CellUpdated(cell, change, newValue, becameDirty) =>
+      case CellUpdated(cell, res, becameDirty) =>
         val domains1 = simpleCells.put(ref)(cell)
-        (copy(simpleCells = domains1), IUpdateRes.Updated(change, newValue), becameDirty)
-      case CellUnchanged(value) =>
-        (this, IUpdateRes.Unchanged(value), false)
+        (copy(simpleCells = domains1), Exists(res), becameDirty)
+      case CellUnchanged(res) =>
+        (this, Exists(res), false)
     }
 
   def exclUpdate[D[_], U[_], Δ[_, _], J](ref: AutoCellId[K, D], cycle: CellCycle[D], u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): (PropagationStore[K], Boolean) =
     autoCells.get(ref) match {
       case Some(cell0) if(cell0.cycle === cycle) =>
         cell0.infer.exclUpdate(u) match {
-          case CellUpdated(cell, delta, newValue, becameDirty) =>
+          case CellUpdated(cell, res, becameDirty) =>
             val autoCells1 = autoCells.put(ref)(cell)
             (copy(autoCells = autoCells1), becameDirty)
           case CellUnchanged(value) =>

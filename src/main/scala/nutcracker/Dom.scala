@@ -4,23 +4,25 @@ import scalaz.{Leibniz, Semigroup, \&/, ===}
 import scalaz.Isomorphism.<=>
 
 trait IDom[D[_]] {
+  /** An action on [[D]]. (`IUpdate[?]` acts on `D[?]`.)
+    * In order to get deterministic results in a propagation network
+    * (where the order of applying updates is non-deterministic),
+    * it should form a commutative semigroup of closure operators on [[D]].
+    */
   type IUpdate[_]
 
-  /** `IChange[I, J, K]` represents a change of `D[I]` by `IUpdate[J]`, resulting in `D[K]`. */
-  type IChange[_, _, _]
+  /** Result of updating `D[I]` by `IUpdate[J]`.
+    * The type is user-defined, but has to be convertible to [[IUpdateResult]] via [[toUpdateResult]].
+    */
+  type IUpdateRes[I, J]
 
   /** `IDelta[I, K]` represents a change from `D[I]` to `D[K]`, forgetting the index of the update that caused the change. */
   type IDelta[_, _]
 
-  /** Applies the monotonic update `u` to `d`, obtaining `d1 ≥ d`
-    * and a description of the diff. If the update doesn't have any
-    * effect on `d`, returns `Unchanged`. In addition to being monotonic,
-    * updates also have to be _commutative_ and _idempotent_ (when
-    * the deltas are combined using [[composeDeltas]]).
-    */
-  def iUpdate[I, J](d: D[I], u: IUpdate[J]): IUpdateResult[D, IChange, I, J, ?]
+  /** Applies update `u` to `d`, obtaining a description of the change. */
+  def iUpdate[I, J](d: D[I], u: IUpdate[J]): IUpdateRes[I, J]
 
-  def changeToDelta[I, J, K](ch: IChange[I, J, K]): IDelta[I, K]
+  def toUpdateResult[I, J](ch: IUpdateRes[I, J]): IUpdateResult[D, IDelta, I, ?]
 
   def composeDeltas[I1, I2, I3](δ1: IDelta[I2, I3], δ2: IDelta[I1, I2]): IDelta[I1, I3]
 
@@ -33,31 +35,31 @@ object IDom {
   type Aux0[D[_], U[_]] = IDom[D] { type IUpdate[I] = U[I] }
   type AuxΔ[D[_], Δ[_, _]] = IDom[D] { type IDelta[I, J] = Δ[I, J] }
   type Aux[D[_], U[_], Δ[_, _]] = Aux0[D, U] { type IDelta[I, J] = Δ[I, J] }
-  type Aux1[D[_], U[_], Ch[_, _, _]] = Aux0[D, U] { type IChange[I, J, K] = Ch[I, J, K] }
+  type Aux1[D[_], U[_], R[_, _]] = Aux0[D, U] { type IUpdateRes[I, J] = R[I, J] }
 }
 
-sealed abstract class IUpdateResult[D[_], Δ[_, _, _], I, J, K] {
-  def map[E[_], Δ2[_, _, _]](f: [i] => D[i] => E[i], g: [i, j, k] => Δ[i, j, k] => Δ2[i, j, k]): IUpdateResult[E, Δ2, I, J, K]
+sealed abstract class IUpdateResult[D[_], Δ[_, _], I, J] {
+  def map[E[_], Δ2[_, _]](f: [i] => D[i] => E[i], g: [i, j] => Δ[i, j] => Δ2[i, j]): IUpdateResult[E, Δ2, I, J]
 
-  def map_[E, Δ2](f: [i] => D[i] => E, g: [i, j, k] => Δ[i, j, k] => Δ2): UpdateResult[E, Δ2] =
-    UpdateResult(map[[i] =>> E, [i, j, k] =>> Δ2](f, g))
+  def map_[E, Δ2](f: [i] => D[i] => E, g: [i, j] => Δ[i, j] => Δ2): UpdateResult[E, Δ2] =
+    UpdateResult(map[[i] =>> E, [i, j] =>> Δ2](f, g))
 }
-case class Unchanged[D[_], Δ[_, _, _], I, J]() extends IUpdateResult[D, Δ, I, J, I] {
-  override def map[E[_], Δ2[_, _, _]](f: [i] => D[i] => E[i], g: [i, j, k] => Δ[i, j, k] => Δ2[i, j, k]): IUpdateResult[E, Δ2, I, J, I] =
+case class Unchanged[D[_], Δ[_, _], I]() extends IUpdateResult[D, Δ, I, I] {
+  override def map[E[_], Δ2[_, _]](f: [i] => D[i] => E[i], g: [i, j] => Δ[i, j] => Δ2[i, j]): IUpdateResult[E, Δ2, I, I] =
     IUpdateResult.unchanged
 }
-case class Updated[D[_], Δ[_, _, _], I, J, K](newValue: D[K], change: Δ[I, J, K]) extends IUpdateResult[D, Δ, I, J, K] {
-  override def map[E[_], Δ2[_, _, _]](f: [i] => D[i] => E[i], g: [i, j, k] => Δ[i, j, k] => Δ2[i, j, k]): IUpdateResult[E, Δ2, I, J, K] =
-    Updated(f(newValue), g(change))
+case class Updated[D[_], Δ[_, _], I, J](newValue: D[J], delta: Δ[I, J]) extends IUpdateResult[D, Δ, I, J] {
+  override def map[E[_], Δ2[_, _]](f: [i] => D[i] => E[i], g: [i, j] => Δ[i, j] => Δ2[i, j]): IUpdateResult[E, Δ2, I, J] =
+    Updated(f(newValue), g(delta))
 }
 
 object IUpdateResult {
   private val _unchanged = Unchanged()
 
-  def unchanged[D[_], Δ[_, _, _], I, J]: IUpdateResult[D, Δ, I, J, I] =
-    _unchanged.asInstanceOf[IUpdateResult[D, Δ, I, J, I]]
+  def unchanged[D[_], Δ[_, _], I]: IUpdateResult[D, Δ, I, I] =
+    _unchanged.asInstanceOf[IUpdateResult[D, Δ, I, I]]
 
-  def updated[D[_], Δ[_, _, _], I, J, K](newVal: D[K], δ: Δ[I, J, K]): IUpdateResult[D, Δ, I, J, K] =
+  def updated[D[_], Δ[_, _], I, J](newVal: D[J], δ: Δ[I, J]): IUpdateResult[D, Δ, I, J] =
     Updated(newVal, δ)
 }
 
@@ -67,15 +69,15 @@ trait Dom[D] extends IDom[[i] =>> D] {
   type Delta
 
   override type IUpdate[I] = Update
-  override type IChange[I, J, K] = Delta
   override type IDelta[I, J] = Delta
+  override type IUpdateRes[I, J] = IUpdateResult[[i] =>> D, IDelta, I, ?]
 
   def update(d: D, u: Update): UpdateResult[D, Delta]
 
-  override def iUpdate[I, J](d: D, u: Update): IUpdateResult[[i] =>> D, IChange, I, J, ?] =
-    update(d, u).at[I, J, Any]
+  override def iUpdate[I, J](d: D, u: Update): IUpdateRes[I, J] =
+    update(d, u).at[I, Any]
 
-  override def changeToDelta[I, J, K](ch: IChange[I, J, K]): IDelta[I, K] =
+  override def toUpdateResult[I, J](ch: IUpdateRes[I, J]): IUpdateResult[[i] =>> D, IDelta, I, ?] =
     ch
 
   /** Associative, idempotent and monotonic (non-decreasing) operation
@@ -138,7 +140,7 @@ object Dom {
         case \&/.That(u2) =>
           dom2.update(d._2, u2).map((d._1, _), \&/.That(_))
         case \&/.Both(u1, u2) =>
-          (dom1.update(d._1, u1).at[Any, Any, Any], dom2.update(d._2, u2).at[Any, Any, Any]) match {
+          (dom1.update(d._1, u1).at[Any, Any], dom2.update(d._2, u2).at[Any, Any]) match {
             case (Updated(d1, δ1), Updated(d2, δ2)) => UpdateResult.updated((d1, d2  ), \&/.Both(δ1, δ2))
             case (Updated(d1, δ1), Unchanged()    ) => UpdateResult.updated((d1, d._2), \&/.This(δ1))
             case (Unchanged()    , Updated(d2, δ2)) => UpdateResult.updated((d._1, d2), \&/.That(δ2))

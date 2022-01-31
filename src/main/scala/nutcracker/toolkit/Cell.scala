@@ -117,11 +117,11 @@ private[nutcracker] abstract class SimpleCell[K[_], D[_]] extends Cell[K, D] {
 
   private def hasPendingObservers: Boolean = pendingObservers.nonEmpty
 
-  def update[J](u: Update[J])(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[SimpleCell[K, D], D, dom.IChange, J, ?] =
-    dom.iUpdate(value, u) match {
-      case Updated(newVal, change) =>
-        def go[J1](newVal: D[J1], change: dom.IChange[Idx, J, J1]): CellUpdateResult[SimpleCell[K, D], D, dom.IChange, J, J1] = {
-          val delta: Delta[Idx, J1] = dom.changeToDelta(change)
+  def update[J](u: Update[J])(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[SimpleCell[K, D], D, dom.IUpdateRes, Idx, J] = {
+    val res = dom.iUpdate(value, u)
+    dom.toUpdateResult(res) match {
+      case Updated(newVal, delta) =>
+        def go[J1](newVal: D[J1], delta: dom.IDelta[Idx, J1]): CellUpdateResult[SimpleCell[K, D], D, dom.IUpdateRes, Idx, J] = {
           val pending0: List[PendingObserver[J1]] = pendingObservers.map(_.addDelta(delta))
           val pending1: List[PendingObserver[J1]] = idleObservers.map(_.addDelta(delta))
           val pending = pending1 ::: pending0
@@ -140,13 +140,14 @@ private[nutcracker] abstract class SimpleCell[K[_], D[_]] extends Cell[K, D] {
 
           val cell = SimpleCell[K, D, Update, Delta, J1](newVal)(Nil, pending, KMap[Token, BlockedIdleObserver[*, J1]](), blocked, lastObserverId, lastToken)
           val becameDirty = !this.hasPendingObservers && cell.hasPendingObservers
-          CellUpdated(cell, change, newVal, becameDirty)
+          CellUpdated(cell, res, becameDirty)
         }
-        go(newVal, change)
+        go(newVal, delta)
 
       case Unchanged() =>
-        CellUnchanged(value)
+        CellUnchanged(res)
     }
+  }
 
   def observe(
     self: CellIncarnationId,
@@ -372,7 +373,7 @@ private[nutcracker] sealed abstract class OnDemandCell[K[_], D[_]] extends Cell[
     onReconsidered: (Token[I], Trigger[I]) => K[Unit],
   ): (Option[OnDemandCell[K, D]], Lst[K[Unit]])
 
-  def exclUpdate[J](u: Update[J])(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[OnDemandCell[K, D], D, dom.IChange, J, ?]
+  def exclUpdate[J](u: Update[J])(implicit dom: IDom.Aux[D, Update, Delta]): CellUpdateResult[OnDemandCell[K, D], D, dom.IUpdateRes, Idx, J]
 
   def addFinalizer(sub: Subscription[K]): (Lst[K[Unit]], OnDemandCell[K, D], FinalizerId)
 
@@ -467,7 +468,7 @@ private[nutcracker] case class InitializingCell[K[_], D[_], U[_], Δ[_, _]](
     }
   }
 
-  override def exclUpdate[J](u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D], D, dom.IChange, J, ?] = {
+  override def exclUpdate[J](u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D], D, dom.IUpdateRes, Idx, J] = {
     sys.error("Unreachable code: no one has access to the current cycle yet")
   }
 
@@ -603,13 +604,12 @@ private[nutcracker] case class ActiveCell[K[_], D[_], U[_], Δ[_, _], I](
     else (None, ks ++ collectFinalizers)
   }
 
-  override def exclUpdate[J](u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D], D, dom.IChange, J, ?] = {
+  override def exclUpdate[J](u: U[J])(implicit dom: IDom.Aux[D, U, Δ]): CellUpdateResult[OnDemandCell[K, D], D, dom.IUpdateRes, Idx, J] = {
     impl.update(u) match {
-      case CellUpdated(cell, change, newValue, becameDirty) =>
+      case CellUpdated(cell, res, becameDirty) =>
         CellUpdated(
           ActiveCell[K, D, cell.Update, cell.Delta, cell.Idx](cycle, cell, finalizers, lastFinalizerId),
-          change,
-          newValue,
+          res,
           becameDirty,
         )
       case CellUnchanged(value) =>
@@ -629,18 +629,17 @@ private[nutcracker] case class ActiveCell[K[_], D[_], U[_], Δ[_, _], I](
     finalizers.valuesIterator.foldLeft(Lst.empty[K[Unit]])((ks, sub) => sub.unsubscribe ++ ks)
 }
 
-private[toolkit] sealed abstract class CellUpdateResult[+C, D[_], Ch[_, _, _], J, J1]
+private[toolkit] sealed abstract class CellUpdateResult[+C, D[_], Res[_, _], I, J]
 
-private[toolkit] case class CellUpdated[C, D[_], Δ[_, _, _], I, J, J1](
+private[toolkit] case class CellUpdated[C, D[_], Res[_, _], I, J](
   cell: C,
-  change: Δ[I, J, J1],
-  newValue: D[J1],
+  res: Res[I, J],
   becameDirty: Boolean,
-) extends CellUpdateResult[C, D, Δ, J, J1]
+) extends CellUpdateResult[C, D, Res, I, J]
 
-private[toolkit] case class CellUnchanged[D[_], Δ[_, _, _], I, J](
-  value: D[I],
-) extends CellUpdateResult[Nothing, D, Δ, J, I]
+private[toolkit] case class CellUnchanged[D[_], Res[_, _], I, J](
+  res: Res[I, J],
+) extends CellUpdateResult[Nothing, D, Res, I, J]
 
 private[nutcracker] final class Token[A] private(val id: Long) extends AnyVal {
   def inc[B]: Token[B] = new Token(id + 1)

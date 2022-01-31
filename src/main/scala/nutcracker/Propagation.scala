@@ -7,8 +7,6 @@ import scalaz.Monad
 import scalaz.syntax.functor._
 
 trait Propagation[M[_]] extends Observe[M] {
-  import Propagation.IUpdateRes
-
   type IVar[A[_]]
 
   type Out[_]
@@ -27,7 +25,7 @@ trait Propagation[M[_]] extends Observe[M] {
   final def newCell[D](d: D)(implicit dom: Dom[D]): M[Var[D]] =
     newICell[[i] =>> D, Any](d)
 
-  def iUpdate[D[_], U[_], J](ref: IVar[D])(u: U[J])(implicit dom: IDom.Aux0[D, U]): M[IUpdateRes[D, dom.IChange, J, ?]]
+  def iUpdate[D[_], U[_], J](ref: IVar[D])(u: U[J])(implicit dom: IDom.Aux0[D, U]): M[Exists[dom.IUpdateRes[*, J]]]
 
   final def updateImpl[D, U, Δ](ref: Var[D])(u: U)(implicit dom: Dom.Aux[D, U, Δ]): M[Unit] =
     iUpdate[[i] =>> D, [j] =>> U, Any](ref)(u)(dom).void
@@ -83,12 +81,6 @@ object Propagation {
     Propagation.Aux1[M, Var, Val] { type Out[A] = Out0[A] }
 
   def apply[M[_], Ref[_], Val[_], Out[_]](implicit M: Propagation.Aux[M, Ref, Val, Out]): Propagation.Aux[M, Ref, Val, Out] = M
-
-  sealed trait IUpdateRes[D[_], Δ[_, _, _], J, K]
-  object IUpdateRes {
-    case class Updated[D[_], Δ[_, _, _], I, J, K](delta: Δ[I, J, K], newValue: D[K]) extends IUpdateRes[D, Δ, J, K]
-    case class Unchanged[D[_], Δ[_, _, _], J, K](value: D[K]) extends IUpdateRes[D, Δ, J, K]
-  }
 }
 
 trait OnDemandPropagation[M[_]] extends Propagation[M] {
