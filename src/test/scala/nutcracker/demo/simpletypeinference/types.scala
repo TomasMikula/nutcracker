@@ -405,12 +405,12 @@ object types {
       (ta.f, ta.x.value)
   }
 
-  type ComposedConstructors = Composed1T[Exists]
-  object ComposedConstructors {
+  type Composed1 = Composed1T[Exists]
+  object Composed1 {
     def apply(f: Type1, g: Type1): Type1 =
       Composed1T(Exists(f), Exists(g))
 
-    def unapply(cc: ComposedConstructors): (Type1, Type1) =
+    def unapply(cc: Composed1): (Type1, Type1) =
       (cc.f.value, cc.g.value)
   }
 

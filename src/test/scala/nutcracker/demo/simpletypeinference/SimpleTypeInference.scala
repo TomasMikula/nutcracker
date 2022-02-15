@@ -153,7 +153,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
       case TypeApp1T(f, x) =>
         outputTypeCell(x).map(TypeApp1(f, _))
       case Composed1T(f, g) =>
-        (outputType1Cell(f) |@| outputType1Cell(g)) { (f, g) => ComposedConstructors(f, g) }
+        (outputType1Cell(f) |@| outputType1Cell(g)) { (f, g) => Composed1(f, g) }
       case other =>
         throw new NotImplementedError(s"$other")
     }
