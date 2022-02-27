@@ -17,8 +17,13 @@ object types {
     sealed trait Prod
     sealed trait Sum
     sealed trait Fix
+    sealed trait PFix
     sealed trait Comp
     sealed trait Err
+    sealed trait Id
+    sealed trait Par
+    sealed trait Dup
+    sealed trait IFst
   }
 
   /** Represents a (non-parametric) type. */
@@ -219,7 +224,9 @@ object types {
     sealed trait ChangeT[T[_[_]], I, J]
 
     object ChangeT {
-      case class UnifiedVars[T[_[_]]](newAliases: Set[Object]) extends ChangeT[T, Tag.Var, Tag.Var]
+      case class UnifiedVars[T[_[_]]](newAliases: Set[Object]) extends ChangeT[T, Tag.Var, Tag.Var] {
+        require(newAliases.nonEmpty)
+      }
       case class SubstitutedForVar[T[_[_]], J](newValue: Type1T[T, J]) extends ChangeT[T, Tag.Var, J]
       case class Failed[T[_[_]], I](newValue: Type1ErrorT[T]) extends ChangeT[T, I, Tag.Err]
     }
@@ -232,11 +239,15 @@ object types {
       def toUpdateResult: IUpdateResult[Type1T[T, *], ChangeT[T, *, *], I, K] =
         this match {
           case Unchanged()                       => IUpdateResult.unchanged
-          case UnifiedVars(newValue, newAliases) => IUpdateResult.updated(newValue, ChangeT.UnifiedVars(newAliases))
           case SubstitutedForVar(newValue)       => IUpdateResult.updated(newValue, ChangeT.SubstitutedForVar(newValue))
           case AlreadyTypeApp(_)                 => IUpdateResult.unchanged
           case AlreadyComposed(_)                => IUpdateResult.unchanged
           case Failed(typeError)                 => IUpdateResult.updated(typeError, ChangeT.Failed(typeError))
+          case UnifiedVars(newValue, newAliases) =>
+            if (newAliases.nonEmpty)
+              IUpdateResult.updated(newValue, ChangeT.UnifiedVars(newAliases))
+            else
+              IUpdateResult.unchanged
         }
     }
 
@@ -414,6 +425,15 @@ object types {
       (cc.f.value, cc.g.value)
   }
 
+  type Type1Error = Type1ErrorT[Exists]
+  object Type1Error {
+    def apply(msg: String): Type1 =
+      Type1ErrorT(msg)
+
+    def unapply(te: Type1Error): Tuple1[String] =
+      Tuple1(te.msg)
+  }
+
   object ProductType {
     def apply(ta: Type): Type1 =
       ProductTypeT[Exists](Exists(ta))
@@ -428,6 +448,346 @@ object types {
 
     def apply(ta: Type, tb: Type): Type =
       Exists(SumTypeT[Exists](Exists(ta)))(Exists(tb: TypeT[Exists, ?]))
+  }
+
+  /** Phantom type representing the kind of types. Unicode character U+25CF */
+  sealed trait ●
+
+  /** Phantom type representing a pair of kinds. Unicode character U+00D7. */
+  sealed trait ×[K, L]
+
+  /** Phantom type representing the "unit" kind. Neutral element for [[×]]. Unicode character U+25CB. */
+  sealed trait ○
+
+  /** Phantom type representing the kinds of type functions. Internal hom in the category [[TypeFun]].
+   *
+   * @tparam K input kind
+   * @tparam L output kind
+   */
+  // sealed trait ->[K, L]
+
+  sealed trait Kind[K] {
+    def testEqual[L](that: Kind[L]): Option[K =:= L] =
+      (this, that) match {
+        case (Kind.Unit, Kind.Unit) =>
+          Some(implicitly[○ =:= ○])
+        case (Kind.Type, Kind.Type) =>
+          Some(implicitly[● =:= ●])
+        case (Kind.Prod(a, b), Kind.Prod(x, y)) =>
+          (a testEqual x, b testEqual y) match {
+            case (Some(ax), Some(by)) =>
+              Some(implicitly[K =:= K].asInstanceOf[K =:= L])
+            case _ =>
+              None
+          }
+        case _ =>
+          None
+      }
+  }
+
+  object Kind {
+    case object Unit extends Kind[○] {
+      override def toString = "○"
+    }
+    case object Type extends Kind[●] {
+      override def toString = "●"
+    }
+    case class Prod[K, L](k: Kind[K], l: Kind[L]) extends Kind[K × L] {
+      override def toString = s"($k × $l)"
+    }
+
+    given Kind[○] = Unit
+    given Kind[●] = Type
+    given [K, L](using k: Kind[K], l: Kind[L]): Kind[K × L] = Prod(k, l)
+  }
+
+  object generic {
+    /**
+     * @tparam ->> type of nested arrows
+     * @tparam K input kind
+     * @tparam L output kind
+     * @tparam I marks the constructor of this [[TypeFun]]
+     */
+    sealed trait TypeFun[->>[_, _], K, L, I](using k: Kind[K], l: Kind[L]) {
+      given inKind: Kind[K] = k
+      given outKind: Kind[L] = l
+    }
+
+    object TypeFun {
+      case class Pair[->>[_, _]]() extends TypeFun[->>, ● × ●, ●, Tag.Prod]
+      case class Sum[->>[_, _]]() extends TypeFun[->>, ● × ●, ●, Tag.Sum]
+
+      case class AndThen[->>[_, _], K: Kind, L, M: Kind](
+        f: K ->> L,
+        g: L ->> M,
+      )(using
+        l: Kind[L],
+      ) extends TypeFun[->>, K, M, Tag.Comp] {
+        given pivotKind: Kind[L] = l
+      }
+
+      case class Id[->>[_, _], K: Kind]() extends TypeFun[->>, K, K, Tag.Id]
+
+      case class Par[->>[_, _], K1: Kind, K2: Kind, L1: Kind, L2: Kind](
+        f: K1 ->> L1,
+        g: K2 ->> L2,
+      ) extends TypeFun[->>, K1 × K2, L1 × L2, Tag.Par]
+
+      case class IntroFst[->>[_, _], K: Kind]() extends TypeFun[->>, K, ○ × K, Tag.IFst]
+
+      case class Dup[->>[_, _], K: Kind]() extends TypeFun[->>, K, K × K, Tag.Dup]
+
+      // Could be generalized to Fix[->>[_, _], K](f: K ->> K) extends TypeFun[->>, ○, K, Tag.Fix]
+      case class Fix[->>[_, _]](f: ● ->> ●) extends TypeFun[->>, ○, ●, Tag.Fix]
+
+      // Could be generalized to PFix[->>[_, _], K, L](f: (K × L) ->> L) extends TypeFun[->>, K, L, Tag.PFix]
+      case class PFix[->>[_, _]](f: (● × ●) ->> ●) extends TypeFun[->>, ●, ●, Tag.PFix]
+
+      case class UnitType[->>[_, _]]() extends TypeFun[->>, ○, ●, Tag.Unit]
+
+      case class IntType[->>[_, _]]() extends TypeFun[->>, ○, ●, Tag.Int]
+
+      case class StringType[->>[_, _]]() extends TypeFun[->>, ○, ●, Tag.Str]
+
+      case class TypeError[->>[_, _], K: Kind, L: Kind](msg: String) extends TypeFun[->>, K, L, Tag.Err]
+
+      case class Var[->>[_, _], K: Kind, L: Kind](aliases: Set[Object]) extends TypeFun[->>, K, L, Tag.Var]
+
+      def newVar[->>[_, _], K: Kind, L: Kind](): TypeFun[->>, K, L, Tag.Var] =
+        Var(Set(new Object))
+
+      sealed trait UpdRes[->>[_, _], K, L, I0, J, I1] {
+        import UpdRes._
+
+        def toUpdateResult: IUpdateResult[TypeFun[->>, K, L, *], Change[->>, K, L, *, *], I0, I1] =
+          this match {
+            case UpdatedAliases(nv, na) => IUpdateResult.updated(nv, Change.UpdatedAliases(na))
+            case AlreadySuperset(_)     => IUpdateResult.unchanged
+            case SubstitutedForVar(nv)  => IUpdateResult.updated(nv, Change.SubstitutedForVar())
+            case AlreadyRefined(_)      => IUpdateResult.unchanged
+            case AlreadyAndThen(_)      => IUpdateResult.unchanged
+            case AlreadyPar(_)          => IUpdateResult.unchanged
+            case AlreadyFix(_)          => IUpdateResult.unchanged
+            case AlreadySameAtom()      => IUpdateResult.unchanged
+            case other                  => throw new NotImplementedError(s"$other")
+          }
+      }
+
+      object UpdRes {
+        case class UpdatedAliases[->>[_, _], K, L](
+          newValue: Var[->>, K, L],
+          newAliases: Set[Object],
+        ) extends UpdRes[->>, K, L, Tag.Var, Tag.Var, Tag.Var] {
+          require(newAliases.nonEmpty)
+        }
+
+        case class AlreadySuperset[->>[_, _], K, L](
+          value: Var[->>, K, L],
+        ) extends UpdRes[->>, K, L, Tag.Var, Tag.Var, Tag.Var]
+
+        case class SubstitutedForVar[->>[_, _], K, L, J](
+          newValue: TypeFun[->>, K, L, J],
+        ) extends UpdRes[->>, K, L, Tag.Var, J, J]
+
+        case class AlreadyRefined[->>[_, _], K, L, I](
+          value: TypeFun[->>, K, L, I],
+        ) extends UpdRes[->>, K, L, I, Tag.Var, I]
+
+        case class AlreadyAndThen[->>[_, _], K, L, M](
+          value: TypeFun.AndThen[->>, K, L, M],
+        ) extends UpdRes[->>, K, M, Tag.Comp, Tag.Comp, Tag.Comp]
+
+        case class AlreadyPar[->>[_, _], K1, K2, L1, L2](
+          value: TypeFun.Par[->>, K1, K2, L1, L2],
+        ) extends UpdRes[->>, K1 × K2, L1 × L2, Tag.Par, Tag.Par, Tag.Par]
+
+        case class AlreadyFix[->>[_, _]](
+          value: TypeFun.Fix[->>],
+        ) extends UpdRes[->>, ○, ●, Tag.Fix, Tag.Fix, Tag.Fix]
+
+        case class AlreadySameAtom[->>[_, _], K, L, I]() extends UpdRes[->>, K, L, I, I, I]
+      }
+
+      sealed trait Change[->>[_, _], K, L, I0, I1] {
+        import Change._
+
+        def andThen[I2](that: Change[->>, K, L, I1, I2]): Change[->>, K, L, I0, I2] =
+          (this, that) match {
+            case (UpdatedAliases(as1), UpdatedAliases(as2)) => UpdatedAliases(as1 union as2)
+            case (UpdatedAliases(_), SubstitutedForVar())   => SubstitutedForVar()
+            case (x, y) => throw new NotImplementedError(s"$x, $y")
+          }
+      }
+
+      object Change {
+        case class UpdatedAliases[->>[_, _], K, L](
+          newAliases: Set[Object],
+        ) extends Change[->>, K, L, Tag.Var, Tag.Var] {
+          require(newAliases.nonEmpty)
+        }
+
+        case class SubstitutedForVar[->>[_, _], K, L, J]() extends Change[->>, K, L,Tag.Var, J]
+      }
+
+      implicit def domTypeFun[->>[_, _], K, L]
+      : IDom.Aux2[
+          TypeFun[->>, K, L, *],
+          TypeFun[->>, K, L, *],
+          UpdRes[->>, K, L, *, *, ?],
+          Change[->>, K, L, *, *],
+        ] =
+        new IDom[TypeFun[->>, K, L, *]] {
+          override type IUpdate[I] = TypeFun[->>, K, L, I]
+          override type IUpdateRes[I, J] = UpdRes[->>, K, L, I, J, ?]
+          override type IDelta[I1, I2] = Change[->>, K, L, I1, I2]
+
+          override def iUpdate[I, J](t: TypeFun[->>, K, L, I], u: TypeFun[->>, K, L, J]): IUpdateRes[I, J] = {
+            import t.{inKind, outKind}
+
+            (t, u) match {
+              case (t @ Var(aliases1), Var(aliases2)) =>
+                val newAliases = aliases2 diff aliases1
+                if (newAliases.nonEmpty) {
+                  val newVal = Var[->>, K, L](aliases1 union newAliases)
+                  UpdRes.UpdatedAliases(newVal, newAliases)
+                } else {
+                  UpdRes.AlreadySuperset(t)
+                }
+
+              case (Var(_), u) =>
+                UpdRes.SubstitutedForVar(u)
+
+              case (t, Var(_)) =>
+                UpdRes.AlreadyRefined(t)
+
+              case (t @ AndThen(_, _), AndThen(_, _)) =>
+                UpdRes.AlreadyAndThen(t)
+
+              case (t @ Par(_, _), Par(_, _)) =>
+                UpdRes.AlreadyPar(t)
+
+              case (t @ Fix(_), Fix(_)) =>
+                UpdRes.AlreadyFix(t)
+
+              case (Dup(), Dup()) =>
+                UpdRes.AlreadySameAtom()
+
+              case (Sum(), Sum()) =>
+                UpdRes.AlreadySameAtom()
+
+              case (Pair(), Pair()) =>
+                UpdRes.AlreadySameAtom()
+
+              case (UnitType(), UnitType()) =>
+                UpdRes.AlreadySameAtom()
+
+              case (IntType(), IntType()) =>
+                UpdRes.AlreadySameAtom()
+
+              case (StringType(), StringType()) =>
+                UpdRes.AlreadySameAtom()
+
+              case (f, g) =>
+                throw new NotImplementedError(s"Unhandled update of $f by $g")
+            }
+          }
+
+          override def toUpdateResult[I, J](r: IUpdateRes[I, J]): IUpdateResult[TypeFun[->>, K, L, *], IDelta, I, ?] =
+            r.toUpdateResult
+
+          override def composeDeltas[I1, I2, I3](ε: IDelta[I2, I3], δ: IDelta[I1, I2]): IDelta[I1, I3] =
+            δ andThen ε
+
+          override def iIsFailed[I](f: TypeFun[->>, K, L, I]): Boolean =
+            f match {
+              case TypeError(_) => true
+              case _            => false
+            }
+        }
+    }
+  }
+
+  /**
+   * @tparam K input kind
+   * @tparam L output kind
+   */
+  case class TypeFun[K, L](value: generic.TypeFun[TypeFun, K, L, ?]) {
+    export value.{inKind, outKind}
+
+    /** Sequential composition. */
+    def >[M](that: TypeFun[L, M]): TypeFun[K, M] = {
+      import that.outKind
+      TypeFun(generic.TypeFun.AndThen(this, that))
+    }
+
+    def ∘[J](that: TypeFun[J, K]): TypeFun[J, L] =
+      that > this
+
+    override def toString: String =
+      value.toString
+  }
+
+  object TypeFun {
+    def id[K: Kind]: TypeFun[K, K] = TypeFun(generic.TypeFun.Id())
+
+    def pair: TypeFun[● × ●, ●] = TypeFun(generic.TypeFun.Pair())
+    def sum: TypeFun[● × ●, ●] = TypeFun(generic.TypeFun.Sum())
+
+    def par[K1, K2, L1, L2](f: TypeFun[K1, L1], g: TypeFun[K2, L2]): TypeFun[K1 × K2, L1 × L2] = {
+      import f.{inKind, outKind}; import g.{inKind, outKind}
+      TypeFun(generic.TypeFun.Par(f, g))
+    }
+
+    def fst[K, L, M: Kind](f: TypeFun[K, L]): TypeFun[K × M, L × M] =
+      par(f, id)
+
+    def introFst[K: Kind]: TypeFun[K, ○ × K] =
+      TypeFun(generic.TypeFun.IntroFst())
+
+    def introFst[K: Kind, L](f: TypeFun[○, L]): TypeFun[K, L × K] =
+      introFst[K] > fst(f)
+
+    def dup[K: Kind]: TypeFun[K, K × K] = TypeFun(generic.TypeFun.Dup())
+
+    def fix(f: TypeFun[●, ●]): TypeFun[○, ●] =
+      TypeFun(generic.TypeFun.Fix(f))
+
+    def pfix(f: TypeFun[● × ●, ●]): TypeFun[●, ●] =
+      TypeFun(generic.TypeFun.PFix(f))
+
+    def unit: TypeFun[○, ●] =
+      TypeFun(generic.TypeFun.UnitType())
+
+    def int: TypeFun[○, ●] =
+      TypeFun(generic.TypeFun.IntType())
+
+    def string: TypeFun[○, ●] =
+      TypeFun(generic.TypeFun.StringType())
+
+    def pair1(a: Typ): TypeFun[●, ●] =
+      introFst(a) > pair
+
+    def sum1(a: Typ): TypeFun[●, ●] =
+      introFst(a) > sum
+
+    def variable[K: Kind, L: Kind](aliases: Set[Object]): TypeFun[K, L] =
+      TypeFun(generic.TypeFun.Var(aliases))
+
+    def typeError[K: Kind, L: Kind](msg: String): TypeFun[K, L] =
+      TypeFun(generic.TypeFun.TypeError(msg))
+  }
+
+  type Typ = TypeFun[○, ●]
+  object Typ {
+    def unit   : Typ = TypeFun.unit
+    def int    : Typ = TypeFun.int
+    def string : Typ = TypeFun.string
+
+    def sum(a: Typ, b: Typ): Typ =
+      TypeFun.dup[○] > TypeFun.par(a, b) > TypeFun.sum
+
+    def fix(f: TypeFun[●, ●]): Typ =
+      TypeFun.fix(f)
   }
 
 }

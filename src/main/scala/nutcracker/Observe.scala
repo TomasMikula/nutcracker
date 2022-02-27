@@ -291,6 +291,13 @@ trait Observers[M[_]] {
     }
   }
 
+  def iThreshold[D[_], Δ[_, _]](f: [i] => D[i] => Option[M[Unit]]): [i] => D[i] => ITrigger[D, Δ, i] =
+    [i] => (d: D[i]) =>
+      f(d) match {
+        case None    => iSleep[D, Δ, i]([j] => (d: D[j], _: Δ[i, j]) => iThreshold[D, Δ](f)(d))
+        case Some(k) => iFire(k)
+      }
+
   /** Keep trying `f` until it returns `Some`. Then fire the returned program. */
   def threshold[D, Δ](f: D => Option[M[Unit]]): D => Trigger[D, Δ] =
     d => f(d) match {

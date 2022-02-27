@@ -30,6 +30,10 @@ object ast {
     }
     case class RecCall[A, B](label: Label[A, B]) extends Fun[A, B]
 
+    case class ConstInt(n: Int) extends Fun[Unit, Int]
+
+    case class AddInts() extends Fun[(Int, Int), Int]
+
     case class IntToString() extends Fun[Int, String]
 
     final class Label[A, B] private[Fun]()
@@ -54,6 +58,12 @@ object ast {
 
     def rec[A, B](f: Fun[A, B] => Fun[A, B]): Fun[A, B] =
       Rec(f)
+
+    def constInt(n: Int): Fun[Unit, Int] =
+      ConstInt(n)
+
+    def addInts: Fun[(Int, Int), Int] =
+      AddInts()
 
     def intToString: Fun[Int, String] =
       IntToString()

@@ -42,6 +42,9 @@ object IDom {
 sealed abstract class IUpdateResult[D[_], Δ[_, _], I, J] {
   def map[E[_], Δ2[_, _]](f: [i] => D[i] => E[i], g: [i, j] => Δ[i, j] => Δ2[i, j]): IUpdateResult[E, Δ2, I, J]
 
+  def mapDomain[E[_]](f: [i] => D[i] => E[i]): IUpdateResult[E, Δ, I, J] =
+    map[E, Δ](f, [i, j] => (δ: Δ[i, j]) => δ)
+
   def map_[E, Δ2](f: [i] => D[i] => E, g: [i, j] => Δ[i, j] => Δ2): UpdateResult[E, Δ2] =
     UpdateResult(map[[i] =>> E, [i, j] =>> Δ2](f, g))
 }

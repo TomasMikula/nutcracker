@@ -11,6 +11,7 @@ import scalaz.Equal
   * the elements of `A` represent a completed promise, and `1` represents a
   * conflict (a promise completed multiple times with different values).
   *
+  * @see [[PromiseOnce]]
   * @see [[Revocable]]
   * @see [[Discrete]]
   */
