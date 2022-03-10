@@ -1,5 +1,7 @@
 package nutcracker.demo.simpletypeinference
 
+import nutcracker.demo.simpletypeinference.types.TypeTag
+
 object ast {
 
   sealed trait Fun[A, B] {
@@ -18,8 +20,8 @@ object ast {
     case class InjectL[A, B]() extends Fun[A, A Either B]
     case class InjectR[A, B]() extends Fun[B, A Either B]
 
-    case class FixF[F[_]]() extends Fun[F[Fix[F]], Fix[F]]
-    case class UnfixF[F[_]]() extends Fun[Fix[F], F[Fix[F]]]
+    case class FixF[F[_]](f: TypeTag[F]) extends Fun[F[Fix[F]], Fix[F]]
+    case class UnfixF[F[_]](f: TypeTag[F]) extends Fun[Fix[F], F[Fix[F]]]
 
     case class Rec[A, B](label: Label[A, B], f: Fun[A, B]) extends Fun[A, B]
     object Rec {
@@ -50,11 +52,11 @@ object ast {
     def either[A, B, C](f: Fun[A, C], g: Fun[B, C]): Fun[A Either B, C] =
       EitherF(f, g)
 
-    def fix[F[_]]: Fun[F[Fix[F]], Fix[F]] =
-      FixF[F]()
+    def fix[F[_]](using f: TypeTag[F]): Fun[F[Fix[F]], Fix[F]] =
+      FixF[F](f)
 
-    def unfix[F[_]]: Fun[Fix[F], F[Fix[F]]] =
-      UnfixF[F]()
+    def unfix[F[_]](using f: TypeTag[F]): Fun[Fix[F], F[Fix[F]]] =
+      UnfixF[F](f)
 
     def rec[A, B](f: Fun[A, B] => Fun[A, B]): Fun[A, B] =
       Rec(f)

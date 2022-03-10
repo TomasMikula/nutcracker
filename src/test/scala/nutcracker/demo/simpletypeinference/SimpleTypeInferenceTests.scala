@@ -16,16 +16,26 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
 
   type InfiniteList[A] = Fix[(A, *)]
   object InfiniteList {
-    def map[A, B](f: Fun[A, B]): Fun[InfiniteList[A], InfiniteList[B]] =
+    def map[A, B](f: Fun[A, B]): Fun[InfiniteList[A], InfiniteList[B]] = {
+      given TypeTag[A] = TypeTag.ofTypeParam[A]
+      given TypeTag[B] = TypeTag.ofTypeParam[B]
+
       Fun.rec { map =>
         Fun.unfix[(A, *)] > Fun.par(f, map)> Fun.fix[(B, *)]
       }
+    }
   }
 
   type ListF[A, X] = Either[Unit, (A, X)]
   object ListF {
     val typ: TypeFun[● × ●, ●] =
       TypeFun.pair > TypeFun.introFst(Typ.unit) > TypeFun.sum
+
+    given typeTag: TypeTag[ListF] =
+      TypeTag.compose2(TypeTag[Either[Unit, *]], TypeTag.pair)
+
+    given typeTag[A](using TypeTag[A]): TypeTag[ListF[A, *]] =
+      TypeTag.compose(TypeTag[Either[Unit, *]], TypeTag[(A, *)])
   }
 
   type List[A] = Fix[ListF[A, *]]
@@ -33,13 +43,20 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
     val typ: TypeFun[●, ●] =
       TypeFun.pfix(ListF.typ)
 
-    def map[A, B](f: Fun[A, B]): Fun[List[A], List[B]] =
+    given TypeTag[List] =
+      TypeTag.pfix[ListF](using ListF.typeTag)
+
+    def map[A, B](f: Fun[A, B]): Fun[List[A], List[B]] = {
+      given TypeTag[A] = TypeTag.ofTypeParam[A]
+      given TypeTag[B] = TypeTag.ofTypeParam[B]
+
       Fun.rec { map =>
-        Fun.unfix[ListF[A, *]] > Fun.either(
+        Fun.unfix[ListF[A, *]](using ListF.typeTag[A]) > Fun.either(
           Fun.injectL[Unit, (B, List[B])],
           Fun.par(f, map) > Fun.injectR[Unit, (B, List[B])]
-        ) > Fun.fix[ListF[B, *]]
+        ) > Fun.fix[ListF[B, *]](using ListF.typeTag[B])
       }
+    }
   }
 
   def infiniteListType(elemType: Typ): Typ =
@@ -101,9 +118,11 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
   }
 
   test("infer types of countNils") {
+    import List.given_TypeTag_List
+
     val countNils: Fun[Fix[List], Int] =
       Fun.rec { countNils =>
-        Fun.unfix[List] > Fun.unfix[ListF[Fix[List], *]] > Fun.either(
+        Fun.unfix[List] > Fun.unfix[ListF[Fix[List], *]](using ListF.typeTag[Fix[List]]) > Fun.either(
           Fun.constInt(1),
           Fun.par(
             countNils,

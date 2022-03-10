@@ -47,6 +47,9 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     ): ITypeFun[K1 × K2, L1 × L2, Tag.Par] =
       ITypeFun(generic.TypeFun.Par(f1, f2))
 
+    def introFst[K: Kind]: ITypeFun[K, ○ × K, Tag.IFst] =
+      ITypeFun(generic.TypeFun.IntroFst())
+
     def dup[K: Kind]: ITypeFun[K, K × K, Tag.Dup] =
       ITypeFun(generic.TypeFun.Dup())
 
@@ -166,21 +169,6 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
   def newType1Cell[I](t: IType1[I]): F[Type1Cell] =
     P.newICell(t)
 
-  // type TypeCell  = IVar[TypeT[IVar, *]]
-  // type Type1Cell = IVar[Type1T[IVar, *]]
-
-  // def newTypeVar(): TypeT[IVar, Tag.Var] =
-  //   types.newTypeVar[IVar]()
-
-  // def newType1Var(): Type1T[IVar, Tag.Var] =
-  //   types.newType1Var[IVar]()
-
-  // def newTypeCell[I](t: TypeT[IVar, I]): F[TypeCell] =
-  //   P.newICell(t)
-
-  // def newType1Cell[I](t: Type1T[IVar, I]): F[Type1Cell] =
-  //   P.newICell(t)
-
   def reconstructTypes[A, B](
     f: Fun[A, B]
   ): F[Out[(Typ, Typ)]] =
@@ -256,8 +244,8 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
           g  <- newType1Cell(newType1Var())
           fg <- TypeCell.fix(g)
           _  <- unifyTypes(b, fg)
-          g1 <- abs(ITypeFun.fix(g), a)
-          _  <- propagateType(g1, g)
+          // g1 <- abs(ITypeFun.fix(g), a)
+          _  <- propagateType(???, g)
         } yield ()
 
       case unfix: UnfixF[g] =>
@@ -265,8 +253,8 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
           g  <- newType1Cell(newType1Var())
           fg <- TypeCell.fix(g)
           _  <- unifyTypes(a, fg)
-          g1 <- abs(ITypeFun.fix(g), b)
-          _  <- propagateType(g1, g)
+          // g1 <- abs(ITypeFun.fix(g), b)
+          _  <- propagateType(???, g)
         } yield ()
 
       case Rec(label, f) =>
@@ -302,9 +290,6 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
   private def outputTypeCell(tc: TypeCell): Out[Typ] =
     outputTypeFunCell(tc)
 
-  // private def outputType1Cell(tc: Type1Cell): Out[TypeFun[●, ●]] =
-  //   iOut(tc).flatMap(f => outputType1(f.value))
-
   private def outputTypeFunCell[K, L](tc: TypeFunCell[K, L]): Out[TypeFun[K, L]] =
     iOut(tc).flatMap(t => outputType(t.value))
 
@@ -332,33 +317,11 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     }
   }
 
-  // private def outputType1[I](
-  //   tf: IType1[I],
-  // ): Out[TypeFun[●, ●]] = {
-  //   ???
-  //   // tf.value match {
-  //   //   case TypeApp1T(f, x) =>
-  //   //     outputTypeCell(x).map(TypeApp1(f, _))
-  //   //   case Composed1T(f, g) =>
-  //   //     (outputType1Cell(f) |@| outputType1Cell(g)) { (f, g) => Composed1(f, g) }
-  //   //   case Type1ErrorT(msg) =>
-  //   //     monadOut.pure(Type1Error(msg))
-  //   //   case other =>
-  //   //     throw new NotImplementedError(s"$other")
-  //   // }
-  // }
-
   private def unifyTypes(
     t1: TypeCell,
     t2: TypeCell,
   ): F[Unit] =
     propagateType(t1, t2) *> propagateType(t2, t1)
-
-  // private def unifyTypeConstructors(
-  //   g: Type1Cell,
-  //   h: Type1Cell,
-  // ): F[Unit] =
-  //   propagateType1(g, h) *> propagateType1(h, g)
 
   private def propagateType[K, L](
     src: TypeFunCell[K, L],
@@ -373,20 +336,6 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
         }
       }
     }
-
-  // private def propagateType1(
-  //   src: Type1Cell,
-  //   tgt: Type1Cell,
-  // ): F[Unit] =
-  //   if (src == tgt) { // TODO: use Equal typeclass on cells (add it to Propagation)
-  //     ().pure[F]
-  //   } else {
-  //     iObserve(iReadOnly(src)).by_ {
-  //       P.iContinually[IType1, ITypeFun.Change[●, ●, *, *]] {
-  //         [i] => (t: IType1[i]) => refinePropagate1[i](tgt, t)
-  //       }
-  //     }
-  //   }
 
   private def refineUnify[J](
     cell: TypeCell,
@@ -450,31 +399,6 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     } yield ()
   }
 
-  // private def refinePropagate1[J](
-  //   cell: Type1Cell,
-  //   update: IType1[J],
-  // ): F[Unit] = {
-  //   def handleResult[I, J, K](
-  //     update: IType1[J],
-  //     updRes: ITypeFun.UpdRes[●, ●, I, J, K],
-  //   ): F[Unit] = {
-  //     import generic.TypeFun.UpdRes._
-  //     ???
-  //     // updRes match {
-  //     //   case Unchanged()          => M.pure(())
-  //     //   case SubstitutedForVar(_) => M.pure(())
-  //     //   case UnifiedVars(_, _)    => M.pure(())
-  //     //   case AlreadyTypeApp(ta)   => propagateTypeArg(ta, update)
-  //     //   case other                => throw new NotImplementedError(s"$other")
-  //     // }
-  //   }
-
-  //   for {
-  //     updRes <- iUpdate(cell)(update)
-  //     _      <- handleResult(update, updRes.value)
-  //   } yield ()
-  // }
-
   private def propagateAndThen[K, L](
     src: ITypeFun[K, L, Tag.Comp],
     tgt: ITypeFun[K, L, Tag.Comp],
@@ -517,24 +441,6 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     }
   }
 
-  // private def unifyTypeApps(
-  //   gx: TypeT[IVar, Tag.App],
-  //   hy: TypeT[IVar, Tag.App],
-  // ): F[Unit] =
-  //   propagateTypeApp(gx, hy) *> propagateTypeApp(hy, gx)
-
-  // private def propagateTypeArg(
-  //   gx: Type1T[IVar, Tag.App],
-  //   hy: Type1T[IVar, Tag.App],
-  // ): F[Unit] = {
-  //   def go(gx: TypeApp1T[IVar], hy: TypeApp1T[IVar]): F[Unit] =
-  //     propagateType(gx.x, hy.x)
-
-  //   (gx, hy) match {
-  //     case (gx @ TypeApp1T(_, _), hy @ TypeApp1T(_, _)) => go(gx, hy)
-  //   }
-  // }
-
   private def propagateFix(
     src: ITypeFun[○, ●, Tag.Fix],
     tgt: ITypeFun[○, ●, Tag.Fix],
@@ -549,27 +455,6 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     }
   }
 
-  // private def unifyFixTypes(
-  //   fg: TypeT[IVar, Tag.Fix],
-  //   fh: TypeT[IVar, Tag.Fix],
-  // ): F[Unit] =
-  //   propagateFixType(fg, fh) *> propagateFixType(fh, fg)
-
-  private def abs(x: IType[Tag.Fix], expr: TypeCell): F[Type1Cell] =
-    x.value match {
-      case x @ generic.TypeFun.Fix(_) => abs(x, expr)
-    }
-
-  private def abs(x: generic.TypeFun.Fix[TypeFunCell], expr: TypeCell): F[Type1Cell] =
-    for {
-      res <- newType1Cell(newType1Var())
-      p   <- find(x, expr)
-      _   <- onComplete(p) {
-        case Right(FindRes.Found(f)) => refinePropagate(res, f)
-        case other => throw new NotImplementedError(s"other")
-      }
-    } yield res
-
   private def onComplete[A](pa: Var[PromiseOnce[A]])(f: Either[PromiseOnce.Conflict.type, A] => F[Unit]): F[Unit] =
     P.observe(pa).by_(
       P.threshold {
@@ -579,83 +464,10 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
       }
     )
 
-  sealed trait IntroRightMost[K, L]
-  object IntroRightMost {}
-
-  /** Result of looking for a given (fixed-point) type (`●`) in a `TypeFunCell[○, L]` */
-  sealed trait FindRes[L]
-  object FindRes {
-    case class Found[L](f: ITypeFun[●, L, ?]) extends FindRes[L]
-
-    case class NotFound[L]() extends FindRes[L]
-
-    /** The unit kind (`○`) is propagated in the right-most position of `L`. */
-    case class Propagated[L0, L](f: ITypeFun[○, L0, ?], g: IntroRightMost[L0, L]) extends FindRes[L]
-  }
-
   extension [A](pa: Var[PromiseOnce[A]]) {
     def complete(a: A): F[Unit] =
       P.update(pa).by(PromiseOnce.completed(a))
   }
-
-  private def find[L](x: generic.TypeFun.Fix[TypeFunCell], in: TypeFunCell[○, L]): F[Var[PromiseOnce[FindRes[L]]]] = {
-    import generic.{TypeFun => gtf}
-    for {
-      res <- newCell(PromiseOnce.empty[FindRes[L]])
-      _   <- whenRefined(in) { t =>
-        t.value match {
-          case gtf.Fix(f) =>
-            if (f == x.f) { // TODO: use Equal typeclass on cells (should be added to Propagation)
-              val L_eq_● = summon[L =:= L].asInstanceOf[L =:= ●]
-              res.complete(FindRes.Found(L_eq_●.substituteContra[ITypeFun[●, *, ?]](ITypeFun.id[●])))
-            } else {
-              res.complete(FindRes.NotFound())
-            }
-          case other =>
-            throw new NotImplementedError(s"$other")
-        }
-      }
-    } yield res
-  }
-
-  // private def abs(x: generic.TypeFun.Fix[TypeFunCell], expr: TypeCell): F[Type1Cell] = {
-  //   type D[I] = IType[I]
-  //   type Δ[I, J] = ITypeFun.Change[○, ●, I, J]
-
-  //   def observer(acc: Option[Type1Cell], resultVar: Type1Cell): [i] => D[i] => ITrigger[D, Δ, i] =
-  //     [i] => (t: D[i]) =>
-  //       ???
-  //       // t.value match {
-  //       //   case TypeVar(_) =>
-  //       //     iSleep[D, Δ, i]([j] => (t: D[j], _: Δ[i, j]) => observer(acc, resultVar)[j](t))
-  //       //   case y @ FixTypeT(f) =>
-  //       //     iFire[D, Δ, i] {
-  //       //       if (f == x.f) { // TODO: use Equal typeclass on cells (should be added to Propagation)
-  //       //         acc match {
-  //       //           case Some(g) => propagateType1(g, resultVar)
-  //       //           case None    => refinePropagate1(resultVar, IType1.typeError(s"Fixed-point of identity (`[x] =>> x`) is not supported"))
-  //       //         }
-  //       //       } else {
-  //       //         refinePropagate1(resultVar, IType1.typeError(s"Nested fixed-point types are not yet supported"))
-  //       //       }
-  //       //     }
-  //       //   case TypeAppT(f, a) =>
-  //       //     iFire[D, Δ, i] {
-  //       //       for {
-  //       //         acc1 <- acc.map(g => newType1Cell(g ∘ f)).getOrElse(f.pure[F])
-  //       //         _    <- go(Some(acc1), a, resultVar)
-  //       //       } yield ()
-  //       //     }
-  //       // }
-
-  //   def go(acc: Option[Type1Cell], expr: TypeCell, resultVar: Type1Cell): F[Unit] =
-  //     iObserve(iReadOnly(expr)).by_(observer(acc, resultVar))
-
-  //   for {
-  //     res <- newType1Cell(newType1Var())
-  //     _   <- go(acc = None, expr, res)
-  //   } yield res
-  // }
 
   /** Execute `f` when `cell` is more refined than a variable. */
   private def whenRefined[K, L](cell: TypeFunCell[K, L])(f: ITypeFun[K, L, ?] => F[Unit]): F[Unit] = {
