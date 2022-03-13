@@ -78,8 +78,8 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
   test("infer types of eitherBimap(intToString, intToString)") {
     val (tIn, tOut) = reconstructTypes[Either[Int, Int], Either[String, String]](eitherBimap(Fun.intToString, Fun.intToString))
 
-    assert(tIn  == Typ.sum(Typ.int, Typ.int))
-    assert(tOut == Typ.sum(Typ.string, Typ.string))
+    assert(tIn  == Tpe.sum(Tpe.int, Tpe.int))
+    assert(tOut == Tpe.sum(Tpe.string, Tpe.string))
   }
 
   test("infer types of InfiniteList.map(intToString)") {

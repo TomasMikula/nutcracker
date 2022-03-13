@@ -3,8 +3,10 @@ package nutcracker.demo.simpletypeinference
 import nutcracker.{IDom, IUpdateResult}
 import nutcracker.util.Exists
 import nutcracker.util.typealigned.{ANone, AOption, ASome}
-import scalaz.Show
+import scalaz.{Monad, Show}
+import scalaz.syntax.monad._
 import scalaz.syntax.show._
+import scalaz.Alpha.X
 
 object types {
 
@@ -25,6 +27,7 @@ object types {
     sealed trait Dup
     sealed trait IFst
     sealed trait TPrm
+    sealed trait BiApp
   }
 
   /** Represents a (non-parametric) type. */
@@ -503,6 +506,238 @@ object types {
   }
 
   object generic {
+    /** Tree-like structure that builds up a type (or type constructor, depending on the output kind `L`).
+     *  May take type parameters, represented by the input kind `K`.
+     *  Each type (constructor) has a unique representation as [[TypeExpr]] (i.e. each [[TypeExpr]] is a normal form).
+     */
+    sealed trait TypeExpr[->>[_, _], K, L, I](using k: Kind[K], l: Kind[L]) {
+      given inKind: Kind[K] = k
+      given outKind: Kind[L] = l
+
+      def translate[-->>[_, _]](f: [k, l] => (k ->> l) => (k -->> l)): TypeExpr[-->>, K, L, I] =
+        ???
+
+      def translateM[-->>[_, _], M[_]](f: [k, l] => (k ->> l) => M[k -->> l]): M[TypeExpr[-->>, K, L, I]] =
+        ???
+    }
+
+    object TypeExpr {
+      sealed trait Elementary[->>[_, _], K, L, I](using Kind[K], Kind[L]) extends TypeExpr[->>, K, L, I]
+      sealed trait BinaryOperator[->>[_, _], K1: Kind, K2: Kind, L: Kind, I] extends Elementary[->>, K1 × K2, L, I] {
+        def cast[F[_, _]]: BinaryOperator[F, K1, K2, L, I] =
+          this match {
+            case Pair() => Pair()
+            case Sum()  => Sum()
+          }
+      }
+
+      case class UnitType[->>[_, _]]() extends TypeExpr[->>, ○, ●, Tag.Unit]
+      case class IntType[->>[_, _]]() extends TypeExpr[->>, ○, ●, Tag.Int]
+      case class StringType[->>[_, _]]() extends TypeExpr[->>, ○, ●, Tag.Str]
+
+      case class Pair[->>[_, _]]() extends BinaryOperator[->>, ●, ●, ●, Tag.Prod]
+      case class Sum[->>[_, _]]() extends BinaryOperator[->>, ●, ●, ●, Tag.Sum]
+
+      case class Fix[->>[_, _], K](f: Route[●, K], g: K ->> ●) extends Elementary[->>, ○, ●, Tag.Fix]
+      case class PFix[->>[_, _], K](f: Route[●, K], g: (● × K) ->> ●) extends Elementary[->>, ●, ●, Tag.PFix]
+
+      case class InferenceVar[->>[_, _]](aliases: Set[Object]) extends TypeExpr[->>, ○, ●, Tag.Var]
+
+      case class BiApp[->>[_, _], K1, K2, L](
+        op: BinaryOperator[->>, K1, K2, L, ?],
+        arg1: ○ ->> K1,
+        arg2: ○ ->> K2,
+      ) extends TypeExpr[->>, ○, L, Tag.BiApp](using summon, op.outKind)
+
+      case class TypeError[->>[_, _], K: Kind, L: Kind](msg: String) extends TypeExpr[->>, K, L, Tag.Err]
+
+      def newInferenceVar[->>[_, _]](): TypeExpr[->>, ○, ●, Tag.Var] =
+        InferenceVar(Set(new Object))
+
+      def pair[->>[_, _]](a: ○ ->> ●, b: ○ ->> ●): TypeExpr[->>, ○, ●, ?] =
+        BiApp(Pair(), a, b)
+
+      def sum[->>[_, _]](a: ○ ->> ●, b: ○ ->> ●): TypeExpr[->>, ○, ●, ?] =
+        BiApp(Sum(), a, b)
+
+      sealed trait UpdRes[->>[_, _], K, L, I0, J, I1] {
+        import UpdRes._
+
+        def toUpdateResult: IUpdateResult[TypeExpr[->>, K, L, *], Change[->>, K, L, *, *], I0, I1] =
+          this match {
+            // case UpdatedAliases(nv, na) => IUpdateResult.updated(nv, Change.UpdatedAliases(na))
+            // case AlreadySuperset(_)     => IUpdateResult.unchanged
+            case SubstitutedForVar(nv)  => IUpdateResult.updated(nv, Change.SubstitutedForVar())
+            case AlreadyRefined(_)      => IUpdateResult.unchanged
+            case AlreadyBiApp(_, _, _, _, _) => IUpdateResult.unchanged
+            // case AlreadyPar(_)          => IUpdateResult.unchanged
+            case AlreadyFix(_, _, _)    => IUpdateResult.unchanged
+            case AlreadySameAtom()      => IUpdateResult.unchanged
+            case other                  => throw new NotImplementedError(s"$other")
+          }
+      }
+
+      object UpdRes {
+        case class UpdatedAliases[->>[_, _]](
+          newValue: InferenceVar[->>],
+          newAliases: Set[Object],
+        ) extends UpdRes[->>, ○, ●, Tag.Var, Tag.Var, Tag.Var] {
+          require(newAliases.nonEmpty)
+        }
+
+        case class AlreadySuperset[->>[_, _]](
+          value: InferenceVar[->>],
+        ) extends UpdRes[->>, ○, ●, Tag.Var, Tag.Var, Tag.Var]
+
+        case class SubstitutedForVar[->>[_, _], K, L, J](
+          newValue: TypeExpr[->>, K, L, J],
+        ) extends UpdRes[->>, K, L, Tag.Var, J, J]
+
+        case class AlreadyRefined[->>[_, _], K, L, I](
+          value: TypeExpr[->>, K, L, I],
+        ) extends UpdRes[->>, K, L, I, Tag.Var, I]
+
+        case class AlreadyBiApp[->>[_, _], K1, K2, L](
+          operator: BinaryOperator[->>, K1, K2, L, ?],
+          arg1: ○ ->> K1,
+          arg2: ○ ->> K2,
+          updArg1: ○ ->> K1,
+          updArg2: ○ ->> K2,
+        ) extends UpdRes[->>, ○, L, Tag.BiApp, Tag.BiApp, Tag.BiApp]
+
+        // case class AlreadyPar[->>[_, _], K1, K2, L1, L2](
+        //   value: TypeExpr.Par[->>, K1, K2, L1, L2],
+        // ) extends UpdRes[->>, K1 × K2, L1 × L2, Tag.Par, Tag.Par, Tag.Par]
+
+        case class AlreadyFix[->>[_, _], K](
+          pre: Route[●, K], // same in both the original value and update
+          value: K ->> ●,
+          update: K ->> ●,
+        ) extends UpdRes[->>, ○, ●, Tag.Fix, Tag.Fix, Tag.Fix]
+
+        case class AlreadySameAtom[->>[_, _], K, L, I]() extends UpdRes[->>, K, L, I, I, I]
+
+        case class Failed[->>[_, _], K, L, I, J](newValue: TypeError[->>, K, L]) extends UpdRes[->>, K, L, I, J, Tag.Err]
+      }
+
+      sealed trait Change[->>[_, _], K, L, I0, I1] {
+        import Change._
+
+        def andThen[I2](that: Change[->>, K, L, I1, I2]): Change[->>, K, L, I0, I2] =
+          (this, that) match {
+            case (UpdatedAliases(as1), UpdatedAliases(as2)) => UpdatedAliases(as1 union as2)
+            case (UpdatedAliases(_), SubstitutedForVar())   => SubstitutedForVar()
+            case (x, y) => throw new NotImplementedError(s"$x, $y")
+          }
+      }
+
+      object Change {
+        case class UpdatedAliases[->>[_, _], K, L](
+          newAliases: Set[Object],
+        ) extends Change[->>, K, L, Tag.Var, Tag.Var] {
+          require(newAliases.nonEmpty)
+        }
+
+        case class SubstitutedForVar[->>[_, _], K, L, J]() extends Change[->>, K, L,Tag.Var, J]
+      }
+
+      implicit def domTypeExpr[->>[_, _], K, L]
+      : IDom.Aux2[
+          TypeExpr[->>, K, L, *],
+          TypeExpr[->>, K, L, *],
+          UpdRes[->>, K, L, *, *, ?],
+          Change[->>, K, L, *, *],
+        ] =
+        new IDom[TypeExpr[->>, K, L, *]] {
+          override type IUpdate[I] = TypeExpr[->>, K, L, I]
+          override type IUpdateRes[I, J] = UpdRes[->>, K, L, I, J, ?]
+          override type IDelta[I1, I2] = Change[->>, K, L, I1, I2]
+
+          override def iUpdate[I, J](t: TypeExpr[->>, K, L, I], u: TypeExpr[->>, K, L, J]): IUpdateRes[I, J] = {
+            import t.{inKind, outKind}
+
+            (t, u) match {
+              case (t @ InferenceVar(aliases1), InferenceVar(aliases2)) =>
+                val newAliases = aliases2 diff aliases1
+                if (newAliases.nonEmpty) {
+                  val newVal = InferenceVar[->>](aliases1 union newAliases)
+                  UpdRes.UpdatedAliases(newVal, newAliases)
+                } else {
+                  UpdRes.AlreadySuperset(t)
+                }
+
+              case (InferenceVar(_), u) =>
+                UpdRes.SubstitutedForVar(u)
+
+              case (t, InferenceVar(_)) =>
+                UpdRes.AlreadyRefined(t)
+
+              case (t @ BiApp(_, _, _), u @ BiApp(_, _, _)) =>
+                def go[X1, X2, Y1, Y2](t: BiApp[->>, X1, X2, L], u: BiApp[->>, Y1, Y2, L]): IUpdateRes[I, J] =
+                  if (t.op == u.op)
+                    UpdRes.AlreadyBiApp(t.op, t.arg1, t.arg2, u.arg1.asInstanceOf[○ ->> X1], u.arg2.asInstanceOf[○ ->> X2]) // TODO: derive X1 =:= Y1, X2 =:= Y2 instead of coersion
+                  else
+                    UpdRes.Failed(TypeError(s"Cannot unify $t with $u, because ${t.op} != ${u.op}"))
+
+                go(t, u)
+
+              // case (t @ Par(_, _), Par(_, _)) =>
+              //   UpdRes.AlreadyPar(t)
+
+              case (t @ Fix(rt, _), u @ Fix(ru, _)) =>
+                def go[X, Y](t: Fix[->>, X], u: Fix[->>, Y]): IUpdateRes[I, J] =
+                  if (t.f == u.f)
+                    UpdRes.AlreadyFix(t.f, t.g, u.g.asInstanceOf[X ->> ●]) // TODO: derive X =:= Y instead of coersion
+                  else
+                    UpdRes.Failed(TypeError(s"Cannot unify $t with $u, because of different initial multiplication of the argument"))
+
+                go(t, u)
+
+              // case (Dup(), Dup()) =>
+              //   UpdRes.AlreadySameAtom()
+
+              // case (Sum(), Sum()) =>
+              //   UpdRes.AlreadySameAtom()
+
+              // case (Pair(), Pair()) =>
+              //   UpdRes.AlreadySameAtom()
+
+              case (UnitType(), UnitType()) =>
+                UpdRes.AlreadySameAtom()
+
+              case (IntType(), IntType()) =>
+                UpdRes.AlreadySameAtom()
+
+              case (StringType(), StringType()) =>
+                UpdRes.AlreadySameAtom()
+
+              case (f, g) =>
+                throw new NotImplementedError(s"Unhandled update of $f by $g")
+            }
+          }
+
+          override def toUpdateResult[I, J](r: IUpdateRes[I, J]): IUpdateResult[TypeExpr[->>, K, L, *], IDelta, I, ?] =
+            r.toUpdateResult
+
+          override def composeDeltas[I1, I2, I3](ε: IDelta[I2, I3], δ: IDelta[I1, I2]): IDelta[I1, I3] =
+            δ andThen ε
+
+          override def iIsFailed[I](f: TypeExpr[->>, K, L, I]): Boolean =
+            f match {
+              case TypeError(_) => true
+              case _            => false
+            }
+        }
+    }
+
+    sealed trait Route[K, L]
+    object Route {
+      case class Id[K]() extends Route[K, K]
+
+      def id[K]: Route[K, K] =
+        Id()
+    }
+
     /**
      * @tparam ->> type of nested arrows
      * @tparam K input kind
@@ -512,11 +747,12 @@ object types {
     sealed trait TypeFun[->>[_, _], K, L, I](using k: Kind[K], l: Kind[L]) {
       given inKind: Kind[K] = k
       given outKind: Kind[L] = l
+
+      def decompose: Exists[[x] =>> (Route[K, x], TypeExpr[->>, x, L, I])] =
+        ???
     }
 
     object TypeFun {
-      case class Pair[->>[_, _]]() extends TypeFun[->>, ● × ●, ●, Tag.Prod]
-      case class Sum[->>[_, _]]() extends TypeFun[->>, ● × ●, ●, Tag.Sum]
 
       case class AndThen[->>[_, _], K: Kind, L, M: Kind](
         f: K ->> L,
@@ -555,6 +791,22 @@ object types {
       case class ScalaTypeParam[->>[_, _]](filename: String, line: Int, name: String) extends TypeFun[->>, ○, ●, Tag.TPrm]
 
       case class Var[->>[_, _], K: Kind, L: Kind](aliases: Set[Object]) extends TypeFun[->>, K, L, Tag.Var]
+
+      case class RouteExpr[->>[_, _], K: Kind, L, M, I](
+        route: Route[K, L],
+        expr: TypeExpr[->>, L, M, I],
+      ) extends TypeFun[->>, K, M, I](using summon, expr.outKind)
+
+      def expr[->>[_, _], K, L, I](e: TypeExpr[->>, K, L, I]): TypeFun[->>, K, L, I] = {
+        import e.inKind
+        RouteExpr(Route.id[K], e)
+      }
+
+      def pair[->>[_, _]]: TypeFun[->>, ● × ●, ●, Tag.Prod] =
+        expr(TypeExpr.Pair())
+
+      def sum[->>[_, _]]: TypeFun[->>, ● × ●, ●, Tag.Sum] =
+        expr(TypeExpr.Sum())
 
       def newVar[->>[_, _], K: Kind, L: Kind](): TypeFun[->>, K, L, Tag.Var] =
         Var(Set(new Object))
@@ -675,11 +927,11 @@ object types {
               case (Dup(), Dup()) =>
                 UpdRes.AlreadySameAtom()
 
-              case (Sum(), Sum()) =>
-                UpdRes.AlreadySameAtom()
+              // case (Sum(), Sum()) =>
+              //   UpdRes.AlreadySameAtom()
 
-              case (Pair(), Pair()) =>
-                UpdRes.AlreadySameAtom()
+              // case (Pair(), Pair()) =>
+              //   UpdRes.AlreadySameAtom()
 
               case (UnitType(), UnitType()) =>
                 UpdRes.AlreadySameAtom()
@@ -710,6 +962,23 @@ object types {
     }
   }
 
+  sealed trait TpeFun[K, L] {
+    type X
+    def pre: generic.Route[K, X]
+    def expr: TypeExpr[X, L]
+  }
+  object TpeFun {
+    def apply[K, P, L](r: generic.Route[K, P], f: TypeExpr[P, L]): TpeFun[K, L] =
+      new TpeFun[K, L] {
+        override type X = P
+        override def pre = r
+        override def expr = f
+      }
+
+    def unapply[K, L](f: TpeFun[K, L]): (generic.Route[K, f.X], TypeExpr[f.X, L]) =
+      (f.pre, f.expr)
+  }
+
   /**
    * @tparam K input kind
    * @tparam L output kind
@@ -726,6 +995,9 @@ object types {
     def ∘[J](that: TypeFun[J, K]): TypeFun[J, L] =
       that > this
 
+    def apply(arg: TypeExpr[○, K]): TypeExpr[○, L] =
+      ???
+
     override def toString: String =
       value.toString
   }
@@ -733,8 +1005,8 @@ object types {
   object TypeFun {
     def id[K: Kind]: TypeFun[K, K] = TypeFun(generic.TypeFun.Id())
 
-    def pair: TypeFun[● × ●, ●] = TypeFun(generic.TypeFun.Pair())
-    def sum: TypeFun[● × ●, ●] = TypeFun(generic.TypeFun.Sum())
+    def pair: TypeFun[● × ●, ●] = TypeFun(generic.TypeFun.pair)
+    def sum: TypeFun[● × ●, ●] = TypeFun(generic.TypeFun.sum)
 
     def par[K1, K2, L1, L2](f: TypeFun[K1, L1], g: TypeFun[K2, L2]): TypeFun[K1 × K2, L1 × L2] = {
       import f.{inKind, outKind}; import g.{inKind, outKind}
@@ -799,61 +1071,152 @@ object types {
       TypeFun.fix(f)
   }
 
-  opaque type TypeTag[A <: AnyKind] = TypeFun[?, ?]
+  case class EnrichedTypeFun[F[_, _], K, L](value: generic.TypeFun[[k, l] =>> (F[k, l], EnrichedTypeFun[F, k, l]), K, L, ?])
+  object EnrichedTypeFun {
+    type Enr[F[_, _], K, L] = (F[K, L], EnrichedTypeFun[F, K, L])
+
+    def enrich[F[_, _], K, L](
+      f: TypeFun[K, L],
+      e: [k, l] => generic.TypeFun[F, k, l, ?] => F[k, l],
+    ): EnrichedTypeFun[F, K, L] =
+      ???
+
+    def enrichM[F[_, _], K, L, M[_]](
+      f: TypeFun[K, L],
+      e: [k, l] => generic.TypeExpr[F, k, l, ?] => M[F[k, l]],
+    ): M[EnrichedTypeFun[F, K, L]] =
+      ???
+  }
+
+  case class AnnotatedTypeExpr[A[_, _], K, L](annotation: A[K, L], value: generic.TypeExpr[AnnotatedTypeExpr[A, *, *], K, L, ?])
+  object AnnotatedTypeExpr {
+    def annotate[A[_, _], K, L](
+      f: TypeExpr[K, L],
+      ann: [k, l] => generic.TypeExpr[A, k, l, ?] => A[k, l],
+    ): AnnotatedTypeExpr[A, K, L] =
+      ???
+
+    def annotateM[A[_, _], K, L, M[_]: Monad](
+      f: TypeExpr[K, L],
+      ann: [k, l] => generic.TypeExpr[A, k, l, ?] => M[A[k, l]],
+    ): M[AnnotatedTypeExpr[A, K, L]] =
+      f.foldM[AnnotatedTypeExpr[A, *, *], M](
+        [k, l] => (tf: generic.TypeExpr[AnnotatedTypeExpr[A, *, *], k, l, ?]) => {
+          val ta: generic.TypeExpr[A, k, l, ?] = tf.translate[A](getAnnotation[A])
+          ann(ta).map(AnnotatedTypeExpr(_, tf))
+        }
+      )
+
+    private def getAnnotation[A[_, _]]: [x, y] => AnnotatedTypeExpr[A, x, y] => A[x, y] =
+      [x, y] => (ate: AnnotatedTypeExpr[A, x, y]) => ate.annotation
+  }
+
+  case class TypeExpr[K, L](value: generic.TypeExpr[TypeExpr, K, L, ?]) {
+    def foldM[F[_, _], M[_]: Monad](f: [k, l] => generic.TypeExpr[F, k, l, ?] => M[F[k, l]]): M[F[K, L]] = {
+      value
+        .translateM[F, M]([x, y] => (te: TypeExpr[x, y]) => te.foldM[F, M](f))
+        .flatMap(f(_))
+    }
+  }
+
+  object TypeExpr {
+    def unit: TypeExpr[○, ●] =
+      TypeExpr(generic.TypeExpr.UnitType())
+
+    def int: TypeExpr[○, ●] =
+      TypeExpr(generic.TypeExpr.IntType())
+
+    def string: TypeExpr[○, ●] =
+      TypeExpr(generic.TypeExpr.StringType())
+
+    def inferenceVar(aliases: Set[Object]): TypeExpr[○, ●] =
+      TypeExpr(generic.TypeExpr.newInferenceVar())
+
+    def biApp[K1, K2, L](
+      op: generic.TypeExpr.BinaryOperator[?, K1, K2, L, ?],
+      arg1: TypeExpr[○, K1],
+      arg2: TypeExpr[○, K2],
+    ): TypeExpr[○, L] =
+      TypeExpr(generic.TypeExpr.BiApp(op.cast[TypeExpr], arg1, arg2))
+
+    def fix[K](f: generic.Route[●, K], g: TypeExpr[K, ●]): Tpe =
+      TypeExpr(generic.TypeExpr.Fix(f, g))
+
+    def pfix[K](f: generic.Route[●, K], g: TypeExpr[● × K, ●]): TypeExpr[●, ●] =
+      TypeExpr(generic.TypeExpr.PFix(f, g))
+
+    def fix(f: TypeFun[●, ●]): Tpe =
+      TypeExpr(generic.TypeExpr.Fix(???, ???))
+
+    def typeError[K: Kind, L: Kind](msg: String): TypeExpr[K, L] =
+      TypeExpr(generic.TypeExpr.TypeError(msg))
+  }
+
+  type Tpe = TypeExpr[○, ●]
+  object Tpe {
+    def unit: Tpe   = TypeExpr.unit
+    def int: Tpe    = TypeExpr.int
+    def string: Tpe = TypeExpr.string
+
+    def sum(a: Tpe, b: Tpe): Tpe =
+      TypeExpr(generic.TypeExpr.sum(a, b))
+  }
+
+  opaque type TypeTag[A <: AnyKind] = TpeFun[?, ?]
   object TypeTag {
     def apply[A <: AnyKind](using a: TypeTag[A]): TypeTag[A] =
       a
 
-    given unit: TypeTag[Unit] = TypeFun.unit
-    given int: TypeTag[Int] = TypeFun.int
-    given string: TypeTag[String] = TypeFun.string
+    given unit: TypeTag[Unit] = TpeFun.unit
+    given int: TypeTag[Int] = TpeFun.int
+    given string: TypeTag[String] = TpeFun.string
 
     given pair: TypeTag[Tuple2] =
-      TypeFun.pair
+      TpeFun.pair
 
     given pair[A, B](using a: TypeTag[A], b: TypeTag[B]): TypeTag[(A, B)] =
-      TypeFun.pair(
-        (a: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]],
-        (b: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]],
+      TpeFun.pair(
+        (a: TpeFun[?, ?]).asInstanceOf[TpeFun[○, ●]],
+        (b: TpeFun[?, ?]).asInstanceOf[TpeFun[○, ●]],
       )
 
     given pair1[A](using a: TypeTag[A]): TypeTag[(A, *)] =
-      TypeFun.pair1(
-        (a: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]]
+      TpeFun.pair1(
+        (a: TpeFun[?, ?]).asInstanceOf[TpeFun[○, ●]]
       )
 
     given sum1[A](using a: TypeTag[A]): TypeTag[Either[A, *]] =
-      TypeFun.sum1(
-        (a: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]]
+      TpeFun.sum1(
+        (a: TpeFun[?, ?]).asInstanceOf[TpeFun[○, ●]]
       )
 
     given fix[F[_]](using f: TypeTag[F]): TypeTag[Fix[F]] =
-      TypeFun.fix(
-        (f: TypeFun[?, ?]).asInstanceOf[TypeFun[●, ●]]
+      TpeFun.fix(
+        (f: TpeFun[?, ?]).asInstanceOf[TpeFun[●, ●]]
       )
 
     given pfix[F[_, _]](using f: TypeTag[F]): TypeTag[[x] =>> Fix[F[x, *]]] =
-      TypeFun.pfix(
-        (f: TypeFun[?, ?]).asInstanceOf[TypeFun[● × ●, ●]]
+      TpeFun.pfix(
+        (f: TpeFun[?, ?]).asInstanceOf[TpeFun[● × ●, ●]]
       )
 
     def compose[F[_], G[_]](f: TypeTag[F], g: TypeTag[G]): TypeTag[[x] =>> F[G[x]]] = {
-      val f1 = (f: TypeFun[?, ?]).asInstanceOf[TypeFun[●, ●]]
-      val g1 = (g: TypeFun[?, ?]).asInstanceOf[TypeFun[●, ●]]
+      val f1 = (f: TpeFun[?, ?]).asInstanceOf[TpeFun[●, ●]]
+      val g1 = (g: TpeFun[?, ?]).asInstanceOf[TpeFun[●, ●]]
       f1 ∘ g1
     }
 
     def compose2[F[_], G[_, _]](f: TypeTag[F], g: TypeTag[G]): TypeTag[[x, y] =>> F[G[x, y]]] = {
-      val f1 = (f: TypeFun[?, ?]).asInstanceOf[TypeFun[●, ●]]
-      val g1 = (g: TypeFun[?, ?]).asInstanceOf[TypeFun[● × ●, ●]]
+      val f1 = (f: TpeFun[?, ?]).asInstanceOf[TpeFun[●, ●]]
+      val g1 = (g: TpeFun[?, ?]).asInstanceOf[TpeFun[● × ●, ●]]
       f1 ∘ g1
     }
 
     def toType[A](ta: TypeTag[A]): Typ =
-      (ta: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]]
+      (ta: TpeFun[?, ?]).asInstanceOf[TpeFun[○, ●]]
 
-    def toTypeFun[F[_]](tf: TypeTag[F]): TypeFun[●, ●] =
-      (tf: TypeFun[?, ?]).asInstanceOf[TypeFun[●, ●]]
+    def toTpeFun[F[_]](tf: TypeTag[F]): TpeFun[●, ●] =
+      (tf: TpeFun[?, ?]).asInstanceOf[TpeFun[●, ●]]
 
     import scala.{quoted => sq}
     private def fromTypeParam[T](using t: sq.Type[T], q: sq.Quotes): sq.Expr[TypeTag[T]] = {
@@ -868,7 +1231,7 @@ object types {
           val file = pos.sourceFile.path
           val line = pos.startLine
           '{
-            TypeFun.scalaTypeParam[T](
+            TpeFun.scalaTypeParam[T](
               filename = ${sq.Expr(file)},
               line = ${sq.Expr(line)},
               name = ${sq.Expr(name)},
