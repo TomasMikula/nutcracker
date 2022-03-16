@@ -62,17 +62,17 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
   def infiniteListType(elemType: Typ): Typ =
     Typ.fix(TypeFun.pair1(elemType))
 
-  def infiniteListType(elemType: Type): Type =
-    FixType(ProductType(elemType))
+  def infiniteListType(elemType: Tpe): Tpe =
+    Tpe.fix(TpeFun.pair1(elemType))
 
   def listType(elemType: Typ): Typ =
     Typ.fix(
       TypeFun.sum1(Typ.unit) ∘ TypeFun.pair1(elemType)
     )
 
-  def listType(elemType: Type): Type =
-    FixType(
-      SumType(UnitType()) ∘ ProductType(elemType)
+  def listType(elemType: Tpe): Tpe =
+    Tpe.fix(
+      TpeFun.sum1(Tpe.unit) ∘ TpeFun.pair1(elemType)
     )
 
   test("infer types of eitherBimap(intToString, intToString)") {
@@ -133,6 +133,6 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
 
     val (tIn, tOut) = reconstructTypes[Fix[List], Int](countNils)
 
-    assert(tIn == IntType())
+    assert(tIn == Tpe.int)
   }
 }
