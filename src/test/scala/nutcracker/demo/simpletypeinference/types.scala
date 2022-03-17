@@ -29,6 +29,7 @@ object types {
     sealed trait TPrm
     sealed trait BiApp
     sealed trait AppFst
+    sealed trait AppComp
   }
 
   /** Represents a (non-parametric) type. */
@@ -509,8 +510,6 @@ object types {
     def fst[K, L](kl: Kind[K × L]): Kind[K] =
       kl match {
         case Prod(k, l) => k
-        case Unit => impossible("○ cannot equal (K × L)")
-        case Type => impossible("● cannot equal (K × L)")
       }
 
     private def impossible(msg: String): Nothing =
@@ -537,9 +536,10 @@ object types {
      *  May take type parameters, represented by the input kind `K`.
      *  Each type (constructor) has a unique representation as [[TypeExpr]] (i.e. each [[TypeExpr]] is a normal form).
      */
-    sealed abstract class TypeExpr[->>[_, _], K, L, I](using k: Kind[K], l: OutputKind[L]) {
-      given inKind: Kind[K] = k
-      given outKind: OutputKind[L] = l
+    sealed abstract class TypeExpr[->>[_, _], K, L, I](using
+      val inKind: Kind[K],
+      val outKind: OutputKind[L],
+    ) {
 
       def translate[-->>[_, _]](f: [k, l] => (k ->> l) => (k -->> l)): TypeExpr[-->>, K, L, I] =
         translateM[-->>, scalaz.Id.Id](f)(using scalaz.Id.id)
@@ -554,17 +554,27 @@ object types {
           case Pair() => Pair().pure[M]
           case Sum() => Sum().pure[M]
           case InferenceVar(as) => InferenceVar(as).pure[M]
-          case ScalaTypeParam(fn, l, n) => ScalaTypeParam(fn, l, n).pure[M]
+          case ScalaTypeParams(ps) => ScalaTypeParams(ps).pure[M]
+
           case AppFst(op, a) =>
             for {
               a  <- f(a)
             } yield AppFst(op.cast[-->>], a)
+
+          case AppCompose(op, a, g) =>
+            for {
+              a <- f(a)
+              g <- f(g)
+            } yield AppCompose(op.cast[-->>], a, g)
+
           case BiApp(op, a, b) =>
             for {
               a  <- f(a)
               b  <- f(b)
             } yield BiApp(op.cast[-->>], a, b)
-          case other => throw new NotImplementedError(s"$other")
+
+          case other =>
+            throw new NotImplementedError(s"$other")
         }
       }
     }
@@ -603,6 +613,15 @@ object types {
 
       case class InferenceVar[->>[_, _]](aliases: Set[Object]) extends TypeExpr[->>, ○, ●, Tag.Var]
 
+      case class ScalaTypeParam(filename: String, line: Int, name: String)
+      case class ScalaTypeParams[->>[_, _]](values: Set[ScalaTypeParam]) extends TypeExpr[->>, ○, ●, Tag.TPrm] {
+        require(values.nonEmpty)
+      }
+      object ScalaTypeParams {
+        def one[->>[_, _]](filename: String, line: Int, name: String): ScalaTypeParams[->>] =
+          ScalaTypeParams(Set(ScalaTypeParam(filename, line, name)))
+      }
+
       case class BiApp[->>[_, _], K1, K2, L](
         op: BinaryOperator[->>, K1, K2, L, ?],
         arg1: ○ ->> K1,
@@ -612,13 +631,13 @@ object types {
       case class AppFst[->>[_, _], K1, K2, L](
         op: BinaryOperator[->>, K1, K2, L, ?],
         arg1: ○ ->> K1,
-      ) extends TypeExpr[->>, K1, L, Tag.AppFst](using op.in1Kind.kind, op.outKind)
+      ) extends TypeExpr[->>, K2, L, Tag.AppFst](using op.in2Kind.kind, op.outKind)
 
-      case class ScalaTypeParam[->>[_, _]](
-        filename: String,
-        line: Int,
-        name: String,
-      ) extends TypeExpr[->>, ○, ●, Tag.TPrm]
+      case class AppCompose[->>[_, _], K: Kind, L1, L2, M](
+        op: BinaryOperator[->>, L1, L2, M, ?],
+        arg1: ○ ->> L1,
+        arg2: K ->> L2,
+      ) extends TypeExpr[->>, K, M, Tag.AppComp](using summon, op.outKind)
 
       case class TypeError[->>[_, _], K: Kind, L: OutputKind](msg: String) extends TypeExpr[->>, K, L, Tag.Err]
 
@@ -642,10 +661,12 @@ object types {
 
         def toUpdateResult: IUpdateResult[TypeExpr[->>, K, L, *], Change[->>, K, L, *, *], I0, I1] =
           this match {
-            // case UpdatedAliases(nv, na) => IUpdateResult.updated(nv, Change.UpdatedAliases(na))
-            // case AlreadySuperset(_)     => IUpdateResult.unchanged
+            case UpdatedAliases(nv, na) => IUpdateResult.updated(nv, Change.UpdatedAliases(na))
+            case AlreadySuperset(_)     => IUpdateResult.unchanged
             case SubstitutedForVar(nv)  => IUpdateResult.updated(nv, Change.SubstitutedForVar())
+            case SubstitutedForParams(nv) => IUpdateResult.updated(nv, Change.SubstitutedForParams())
             case AlreadyRefined(_)      => IUpdateResult.unchanged
+            case AlreadyConcrete(_)     => IUpdateResult.unchanged
             case AlreadyBiApp(_, _, _, _, _) => IUpdateResult.unchanged
             // case AlreadyPar(_)          => IUpdateResult.unchanged
             case AlreadyFix(_, _, _)    => IUpdateResult.unchanged
@@ -666,13 +687,30 @@ object types {
           value: InferenceVar[->>],
         ) extends UpdRes[->>, ○, ●, Tag.Var, Tag.Var, Tag.Var]
 
-        case class SubstitutedForVar[->>[_, _], K, L, J](
-          newValue: TypeExpr[->>, K, L, J],
-        ) extends UpdRes[->>, K, L, Tag.Var, J, J]
+        case class SubstitutedForVar[->>[_, _], J](
+          newValue: TypeExpr[->>, ○, ●, J],
+        ) extends UpdRes[->>, ○, ●, Tag.Var, J, J]
 
-        case class AlreadyRefined[->>[_, _], K, L, I](
-          value: TypeExpr[->>, K, L, I],
-        ) extends UpdRes[->>, K, L, I, Tag.Var, I]
+        case class AlreadyRefined[->>[_, _], I](
+          value: TypeExpr[->>, ○, ●, I],
+        ) extends UpdRes[->>, ○, ●, I, Tag.Var, I]
+
+        case class UpdatedScalaParams[->>[_, _]](
+          newValue: ScalaTypeParams[->>],
+          newParams: Set[ScalaTypeParam], // subset of newValue's set of params
+        ) extends UpdRes[->>, ○, ●, Tag.TPrm, Tag.TPrm, Tag.TPrm]
+
+        case class AlreadyParamSuperset[->>[_, _]](
+          value: ScalaTypeParams[->>],
+        ) extends UpdRes[->>, ○, ●, Tag.TPrm, Tag.TPrm, Tag.TPrm]
+
+        case class SubstitutedForParams[->>[_, _], J](
+          newValue: TypeExpr[->>, ○, ●, J],
+        ) extends UpdRes[->>, ○, ●, Tag.TPrm, J, J]
+
+        case class AlreadyConcrete[->>[_, _], I](
+          value: TypeExpr[->>, ○, ●, I],
+        ) extends UpdRes[->>, ○, ●, I, Tag.TPrm, I]
 
         case class AlreadyBiApp[->>[_, _], K1, K2, L](
           operator: BinaryOperator[->>, K1, K2, L, ?],
@@ -709,13 +747,14 @@ object types {
       }
 
       object Change {
-        case class UpdatedAliases[->>[_, _], K, L](
+        case class UpdatedAliases[->>[_, _]](
           newAliases: Set[Object],
-        ) extends Change[->>, K, L, Tag.Var, Tag.Var] {
+        ) extends Change[->>, ○, ●, Tag.Var, Tag.Var] {
           require(newAliases.nonEmpty)
         }
 
-        case class SubstitutedForVar[->>[_, _], K, L, J]() extends Change[->>, K, L,Tag.Var, J]
+        case class SubstitutedForVar[->>[_, _], J]() extends Change[->>, ○, ●, Tag.Var, J]
+        case class SubstitutedForParams[->>[_, _], J]() extends Change[->>, ○, ●, Tag.TPrm, J]
       }
 
       implicit def domTypeExpr[->>[_, _], K, L]
@@ -748,6 +787,21 @@ object types {
 
               case (t, InferenceVar(_)) =>
                 UpdRes.AlreadyRefined(t)
+
+              case (t @ ScalaTypeParams(ps), ScalaTypeParams(qs)) =>
+                val newParams = qs diff ps
+                if (newParams.nonEmpty) {
+                  val newVal = ScalaTypeParams[->>](ps union newParams)
+                  UpdRes.UpdatedScalaParams(newVal, newParams)
+                } else {
+                  UpdRes.AlreadyParamSuperset(t)
+                }
+
+              case (ScalaTypeParams(_), u) =>
+                UpdRes.SubstitutedForParams(u)
+
+              case (t, ScalaTypeParams(_)) =>
+                UpdRes.AlreadyConcrete(t)
 
               case (t @ BiApp(_, _, _), u @ BiApp(_, _, _)) =>
                 def go[X1, X2, Y1, Y2](t: BiApp[->>, X1, X2, L], u: BiApp[->>, Y1, Y2, L]): IUpdateRes[I, J] =
@@ -873,7 +927,14 @@ object types {
 
       case class TypeError[->>[_, _], K: Kind, L: Kind](msg: String) extends TypeFun[->>, K, L, Tag.Err]
 
-      case class ScalaTypeParam[->>[_, _]](filename: String, line: Int, name: String) extends TypeFun[->>, ○, ●, Tag.TPrm]
+      case class ScalaTypeParam(filename: String, line: Int, name: String)
+      case class ScalaTypeParams[->>[_, _]](values: Set[ScalaTypeParam]) extends TypeFun[->>, ○, ●, Tag.TPrm] {
+        require(values.nonEmpty)
+      }
+      object ScalaTypeParams {
+        def one[->>[_, _]](filename: String, line: Int, name: String): ScalaTypeParams[->>] =
+          ScalaTypeParams(Set(ScalaTypeParam(filename, line, name)))
+      }
 
       case class Var[->>[_, _], K: Kind, L: Kind](aliases: Set[Object]) extends TypeFun[->>, K, L, Tag.Var]
 
@@ -1191,7 +1252,7 @@ object types {
       introFst(a) > sum
 
     def scalaTypeParam[T](filename: String, line: Int, name: String): TypeFun[○, ●] =
-      TypeFun(generic.TypeFun.ScalaTypeParam(filename, line, name))
+      TypeFun(generic.TypeFun.ScalaTypeParams.one(filename, line, name))
 
     def variable[K: Kind, L: Kind](aliases: Set[Object]): TypeFun[K, L] =
       TypeFun(generic.TypeFun.Var(aliases))
@@ -1264,7 +1325,23 @@ object types {
     }
 
     def ∘[J](that: TypeExpr[J, K]): TypeExpr[J, L] =
-      ???
+      that > this
+
+    def >[M](that: TypeExpr[L, M]): TypeExpr[K, M] = {
+      import generic.{TypeExpr => gt}
+
+      TypeExpr(
+        (this.value, that.value) match {
+          case (f, gt.AppFst(g, b1)) =>
+            gt.AppCompose(g, b1, TypeExpr(f))
+          case (a, b) =>
+            throw new NotImplementedError(s"$a > $b")
+        }
+      )
+    }
+
+    override def toString: String =
+      value.toString
   }
 
   object TypeExpr {
@@ -1279,6 +1356,21 @@ object types {
 
     def inferenceVar(aliases: Set[Object]): TypeExpr[○, ●] =
       TypeExpr(generic.TypeExpr.newInferenceVar())
+
+    def appFst[K1, K2, L](
+      op: generic.TypeExpr.BinaryOperator[?, K1, K2, L, ?],
+      arg1: TypeExpr[○, K1],
+    ): TypeExpr[K2, L] =
+      TypeExpr(generic.TypeExpr.AppFst(op.cast[TypeExpr], arg1))
+
+    def appCompose[K, L1, L2, M](
+      op: generic.TypeExpr.BinaryOperator[?, L1, L2, M, ?],
+      arg1: TypeExpr[○, L1],
+      arg2: TypeExpr[K, L2],
+    ): TypeExpr[K, M] = {
+      import arg2.{given Kind[K]}
+      TypeExpr(generic.TypeExpr.AppCompose(op.cast[TypeExpr], arg1, arg2))
+    }
 
     def biApp[K1, K2, L](
       op: generic.TypeExpr.BinaryOperator[?, K1, K2, L, ?],
@@ -1312,7 +1404,7 @@ object types {
       TypeExpr(generic.TypeExpr.Fix(???, ???))
 
     def scalaTypeParam[T](filename: String, line: Int, name: String): TypeExpr[○, ●] =
-      TypeExpr(generic.TypeExpr.ScalaTypeParam(filename, line, name))
+      TypeExpr(generic.TypeExpr.ScalaTypeParams.one(filename, line, name))
 
     def typeError[K: Kind, L: OutputKind](msg: String): TypeExpr[K, L] =
       TypeExpr(generic.TypeExpr.TypeError(msg))

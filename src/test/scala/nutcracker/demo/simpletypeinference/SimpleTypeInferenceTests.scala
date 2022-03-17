@@ -85,40 +85,26 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
   test("infer types of InfiniteList.map(intToString)") {
     val (tIn, tOut) = reconstructTypes[InfiniteList[Int], InfiniteList[String]](InfiniteList.map(Fun.intToString))
 
-    assert(tIn  == infiniteListType(Typ.int))
-    assert(tOut == infiniteListType(Typ.string))
+    assert(tIn  == infiniteListType(Tpe.int))
+    assert(tOut == infiniteListType(Tpe.string))
   }
 
   test("infer types of List.map(intToString)") {
     val (tIn, tOut) = reconstructTypes[List[Int], List[String]](List.map(Fun.intToString))
 
-    ???
-    // inside(tIn) {
-    //   case FixType(Composed1(TypeApp1(SumTypeT(), TypeVar(aliases1)), TypeApp1(ProductTypeT(), IntType()))) =>
-    //     // note that the Nil case is inferred as  ^^^^^^^^^^^^^^^^^^  instead of Unit, since List.map really is polymorphic in it
-    //     inside(tOut) {
-    //       case FixType(Composed1(TypeApp1(SumTypeT(), TypeVar(aliases2)), TypeApp1(ProductTypeT(), StringType()))) =>
-    //         assert(aliases1 == aliases2)
-    //     }
-    // }
+    assert(tIn == listType(Tpe.int))
+    assert(tOut == listType(Tpe.string))
   }
 
   test("infer types of List.map(List.map(intToString))") {
     val (tIn, tOut) = reconstructTypes[List[List[Int]], List[List[String]]](List.map(List.map(Fun.intToString)))
 
-    ???
-    // inside(tIn) {
-    //   case FixType(Composed1(TypeApp1(SumTypeT(), TypeVar(aliases1)), TypeApp1(ProductTypeT(), FixType(Composed1(TypeApp1(SumTypeT(), TypeVar(aliases2)), TypeApp1(ProductTypeT(), IntTypeT())))))) =>
-    //     inside(tOut) {
-    //       case FixType(Composed1(TypeApp1(SumTypeT(), TypeVar(aliases3)), TypeApp1(ProductTypeT(), FixType(Composed1(TypeApp1(SumTypeT(), TypeVar(aliases4)), TypeApp1(ProductTypeT(), StringTypeT())))))) =>
-    //         assert(aliases1 == aliases3)
-    //         assert(aliases2 == aliases4)
-    //     }
-    // }
+    assert(tIn == listType(listType(Tpe.int)))
+    assert(tOut == listType(listType(Tpe.string)))
   }
 
   test("infer types of countNils") {
-    import List.given_TypeTag_List
+    import List.{given TypeTag[List]}
 
     val countNils: Fun[Fix[List], Int] =
       Fun.rec { countNils =>
