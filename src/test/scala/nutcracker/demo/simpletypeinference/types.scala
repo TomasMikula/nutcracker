@@ -159,12 +159,11 @@ object types {
     }
 
     object TypeExpr {
-      sealed abstract class Elementary[->>[_, _], K: Kind, L: OutputKind, I] extends TypeExpr[->>, K, L, I]
       sealed abstract class BinaryOperator[->>[_, _], K1, K2, L, I](using
         k1: OutputKind[K1],
         k2: OutputKind[K2],
         l: OutputKind[L],
-      ) extends Elementary[->>, K1 × K2, L, I] {
+      ) extends TypeExpr[->>, K1 × K2, L, I] {
         given in1Kind: OutputKind[K1] = k1
         given in2Kind: OutputKind[K2] = k2
 
@@ -182,13 +181,13 @@ object types {
       case class Pair[->>[_, _]]() extends BinaryOperator[->>, ●, ●, ●, Tag.Prod]
       case class Sum[->>[_, _]]() extends BinaryOperator[->>, ●, ●, ●, Tag.Sum]
 
-      case class Fix[->>[_, _], K](f: Route[●, K], g: K ->> ●) extends Elementary[->>, ○, ●, Tag.Fix]
+      case class Fix[->>[_, _], K](f: Route[●, K], g: K ->> ●) extends TypeExpr[->>, ○, ●, Tag.Fix]
 
       // TODO: Make the representation normalized (part of initial routing may possibly be factored out)
       case class PFix[->>[_, _], K, X](
         f: Route[K × ●, X],
         g: X ->> ●,
-      ) extends Elementary[->>, K, ●, Tag.PFix](using Kind.fst[K, ●](f.inKind), summon[OutputKind[●]])
+      ) extends TypeExpr[->>, K, ●, Tag.PFix](using Kind.fst[K, ●](f.inKind), summon[OutputKind[●]])
 
       case class InferenceVar[->>[_, _]](aliases: Set[Object]) extends TypeExpr[->>, ○, ●, Tag.Var]
 
