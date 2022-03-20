@@ -28,9 +28,6 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
 
   type ListF[A, X] = Either[Unit, (A, X)]
   object ListF {
-    val typ: TypeFun[● × ●, ●] =
-      TypeFun.pair > TypeFun.introFst(Typ.unit) > TypeFun.sum
-
     given typeTag: TypeTag[ListF] =
       TypeTag.compose2(TypeTag[Either[Unit, *]], TypeTag.pair)
 
@@ -40,9 +37,6 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
 
   type List[A] = Fix[ListF[A, *]]
   object List {
-    val typ: TypeFun[●, ●] =
-      TypeFun.pfix(ListF.typ)
-
     given TypeTag[List] =
       TypeTag.pfix[ListF](using ListF.typeTag)
 
@@ -62,16 +56,8 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
     }
   }
 
-  def infiniteListType(elemType: Typ): Typ =
-    Typ.fix(TypeFun.pair1(elemType))
-
   def infiniteListType(elemType: Tpe): Tpe =
     Tpe.fix(TpeFun.pair1(elemType))
-
-  def listType(elemType: Typ): Typ =
-    Typ.fix(
-      TypeFun.sum1(Typ.unit) ∘ TypeFun.pair1(elemType)
-    )
 
   def listType(elemType: Tpe): Tpe =
     Tpe.fix(
