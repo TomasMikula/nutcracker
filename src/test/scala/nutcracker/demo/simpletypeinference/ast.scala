@@ -1,6 +1,6 @@
 package nutcracker.demo.simpletypeinference
 
-import nutcracker.demo.simpletypeinference.types.TypeTag
+import nutcracker.demo.simpletypeinference.types.{Fix, TypeTag}
 
 object ast {
 

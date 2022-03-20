@@ -6,7 +6,9 @@ import scalaz.syntax.monad._
 
 import nutcracker.demo.simpletypeinference.ast.Fun
 import nutcracker.demo.simpletypeinference.ast.Fun._
+import nutcracker.demo.simpletypeinference.kinds._
 import nutcracker.demo.simpletypeinference.types._
+import nutcracker.demo.simpletypeinference.types.generic.TypeExpr.Tag
 
 object SimpleTypeInference {
   def apply[F[_]](using P: Propagation[F]): SimpleTypeInference[F, P.type] =
@@ -113,9 +115,9 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
   sealed trait TypeObject[K] {
     given kind: Kind[K]
 
-    def map[L](f: generic.Routing[K, L]): TypeObject[L] =
+    def map[L](f: Routing[K, L]): TypeObject[L] =
       f match {
-        case generic.Routing.Id() => this
+        case Routing.Id() => this
       }
 
     def map[L](f: CellAnnotatedTypeExpr[K, L]): F[TypeObject[L]] = {
@@ -172,10 +174,10 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     given inKind: Kind[K]
     given outKind: Kind[L]
 
-    def pushThrough[M](r: generic.Routing[L, M]): PushThroughRes[K, ?, M] =
+    def pushThrough[M](r: Routing[L, M]): PushThroughRes[K, ?, M] =
       r match {
-        case generic.Routing.Id() =>
-          PushThroughRes(generic.Routing.Id(), this)
+        case Routing.Id() =>
+          PushThroughRes(Routing.Id(), this)
       }
 
     def supplyTo[M](e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] = {
@@ -206,7 +208,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
       override def outKind: Kind[K × L] = summon[Kind[K × L]]
     }
 
-    case class PushThroughRes[K, X, L](r: generic.Routing[K, X], ai: ArgIntro[X, L])
+    case class PushThroughRes[K, X, L](r: Routing[K, X], ai: ArgIntro[X, L])
 
     def introFst[K: Kind, L: Kind](a: TypeObject[K]): ArgIntro[L, K × L] =
       IntroFst(a)
@@ -224,7 +226,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     ): F[TypeExprCell[○, L]] =
       TypeExprCell(ITypeExpr.biApp(op, a1, a2))
 
-    def fix[K](f: generic.Routing[●, K], g: TypeExprCell[K, ●]): F[TypeExprCell[○, ●]] =
+    def fix[K](f: Routing[●, K], g: TypeExprCell[K, ●]): F[TypeExprCell[○, ●]] =
       TypeExprCell(ITypeExpr(generic.TypeExpr.Fix(f, g)))
   }
 
@@ -239,7 +241,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     def sum(a: TypeCell, b: TypeCell): F[TypeCell] =
       TypeCell(ITypeExpr(generic.TypeExpr.sum(a, b)))
 
-    def fix[K](f: generic.Routing[●, K], g: TypeExprCell[K, ●]): F[TypeCell] =
+    def fix[K](f: Routing[●, K], g: TypeExprCell[K, ●]): F[TypeCell] =
       TypeExprCell.fix(f, g)
   }
 

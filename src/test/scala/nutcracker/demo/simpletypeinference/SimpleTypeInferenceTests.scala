@@ -2,6 +2,7 @@ package nutcracker.demo.simpletypeinference
 
 import nutcracker.demo.simpletypeinference.SimpleTypeInference.reconstructTypes
 import nutcracker.demo.simpletypeinference.ast.Fun
+import nutcracker.demo.simpletypeinference.kinds._
 import nutcracker.demo.simpletypeinference.types._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.Inside
