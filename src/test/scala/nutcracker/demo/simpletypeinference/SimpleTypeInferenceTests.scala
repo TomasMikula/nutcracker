@@ -46,6 +46,9 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
     given TypeTag[List] =
       TypeTag.pfix[ListF](using ListF.typeTag)
 
+    def tpe: TpeFun[●, ●] =
+      TypeTag.toTpeFun[List](summon[TypeTag[List]])
+
     def map[A, B](f: Fun[A, B]): Fun[List[A], List[B]] = {
       given TypeTag[A] = TypeTag.ofTypeParam[A]
       given TypeTag[B] = TypeTag.ofTypeParam[B]
@@ -119,6 +122,6 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
 
     val (tIn, tOut) = reconstructTypes[Fix[List], Int](countNils)
 
-    assert(tIn == Tpe.int)
+    assert(tIn == Tpe.fix(List.tpe))
   }
 }

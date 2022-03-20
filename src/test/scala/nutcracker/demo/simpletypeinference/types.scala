@@ -573,6 +573,16 @@ object types {
               b  <- f(b)
             } yield BiApp(op.cast[-->>], a, b)
 
+          case Fix(pre, expr) =>
+            for {
+              expr <- f(expr)
+            } yield Fix(pre, expr)
+
+          case PFix(pre, expr) =>
+            for {
+              expr <- f(expr)
+            } yield PFix(pre, expr)
+
           case other =>
             throw new NotImplementedError(s"$other")
         }
@@ -661,17 +671,19 @@ object types {
 
         def toUpdateResult: IUpdateResult[TypeExpr[->>, K, L, *], Change[->>, K, L, *, *], I0, I1] =
           this match {
-            case UpdatedAliases(nv, na) => IUpdateResult.updated(nv, Change.UpdatedAliases(na))
-            case AlreadySuperset(_)     => IUpdateResult.unchanged
-            case SubstitutedForVar(nv)  => IUpdateResult.updated(nv, Change.SubstitutedForVar())
-            case SubstitutedForParams(nv) => IUpdateResult.updated(nv, Change.SubstitutedForParams())
-            case AlreadyRefined(_)      => IUpdateResult.unchanged
-            case AlreadyConcrete(_)     => IUpdateResult.unchanged
-            case AlreadyBiApp(_, _, _, _, _) => IUpdateResult.unchanged
-            // case AlreadyPar(_)          => IUpdateResult.unchanged
-            case AlreadyFix(_, _, _)    => IUpdateResult.unchanged
-            case AlreadySameAtom()      => IUpdateResult.unchanged
-            case other                  => throw new NotImplementedError(s"$other")
+            case UpdatedAliases(nv, na)           => IUpdateResult.updated(nv, Change.UpdatedAliases(na))
+            case AlreadySuperset(_)               => IUpdateResult.unchanged
+            case SubstitutedForVar(nv)            => IUpdateResult.updated(nv, Change.SubstitutedForVar())
+            case SubstitutedForParams(nv)         => IUpdateResult.updated(nv, Change.SubstitutedForParams())
+            case AlreadyRefined(_)                => IUpdateResult.unchanged
+            case AlreadyConcrete(_)               => IUpdateResult.unchanged
+            case AlreadyAppFst(_, _, _)           => IUpdateResult.unchanged
+            case AlreadyBiApp(_, _, _, _, _)      => IUpdateResult.unchanged
+            case AlreadyAppCompose(_, _, _, _, _) => IUpdateResult.unchanged
+            case AlreadyFix(_, _, _)              => IUpdateResult.unchanged
+            case AlreadyPFix(_, _, _)             => IUpdateResult.unchanged
+            case AlreadySameAtom()                => IUpdateResult.unchanged
+            case other                            => throw new NotImplementedError(s"$other")
           }
       }
 
@@ -712,6 +724,12 @@ object types {
           value: TypeExpr[->>, ○, ●, I],
         ) extends UpdRes[->>, ○, ●, I, Tag.TPrm, I]
 
+        case class AlreadyAppFst[->>[_, _], K1, K2, L](
+          operator: BinaryOperator[->>, K1, K2, L, ?],
+          arg1: ○ ->> K1,
+          updArg1: ○ ->> K1,
+         ) extends UpdRes[->>, K2, L, Tag.AppFst, Tag.AppFst, Tag.AppFst]
+
         case class AlreadyBiApp[->>[_, _], K1, K2, L](
           operator: BinaryOperator[->>, K1, K2, L, ?],
           arg1: ○ ->> K1,
@@ -720,15 +738,25 @@ object types {
           updArg2: ○ ->> K2,
         ) extends UpdRes[->>, ○, L, Tag.BiApp, Tag.BiApp, Tag.BiApp]
 
-        // case class AlreadyPar[->>[_, _], K1, K2, L1, L2](
-        //   value: TypeExpr.Par[->>, K1, K2, L1, L2],
-        // ) extends UpdRes[->>, K1 × K2, L1 × L2, Tag.Par, Tag.Par, Tag.Par]
+        case class AlreadyAppCompose[->>[_, _], K, L1, L2, M](
+          operator: BinaryOperator[->>, L1, L2, M, ?],
+          arg1: ○ ->> L1,
+          arg2: K ->> L2,
+          updArg1: ○ ->> L1,
+          updArg2: K ->> L2,
+        ) extends UpdRes[->>, K, M, Tag.AppComp, Tag.AppComp, Tag.AppComp]
 
         case class AlreadyFix[->>[_, _], K](
           pre: Route[●, K], // same in both the original value and update
           value: K ->> ●,
           update: K ->> ●,
         ) extends UpdRes[->>, ○, ●, Tag.Fix, Tag.Fix, Tag.Fix]
+
+        case class AlreadyPFix[->>[_, _], K, X](
+          pre: Route[K × ●, X], // same in both the original value and update
+          value: X ->> ●,
+          update: X ->> ●,
+        ) extends UpdRes[->>, K, ●, Tag.PFix, Tag.PFix, Tag.PFix]
 
         case class AlreadySameAtom[->>[_, _], K, L, I]() extends UpdRes[->>, K, L, I, I, I]
 
@@ -803,6 +831,16 @@ object types {
               case (t, ScalaTypeParams(_)) =>
                 UpdRes.AlreadyConcrete(t)
 
+              case (t @ AppFst(_, _), u @ AppFst(_, _)) =>
+                def go[X, Y](t: AppFst[->>, X, K, L], u: AppFst[->>, Y, K, L]): IUpdateRes[I, J] =
+                  if (t.op == u.op) {
+                    UpdRes.AlreadyAppFst(t.op, t.arg1, u.arg1.asInstanceOf[○ ->> X]) // TODO: derive X =:= Y, instead of coersion
+                  } else {
+                    UpdRes.Failed(TypeError(s"Cannot unify $t with $u, because ${t.op} != ${u.op}"))
+                  }
+
+                go(t, u)
+
               case (t @ BiApp(_, _, _), u @ BiApp(_, _, _)) =>
                 def go[X1, X2, Y1, Y2](t: BiApp[->>, X1, X2, L], u: BiApp[->>, Y1, Y2, L]): IUpdateRes[I, J] =
                   if (t.op == u.op)
@@ -812,15 +850,32 @@ object types {
 
                 go(t, u)
 
-              // case (t @ Par(_, _), Par(_, _)) =>
-              //   UpdRes.AlreadyPar(t)
+              case (t @ AppCompose(_, _, _), u @ AppCompose(_, _, _)) =>
+                def go[X1, X2, Y1, Y2](t: AppCompose[->>, K, X1, X2, L], u: AppCompose[->>, K, Y1, Y2, L]): IUpdateRes[I, J] =
+                  if (t.op == u.op) {
+                    UpdRes.AlreadyAppCompose(t.op, t.arg1, t.arg2, u.arg1.asInstanceOf[○ ->> X1], u.arg2.asInstanceOf[K ->> X2]) // TODO: derive X1 =:= Y1, X2 =:= Y2 instead of coersion
+                  } else {
+                    UpdRes.Failed(TypeError(s"Cannot unify $t with $u, because ${t.op} != ${u.op}"))
+                  }
 
-              case (t @ Fix(rt, _), u @ Fix(ru, _)) =>
+                go(t, u)
+
+              case (t @ Fix(_, _), u @ Fix(_, _)) =>
                 def go[X, Y](t: Fix[->>, X], u: Fix[->>, Y]): IUpdateRes[I, J] =
-                  if (t.f == u.f)
+                  if (t.f == u.f) // TODO: implement and use proper equality testing
                     UpdRes.AlreadyFix(t.f, t.g, u.g.asInstanceOf[X ->> ●]) // TODO: derive X =:= Y instead of coersion
                   else
-                    UpdRes.Failed(TypeError(s"Cannot unify $t with $u, because of different initial multiplication of the argument"))
+                    UpdRes.Failed(TypeError(s"Cannot unify $t with $u, because ${t.f} != ${u.f}"))
+
+                go(t, u)
+
+              case (t @ PFix(_, _), u @ PFix(_, _)) =>
+                def go[X, Y](t: PFix[->>, K, X], u: PFix[->>, K, Y]): IUpdateRes[I, J] =
+                  if (t.f == u.f) { // TODO: implement and use proper equality testing
+                    UpdRes.AlreadyPFix(t.f, t.g, u.g.asInstanceOf[X ->> ●]) // TODO: derive X =:= Y instead of coersion
+                  } else {
+                    UpdRes.Failed(TypeError(s"Cannot unify $t with $u, because ${t.f} != ${u.f}"))
+                  }
 
                 go(t, u)
 
@@ -830,8 +885,8 @@ object types {
               // case (Sum(), Sum()) =>
               //   UpdRes.AlreadySameAtom()
 
-              // case (Pair(), Pair()) =>
-              //   UpdRes.AlreadySameAtom()
+              case (Pair(), Pair()) =>
+                UpdRes.AlreadySameAtom()
 
               case (UnitType(), UnitType()) =>
                 UpdRes.AlreadySameAtom()
@@ -861,10 +916,7 @@ object types {
         }
     }
 
-    sealed trait Route[K, L](using k: Kind[K], l: Kind[L]) {
-      def inKind: Kind[K] = k
-      def outKind: Kind[L] = l
-    }
+    sealed trait Route[K, L](using val inKind: Kind[K], val outKind: Kind[L])
     object Route {
       case class Id[K: Kind]() extends Route[K, K]
 
@@ -1293,6 +1345,9 @@ object types {
 
   case class AnnotatedTypeExpr[A[_, _], K, L](annotation: A[K, L], value: generic.TypeExpr[AnnotatedTypeExpr[A, *, *], K, L, ?])
   object AnnotatedTypeExpr {
+    def annotations[A[_, _], K, L, I](e: generic.TypeExpr[AnnotatedTypeExpr[A, *, *], K, L, I]): generic.TypeExpr[A, K, L, I] =
+      e.translate[A]([k, l] => (ae: AnnotatedTypeExpr[A, k, l]) => ae.annotation)
+
     def annotate[A[_, _], K, L](
       f: TypeExpr[K, L],
       ann: [k, l] => generic.TypeExpr[A, k, l, ?] => A[k, l],

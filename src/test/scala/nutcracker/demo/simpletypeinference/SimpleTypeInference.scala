@@ -177,6 +177,14 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
   /** Has both the pure [[TypeExpr]] and its embedding into the propagation network. */
   type BiTypeExpr[K, L] = AnnotatedTypeExpr[TypeExprCell, K, L]
   object BiTypeExpr {
+    def apply[K, L](cell: TypeExprCell[K, L], value: generic.TypeExpr[BiTypeExpr, K, L, ?]): BiTypeExpr[K, L] =
+      AnnotatedTypeExpr(cell, value)
+
+    def apply[K, L](value: generic.TypeExpr[BiTypeExpr, K, L, ?]): F[BiTypeExpr[K, L]] = {
+      val expr: generic.TypeExpr[TypeExprCell, K, L, ?] = AnnotatedTypeExpr.annotations(value)
+      TypeExprCell(ITypeExpr(expr)).map(BiTypeExpr(_, value))
+    }
+
     def unroll[K, L](f: TypeExpr[K, L]): F[BiTypeExpr[K, L]] =
       AnnotatedTypeExpr.annotateM[TypeExprCell, K, L, F](
         f,
@@ -186,6 +194,8 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
   }
 
   sealed trait TypeObject[K] {
+    given kind: Kind[K]
+
     def map[L](f: generic.Route[K, L]): TypeObject[L] =
       f match {
         case generic.Route.Id() => this
@@ -195,17 +205,28 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
       import generic.{TypeExpr => gt}
       f.value match {
         case gt.AppFst(op, arg1) =>
-          import op.in2Kind
+          import op.{in2Kind, outKind}
           TypeExprCell
             .biApp(op.cast, arg1.annotation, TypeObject.toCell(this))
             .map(TypeObject(_))
 
         case gt.AppCompose(op, a, g) =>
-          import op.in2Kind
+          import op.{in2Kind, outKind}
           for {
             b <- map(g)
             cell <- TypeExprCell.biApp(op.cast, a.annotation, TypeObject.toCell(b))
           } yield TypeObject(cell)
+
+        case gt.PFix(pre, expr) =>
+          val a: ArgIntro[●, K × ●] = ArgIntro.introFst(this)
+          a.pushThrough(pre) match {
+            case ArgIntro.PushThroughRes(r, ai) =>
+              for {
+                expr1 <- ai.supplyTo(expr)
+                cell0 <- TypeExprCell(expr1)
+                cell1 <- TypeExprCell.fix(r, cell0)
+              } yield TypeObject(cell1)(using Kind.Type)
+          }
 
         case other =>
           throw new NotImplementedError(s"$other")
@@ -214,15 +235,64 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
   }
 
   object TypeObject {
-    case class WrapCell[K](cell: TypeExprCell[○, K]) extends TypeObject[K]
+    case class WrapCell[K: Kind](cell: TypeExprCell[○, K]) extends TypeObject[K] {
+      override def kind: Kind[K] = summon
+    }
 
-    def apply[K](cell: TypeExprCell[○, K]): TypeObject[K] =
+    def apply[K: Kind](cell: TypeExprCell[○, K]): TypeObject[K] =
       WrapCell(cell)
 
     def toCell[K: OutputKind](o: TypeObject[K]): TypeExprCell[○, K] =
       o match {
         case WrapCell(cell) => cell
       }
+  }
+
+  /** Introduces type arguments into `K`, obtaining `L`. */
+  sealed trait ArgIntro[K, L] {
+    import ArgIntro._
+
+    given inKind: Kind[K]
+    given outKind: Kind[L]
+
+    def pushThrough[M](r: generic.Route[L, M]): PushThroughRes[K, ?, M] =
+      r match {
+        case generic.Route.Id() =>
+          PushThroughRes(generic.Route.Id(), this)
+      }
+
+    def supplyTo[M](e: BiTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] = {
+        import generic.{TypeExpr => gt}
+
+        e.value match {
+          case gt.AppCompose(op, a, g) =>
+            for {
+              h <- this.supplyTo(g)
+              hc <- TypeExprCell(h)
+            } yield
+              ITypeExpr(gt.AppCompose(op.cast, a.annotation, hc))
+
+          case gt.Pair() =>
+            this match {
+              case IntroFst(a) => ITypeExpr(gt.pair1(TypeObject.toCell(a))).pure[F]
+              case other => throw new NotImplementedError(s"$other")
+            }
+
+          case other =>
+            throw new NotImplementedError(s"$other")
+        }
+      }
+  }
+  object ArgIntro {
+    case class IntroFst[K: Kind, L: Kind](arg: TypeObject[K]) extends ArgIntro[L, K × L] {
+      override def inKind: Kind[L] = summon[Kind[L]]
+      override def outKind: Kind[K × L] = summon[Kind[K × L]]
+    }
+
+    case class PushThroughRes[K, X, L](r: generic.Route[K, X], ai: ArgIntro[X, L])
+
+    def introFst[K: Kind, L: Kind](a: TypeObject[K]): ArgIntro[L, K × L] =
+      IntroFst(a)
   }
 
   type TypeExprCell[K, L] = IVar[ITypeExpr[K, L, *]]
@@ -236,6 +306,9 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
       a2: TypeExprCell[○, K2],
     ): F[TypeExprCell[○, L]] =
       TypeExprCell(ITypeExpr.biApp(op, a1, a2))
+
+    def fix[K](f: generic.Route[●, K], g: TypeExprCell[K, ●]): F[TypeExprCell[○, ●]] =
+      TypeExprCell(ITypeExpr(generic.TypeExpr.Fix(f, g)))
   }
 
   type TpeCell = TypeExprCell[○, ●]
@@ -250,7 +323,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
       TpeCell(ITypeExpr(generic.TypeExpr.sum(a, b)))
 
     def fix[K](f: generic.Route[●, K], g: TypeExprCell[K, ●]): F[TpeCell] =
-      TpeCell(ITypeExpr(generic.TypeExpr.Fix(f, g)))
+      TypeExprCell.fix(f, g)
   }
 
   type TypeFunCell[K, L] = IVar[ITypeFun[K, L, *]]
@@ -558,17 +631,18 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     import t.value.{inKind, outKind}
 
     t.value match {
-      case gte.InferenceVar(aliases)     => monadOut.pure(TypeExpr.inferenceVar(aliases))
-      case gte.AppFst(op, a1)    => outputTypeExprCell(a1).map(TypeExpr.appFst(op, _))
+      case gte.InferenceVar(aliases)  => TypeExpr.inferenceVar(aliases).pure[Out]
+      case gte.AppFst(op, a1)         => outputTypeExprCell(a1).map(TypeExpr.appFst(op, _))
       case gte.AppCompose(op, a1, f2) => (outputTypeExprCell(a1) |@| outputTypeExprCell(f2)) { (a1, f2) => TypeExpr.appCompose(op, a1, f2) }
-      case gte.BiApp(op, a1, a2) => (outputTypeExprCell(a1) |@| outputTypeExprCell(a2)) { (a1, a2) => TypeExpr.biApp(op, a1, a2) }
-      case gte.UnitType()       => monadOut.pure(TypeExpr.unit)
-      case gte.IntType()        => monadOut.pure(TypeExpr.int)
-      case gte.StringType()     => monadOut.pure(TypeExpr.string)
-      case gte.Fix(f, g)        => outputTypeExprCell(g).map(TypeExpr.fix(f, _))
-      case gte.PFix(f, g)       => outputTypeExprCell(g).map(TypeExpr.pfix(f, _))
-      case gte.TypeError(msg)   => monadOut.point(TypeExpr.typeError(msg))
-      case other                => throw new NotImplementedError(s"$other")
+      case gte.BiApp(op, a1, a2)      => (outputTypeExprCell(a1) |@| outputTypeExprCell(a2)) { (a1, a2) => TypeExpr.biApp(op, a1, a2) }
+      case gte.UnitType()             => TypeExpr.unit.pure[Out]
+      case gte.IntType()              => TypeExpr.int.pure[Out]
+      case gte.StringType()           => TypeExpr.string.pure[Out]
+      case gte.Pair()                 => TypeExpr.pair.pure[Out]
+      case gte.Fix(f, g)              => outputTypeExprCell(g).map(TypeExpr.fix(f, _))
+      case gte.PFix(f, g)             => outputTypeExprCell(g).map(TypeExpr.pfix(f, _))
+      case gte.TypeError(msg)         => TypeExpr.typeError(msg).pure[Out]
+      case other                      => throw new NotImplementedError(s"$other")
     }
   }
 
@@ -715,19 +789,20 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
       import generic.TypeExpr.UpdRes._
 
       updRes match {
-        case UpdatedAliases(_, _)   => M.pure(())
-        case AlreadySuperset(_)     => M.pure(())
-        case AlreadyRefined(_)      => M.pure(())
-        case AlreadyConcrete(_)     => M.pure(())
-        case AlreadySameAtom()      => M.pure(())
-        case SubstitutedForVar(_)   => M.pure(())
-        case SubstitutedForParams(_)=> M.pure(())
-        case AlreadyBiApp(_, a1, a2, u1, u2) => propagateTpe(u1, a1) *> propagateTpe(u2, a2)
-        // case ap: AlreadyPar[TypeExprCell, k1, k2, l1, l2] =>
-        //   propagatePar[k1, k2, l1, l2](update, ITypeFun(ap.value))
-        case AlreadyFix(_, t, u)    => propagateTpe(u, t)
-        // case Failed(_)              => M.pure(())
-        // case AlreadyFailed(_)       => M.pure(())
+        case UpdatedAliases(_, _)                 => M.pure(())
+        case AlreadySuperset(_)                   => M.pure(())
+        case AlreadyRefined(_)                    => M.pure(())
+        case AlreadyConcrete(_)                   => M.pure(())
+        case AlreadySameAtom()                    => M.pure(())
+        case SubstitutedForVar(_)                 => M.pure(())
+        case SubstitutedForParams(_)              => M.pure(())
+        case AlreadyAppFst(_, a1, u1)             => propagateTpe(u1, a1)
+        case AlreadyBiApp(_, a1, a2, u1, u2)      => propagateTpe(u1, a1) *> propagateTpe(u2, a2)
+        case AlreadyAppCompose(_, a1, a2, u1, u2) => propagateTpe(u1, a1) *> propagateTpe(u2, a2)
+        case AlreadyFix(_, t, u)                  => propagateTpe(u, t)
+        case AlreadyPFix(_, t, u)                 => propagateTpe(u, t)
+        case Failed(_)                            => M.pure(())
+        // case AlreadyFailed(_)                     => M.pure(())
         case other => throw new NotImplementedError(s"$other")
       }
     }
