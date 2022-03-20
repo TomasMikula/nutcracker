@@ -12,7 +12,7 @@ object SimpleTypeInference {
   def apply[F[_]](using P: Propagation[F]): SimpleTypeInference[F, P.type] =
     new SimpleTypeInference[F, P.type]
 
-  def reconstructTypes[A, B](f: Fun[A, B]): (Tpe, Tpe) =
+  def reconstructTypes[A, B](f: Fun[A, B]): (Type, Type) =
     PropagationToolkit.run { [F[_]] =>
       (propagation: Propagation[F]) =>
         SimpleTypeInference(using propagation).reconstructTypes(f)
@@ -65,41 +65,44 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
       }
   }
 
-  type ITpe[I] = ITypeExpr[○, ●, I]
-  object ITpe {
-    def newInferenceVar(): ITpe[Tag.Var] =
+  type IType[I] = ITypeExpr[○, ●, I]
+  object IType {
+    def newInferenceVar(): IType[Tag.Var] =
       ITypeExpr.newInferenceVar()
 
-    def unit: ITpe[Tag.Unit] =
+    def unit: IType[Tag.Unit] =
       ITypeExpr(generic.TypeExpr.UnitType())
 
-    def int: ITpe[Tag.Int] =
+    def int: IType[Tag.Int] =
       ITypeExpr(generic.TypeExpr.IntType())
 
-    def string: ITpe[Tag.Str] =
+    def string: IType[Tag.Str] =
       ITypeExpr(generic.TypeExpr.StringType())
 
-    def pair(a: ITpe[?], b: ITpe[?]): F[ITpe[?]] =
+    def pair(a: IType[?], b: IType[?]): F[IType[?]] =
       for {
-        a <- TpeCell(a)
-        b <- TpeCell(b)
+        a <- TypeCell(a)
+        b <- TypeCell(b)
       } yield ITypeExpr(generic.TypeExpr.pair[TypeExprCell](a, b))
   }
 
-  import ITpe.newInferenceVar
+  import IType.newInferenceVar
 
   /** Has both the pure [[TypeExpr]] and its embedding into the propagation network. */
-  type BiTypeExpr[K, L] = AnnotatedTypeExpr[TypeExprCell, K, L]
-  object BiTypeExpr {
-    def apply[K, L](cell: TypeExprCell[K, L], value: generic.TypeExpr[BiTypeExpr, K, L, ?]): BiTypeExpr[K, L] =
+  type CellAnnotatedTypeExpr[K, L] = AnnotatedTypeExpr[TypeExprCell, K, L]
+  object CellAnnotatedTypeExpr {
+    def apply[K, L](
+      cell: TypeExprCell[K, L],
+      value: generic.TypeExpr[CellAnnotatedTypeExpr, K, L, ?],
+    ): CellAnnotatedTypeExpr[K, L] =
       AnnotatedTypeExpr(cell, value)
 
-    def apply[K, L](value: generic.TypeExpr[BiTypeExpr, K, L, ?]): F[BiTypeExpr[K, L]] = {
+    def apply[K, L](value: generic.TypeExpr[CellAnnotatedTypeExpr, K, L, ?]): F[CellAnnotatedTypeExpr[K, L]] = {
       val expr: generic.TypeExpr[TypeExprCell, K, L, ?] = AnnotatedTypeExpr.annotations(value)
-      TypeExprCell(ITypeExpr(expr)).map(BiTypeExpr(_, value))
+      TypeExprCell(ITypeExpr(expr)).map(CellAnnotatedTypeExpr(_, value))
     }
 
-    def unroll[K, L](f: TypeExpr[K, L]): F[BiTypeExpr[K, L]] =
+    def unroll[K, L](f: TypeExpr[K, L]): F[CellAnnotatedTypeExpr[K, L]] =
       AnnotatedTypeExpr.annotateM[TypeExprCell, K, L, F](
         f,
         [k, l] => (t: generic.TypeExpr[TypeExprCell, k, l, ?]) =>
@@ -110,12 +113,12 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
   sealed trait TypeObject[K] {
     given kind: Kind[K]
 
-    def map[L](f: generic.Route[K, L]): TypeObject[L] =
+    def map[L](f: generic.Routing[K, L]): TypeObject[L] =
       f match {
-        case generic.Route.Id() => this
+        case generic.Routing.Id() => this
       }
 
-    def map[L](f: BiTypeExpr[K, L]): F[TypeObject[L]] = {
+    def map[L](f: CellAnnotatedTypeExpr[K, L]): F[TypeObject[L]] = {
       import generic.{TypeExpr => gt}
       f.value match {
         case gt.AppFst(op, arg1) =>
@@ -169,13 +172,13 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     given inKind: Kind[K]
     given outKind: Kind[L]
 
-    def pushThrough[M](r: generic.Route[L, M]): PushThroughRes[K, ?, M] =
+    def pushThrough[M](r: generic.Routing[L, M]): PushThroughRes[K, ?, M] =
       r match {
-        case generic.Route.Id() =>
-          PushThroughRes(generic.Route.Id(), this)
+        case generic.Routing.Id() =>
+          PushThroughRes(generic.Routing.Id(), this)
       }
 
-    def supplyTo[M](e: BiTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] = {
+    def supplyTo[M](e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] = {
         import generic.{TypeExpr => gt}
 
         e.value match {
@@ -203,7 +206,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
       override def outKind: Kind[K × L] = summon[Kind[K × L]]
     }
 
-    case class PushThroughRes[K, X, L](r: generic.Route[K, X], ai: ArgIntro[X, L])
+    case class PushThroughRes[K, X, L](r: generic.Routing[K, X], ai: ArgIntro[X, L])
 
     def introFst[K: Kind, L: Kind](a: TypeObject[K]): ArgIntro[L, K × L] =
       IntroFst(a)
@@ -221,67 +224,67 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     ): F[TypeExprCell[○, L]] =
       TypeExprCell(ITypeExpr.biApp(op, a1, a2))
 
-    def fix[K](f: generic.Route[●, K], g: TypeExprCell[K, ●]): F[TypeExprCell[○, ●]] =
+    def fix[K](f: generic.Routing[●, K], g: TypeExprCell[K, ●]): F[TypeExprCell[○, ●]] =
       TypeExprCell(ITypeExpr(generic.TypeExpr.Fix(f, g)))
   }
 
-  type TpeCell = TypeExprCell[○, ●]
-  object TpeCell {
-    def apply[I](t: ITpe[I]): F[TpeCell] =
+  type TypeCell = TypeExprCell[○, ●]
+  object TypeCell {
+    def apply[I](t: IType[I]): F[TypeCell] =
       P.newICell(t)
 
-    def pair(a: TpeCell, b: TpeCell): F[TpeCell] =
-      TpeCell(ITypeExpr(generic.TypeExpr.pair(a, b)))
+    def pair(a: TypeCell, b: TypeCell): F[TypeCell] =
+      TypeCell(ITypeExpr(generic.TypeExpr.pair(a, b)))
 
-    def sum(a: TpeCell, b: TpeCell): F[TpeCell] =
-      TpeCell(ITypeExpr(generic.TypeExpr.sum(a, b)))
+    def sum(a: TypeCell, b: TypeCell): F[TypeCell] =
+      TypeCell(ITypeExpr(generic.TypeExpr.sum(a, b)))
 
-    def fix[K](f: generic.Route[●, K], g: TypeExprCell[K, ●]): F[TpeCell] =
+    def fix[K](f: generic.Routing[●, K], g: TypeExprCell[K, ●]): F[TypeCell] =
       TypeExprCell.fix(f, g)
   }
 
-  def newTpeCell[I](t: ITpe[I]): F[TpeCell] =
+  def newTypeCell[I](t: IType[I]): F[TypeCell] =
     P.newICell(t)
 
   def reconstructTypes[A, B](
     f: Fun[A, B]
-  ): F[Out[(Tpe, Tpe)]] =
+  ): F[Out[(Type, Type)]] =
     for {
-      ta <- newTpeCell(newInferenceVar())
-      tb <- newTpeCell(newInferenceVar())
+      ta <- newTypeCell(newInferenceVar())
+      tb <- newTypeCell(newInferenceVar())
       _ <- connect(ta, f, tb, Map.empty)
     } yield for {
-      ta <- outputTpeCell(ta)
-      tb <- outputTpeCell(tb)
+      ta <- outputTypeCell(ta)
+      tb <- outputTypeCell(tb)
     } yield (ta, tb)
 
   private def connect[A, B](
-    a: TpeCell,
+    a: TypeCell,
     f: Fun[A, B],
-    b: TpeCell,
-    ctx: Map[Fun.Label[?, ?], (TpeCell, TpeCell)],
+    b: TypeCell,
+    ctx: Map[Fun.Label[?, ?], (TypeCell, TypeCell)],
   ): F[Unit] =
     f match {
       case IdFun() =>
-        unifyTpes(a, b)
+        unifyTypes(a, b)
 
       case AndThen(g, h) =>
         def go[X](g: Fun[A, X], h: Fun[X, B]): F[Unit] =
-          newTpeCell(newInferenceVar())
+          newTypeCell(newInferenceVar())
             .flatMap { x => connect(a, g, x, ctx) *> connect(x, h, b, ctx) }
         go(g, h)
 
       case par: Par[a1, a2, b1, b2] =>
         def go[A1, A2, B1, B2](f1: Fun[A1, B1], f2: Fun[A2, B2]): F[Unit] =
           for {
-            a1 <- newTpeCell(newInferenceVar())
-            a2 <- newTpeCell(newInferenceVar())
-            b1 <- newTpeCell(newInferenceVar())
-            b2 <- newTpeCell(newInferenceVar())
-            a12 <- TpeCell.pair(a1, a2)
-            b12 <- TpeCell.pair(b1, b2)
-            _ <- unifyTpes(a, a12)
-            _ <- unifyTpes(b, b12)
+            a1 <- newTypeCell(newInferenceVar())
+            a2 <- newTypeCell(newInferenceVar())
+            b1 <- newTypeCell(newInferenceVar())
+            b2 <- newTypeCell(newInferenceVar())
+            a12 <- TypeCell.pair(a1, a2)
+            b12 <- TypeCell.pair(b1, b2)
+            _ <- unifyTypes(a, a12)
+            _ <- unifyTypes(b, b12)
             _ <- connect(a1, f1, b1, ctx)
             _ <- connect(a2, f2, b2, ctx)
           } yield ()
@@ -290,10 +293,10 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
       case e: EitherF[a1, a2, B] =>
         def go[A1, A2](g: Fun[A1, B], h: Fun[A2, B]): F[Unit] =
           for {
-            a1  <- newTpeCell(newInferenceVar())
-            a2  <- newTpeCell(newInferenceVar())
-            a12 <- TpeCell.sum(a1, a2)
-            _   <- unifyTpes(a, a12)
+            a1  <- newTypeCell(newInferenceVar())
+            a2  <- newTypeCell(newInferenceVar())
+            a12 <- TypeCell.sum(a1, a2)
+            _   <- unifyTypes(a, a12)
             _   <- connect(a1, g, b, ctx)
             _   <- connect(a2, h, b, ctx)
           } yield ()
@@ -301,36 +304,36 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
 
       case i: InjectL[A, b2] =>
         for {
-          b2  <- newTpeCell(newInferenceVar())
-          ab2 <- TpeCell.sum(a, b2)
-          _   <- unifyTpes(b, ab2)
+          b2  <- newTypeCell(newInferenceVar())
+          ab2 <- TypeCell.sum(a, b2)
+          _   <- unifyTypes(b, ab2)
         } yield ()
 
       case i: InjectR[A, b1] =>
         for {
-          b1  <- newTpeCell(newInferenceVar())
-          b1a <- TpeCell.sum(b1, a)
-          _   <- unifyTpes(b, b1a)
+          b1  <- newTypeCell(newInferenceVar())
+          b1a <- TypeCell.sum(b1, a)
+          _   <- unifyTypes(b, b1a)
         } yield ()
 
       case fix: FixF[g] =>
-        val tf = TypeTag.toTpeFun(fix.f)
+        val tf = TypeTag.toTypeFun(fix.f)
         for {
-          g <- BiTypeExpr.unroll(tf.expr)
-          fg <- TpeCell.fix(tf.pre, g.annotation)
+          g <- CellAnnotatedTypeExpr.unroll(tf.expr)
+          fg <- TypeCell.fix(tf.pre, g.annotation)
           gfg <- TypeObject(fg).map(tf.pre).map(g).map(TypeObject.toCell)
-          _ <- unifyTpes(a, gfg)
-          _ <- unifyTpes(b, fg)
+          _ <- unifyTypes(a, gfg)
+          _ <- unifyTypes(b, fg)
         } yield ()
 
       case unfix: UnfixF[g] =>
-        val tf = TypeTag.toTpeFun(unfix.f)
+        val tf = TypeTag.toTypeFun(unfix.f)
         for {
-          g <- BiTypeExpr.unroll(tf.expr)
-          fg <- TpeCell.fix(tf.pre, g.annotation)
+          g <- CellAnnotatedTypeExpr.unroll(tf.expr)
+          fg <- TypeCell.fix(tf.pre, g.annotation)
           gfg <- TypeObject(fg).map(tf.pre).map(g).map(TypeObject.toCell)
-          _  <- unifyTpes(a, fg)
-          _  <- unifyTpes(b, gfg)
+          _  <- unifyTypes(a, fg)
+          _  <- unifyTypes(b, gfg)
         } yield ()
 
       case Rec(label, f) =>
@@ -338,37 +341,37 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
 
       case RecCall(label) =>
         ctx.get(label) match {
-          case Some((ta, tb)) => unifyTpes(a, ta) *> unifyTpes(b, tb)
+          case Some((ta, tb)) => unifyTypes(a, ta) *> unifyTypes(b, tb)
           case None           => throw new IllegalArgumentException("Recursive call to an undefined function")
         }
 
       case ConstInt(_) =>
         for {
-          _ <- refinePropagate(a, ITpe.unit)
-          _ <- refinePropagate(b, ITpe.int)
+          _ <- refinePropagate(a, IType.unit)
+          _ <- refinePropagate(b, IType.int)
         } yield ()
 
       case AddInts() =>
         for {
-          ii <- ITpe.pair(ITpe.int, ITpe.int)
+          ii <- IType.pair(IType.int, IType.int)
           _ <- refinePropagate(a, ii)
-          _ <- refinePropagate(b, ITpe.int)
+          _ <- refinePropagate(b, IType.int)
         } yield ()
 
       case IntToString() =>
         for {
-          _ <- refinePropagate(a, ITpe.int)
-          _ <- refinePropagate(b, ITpe.string)
+          _ <- refinePropagate(a, IType.int)
+          _ <- refinePropagate(b, IType.string)
         } yield ()
     }
 
-  private def outputTpeCell(tc: TpeCell): Out[Tpe] =
+  private def outputTypeCell(tc: TypeCell): Out[Type] =
     outputTypeExprCell(tc)
 
   private def outputTypeExprCell[K, L](tc: TypeExprCell[K, L]): Out[TypeExpr[K, L]] =
-    iOut(tc).flatMap(t => outputTpe(t.value))
+    iOut(tc).flatMap(t => outputType(t.value))
 
-  private def outputTpe[K, L, I](
+  private def outputType[K, L, I](
     t: ITypeExpr[K, L, I],
   ): Out[TypeExpr[K, L]] = {
     import generic.{TypeExpr => gte}
@@ -390,13 +393,13 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     }
   }
 
-  private def unifyTpes(
-    t1: TpeCell,
-    t2: TpeCell,
+  private def unifyTypes(
+    t1: TypeCell,
+    t2: TypeCell,
   ): F[Unit] =
-    propagateTpe(t1, t2) *> propagateTpe(t2, t1)
+    propagateType(t1, t2) *> propagateType(t2, t1)
 
-  private def propagateTpe[K, L](
+  private def propagateType[K, L](
     src: TypeExprCell[K, L],
     tgt: TypeExprCell[K, L],
   ): F[Unit] =
@@ -428,11 +431,11 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
         case AlreadySameAtom()                    => M.pure(())
         case SubstitutedForVar(_)                 => M.pure(())
         case SubstitutedForParams(_)              => M.pure(())
-        case AlreadyAppFst(_, a1, u1)             => propagateTpe(u1, a1)
-        case AlreadyBiApp(_, a1, a2, u1, u2)      => propagateTpe(u1, a1) *> propagateTpe(u2, a2)
-        case AlreadyAppCompose(_, a1, a2, u1, u2) => propagateTpe(u1, a1) *> propagateTpe(u2, a2)
-        case AlreadyFix(_, t, u)                  => propagateTpe(u, t)
-        case AlreadyPFix(_, t, u)                 => propagateTpe(u, t)
+        case AlreadyAppFst(_, a1, u1)             => propagateType(u1, a1)
+        case AlreadyBiApp(_, a1, a2, u1, u2)      => propagateType(u1, a1) *> propagateType(u2, a2)
+        case AlreadyAppCompose(_, a1, a2, u1, u2) => propagateType(u1, a1) *> propagateType(u2, a2)
+        case AlreadyFix(_, t, u)                  => propagateType(u, t)
+        case AlreadyPFix(_, t, u)                 => propagateType(u, t)
         case Failed(_)                            => M.pure(())
         // case AlreadyFailed(_)                     => M.pure(())
         case other => throw new NotImplementedError(s"$other")

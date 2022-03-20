@@ -181,11 +181,11 @@ object types {
       case class Pair[->>[_, _]]() extends BinaryOperator[->>, ●, ●, ●, Tag.Prod]
       case class Sum[->>[_, _]]() extends BinaryOperator[->>, ●, ●, ●, Tag.Sum]
 
-      case class Fix[->>[_, _], K](f: Route[●, K], g: K ->> ●) extends TypeExpr[->>, ○, ●, Tag.Fix]
+      case class Fix[->>[_, _], K](f: Routing[●, K], g: K ->> ●) extends TypeExpr[->>, ○, ●, Tag.Fix]
 
       // TODO: Make the representation normalized (part of initial routing may possibly be factored out)
       case class PFix[->>[_, _], K, X](
-        f: Route[K × ●, X],
+        f: Routing[K × ●, X],
         g: X ->> ●,
       ) extends TypeExpr[->>, K, ●, Tag.PFix](using Kind.fst[K, ●](f.inKind), summon[OutputKind[●]])
 
@@ -315,13 +315,13 @@ object types {
         ) extends UpdRes[->>, K, M, Tag.AppComp, Tag.AppComp, Tag.AppComp]
 
         case class AlreadyFix[->>[_, _], K](
-          pre: Route[●, K], // same in both the original value and update
+          pre: Routing[●, K], // same in both the original value and update
           value: K ->> ●,
           update: K ->> ●,
         ) extends UpdRes[->>, ○, ●, Tag.Fix, Tag.Fix, Tag.Fix]
 
         case class AlreadyPFix[->>[_, _], K, X](
-          pre: Route[K × ●, X], // same in both the original value and update
+          pre: Routing[K × ●, X], // same in both the original value and update
           value: X ->> ●,
           update: X ->> ●,
         ) extends UpdRes[->>, K, ●, Tag.PFix, Tag.PFix, Tag.PFix]
@@ -481,91 +481,91 @@ object types {
         }
     }
 
-    sealed trait Route[K, L](using val inKind: Kind[K], val outKind: Kind[L])
-    object Route {
-      case class Id[K: Kind]() extends Route[K, K]
+    sealed trait Routing[K, L](using val inKind: Kind[K], val outKind: Kind[L])
+    object Routing {
+      case class Id[K: Kind]() extends Routing[K, K]
 
-      def id[K: Kind]: Route[K, K] =
+      def id[K: Kind]: Routing[K, K] =
         Id()
 
-      def proveId[K](r: Route[○, K]): K =:= ○ =
+      def proveId[K](r: Routing[○, K]): K =:= ○ =
         r match {
           case Id() => implicitly[K =:= ○]
         }
     }
   }
 
-  sealed trait TpeFun[K, L] {
+  sealed trait TypeFun[K, L] {
     type X
-    def pre: generic.Route[K, X]
+    def pre: generic.Routing[K, X]
     def expr: TypeExpr[X, L]
 
-    def ∘[J](that: TpeFun[J, K]): TpeFun[J, L] =
+    def ∘[J](that: TypeFun[J, K]): TypeFun[J, L] =
       this.pre match {
-        case generic.Route.Id() => TpeFun(that.pre, this.expr ∘ that.expr)
+        case generic.Routing.Id() => TypeFun(that.pre, this.expr ∘ that.expr)
       }
   }
 
-  object TpeFun {
-    def apply[K, P, L](r: generic.Route[K, P], f: TypeExpr[P, L]): TpeFun[K, L] =
-      new TpeFun[K, L] {
+  object TypeFun {
+    def apply[K, P, L](r: generic.Routing[K, P], f: TypeExpr[P, L]): TypeFun[K, L] =
+      new TypeFun[K, L] {
         override type X = P
         override def pre = r
         override def expr = f
       }
 
-    def unapply[K, L](f: TpeFun[K, L]): (generic.Route[K, f.X], TypeExpr[f.X, L]) =
+    def unapply[K, L](f: TypeFun[K, L]): (generic.Routing[K, f.X], TypeExpr[f.X, L]) =
       (f.pre, f.expr)
 
-    def fromExpr[K, L](e: TypeExpr[K, L]): TpeFun[K, L] = {
+    def fromExpr[K, L](e: TypeExpr[K, L]): TypeFun[K, L] = {
       import e.inKind
-      TpeFun(generic.Route.id[K], e)
+      TypeFun(generic.Routing.id[K], e)
     }
 
-    def toExpr[L](f: TpeFun[○, L]): TypeExpr[○, L] =
-      generic.Route.proveId(f.pre).substituteCo[TypeExpr[*, L]](f.expr)
+    def toExpr[L](f: TypeFun[○, L]): TypeExpr[○, L] =
+      generic.Routing.proveId(f.pre).substituteCo[TypeExpr[*, L]](f.expr)
 
-    def unit: TpeFun[○, ●] =
+    def unit: TypeFun[○, ●] =
       fromExpr(TypeExpr.unit)
 
-    def int: TpeFun[○, ●] =
+    def int: TypeFun[○, ●] =
       fromExpr(TypeExpr.int)
 
-    def string: TpeFun[○, ●] =
+    def string: TypeFun[○, ●] =
       fromExpr(TypeExpr.string)
 
-    def pair: TpeFun[● × ●, ●] =
+    def pair: TypeFun[● × ●, ●] =
       fromExpr(TypeExpr.pair)
 
-    def pair(a: TpeFun[○, ●], b: TpeFun[○, ●]): TpeFun[○, ●] =
+    def pair(a: TypeFun[○, ●], b: TypeFun[○, ●]): TypeFun[○, ●] =
       fromExpr(TypeExpr.pair(toExpr(a), toExpr(b)))
 
-    def pair1(a: Tpe): TpeFun[●, ●] =
+    def pair1(a: Type): TypeFun[●, ●] =
       fromExpr(TypeExpr.pair1(a))
 
-    def pair1(a: TpeFun[○, ●]): TpeFun[●, ●] =
+    def pair1(a: TypeFun[○, ●]): TypeFun[●, ●] =
       pair1(toExpr(a))
 
-    def sum(a: TpeFun[○, ●], b: TpeFun[○, ●]): TpeFun[○, ●] =
+    def sum(a: TypeFun[○, ●], b: TypeFun[○, ●]): TypeFun[○, ●] =
       fromExpr(TypeExpr.sum(toExpr(a), toExpr(b)))
 
-    def sum1(a: Tpe): TpeFun[●, ●] =
+    def sum1(a: Type): TypeFun[●, ●] =
       fromExpr(TypeExpr.sum1(a))
 
-    def sum1(a: TpeFun[○, ●]): TpeFun[●, ●] =
+    def sum1(a: TypeFun[○, ●]): TypeFun[●, ●] =
       sum1(toExpr(a))
 
-    def fix(f: TpeFun[●, ●]): TpeFun[○, ●] =
+    def fix(f: TypeFun[●, ●]): TypeFun[○, ●] =
       f match {
-        case TpeFun(pre, expr) => fromExpr(TypeExpr.fix(pre, expr))
+        case TypeFun(pre, expr) => fromExpr(TypeExpr.fix(pre, expr))
       }
 
-    def pfix(f: TpeFun[● × ●, ●]): TpeFun[●, ●] =
+    def pfix(f: TypeFun[● × ●, ●]): TypeFun[●, ●] =
       f match {
-        case TpeFun(pre, expr) => fromExpr(TypeExpr.pfix(pre, expr))
+        case TypeFun(pre, expr) => fromExpr(TypeExpr.pfix(pre, expr))
       }
 
-    def scalaTypeParam[T](filename: String, line: Int, name: String): TpeFun[○, ●] =
+    def scalaTypeParam[T](filename: String, line: Int, name: String): TypeFun[○, ●] =
       fromExpr(TypeExpr.scalaTypeParam(filename, line, name))
   }
 
@@ -675,10 +675,10 @@ object types {
     def sum1(a: TypeExpr[○, ●]): TypeExpr[●, ●] =
       TypeExpr(generic.TypeExpr.sum1(a))
 
-    def fix[K](f: generic.Route[●, K], g: TypeExpr[K, ●]): Tpe =
+    def fix[K](f: generic.Routing[●, K], g: TypeExpr[K, ●]): Type =
       TypeExpr(generic.TypeExpr.Fix(f, g))
 
-    def pfix[K, X](f: generic.Route[K × ●, X], g: TypeExpr[X, ●]): TypeExpr[K, ●] =
+    def pfix[K, X](f: generic.Routing[K × ●, X], g: TypeExpr[X, ●]): TypeExpr[K, ●] =
       TypeExpr(generic.TypeExpr.PFix(f, g))
 
     def scalaTypeParam[T](filename: String, line: Int, name: String): TypeExpr[○, ●] =
@@ -688,74 +688,74 @@ object types {
       TypeExpr(generic.TypeExpr.TypeError(msg))
   }
 
-  type Tpe = TypeExpr[○, ●]
-  object Tpe {
-    def unit: Tpe   = TypeExpr.unit
-    def int: Tpe    = TypeExpr.int
-    def string: Tpe = TypeExpr.string
+  type Type = TypeExpr[○, ●]
+  object Type {
+    def unit: Type   = TypeExpr.unit
+    def int: Type    = TypeExpr.int
+    def string: Type = TypeExpr.string
 
-    def sum(a: Tpe, b: Tpe): Tpe =
+    def sum(a: Type, b: Type): Type =
       TypeExpr(generic.TypeExpr.sum(a, b))
 
-    def fix(f: TpeFun[●, ●]): Tpe =
-      TpeFun.toExpr(TpeFun.fix(f))
+    def fix(f: TypeFun[●, ●]): Type =
+      TypeFun.toExpr(TypeFun.fix(f))
   }
 
-  opaque type TypeTag[A <: AnyKind] = TpeFun[?, ?]
+  opaque type TypeTag[A <: AnyKind] = TypeFun[?, ?]
   object TypeTag {
     def apply[A <: AnyKind](using a: TypeTag[A]): TypeTag[A] =
       a
 
-    given unit: TypeTag[Unit] = TpeFun.unit
-    given int: TypeTag[Int] = TpeFun.int
-    given string: TypeTag[String] = TpeFun.string
+    given unit: TypeTag[Unit] = TypeFun.unit
+    given int: TypeTag[Int] = TypeFun.int
+    given string: TypeTag[String] = TypeFun.string
 
     given pair: TypeTag[Tuple2] =
-      TpeFun.pair
+      TypeFun.pair
 
     given pair[A, B](using a: TypeTag[A], b: TypeTag[B]): TypeTag[(A, B)] =
-      TpeFun.pair(
-        (a: TpeFun[?, ?]).asInstanceOf[TpeFun[○, ●]],
-        (b: TpeFun[?, ?]).asInstanceOf[TpeFun[○, ●]],
+      TypeFun.pair(
+        (a: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]],
+        (b: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]],
       )
 
     given pair1[A](using a: TypeTag[A]): TypeTag[(A, *)] =
-      TpeFun.pair1(
-        (a: TpeFun[?, ?]).asInstanceOf[TpeFun[○, ●]]
+      TypeFun.pair1(
+        (a: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]]
       )
 
     given sum1[A](using a: TypeTag[A]): TypeTag[Either[A, *]] =
-      TpeFun.sum1(
-        (a: TpeFun[?, ?]).asInstanceOf[TpeFun[○, ●]]
+      TypeFun.sum1(
+        (a: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]]
       )
 
     given fix[F[_]](using f: TypeTag[F]): TypeTag[Fix[F]] =
-      TpeFun.fix(
-        (f: TpeFun[?, ?]).asInstanceOf[TpeFun[●, ●]]
+      TypeFun.fix(
+        (f: TypeFun[?, ?]).asInstanceOf[TypeFun[●, ●]]
       )
 
     given pfix[F[_, _]](using f: TypeTag[F]): TypeTag[[x] =>> Fix[F[x, *]]] =
-      TpeFun.pfix(
-        (f: TpeFun[?, ?]).asInstanceOf[TpeFun[● × ●, ●]]
+      TypeFun.pfix(
+        (f: TypeFun[?, ?]).asInstanceOf[TypeFun[● × ●, ●]]
       )
 
     def compose[F[_], G[_]](f: TypeTag[F], g: TypeTag[G]): TypeTag[[x] =>> F[G[x]]] = {
-      val f1 = (f: TpeFun[?, ?]).asInstanceOf[TpeFun[●, ●]]
-      val g1 = (g: TpeFun[?, ?]).asInstanceOf[TpeFun[●, ●]]
+      val f1 = (f: TypeFun[?, ?]).asInstanceOf[TypeFun[●, ●]]
+      val g1 = (g: TypeFun[?, ?]).asInstanceOf[TypeFun[●, ●]]
       f1 ∘ g1
     }
 
     def compose2[F[_], G[_, _]](f: TypeTag[F], g: TypeTag[G]): TypeTag[[x, y] =>> F[G[x, y]]] = {
-      val f1 = (f: TpeFun[?, ?]).asInstanceOf[TpeFun[●, ●]]
-      val g1 = (g: TpeFun[?, ?]).asInstanceOf[TpeFun[● × ●, ●]]
+      val f1 = (f: TypeFun[?, ?]).asInstanceOf[TypeFun[●, ●]]
+      val g1 = (g: TypeFun[?, ?]).asInstanceOf[TypeFun[● × ●, ●]]
       f1 ∘ g1
     }
 
-    def toType[A](ta: TypeTag[A]): Tpe =
-      TpeFun.toExpr((ta: TpeFun[?, ?]).asInstanceOf[TpeFun[○, ●]])
+    def toType[A](ta: TypeTag[A]): Type =
+      TypeFun.toExpr((ta: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]])
 
-    def toTpeFun[F[_]](tf: TypeTag[F]): TpeFun[●, ●] =
-      (tf: TpeFun[?, ?]).asInstanceOf[TpeFun[●, ●]]
+    def toTypeFun[F[_]](tf: TypeTag[F]): TypeFun[●, ●] =
+      (tf: TypeFun[?, ?]).asInstanceOf[TypeFun[●, ●]]
 
     import scala.{quoted => sq}
     private def fromTypeParam[T](using t: sq.Type[T], q: sq.Quotes): sq.Expr[TypeTag[T]] = {
@@ -770,7 +770,7 @@ object types {
           val file = pos.sourceFile.path
           val line = pos.startLine
           '{
-            TpeFun.scalaTypeParam[T](
+            TypeFun.scalaTypeParam[T](
               filename = ${sq.Expr(file)},
               line = ${sq.Expr(line)},
               name = ${sq.Expr(name)},

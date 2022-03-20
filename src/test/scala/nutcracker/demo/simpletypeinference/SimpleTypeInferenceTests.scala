@@ -40,8 +40,8 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
     given TypeTag[List] =
       TypeTag.pfix[ListF](using ListF.typeTag)
 
-    def tpe: TpeFun[●, ●] =
-      TypeTag.toTpeFun[List](summon[TypeTag[List]])
+    def tpe: TypeFun[●, ●] =
+      TypeTag.toTypeFun[List](summon[TypeTag[List]])
 
     def map[A, B](f: Fun[A, B]): Fun[List[A], List[B]] = {
       given TypeTag[A] = TypeTag.ofTypeParam[A]
@@ -56,40 +56,40 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
     }
   }
 
-  def infiniteListType(elemType: Tpe): Tpe =
-    Tpe.fix(TpeFun.pair1(elemType))
+  def infiniteListType(elemType: Type): Type =
+    Type.fix(TypeFun.pair1(elemType))
 
-  def listType(elemType: Tpe): Tpe =
-    Tpe.fix(
-      TpeFun.sum1(Tpe.unit) ∘ TpeFun.pair1(elemType)
+  def listType(elemType: Type): Type =
+    Type.fix(
+      TypeFun.sum1(Type.unit) ∘ TypeFun.pair1(elemType)
     )
 
   test("infer types of eitherBimap(intToString, intToString)") {
     val (tIn, tOut) = reconstructTypes[Either[Int, Int], Either[String, String]](eitherBimap(Fun.intToString, Fun.intToString))
 
-    assert(tIn  == Tpe.sum(Tpe.int, Tpe.int))
-    assert(tOut == Tpe.sum(Tpe.string, Tpe.string))
+    assert(tIn  == Type.sum(Type.int, Type.int))
+    assert(tOut == Type.sum(Type.string, Type.string))
   }
 
   test("infer types of InfiniteList.map(intToString)") {
     val (tIn, tOut) = reconstructTypes[InfiniteList[Int], InfiniteList[String]](InfiniteList.map(Fun.intToString))
 
-    assert(tIn  == infiniteListType(Tpe.int))
-    assert(tOut == infiniteListType(Tpe.string))
+    assert(tIn  == infiniteListType(Type.int))
+    assert(tOut == infiniteListType(Type.string))
   }
 
   test("infer types of List.map(intToString)") {
     val (tIn, tOut) = reconstructTypes[List[Int], List[String]](List.map(Fun.intToString))
 
-    assert(tIn == listType(Tpe.int))
-    assert(tOut == listType(Tpe.string))
+    assert(tIn == listType(Type.int))
+    assert(tOut == listType(Type.string))
   }
 
   test("infer types of List.map(List.map(intToString))") {
     val (tIn, tOut) = reconstructTypes[List[List[Int]], List[List[String]]](List.map(List.map(Fun.intToString)))
 
-    assert(tIn == listType(listType(Tpe.int)))
-    assert(tOut == listType(listType(Tpe.string)))
+    assert(tIn == listType(listType(Type.int)))
+    assert(tOut == listType(listType(Type.string)))
   }
 
   test("infer types of countNils") {
@@ -108,6 +108,6 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
 
     val (tIn, tOut) = reconstructTypes[Fix[List], Int](countNils)
 
-    assert(tIn == Tpe.fix(List.tpe))
+    assert(tIn == Type.fix(List.tpe))
   }
 }
