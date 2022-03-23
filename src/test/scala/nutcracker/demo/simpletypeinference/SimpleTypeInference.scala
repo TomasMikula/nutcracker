@@ -37,6 +37,9 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     ): ITypeExpr[○, L, Tag.BiApp] =
       ITypeExpr(generic.TypeExpr.BiApp(op, a1, a2))
 
+    def fix[X](f: Routing[●, X], g: TypeExprCell[X, ●]): ITypeExpr[○, ●, Tag.Fix] =
+      ITypeExpr(generic.TypeExpr.Fix(f, g))
+
     type UpdRes[K, L, I0, J, I1] = generic.TypeExpr.UpdRes[TypeExprCell, K, L, I0, J, I1]
     type Change[K, L, I0, I1] = generic.TypeExpr.Change[TypeExprCell, K, L, I0, I1]
 
@@ -112,101 +115,59 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
       )
   }
 
-  sealed trait TypeObject[K] {
-    given kind: ProperKind[K]
+  type CellIntro[K, L] = ArgIntro[TypeExprCell[○, *], K, L]
+  object CellIntro {
+    def apply[K: ProperKind](cell: TypeExprCell[○, K]): CellIntro[○, K] =
+      ArgIntro.wrapArg(cell)
 
-    def map[L](f: Routing[K, L]): TypeObject[L] =
-      f match {
-        case Routing.Id() => this
+    def introFst[K, L: ProperKind](a: CellIntro[○, K]): CellIntro[L, K × L] =
+      ArgIntro.introFst(a)
+
+    def toCell[K: OutputKind](ci: CellIntro[○, K]): TypeExprCell[○, K] =
+      ArgIntro.unwrap(ci)
+
+    def supplyTo[K, L, M](a: CellIntro[K, L], e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] =
+      a.inKind.properKind match {
+        case Left(k_eq_○) =>
+          k_eq_○.substituteContra[[k] =>> F[ITypeExpr[k, M, ?]]](
+            CellIntro.supplyTo0(k_eq_○.substituteCo[CellIntro[*, L]](a), e)
+          )
+        case Right(k) =>
+          CellIntro.supplyTo1(a, e)(using k)
       }
 
-    def map[L](f: CellAnnotatedTypeExpr[K, L]): F[TypeObject[L]] = {
+    private def supplyTo0[L, M](args: CellIntro[○, L], e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[○, M, ?]] ={
       import generic.{TypeExpr => gt}
-      f.value match {
+
+      e.value match {
         case gt.AppFst(op, arg1) =>
-          import op.{in2Kind, outKind}
-          TypeExprCell
-            .biApp(op.cast, arg1.annotation, TypeObject.toCell(this))
-            .map(TypeObject(_))
+          import op.in2Kind
+          ITypeExpr
+            .biApp(op.cast, arg1.annotation, toCell(args))
+            .pure[F]
 
         case gt.AppCompose(op, a, g) =>
-          import op.{in2Kind, outKind}
           for {
-            b <- map(g)
-            cell <- TypeExprCell.biApp(op.cast, a.annotation, TypeObject.toCell(b))
-          } yield TypeObject(cell)
+            b <- supplyTo0(args, g)
+            bc <- TypeExprCell(b)
+          } yield ITypeExpr.biApp(op.cast, a.annotation, bc)
 
         case gt.PFix(pre, expr) =>
-          val a: ArgIntro[●, K × ●] = ArgIntro.introFst(this)
-          a.pushThrough(pre) match {
-            case ArgIntro.PushThroughRes(r, ai) =>
+          val a: CellIntro[●, L × ●] = introFst(args)
+          pre.applyTo(a) match {
+            case Routing.ApplyRes(r, ai) =>
               for {
-                expr1 <- ai.supplyTo(expr)
+                expr1 <- supplyTo(ai, expr)
                 cell0 <- TypeExprCell(expr1)
-                cell1 <- TypeExprCell.fix(r, cell0)
-              } yield TypeObject(cell1)(using ProperKind.Type)
+              } yield ITypeExpr.fix(r, cell0)
           }
 
         case other =>
-          throw new NotImplementedError(s"$other")
+          throw new NotImplementedError(s"Supplying $args into $other")
       }
     }
-  }
 
-  object TypeObject {
-    case class WrapCell[K: ProperKind](cell: TypeExprCell[○, K]) extends TypeObject[K] {
-      override def kind: ProperKind[K] = summon
-    }
-
-    def apply[K: ProperKind](cell: TypeExprCell[○, K]): TypeObject[K] =
-      WrapCell(cell)
-
-    def toCell[K: OutputKind](o: TypeObject[K]): TypeExprCell[○, K] =
-      o match {
-        case WrapCell(cell) => cell
-      }
-  }
-
-  /** Introduces type arguments into `K`, obtaining `L`. */
-  sealed trait ArgIntro[K, L] {
-    import ArgIntro._
-
-    given inKind: Kind[K]
-    given outKind: Kind[L]
-
-    def pushThrough[M](r: Routing[L, M]): PushThroughRes[K, ?, M] =
-      r match {
-        case Routing.Id() =>
-          PushThroughRes(Routing.Id(), this)
-      }
-
-    def supplyTo[M](e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] =
-      inKind.properKind match {
-        case Left(k_eq_○) =>
-          k_eq_○.substituteContra[[k] =>> F[ITypeExpr[k, M, ?]]](
-            ArgIntro.supplyTo0(k_eq_○.substituteCo[ArgIntro[*, L]](this), e)
-          )
-        case Right(k) =>
-          ArgIntro.supplyTo1(this, e)(using k)
-      }
-  }
-  object ArgIntro {
-    case class IntroFst[K, L: ProperKind](arg: TypeObject[K]) extends ArgIntro[L, K × L] {
-      import arg.kind
-
-      override def inKind: Kind[L] = summon[Kind[L]]
-      override def outKind: Kind[K × L] = summon[Kind[K × L]]
-    }
-
-    case class PushThroughRes[K, X, L](r: Routing[K, X], ai: ArgIntro[X, L])
-
-    def introFst[K, L: ProperKind](a: TypeObject[K]): ArgIntro[L, K × L] =
-      IntroFst(a)
-
-    private def supplyTo0[L, M](a: ArgIntro[○, L], e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[○, M, ?]] =
-      ???
-
-    private def supplyTo1[K: ProperKind, L, M](args: ArgIntro[K, L], e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] = {
+    private def supplyTo1[K: ProperKind, L, M](args: CellIntro[K, L], e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] = {
       import generic.{TypeExpr => gt}
 
       e.value match {
@@ -219,7 +180,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
 
         case gt.Pair() =>
           args match {
-            case IntroFst(a) => ITypeExpr(gt.pair1(TypeObject.toCell(a))).pure[F]
+            case ArgIntro.IntroFst(a) => ITypeExpr(gt.pair1(toCell(a))).pure[F]
             case other => throw new NotImplementedError(s"$other")
           }
 
@@ -242,7 +203,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
       TypeExprCell(ITypeExpr.biApp(op, a1, a2))
 
     def fix[K](f: Routing[●, K], g: TypeExprCell[K, ●]): F[TypeExprCell[○, ●]] =
-      TypeExprCell(ITypeExpr(generic.TypeExpr.Fix(f, g)))
+      TypeExprCell(ITypeExpr.fix(f, g))
   }
 
   type TypeCell = TypeExprCell[○, ●]
@@ -338,7 +299,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
         for {
           g <- CellAnnotatedTypeExpr.unroll(tf.expr)
           fg <- TypeCell.fix(tf.pre, g.annotation)
-          gfg <- TypeObject(fg).map(tf.pre).map(g).map(TypeObject.toCell)
+          gfg <- CellIntro.supplyTo(tf.pre.applyTo0(CellIntro(fg)), g).flatMap(TypeExprCell(_))
           _ <- unifyTypes(a, gfg)
           _ <- unifyTypes(b, fg)
         } yield ()
@@ -348,7 +309,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
         for {
           g <- CellAnnotatedTypeExpr.unroll(tf.expr)
           fg <- TypeCell.fix(tf.pre, g.annotation)
-          gfg <- TypeObject(fg).map(tf.pre).map(g).map(TypeObject.toCell)
+          gfg <- CellIntro.supplyTo(tf.pre.applyTo0(CellIntro(fg)), g).flatMap(TypeExprCell(_))
           _  <- unifyTypes(a, fg)
           _  <- unifyTypes(b, gfg)
         } yield ()

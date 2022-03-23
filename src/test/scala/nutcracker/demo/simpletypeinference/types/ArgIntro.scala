@@ -38,8 +38,12 @@ object ArgIntro {
   def wrapArgFst[TA[_], K: ProperKind, L: ProperKind](arg: TA[K]): ArgIntro[TA, L, K × L] =
     introFst(wrapArg(arg))
 
-  def unwrap[TA[_]](i: ArgIntro[TA, ○, ●]): TA[●] =
+  def unwrap[TA[_], K](i: ArgIntro[TA, ○, K])(using k: OutputKind[K]): TA[K] =
     i match {
-      case WrapArg(a) => a
+      case WrapArg(a) =>
+        a
+      case other =>
+        // TODO: prove using OutputKind[K], instead of throwing an exception
+        throw new AssertionError(s"didn't expect $i to produce an OutputKind")
     }
 }

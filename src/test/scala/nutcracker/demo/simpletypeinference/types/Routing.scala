@@ -15,6 +15,12 @@ sealed trait Routing[K, L](using
       case Id() => ApplyRes(Id(), args)
     }
   }
+
+  def applyTo0[TA[_]](args: ArgIntro[TA, ○, K]): ArgIntro[TA, ○, L] = {
+    this match {
+      case Id() => args
+    }
+  }
 }
 
 object Routing {
