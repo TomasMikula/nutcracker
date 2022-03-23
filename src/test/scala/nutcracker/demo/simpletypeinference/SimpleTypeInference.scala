@@ -113,7 +113,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
   }
 
   sealed trait TypeObject[K] {
-    given kind: Kind[K]
+    given kind: ProperKind[K]
 
     def map[L](f: Routing[K, L]): TypeObject[L] =
       f match {
@@ -144,7 +144,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
                 expr1 <- ai.supplyTo(expr)
                 cell0 <- TypeExprCell(expr1)
                 cell1 <- TypeExprCell.fix(r, cell0)
-              } yield TypeObject(cell1)(using Kind.Type)
+              } yield TypeObject(cell1)(using ProperKind.Type)
           }
 
         case other =>
@@ -154,11 +154,11 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
   }
 
   object TypeObject {
-    case class WrapCell[K: Kind](cell: TypeExprCell[○, K]) extends TypeObject[K] {
-      override def kind: Kind[K] = summon
+    case class WrapCell[K: ProperKind](cell: TypeExprCell[○, K]) extends TypeObject[K] {
+      override def kind: ProperKind[K] = summon
     }
 
-    def apply[K: Kind](cell: TypeExprCell[○, K]): TypeObject[K] =
+    def apply[K: ProperKind](cell: TypeExprCell[○, K]): TypeObject[K] =
       WrapCell(cell)
 
     def toCell[K: OutputKind](o: TypeObject[K]): TypeExprCell[○, K] =
@@ -180,38 +180,53 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
           PushThroughRes(Routing.Id(), this)
       }
 
-    def supplyTo[M](e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] = {
-        import generic.{TypeExpr => gt}
-
-        e.value match {
-          case gt.AppCompose(op, a, g) =>
-            for {
-              h <- this.supplyTo(g)
-              hc <- TypeExprCell(h)
-            } yield
-              ITypeExpr(gt.AppCompose(op.cast, a.annotation, hc))
-
-          case gt.Pair() =>
-            this match {
-              case IntroFst(a) => ITypeExpr(gt.pair1(TypeObject.toCell(a))).pure[F]
-              case other => throw new NotImplementedError(s"$other")
-            }
-
-          case other =>
-            throw new NotImplementedError(s"$other")
-        }
+    def supplyTo[M](e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] =
+      inKind.properKind match {
+        case Left(k_eq_○) =>
+          k_eq_○.substituteContra[[k] =>> F[ITypeExpr[k, M, ?]]](
+            ArgIntro.supplyTo0(k_eq_○.substituteCo[ArgIntro[*, L]](this), e)
+          )
+        case Right(k) =>
+          ArgIntro.supplyTo1(this, e)(using k)
       }
   }
   object ArgIntro {
-    case class IntroFst[K: Kind, L: Kind](arg: TypeObject[K]) extends ArgIntro[L, K × L] {
+    case class IntroFst[K, L: ProperKind](arg: TypeObject[K]) extends ArgIntro[L, K × L] {
+      import arg.kind
+
       override def inKind: Kind[L] = summon[Kind[L]]
       override def outKind: Kind[K × L] = summon[Kind[K × L]]
     }
 
     case class PushThroughRes[K, X, L](r: Routing[K, X], ai: ArgIntro[X, L])
 
-    def introFst[K: Kind, L: Kind](a: TypeObject[K]): ArgIntro[L, K × L] =
+    def introFst[K, L: ProperKind](a: TypeObject[K]): ArgIntro[L, K × L] =
       IntroFst(a)
+
+    private def supplyTo0[L, M](a: ArgIntro[○, L], e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[○, M, ?]] =
+      ???
+
+    private def supplyTo1[K: ProperKind, L, M](args: ArgIntro[K, L], e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] = {
+      import generic.{TypeExpr => gt}
+
+      e.value match {
+        case gt.AppCompose(op, a, g) =>
+          for {
+            h <- supplyTo1(args, g)
+            hc <- TypeExprCell(h)
+          } yield
+            ITypeExpr(gt.AppCompose(op.cast, a.annotation, hc))
+
+        case gt.Pair() =>
+          args match {
+            case IntroFst(a) => ITypeExpr(gt.pair1(TypeObject.toCell(a))).pure[F]
+            case other => throw new NotImplementedError(s"$other")
+          }
+
+        case other =>
+          throw new NotImplementedError(s"$other")
+      }
+    }
   }
 
   type TypeExprCell[K, L] = IVar[ITypeExpr[K, L, *]]
@@ -380,18 +395,28 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
     import t.value.{inKind, outKind}
 
     t.value match {
-      case gte.InferenceVar(aliases)  => TypeExpr.inferenceVar(aliases).pure[Out]
-      case gte.AppFst(op, a1)         => outputTypeExprCell(a1).map(TypeExpr.appFst(op, _))
-      case gte.AppCompose(op, a1, f2) => (outputTypeExprCell(a1) |@| outputTypeExprCell(f2)) { (a1, f2) => TypeExpr.appCompose(op, a1, f2) }
-      case gte.BiApp(op, a1, a2)      => (outputTypeExprCell(a1) |@| outputTypeExprCell(a2)) { (a1, a2) => TypeExpr.biApp(op, a1, a2) }
-      case gte.UnitType()             => TypeExpr.unit.pure[Out]
-      case gte.IntType()              => TypeExpr.int.pure[Out]
-      case gte.StringType()           => TypeExpr.string.pure[Out]
-      case gte.Pair()                 => TypeExpr.pair.pure[Out]
-      case gte.Fix(f, g)              => outputTypeExprCell(g).map(TypeExpr.fix(f, _))
-      case gte.PFix(f, g)             => outputTypeExprCell(g).map(TypeExpr.pfix(f, _))
-      case gte.TypeError(msg)         => TypeExpr.typeError(msg).pure[Out]
-      case other                      => throw new NotImplementedError(s"$other")
+      case gte.UnitType()            => TypeExpr.unit.pure[Out]
+      case gte.IntType()             => TypeExpr.int.pure[Out]
+      case gte.StringType()          => TypeExpr.string.pure[Out]
+      case gte.Pair()                => TypeExpr.pair.pure[Out]
+      case gte.InferenceVar(aliases) => TypeExpr.inferenceVar(aliases).pure[Out]
+      case gte.TypeError(msg)        => TypeExpr.typeError(msg).pure[Out]
+      case gte.AppFst(op, a1) =>
+        outputTypeExprCell(a1).map(TypeExpr.appFst(op, _))
+      case ac @ gte.AppCompose(op, a1, f2) =>
+        (outputTypeExprCell(a1) |@| outputTypeExprCell(f2)) { (a1, f2) =>
+          TypeExpr.appCompose(op, a1, f2)(using ac.properInKind)
+        }
+      case gte.BiApp(op, a1, a2) =>
+        (outputTypeExprCell(a1) |@| outputTypeExprCell(a2)) { (a1, a2) =>
+          TypeExpr.biApp(op, a1, a2)
+        }
+      case gte.Fix(f, g) =>
+        outputTypeExprCell(g).map(TypeExpr.fix(f, _))
+      case pf @ gte.PFix(f, g) =>
+        outputTypeExprCell(g).map(TypeExpr.pfix(f, _)(using pf.properInKind))
+      case other =>
+        throw new NotImplementedError(s"$other")
     }
   }
 

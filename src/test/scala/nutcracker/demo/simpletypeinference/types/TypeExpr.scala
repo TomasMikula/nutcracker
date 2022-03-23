@@ -16,20 +16,79 @@ case class TypeExpr[K, L](value: generic.TypeExpr[TypeExpr, K, L, ?]) {
   }
 
   def ∘[J](that: TypeExpr[J, K]): TypeExpr[J, L] =
-    that > this
+    that.inKind.properKind match {
+      case Left(j_eq_○) =>
+        j_eq_○.substituteContra[TypeExpr[*, L]](applyTo(j_eq_○.substituteCo[TypeExpr[*, K]](that)))
+      case Right(j) =>
+        composeProper(that)(using j)
+    }
 
-  def >[M](that: TypeExpr[L, M]): TypeExpr[K, M] = {
+  def composeProper[J](that: TypeExpr[J, K])(using j: ProperKind[J]): TypeExpr[J, L] = {
     import generic.{TypeExpr => gt}
 
     TypeExpr(
-      (this.value, that.value) match {
+      (that.value, this.value) match {
         case (f, gt.AppFst(g, b1)) =>
           gt.AppCompose(g, b1, TypeExpr(f))
         case (a, b) =>
-          throw new NotImplementedError(s"$a > $b")
+          throw new NotImplementedError(s"$b ∘ $a")
       }
     )
   }
+
+  def applyTo(that: TypeExpr[○, K]): TypeExpr[○, L] = {
+    import that.outKind
+    applyTo(ArgIntro.wrapArg(that))
+  }
+
+  def applyTo[J](that: ArgIntro[TypeExpr[○, *], J, K]): TypeExpr[J, L] =
+    that.inKind.properKind match {
+      case Left(j_eq_○) =>
+        j_eq_○.substituteContra[TypeExpr[*, L]](
+          applyTo0(j_eq_○.substituteCo[[j] =>> ArgIntro[TypeExpr[○, *], j, K]](that))
+        )
+      case Right(j) =>
+        applyTo1(that)(using j)
+    }
+
+  def applyTo0(that: ArgIntro[TypeExpr[○, *], ○, K]): TypeExpr[○, L] = {
+    import generic.{TypeExpr => gt}
+
+    TypeExpr(
+      this.value match {
+        case gt.PFix(g, h) =>
+          g.applyTo(ArgIntro.introFst[TypeExpr[○, *], K, ●](that)) match {
+            case Routing.ApplyRes(g, i) =>
+              gt.Fix(g, h.applyTo(i))
+          }
+        case other =>
+          throw new NotImplementedError(s"Applying $other to $that")
+      }
+    )
+  }
+
+  def applyTo1[J: ProperKind](that: ArgIntro[TypeExpr[○, *], J, K]): TypeExpr[J, L] = {
+    import generic.{TypeExpr => gt}
+
+    TypeExpr(
+      this.value match {
+        case gt.AppCompose(op, a, g) =>
+          gt.AppCompose(op, a, g.applyTo1(that))
+        case gt.Pair() =>
+          that match {
+            case ArgIntro.IntroFst(a) =>
+              gt.pair1(ArgIntro.unwrap(a))
+            case other =>
+              throw new NotImplementedError(s"Applying $this to $other")
+          }
+        case other =>
+          throw new NotImplementedError(s"Applying $other to $that")
+      }
+    )
+  }
+
+  def >[M](that: TypeExpr[L, M]): TypeExpr[K, M] =
+    that ∘ this
 
   override def toString: String =
     value.toString
@@ -54,7 +113,7 @@ object TypeExpr {
   ): TypeExpr[K2, L] =
     TypeExpr(generic.TypeExpr.AppFst(op.cast[TypeExpr], arg1))
 
-  def appCompose[K, L1, L2, M](
+  def appCompose[K: ProperKind, L1, L2, M](
     op: generic.TypeExpr.BinaryOperator[?, L1, L2, M, ?],
     arg1: TypeExpr[○, L1],
     arg2: TypeExpr[K, L2],
@@ -88,7 +147,7 @@ object TypeExpr {
   def fix[K](f: Routing[●, K], g: TypeExpr[K, ●]): TypeExpr[○, ●] =
     TypeExpr(generic.TypeExpr.Fix(f, g))
 
-  def pfix[K, X](f: Routing[K × ●, X], g: TypeExpr[X, ●]): TypeExpr[K, ●] =
+  def pfix[K: ProperKind, X](f: Routing[K × ●, X], g: TypeExpr[X, ●]): TypeExpr[K, ●] =
     TypeExpr(generic.TypeExpr.PFix(f, g))
 
   def scalaTypeParam[T](filename: String, line: Int, name: String): TypeExpr[○, ●] =

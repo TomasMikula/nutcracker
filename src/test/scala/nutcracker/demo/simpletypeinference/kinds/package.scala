@@ -11,14 +11,9 @@ package object kinds {
   /** Phantom type representing the "unit" kind. Neutral element for [[×]]. Unicode character U+25CB. */
   sealed trait ○
 
-  /** Phantom type representing the kinds of type functions. Internal hom in the category [[TypeFun]].
-   *
-   * @tparam K input kind
-   * @tparam L output kind
-   */
-  // sealed trait ->[K, L]
-
   sealed trait Kind[K] {
+    def properKind: Either[K =:= ○, ProperKind[K]]
+
     def testEqual[L](that: Kind[L]): Option[K =:= L] =
       (this, that) match {
         case (Kind.Unit, Kind.Unit) =>
@@ -26,7 +21,7 @@ package object kinds {
         case (Kind.Type, Kind.Type) =>
           Some(implicitly[● =:= ●])
         case (Kind.Prod(a, b), Kind.Prod(x, y)) =>
-          (a testEqual x, b testEqual y) match {
+          (a.kind testEqual x.kind, b.kind testEqual y.kind) match {
             case (Some(ax), Some(by)) =>
               Some(implicitly[K =:= K].asInstanceOf[K =:= L])
             case _ =>
@@ -40,26 +35,43 @@ package object kinds {
   object Kind {
     case object Unit extends Kind[○] {
       override def toString = "○"
+      override def properKind = Left(summon[○ =:= ○])
     }
     case object Type extends Kind[●] {
       override def toString = "●"
+      override def properKind = Right(ProperKind.Type)
     }
-    case class Prod[K, L](k: Kind[K], l: Kind[L]) extends Kind[K × L] {
+    case class Prod[K, L](k: ProperKind[K], l: ProperKind[L]) extends Kind[K × L] {
       override def toString = s"($k × $l)"
+      override def properKind = Right(ProperKind.Prod(k, l))
     }
 
     given Kind[○] = Unit
-    given Kind[●] = Type
-    given [K, L](using k: Kind[K], l: Kind[L]): Kind[K × L] = Prod(k, l)
-    given [K](using k: OutputKind[K]): Kind[K] = k.kind
+    given [K](using k: ProperKind[K]): Kind[K] = k.kind
 
-    def fst[K, L](kl: Kind[K × L]): Kind[K] =
+    def fst[K, L](kl: Kind[K × L]): ProperKind[K] =
       kl match {
         case Prod(k, l) => k
       }
+  }
 
-    private def impossible(msg: String): Nothing =
-      throw new AssertionError(msg)
+  /** Kind not containing the auxiliary unit kind [[○]]. */
+  sealed trait ProperKind[K] {
+    def kind: Kind[K] =
+      this match {
+        case ProperKind.Type       => Kind.Type
+        case ProperKind.Prod(k, l) => Kind.Prod(k, l)
+      }
+
+    override def toString: String =
+      kind.toString
+  }
+  object ProperKind {
+    case object Type extends ProperKind[●]
+    case class Prod[K, L](k: ProperKind[K], l: ProperKind[L]) extends ProperKind[K × L]
+
+    given [K, L](using k: ProperKind[K], l: ProperKind[L]): ProperKind[K × L] = Prod(k, l)
+    given [K](using k: OutputKind[K]): ProperKind[K] = k.properKind
   }
 
   /** Witnesses that `K` is a legal output kind of type functions. */
@@ -68,11 +80,17 @@ package object kinds {
       this match {
         case OutputKind.Type => Kind.Type
       }
+
+    def properKind: ProperKind[K] =
+      this match {
+        case OutputKind.Type => ProperKind.Type
+      }
+
+    override def toString: String =
+      kind.toString
   }
   object OutputKind {
-    case object Type extends OutputKind[●] {
-      override def toString = "●"
-    }
+    case object Type extends OutputKind[●]
 
     given OutputKind[●] = Type
   }

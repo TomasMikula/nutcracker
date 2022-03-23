@@ -60,11 +60,6 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
   def infiniteListType(elemType: Type): Type =
     Type.fix(TypeFun.pair1(elemType))
 
-  def listType(elemType: Type): Type =
-    Type.fix(
-      TypeFun.sum1(Type.unit) ∘ TypeFun.pair1(elemType)
-    )
-
   test("infer types of eitherBimap(intToString, intToString)") {
     val (tIn, tOut) = reconstructTypes[Either[Int, Int], Either[String, String]](eitherBimap(Fun.intToString, Fun.intToString))
 
@@ -82,15 +77,15 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
   test("infer types of List.map(intToString)") {
     val (tIn, tOut) = reconstructTypes[List[Int], List[String]](List.map(Fun.intToString))
 
-    assert(tIn == listType(Type.int))
-    assert(tOut == listType(Type.string))
+    assert(tIn == List.tpe(Type.int))
+    assert(tOut == List.tpe(Type.string))
   }
 
   test("infer types of List.map(List.map(intToString))") {
     val (tIn, tOut) = reconstructTypes[List[List[Int]], List[List[String]]](List.map(List.map(Fun.intToString)))
 
-    assert(tIn == listType(listType(Type.int)))
-    assert(tOut == listType(listType(Type.string)))
+    assert(tIn == List.tpe(List.tpe(Type.int)))
+    assert(tOut == List.tpe(List.tpe(Type.string)))
   }
 
   test("infer types of countNils") {

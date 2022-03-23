@@ -36,7 +36,8 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
           a  <- f(a)
         } yield AppFst(op.cast[-->>], a)
 
-      case AppCompose(op, a, g) =>
+      case ac @ AppCompose(op, a, g) =>
+        import ac.properInKind
         for {
           a <- f(a)
           g <- f(g)
@@ -53,7 +54,8 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
           expr <- f(expr)
         } yield Fix(pre, expr)
 
-      case PFix(pre, expr) =>
+      case pf @ PFix(pre, expr) =>
+        import pf.properInKind
         for {
           expr <- f(expr)
         } yield PFix(pre, expr)
@@ -110,7 +112,9 @@ object TypeExpr {
   case class PFix[->>[_, _], K, X](
     f: Routing[K × ●, X],
     g: X ->> ●,
-  ) extends TypeExpr[->>, K, ●, Tag.PFix](using Kind.fst[K, ●](f.inKind), summon[OutputKind[●]])
+  )(using
+    val properInKind: ProperKind[K],
+  ) extends TypeExpr[->>, K, ●, Tag.PFix]
 
   case class InferenceVar[->>[_, _]](aliases: Set[Object]) extends TypeExpr[->>, ○, ●, Tag.Var]
 
@@ -134,10 +138,12 @@ object TypeExpr {
     arg1: ○ ->> K1,
   ) extends TypeExpr[->>, K2, L, Tag.AppFst](using op.in2Kind.kind, op.outKind)
 
-  case class AppCompose[->>[_, _], K: Kind, L1, L2, M](
+  case class AppCompose[->>[_, _], K, L1, L2, M](
     op: BinaryOperator[->>, L1, L2, M, ?],
     arg1: ○ ->> L1,
     arg2: K ->> L2,
+  )(using
+    val properInKind: ProperKind[K],
   ) extends TypeExpr[->>, K, M, Tag.AppComp](using summon, op.outKind)
 
   case class TypeError[->>[_, _], K: Kind, L: OutputKind](msg: String) extends TypeExpr[->>, K, L, Tag.Err]

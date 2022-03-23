@@ -11,6 +11,9 @@ sealed trait TypeFun[K, L] {
     this.pre match {
       case Routing.Id() => TypeFun(that.pre, this.expr ∘ that.expr)
     }
+
+  def apply(t: TypeExpr[○, K]): TypeExpr[○, L] =
+    TypeFun.toExpr(this ∘ TypeFun.fromExpr(t))
 }
 
 object TypeFun {
