@@ -119,75 +119,6 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
   object CellIntro {
     def apply[K: ProperKind](cell: TypeExprCell[○, K]): CellIntro[○, K] =
       ArgIntro.wrapArg(cell)
-
-    def introFst[K, L: ProperKind](a: CellIntro[○, K]): CellIntro[L, K × L] =
-      ArgIntro.introFst(a)
-
-    def toCell[K: OutputKind](ci: CellIntro[○, K]): TypeExprCell[○, K] =
-      ArgIntro.unwrap(ci)
-
-    def supplyTo[K, L, M](a: CellIntro[K, L], e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] =
-      a.inKind.properKind match {
-        case Left(k_eq_○) =>
-          k_eq_○.substituteContra[[k] =>> F[ITypeExpr[k, M, ?]]](
-            CellIntro.supplyTo0(k_eq_○.substituteCo[CellIntro[*, L]](a), e)
-          )
-        case Right(k) =>
-          CellIntro.supplyTo1(a, e)(using k)
-      }
-
-    private def supplyTo0[L, M](args: CellIntro[○, L], e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[○, M, ?]] ={
-      import generic.{TypeExpr => gt}
-
-      e.value match {
-        case gt.AppFst(op, arg1) =>
-          import op.in2Kind
-          ITypeExpr
-            .biApp(op.cast, arg1.annotation, toCell(args))
-            .pure[F]
-
-        case gt.AppCompose(op, a, g) =>
-          for {
-            b <- supplyTo0(args, g)
-            bc <- TypeExprCell(b)
-          } yield ITypeExpr.biApp(op.cast, a.annotation, bc)
-
-        case gt.PFix(pre, expr) =>
-          val a: CellIntro[●, L × ●] = introFst(args)
-          pre.applyTo(a) match {
-            case Routing.ApplyRes(r, ai) =>
-              for {
-                expr1 <- supplyTo(ai, expr)
-                cell0 <- TypeExprCell(expr1)
-              } yield ITypeExpr.fix(r, cell0)
-          }
-
-        case other =>
-          throw new NotImplementedError(s"Supplying $args into $other")
-      }
-    }
-
-    private def supplyTo1[K: ProperKind, L, M](args: CellIntro[K, L], e: CellAnnotatedTypeExpr[L, M]): F[ITypeExpr[K, M, ?]] = {
-      import generic.{TypeExpr => gt}
-
-      e.value match {
-        case gt.AppCompose(op, a, g) =>
-          for {
-            h <- supplyTo1(args, g)
-            hc <- TypeExprCell(h)
-          } yield
-            ITypeExpr(gt.AppCompose(op.cast, a.annotation, hc))
-
-        case gt.Pair() =>
-          args match {
-            case ArgIntro.IntroFst(a) => ITypeExpr(gt.pair1(toCell(a))).pure[F]
-            case other => throw new NotImplementedError(s"$other")
-          }
-
-        case other =>
-          throw new NotImplementedError(s"$other")
-      }
-    }
   }
 
   type TypeExprCell[K, L] = IVar[ITypeExpr[K, L, *]]
@@ -219,6 +150,18 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
 
     def fix[K](f: Routing[●, K], g: TypeExprCell[K, ●]): F[TypeCell] =
       TypeExprCell.fix(f, g)
+  }
+
+  extension [K](cell: TypeExprCell[○, K]) {
+    def feedTo[L](r: Routing[K, L])(using ProperKind[K]): CellIntro[○, L] =
+      r.applyTo0(CellIntro(cell))
+  }
+
+  extension [K, L](ci: CellIntro[K, L]) {
+    def feedTo[M](e: CellAnnotatedTypeExpr[L, M]): F[TypeExprCell[K, M]] = {
+      val newCell = [k, l] => (te: generic.TypeExpr[TypeExprCell, k, l, ?]) => TypeExprCell(ITypeExpr(te))
+      e.applyTo(ci)(newCell).flatMap(newCell(_))
+    }
   }
 
   def newTypeCell[I](t: IType[I]): F[TypeCell] =
@@ -299,7 +242,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
         for {
           g <- CellAnnotatedTypeExpr.unroll(tf.expr)
           fg <- TypeCell.fix(tf.pre, g.annotation)
-          gfg <- CellIntro.supplyTo(tf.pre.applyTo0(CellIntro(fg)), g).flatMap(TypeExprCell(_))
+          gfg <- fg feedTo tf.pre feedTo g
           _ <- unifyTypes(a, gfg)
           _ <- unifyTypes(b, fg)
         } yield ()
@@ -309,7 +252,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
         for {
           g <- CellAnnotatedTypeExpr.unroll(tf.expr)
           fg <- TypeCell.fix(tf.pre, g.annotation)
-          gfg <- CellIntro.supplyTo(tf.pre.applyTo0(CellIntro(fg)), g).flatMap(TypeExprCell(_))
+          gfg <- fg feedTo tf.pre feedTo g
           _  <- unifyTypes(a, fg)
           _  <- unifyTypes(b, gfg)
         } yield ()
