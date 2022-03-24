@@ -5,7 +5,7 @@ import scalaz.Monad
 import scalaz.syntax.monad._
 
 import nutcracker.demo.simpletypeinference.kinds._
-import nutcracker.demo.simpletypeinference.types.Routing
+import nutcracker.demo.simpletypeinference.types.{ArgIntro, Routing}
 
 /** Tree-like structure that builds up a type (or type constructor, depending on the output kind `L`).
  *  May take type parameters, represented by the input kind `K`.
@@ -15,13 +15,13 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
   val inKind: Kind[K],
   val outKind: OutputKind[L],
 ) {
+  import TypeExpr._
+
 
   def translate[-->>[_, _]](f: [k, l] => (k ->> l) => (k -->> l)): TypeExpr[-->>, K, L, I] =
     translateM[-->>, scalaz.Id.Id](f)(using scalaz.Id.id)
 
   def translateM[-->>[_, _], M[_]: Monad](f: [k, l] => (k ->> l) => M[k -->> l]): M[TypeExpr[-->>, K, L, I]] = {
-    import TypeExpr._
-
     this match {
       case UnitType() => UnitType().pure[M]
       case IntType() => IntType().pure[M]
@@ -62,6 +62,79 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
 
       case other =>
         throw new NotImplementedError(s"$other")
+    }
+  }
+
+  def transApply[A[_, _], J](
+    a: ArgIntro[A[○, *], J, K],
+    trans: [k, l] => (k ->> l) => A[k, l],
+    transApp: [j, k, l] => (k ->> l, ArgIntro[A[○, *], j, k]) => A[j, l],
+  ): TypeExpr[A, J, L, ?] =
+    transApplyM[A, J, scalaz.Id.Id](a, trans, transApp)(using scalaz.Id.id)
+
+  def transApplyM[A[_, _], J, M[_]: Monad](
+    a: ArgIntro[A[○, *], J, K],
+    trans: [k, l] => (k ->> l) => A[k, l],
+    transApp: [j, k, l] => (k ->> l, ArgIntro[A[○, *], j, k]) => M[A[j, l]],
+  ): M[TypeExpr[A, J, L, ?]] =
+    a.inKind.properKind match {
+      case Left(j_eq_○) =>
+        j_eq_○.substituteContra[[j] =>> M[TypeExpr[A, j, L, ?]]](
+          transApply0M(
+            j_eq_○.substituteCo[ArgIntro[A[○, *], *, K]](a),
+            trans,
+            transApp,
+          )
+        )
+      case Right(j) =>
+        transApply1M(a, trans, transApp)(using j, summon[Monad[M]])
+    }
+
+  private def transApply0M[A[_, _], M[_]: Monad](
+    args: ArgIntro[A[○, *], ○, K],
+    trans: [k, l] => (k ->> l) => A[k, l],
+    transApp: [j, k, l] => (k ->> l, ArgIntro[A[○, *], j, k]) => M[A[j, l]],
+  ): M[TypeExpr[A, ○, L, ?]] = {
+    this match {
+      case AppFst(op, arg1) =>
+        import op.in2Kind
+        val arg2 = ArgIntro.unwrap(args)
+        Monad[M].pure(BiApp(op.cast, trans(arg1), arg2))
+
+      case AppCompose(op, a, g) =>
+        transApp(g, args).map(BiApp(op.cast, trans(a), _))
+
+      case PFix(pre, expr) =>
+        val a: ArgIntro[A[○, *], ●, K × ●] = ArgIntro.introFst(args)
+        pre.applyTo(a) match {
+          case Routing.ApplyRes(r, a1) =>
+            transApp(expr, a1).map(Fix(r, _))
+        }
+
+      case other =>
+        throw new NotImplementedError(s"Applying $other to $args")
+    }
+  }
+
+  private def transApply1M[A[_, _], J: ProperKind, M[_]: Monad](
+    args: ArgIntro[A[○, *], J, K],
+    trans: [k, l] => (k ->> l) => A[k, l],
+    transApp: [j, k, l] => (k ->> l, ArgIntro[A[○, *], j, k]) => M[A[j, l]],
+  ): M[TypeExpr[A, J, L, ?]] = {
+    this match {
+      case AppCompose(op, a, g) =>
+        transApp(g, args).map(AppCompose(op.cast, trans(a), _))
+
+      case Pair() =>
+        args match {
+          case ArgIntro.IntroFst(a) =>
+            pair1(ArgIntro.unwrap(a)).pure[M]
+          case other =>
+            throw new NotImplementedError(s"$other")
+        }
+
+      case other =>
+        throw new NotImplementedError(s"Applying $other to $args")
     }
   }
 }
