@@ -117,7 +117,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
 
   type CellIntro[K, L] = ArgIntro[TypeExprCell[○, *], K, L]
   object CellIntro {
-    def apply[K: ProperKind](cell: TypeExprCell[○, K]): CellIntro[○, K] =
+    def apply[K: OutputKind](cell: TypeExprCell[○, K]): CellIntro[○, K] =
       ArgIntro.wrapArg(cell)
   }
 
@@ -153,7 +153,7 @@ class SimpleTypeInference[F[_], Propagation <: nutcracker.Propagation[F]](using 
   }
 
   extension [K](cell: TypeExprCell[○, K]) {
-    def feedTo[L](r: Routing[K, L])(using ProperKind[K]): CellIntro[○, L] =
+    def feedTo[L](r: Routing[K, L])(using OutputKind[K]): CellIntro[○, L] =
       r.applyTo0(CellIntro(cell))
   }
 

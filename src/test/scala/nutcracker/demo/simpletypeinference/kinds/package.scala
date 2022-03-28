@@ -53,10 +53,18 @@ package object kinds {
       kl match {
         case Prod(k, l) => k
       }
+
+    def snd[K, L](kl: Kind[K × L]): ProperKind[L] =
+      kl match {
+        case Prod(k, l) => l
+      }
   }
 
   /** Kind not containing the auxiliary unit kind [[○]]. */
   sealed trait ProperKind[K] {
+    def ×[L](l: ProperKind[L]): ProperKind[K × L] =
+      ProperKind.Prod(this, l)
+
     def kind: Kind[K] =
       this match {
         case ProperKind.Type       => Kind.Type
@@ -67,6 +75,9 @@ package object kinds {
       kind.toString
   }
   object ProperKind {
+    def apply[K](using k: ProperKind[K]): ProperKind[K] =
+      k
+
     case object Type extends ProperKind[●]
     case class Prod[K, L](k: ProperKind[K], l: ProperKind[L]) extends ProperKind[K × L]
 

@@ -5,7 +5,7 @@ import scalaz.Monad
 import scalaz.syntax.monad._
 
 import nutcracker.demo.simpletypeinference.kinds._
-import nutcracker.demo.simpletypeinference.types.{ArgIntro, Routing}
+import nutcracker.demo.simpletypeinference.types.{ArgIntro, ArgTrans, Routing}
 
 /** Tree-like structure that builds up a type (or type constructor, depending on the output kind `L`).
  *  May take type parameters, represented by the input kind `K`.
@@ -65,23 +65,23 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
     }
   }
 
-  def transApply[A[_, _], J](
-    a: ArgIntro[A[○, *], J, K],
-    trans: [k, l] => (k ->> l) => A[k, l],
-    transApp: [j, k, l] => (k ->> l, ArgIntro[A[○, *], j, k]) => A[j, l],
-  ): TypeExpr[A, J, L, ?] =
-    transApplyM[A, J, scalaz.Id.Id](a, trans, transApp)(using scalaz.Id.id)
+  def transApply[F[_, _], J](
+    a: ArgIntro[F[○, *], J, K],
+    trans: [k, l] => (k ->> l) => F[k, l],
+    transApp: [j, k, l] => (k ->> l, ArgIntro[F[○, *], j, k]) => F[j, l],
+  ): TypeExpr[F, J, L, ?] =
+    transApplyM[F, J, scalaz.Id.Id](a, trans, transApp)(using scalaz.Id.id)
 
-  def transApplyM[A[_, _], J, M[_]: Monad](
-    a: ArgIntro[A[○, *], J, K],
-    trans: [k, l] => (k ->> l) => A[k, l],
-    transApp: [j, k, l] => (k ->> l, ArgIntro[A[○, *], j, k]) => M[A[j, l]],
-  ): M[TypeExpr[A, J, L, ?]] =
+  def transApplyM[F[_, _], J, M[_]: Monad](
+    a: ArgIntro[F[○, *], J, K],
+    trans: [k, l] => (k ->> l) => F[k, l],
+    transApp: [j, k, l] => (k ->> l, ArgIntro[F[○, *], j, k]) => M[F[j, l]],
+  ): M[TypeExpr[F, J, L, ?]] =
     a.inKind.properKind match {
       case Left(j_eq_○) =>
-        j_eq_○.substituteContra[[j] =>> M[TypeExpr[A, j, L, ?]]](
+        j_eq_○.substituteContra[[j] =>> M[TypeExpr[F, j, L, ?]]](
           transApply0M(
-            j_eq_○.substituteCo[ArgIntro[A[○, *], *, K]](a),
+            j_eq_○.substituteCo[ArgIntro[F[○, *], *, K]](a),
             trans,
             transApp,
           )
@@ -90,12 +90,20 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
         transApply1M(a, trans, transApp)(using j, summon[Monad[M]])
     }
 
-  private def transApply0M[A[_, _], M[_]: Monad](
-    args: ArgIntro[A[○, *], ○, K],
-    trans: [k, l] => (k ->> l) => A[k, l],
-    transApp: [j, k, l] => (k ->> l, ArgIntro[A[○, *], j, k]) => M[A[j, l]],
-  ): M[TypeExpr[A, ○, L, ?]] = {
+  private def transApply0M[F[_, _], M[_]: Monad](
+    args: ArgIntro[F[○, *], ○, K],
+    trans: [k, l] => (k ->> l) => F[k, l],
+    transApp: [j, k, l] => (k ->> l, ArgIntro[F[○, *], j, k]) => M[F[j, l]],
+  ): M[TypeExpr[F, ○, L, ?]] = {
     this match {
+      case Pair() =>
+        args match {
+          case ArgIntro.IntroBoth(a1, a2) =>
+            BiApp(Pair[F](), ArgIntro.unwrap(a1), ArgIntro.unwrap(a2)).pure[M]
+          case other =>
+            throw new NotImplementedError(s"$other")
+        }
+
       case AppFst(op, arg1) =>
         import op.in2Kind
         val arg2 = ArgIntro.unwrap(args)
@@ -105,7 +113,7 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
         transApp(g, args).map(BiApp(op.cast, trans(a), _))
 
       case PFix(pre, expr) =>
-        val a: ArgIntro[A[○, *], ●, K × ●] = ArgIntro.introFst(args)
+        val a: ArgIntro[F[○, *], ●, K × ●] = ArgIntro.introFst(args)
         pre.applyTo(a) match {
           case Routing.ApplyRes(r, a1) =>
             transApp(expr, a1).map(Fix(r, _))
@@ -116,12 +124,21 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
     }
   }
 
-  private def transApply1M[A[_, _], J: ProperKind, M[_]: Monad](
-    args: ArgIntro[A[○, *], J, K],
-    trans: [k, l] => (k ->> l) => A[k, l],
-    transApp: [j, k, l] => (k ->> l, ArgIntro[A[○, *], j, k]) => M[A[j, l]],
-  ): M[TypeExpr[A, J, L, ?]] = {
+  private def transApply1M[F[_, _], J: ProperKind, M[_]: Monad](
+    args: ArgIntro[F[○, *], J, K],
+    trans: [k, l] => (k ->> l) => F[k, l],
+    transApp: [j, k, l] => (k ->> l, ArgIntro[F[○, *], j, k]) => M[F[j, l]],
+  ): M[TypeExpr[F, J, L, ?]] = {
     this match {
+      case ComposeSnd(op, g) =>
+        args match {
+          case ArgIntro.IntroFst(a) =>
+            import op.in1Kind
+            AppCompose(op.cast, ArgIntro.unwrap(a), trans(g)).pure[M]
+          case other =>
+            throw new NotImplementedError(s"$other")
+        }
+
       case AppCompose(op, a, g) =>
         transApp(g, args).map(AppCompose(op.cast, trans(a), _))
 
@@ -137,6 +154,57 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
         throw new NotImplementedError(s"Applying $other to $args")
     }
   }
+
+  def transCompose[A[_, _], J](
+    a: ArgTrans[A, J, K],
+    trans: [k, l] => (k ->> l) => A[k, l],
+    transComp: [j, k, l] => (k ->> l, ArgTrans[A, j, k]) => A[j, l],
+  ): TypeExpr[A, J, L, ?] =
+    transComposeM[A, J, scalaz.Id.Id](a, trans, transComp)(using scalaz.Id.id)
+
+  def transComposeM[A[_, _], J, M[_]: Monad](
+    a: ArgTrans[A, J, K],
+    trans: [k, l] => (k ->> l) => A[k, l],
+    transComp: [j, k, l] => (k ->> l, ArgTrans[A, j, k]) => M[A[j, l]],
+  ): M[TypeExpr[A, J, L, ?]] =
+    a.inKind.properKind match {
+      case Left(j_eq_○) =>
+        j_eq_○.substituteContra[[j] =>> M[TypeExpr[A, j, L, ?]]](
+          transCompose0M(
+            j_eq_○.substituteCo[ArgTrans[A, *, K]](a),
+            trans,
+            transComp,
+          )
+        )
+      case Right(j) =>
+        transCompose1M(a, trans, transComp)(using j, summon[Monad[M]])
+    }
+
+  private def transCompose0M[F[_, _], M[_]: Monad](
+    f: ArgTrans[F, ○, K],
+    trans: [k, l] => (k ->> l) => F[k, l],
+    transApp: [j, k, l] => (k ->> l, ArgTrans[F, j, k]) => M[F[j, l]],
+  ): M[TypeExpr[F, ○, L, ?]] =
+    this match {
+      case other => throw new NotImplementedError(s"$other")
+    }
+
+  private def transCompose1M[F[_, _], J: ProperKind, M[_]: Monad](
+    f: ArgTrans[F, J, K],
+    trans: [k, l] => (k ->> l) => F[k, l],
+    transApp: [j, k, l] => (k ->> l, ArgTrans[F, j, k]) => M[F[j, l]],
+  ): M[TypeExpr[F, J, L, ?]] =
+    this match {
+      case Sum() =>
+        f match {
+          case snd @ ArgTrans.Snd(f2) =>
+            composeSnd(Sum(), ArgTrans.unwrap(f2))(using snd.in2Kind).pure[M]
+          case other =>
+            throw new NotImplementedError(s"$other")
+        }
+      case other =>
+        throw new NotImplementedError(s"$other")
+    }
 }
 
 object TypeExpr {
@@ -154,6 +222,8 @@ object TypeExpr {
     sealed trait TPrm
     sealed trait BiApp
     sealed trait AppFst
+    sealed trait AppSnd
+    sealed trait CompSnd
     sealed trait AppComp
   }
 
@@ -211,6 +281,19 @@ object TypeExpr {
     arg1: ○ ->> K1,
   ) extends TypeExpr[->>, K2, L, Tag.AppFst](using op.in2Kind.kind, op.outKind)
 
+  case class AppSnd[->>[_, _], K1, K2, L](
+    op: BinaryOperator[->>, K1, K2, L, ?],
+    arg2: ○ ->> K2,
+  ) extends TypeExpr[->>, K1, L, Tag.AppSnd](using op.in1Kind.kind, op.outKind)
+
+  case class ComposeSnd[->>[_, _], K1, K2: ProperKind, L2, M](
+    op: BinaryOperator[->>, K1, L2, M, ?],
+    arg2: K2 ->> L2,
+  ) extends TypeExpr[->>, K1 × K2, M, Tag.CompSnd](using
+    (Kind.fst(op.inKind) × ProperKind[K2]).kind,
+    op.outKind,
+  )
+
   case class AppCompose[->>[_, _], K, L1, L2, M](
     op: BinaryOperator[->>, L1, L2, M, ?],
     arg1: ○ ->> L1,
@@ -233,8 +316,20 @@ object TypeExpr {
   def pair1[->>[_, _]](a: ○ ->> ●): TypeExpr[->>, ●, ●, ?] =
     AppFst(Pair(), a)
 
+  def pair2[->>[_, _]](b: ○ ->> ●): TypeExpr[->>, ●, ●, ?] =
+    AppSnd(Pair(), b)
+
   def sum1[->>[_, _]](a: ○ ->> ●): TypeExpr[->>, ●, ●, ?] =
     AppFst(Sum(), a)
+
+  def sum2[->>[_, _]](b: ○ ->> ●): TypeExpr[->>, ●, ●, ?] =
+    AppSnd(Sum(), b)
+
+  def composeSnd[->>[_, _], K1, K2: ProperKind, L2, M](
+    op: BinaryOperator[->>, K1, L2, M, ?],
+    arg2: K2 ->> L2,
+  ): TypeExpr[->>, K1 × K2, M, ?] =
+    ComposeSnd(op, arg2)
 
   sealed trait UpdRes[->>[_, _], K, L, I0, J, I1] {
     import UpdRes._

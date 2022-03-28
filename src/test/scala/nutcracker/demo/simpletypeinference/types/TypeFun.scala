@@ -7,6 +7,9 @@ sealed trait TypeFun[K, L] {
   def pre: Routing[K, X]
   def expr: TypeExpr[X, L]
 
+  given inKind: Kind[K] = pre.inKind
+  given outKind: OutputKind[L] = expr.outKind
+
   def ∘[J](that: TypeFun[J, K]): TypeFun[J, L] =
     this.pre match {
       case Routing.Id() => TypeFun(that.pre, this.expr ∘ that.expr)
@@ -56,6 +59,9 @@ object TypeFun {
   def pair1(a: TypeFun[○, ●]): TypeFun[●, ●] =
     pair1(toExpr(a))
 
+  def sum: TypeFun[● × ●, ●] =
+    fromExpr(TypeExpr.sum)
+
   def sum(a: TypeFun[○, ●], b: TypeFun[○, ●]): TypeFun[○, ●] =
     fromExpr(TypeExpr.sum(toExpr(a), toExpr(b)))
 
@@ -74,6 +80,50 @@ object TypeFun {
     f match {
       case TypeFun(pre, expr) => fromExpr(TypeExpr.pfix(pre, expr))
     }
+
+  def composeSnd[K, L, M, N](g: TypeFun[K × M, N], f: TypeFun[L, M])(using
+    ProperKind[L],
+  ): TypeFun[K × L, N] = {
+    def go[X, Y](f1: Routing[L, X], f2: TypeExpr[X, M], g1: Routing[K × M, Y], g2: TypeExpr[Y, N]): TypeFun[K × L, N] = {
+      given ProperKind[K] = Kind.fst(g.inKind)
+      given OutputKind[M] = f2.outKind
+
+      f2.inKind.properKind match {
+        case Left(x_eq_○) =>
+          val f20: TypeExpr[○, M] = x_eq_○.substituteCo[TypeExpr[*, M]](f2)
+          g1.applyTo(ArgIntro.wrapArgSnd(f20)) match {
+            case Routing.ApplyRes(g1, f21) =>
+              TypeFun(Routing.elimSnd[K, L] > g1, g2.applyTo(f21))
+          }
+        case Right(given ProperKind[X]) =>
+          g1.applyToTrans(ArgTrans(f2).snd[K]) match {
+            case Routing.AppTransRes(g1, f2) =>
+              TypeFun(f1.snd[K] > g1, g2.transCompose(f2))
+          }
+      }
+    }
+
+    (f, g) match {
+      case (TypeFun(f1, f2), TypeFun(g1, g2)) =>
+        go(f1, f2, g1, g2)
+    }
+  }
+
+  def appFst[K, L, M](f: TypeFun[K × L, M], a: TypeFun[○, K]): TypeFun[L, M] = {
+    given OutputKind[K] = a.outKind
+    given ProperKind[L] = Kind.snd(f.inKind)
+
+    def go[X](a: TypeExpr[○, K], f1: Routing[K × L, X], f2: TypeExpr[X, M]): TypeFun[L, M] = {
+      f1.applyTo(ArgIntro.wrapArgFst(a)) match {
+        case Routing.ApplyRes(f0, args) =>
+          TypeFun(f0, f2.applyTo(args))
+      }
+    }
+
+    f match {
+      case TypeFun(f1, f2) => go(TypeFun.toExpr(a), f1, f2)
+    }
+  }
 
   def scalaTypeParam[T](filename: String, line: Int, name: String): TypeFun[○, ●] =
     fromExpr(TypeExpr.scalaTypeParam(filename, line, name))

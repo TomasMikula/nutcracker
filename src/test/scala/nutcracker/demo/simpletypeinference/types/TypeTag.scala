@@ -26,6 +26,9 @@ object TypeTag {
       (a: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]]
     )
 
+  given sum: TypeTag[Either] =
+    TypeFun.sum
+
   given sum1[A](using a: TypeTag[A]): TypeTag[Either[A, *]] =
     TypeFun.sum1(
       (a: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]]
@@ -52,6 +55,21 @@ object TypeTag {
     val g1 = (g: TypeFun[?, ?]).asInstanceOf[TypeFun[● × ●, ●]]
     f1 ∘ g1
   }
+
+  def composeSnd[F[_, _], H[_]](f: TypeTag[F], h: TypeTag[H]): TypeTag[[x, y] =>> F[x, H[y]]] = {
+    val f1 = (f: TypeFun[?, ?]).asInstanceOf[TypeFun[● × ●, ●]]
+    val h1 = (h: TypeFun[?, ?]).asInstanceOf[TypeFun[●, ●]]
+    TypeFun.composeSnd(f1, h1)
+  }
+
+  def appFst[F[_, _], A](f: TypeTag[F], a: TypeTag[A]): TypeTag[F[A, *]] = {
+    val f1 = (f: TypeFun[?, ?]).asInstanceOf[TypeFun[● × ●, ●]]
+    val a1 = (a: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]]
+    TypeFun.appFst(f1, a1)
+  }
+
+  def diag: TypeTag[[x] =>> (x, x)] =
+    TypeFun(Routing.dup[●], TypeExpr.pair)
 
   def toType[A](ta: TypeTag[A]): Type =
     TypeFun.toExpr((ta: TypeFun[?, ?]).asInstanceOf[TypeFun[○, ●]])

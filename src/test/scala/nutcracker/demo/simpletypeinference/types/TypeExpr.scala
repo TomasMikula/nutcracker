@@ -50,6 +50,15 @@ case class TypeExpr[K, L](value: generic.TypeExpr[TypeExpr, K, L, ?]) {
       )
     )
 
+  def transCompose[J](that: ArgTrans[TypeExpr, J, K]): TypeExpr[J, L] =
+    TypeExpr(
+      this.value.transCompose[TypeExpr, J](
+        that,
+        [k, l] => (te: TypeExpr[k, l]) => te,
+        [j, k, l] => (te: TypeExpr[k, l], a: ArgTrans[TypeExpr, j, k]) => te.transCompose(a),
+      )
+    )
+
   def >[M](that: TypeExpr[L, M]): TypeExpr[K, M] =
     that ∘ this
 
@@ -100,6 +109,9 @@ object TypeExpr {
 
   def pair1(a: TypeExpr[○, ●]): TypeExpr[●, ●] =
     TypeExpr(generic.TypeExpr.pair1(a))
+
+  def sum: TypeExpr[● × ●, ●] =
+    TypeExpr(generic.TypeExpr.Sum())
 
   def sum(a: TypeExpr[○, ●], b: TypeExpr[○, ●]): TypeExpr[○, ●] =
     TypeExpr(generic.TypeExpr.sum(a, b))
