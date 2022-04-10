@@ -4,16 +4,21 @@ import nutcracker.demo.simpletypeinference.kinds._
 
 sealed trait TypeFun[K, L] {
   type X
-  def pre: Routing[K, X]
-  def expr: TypeExpr[X, L]
+  val pre: Routing[K, X]
+  val expr: TypeExpr[X, L]
 
   given inKind: Kind[K] = pre.inKind
   given outKind: OutputKind[L] = expr.outKind
 
-  def ∘[J](that: TypeFun[J, K]): TypeFun[J, L] =
-    this.pre match {
-      case Routing.Id() => TypeFun(that.pre, this.expr ∘ that.expr)
+  def ∘[J](that: TypeFun[J, K]): TypeFun[J, L] = {
+    import that.pre.outKind
+    import that.expr.outKind
+
+    this.pre.applyToTrans[TypeExpr[*, *], that.X](ArgTrans(that.expr)) match {
+      case Routing.AppTransRes(q, e) =>
+        TypeFun(that.pre > q, this.expr.transCompose(e))
     }
+  }
 
   def apply(t: TypeExpr[○, K]): TypeExpr[○, L] =
     TypeFun.toExpr(this ∘ TypeFun.fromExpr(t))
@@ -23,8 +28,8 @@ object TypeFun {
   def apply[K, P, L](r: Routing[K, P], f: TypeExpr[P, L]): TypeFun[K, L] =
     new TypeFun[K, L] {
       override type X = P
-      override def pre = r
-      override def expr = f
+      override val pre = r
+      override val expr = f
     }
 
   def unapply[K, L](f: TypeFun[K, L]): (Routing[K, f.X], TypeExpr[f.X, L]) =

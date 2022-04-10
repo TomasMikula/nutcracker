@@ -6,6 +6,7 @@ import scalaz.syntax.monad._
 
 import nutcracker.demo.simpletypeinference.kinds._
 import nutcracker.demo.simpletypeinference.types.{ArgIntro, ArgTrans, Routing}
+import nutcracker.demo.simpletypeinference.types.ArgTrans.Wrap
 
 /** Tree-like structure that builds up a type (or type constructor, depending on the output kind `L`).
  *  May take type parameters, represented by the input kind `K`.
@@ -17,6 +18,11 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
 ) {
   import TypeExpr._
 
+  def from[J](using ev: J =:= K): TypeExpr[->>, J, L, I] =
+    ev.substituteContra[TypeExpr[->>, *, L, I]](this)
+
+  def to[M](using ev: L =:= M): TypeExpr[->>, K, M, I] =
+    ev.substituteCo[TypeExpr[->>, K, *, I]](this)
 
   def translate[-->>[_, _]](f: [k, l] => (k ->> l) => (k -->> l)): TypeExpr[-->>, K, L, I] =
     translateM[-->>, scalaz.Id.Id](f)(using scalaz.Id.id)
@@ -132,9 +138,10 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
     this match {
       case ComposeSnd(op, g) =>
         args match {
-          case ArgIntro.IntroFst(a) =>
+          case ArgIntro.IntroFst(a, f) =>
             import op.in1Kind
-            AppCompose(op.cast, ArgIntro.unwrap(a), trans(g)).pure[M]
+            transApp(g, f)
+              .map(AppCompose(op.cast, ArgIntro.unwrap(a), _))
           case other =>
             throw new NotImplementedError(s"$other")
         }
@@ -144,8 +151,16 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
 
       case Pair() =>
         args match {
-          case ArgIntro.IntroFst(a) =>
-            pair1(ArgIntro.unwrap(a)).pure[M]
+          case ArgIntro.Id() =>
+            Pair().pure[M]
+          case ArgIntro.IntroFst(a, f) =>
+            pair1(ArgIntro.unwrap(a))
+              .from(using ArgIntro.deriveId(f))
+              .pure[M]
+          case ArgIntro.IntroSnd(f, a) =>
+            pair2(ArgIntro.unwrap(a))
+              .from(using ArgIntro.deriveId(f))
+              .pure[M]
           case other =>
             throw new NotImplementedError(s"$other")
         }
@@ -186,25 +201,76 @@ sealed abstract class TypeExpr[->>[_, _], K, L, I](using
     transApp: [j, k, l] => (k ->> l, ArgTrans[F, j, k]) => M[F[j, l]],
   ): M[TypeExpr[F, ○, L, ?]] =
     this match {
-      case other => throw new NotImplementedError(s"$other")
+      case PFix(p, e) =>
+        p.applyToTrans(ArgTrans.introFst(f)) match {
+          case Routing.AppTransRes(q, g) =>
+            transApp(e, g)
+              .map(Fix(q, _))
+        }
+      case AppSnd(op, b) =>
+        f match {
+          case ArgTrans.Wrap(a) =>
+            BiApp(op.cast[F], a, trans(b)).pure[M]
+          case other =>
+            throw new NotImplementedError(s"$other")
+        }
+      case AppCompose(op, a, g) =>
+        transApp(g, f)
+          .map(BiApp(op.cast[F], trans(a), _))
+      case other =>
+        throw new NotImplementedError(s"$other")
     }
 
   private def transCompose1M[F[_, _], J: ProperKind, M[_]: Monad](
     f: ArgTrans[F, J, K],
     trans: [k, l] => (k ->> l) => F[k, l],
-    transApp: [j, k, l] => (k ->> l, ArgTrans[F, j, k]) => M[F[j, l]],
-  ): M[TypeExpr[F, J, L, ?]] =
+    transComp: [j, k, l] => (k ->> l, ArgTrans[F, j, k]) => M[F[j, l]],
+  ): M[TypeExpr[F, J, L, ?]] = {
+
+    def goOp[K1, K2](
+      op: BinaryOperator[->>, K1, K2, L, ?],
+      f: ArgTrans[F, J, K1 × K2],
+    ): M[TypeExpr[F, J, L, ?]] = {
+      import op.in1Kind
+      import op.in2Kind
+
+      f match {
+        case snd @ ArgTrans.Snd(f2) =>
+          composeSnd(op.cast[F], ArgTrans.unwrap(f2))(using snd.in2Kind).pure[M]
+        case ArgTrans.IntroFst(f1) =>
+          AppFst(op.cast[F], ArgTrans.unwrap(f1)).pure[M]
+        case other =>
+          throw new NotImplementedError(s"$other")
+      }
+    }
+
     this match {
+      case Pair() =>
+        goOp(Pair(), f)
       case Sum() =>
+        goOp(Sum(), f)
+      case AppFst(op, a) =>
         f match {
-          case snd @ ArgTrans.Snd(f2) =>
-            composeSnd(Sum(), ArgTrans.unwrap(f2))(using snd.in2Kind).pure[M]
+          case ArgTrans.Wrap(h) =>
+            appCompose(op.cast[F], trans(a), h).pure[M]
+          case other =>
+            throw new NotImplementedError(s"$other")
+        }
+      case AppCompose(op, a, g) =>
+        transComp(g, f)
+          .map(AppCompose(op.cast[F], trans(a), _))
+      case ComposeSnd(op, g) =>
+        import op.in1Kind
+        f match {
+          case ArgTrans.IntroFst(f1) =>
+            appCompose(op.cast[F], ArgTrans.unwrap(f1), trans(g)).pure[M]
           case other =>
             throw new NotImplementedError(s"$other")
         }
       case other =>
-        throw new NotImplementedError(s"$other")
+        throw new NotImplementedError(s"Composing $other after $f")
     }
+  }
 }
 
 object TypeExpr {
@@ -324,6 +390,15 @@ object TypeExpr {
 
   def sum2[->>[_, _]](b: ○ ->> ●): TypeExpr[->>, ●, ●, ?] =
     AppSnd(Sum(), b)
+
+  def appCompose[->>[_, _], K, L1, L2, M](
+    op: BinaryOperator[->>, L1, L2, M, ?],
+    arg1: ○ ->> L1,
+    arg2: K ->> L2,
+  )(using
+    k: ProperKind[K],
+  ): TypeExpr[->>, K, M, Tag.AppComp] =
+    AppCompose(op, arg1, arg2)
 
   def composeSnd[->>[_, _], K1, K2: ProperKind, L2, M](
     op: BinaryOperator[->>, K1, L2, M, ?],

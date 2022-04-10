@@ -109,6 +109,46 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
     }
   }
 
+  trait Bifunctor[F[_, _]] {
+    def lmap[A, B, C](f: Fun[A, C]): Fun[F[A, B], F[C, B]]
+    def rmap[A, B, D](g: Fun[B, D]): Fun[F[A, B], F[A, D]]
+
+    def bimap[A, B, C, D](f: Fun[A, C], g: Fun[B, D]): Fun[F[A, B], F[C, D]] =
+      lmap(f) > rmap(g)
+  }
+
+  object Bifunctor {
+    given Bifunctor[Tuple2] with {
+      override def lmap[A, B, C](f: Fun[A, C]): Fun[(A, B), (C, B)] =
+        Fun.par(f, Fun.id[B])
+
+      override def rmap[A, B, D](g: Fun[B, D]): Fun[(A, B), (A, D)] =
+        Fun.par(Fun.id[A], g)
+    }
+  }
+
+  type Const[A, B] = A
+  object Const {
+    given bifunctorConst: Bifunctor[Const] with {
+      override def lmap[A, B, C](f: Fun[A, C]): Fun[Const[A, B], Const[C, B]] =
+        f
+
+      override def rmap[A, B, D](g: Fun[B, D]): Fun[Const[A, B], Const[A, D]] =
+        Fun.id[A]
+    }
+  }
+
+  type Swap[F[_, _], A, B] = F[B, A]
+  object Swap {
+    given bifunctorSwap[F[_, _]](using F: Bifunctor[F]): Bifunctor[Swap[F, *, *]] with {
+      override def lmap[A, B, C](f: Fun[A, C]): Fun[Swap[F, A, B], Swap[F, C, B]] =
+        F.rmap(f)
+
+      override def rmap[A, B, D](g: Fun[B, D]): Fun[Swap[F, A, B], Swap[F, A, D]] =
+        F.lmap(g)
+    }
+  }
+
   test("infer types of eitherBimap(intToString, intToString)") {
     val (tIn, tOut) = reconstructTypes[Either[Int, Int], Either[String, String]](eitherBimap(Fun.intToString, Fun.intToString))
 
@@ -164,5 +204,49 @@ class SimpleTypeInferenceTests extends AnyFunSuite with Inside {
 
     assert(tIn == NonEmptyTree.tpe(Type.int))
     assert(tOut == NonEmptyTree.tpe(Type.string))
+  }
+
+  test("infer types of Bifunctor[[x, y] =>> (Const[x, y], (y, x))].bimap") {
+    type F[X, Y] = (Const[X, Y], (Y, X))
+
+    object F {
+      def lmap[A, B, C](f: Fun[A, C]): Fun[F[A, B], F[C, B]] =
+        Fun.par(
+          Const.bifunctorConst.lmap(f),
+          Swap.bifunctorSwap[(*, *)].lmap(f),
+        )
+
+      def rmap[A, B, D](g: Fun[B, D]): Fun[F[A, B], F[A, D]] =
+        Fun.par(
+          Const.bifunctorConst.rmap(g),
+          Swap.bifunctorSwap[(*, *)].rmap(g)
+        )
+
+      def bimap[A, B, C, D](f: Fun[A, C], g: Fun[B, D]): Fun[F[A, B], F[C, D]] =
+        lmap(f) > rmap(g)
+
+      val tpe: TypeFun[● × ●, ●] =
+        TypeFun(
+          Routing.par(
+            Routing.dup[●],
+            Routing.dup[●],
+          ) > Routing.ixi > Routing.par(
+            Routing.elimSnd,
+            Routing.swap,
+          ): Routing[● × ●, ● × (● × ●)],
+          TypeExpr.composeSnd(TypeExpr.pair, TypeExpr.pair),
+        )
+
+      def tpeAt(a: Type, b: Type): Type =
+        TypeFun.appFst(tpe, TypeFun.fromExpr(a)).apply(b)
+    }
+
+    val f: Fun[F[Unit, Int], F[Int, String]] =
+      F.bimap(Fun.constInt(0), Fun.intToString)
+
+    val (tIn, tOut) = reconstructTypes(f)
+
+    assert(tIn == F.tpeAt(Type.unit, Type.int))
+    assert(tOut == F.tpeAt(Type.int, Type.string))
   }
 }

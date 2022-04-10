@@ -101,6 +101,16 @@ object TypeExpr {
   ): TypeExpr[○, L] =
     TypeExpr(generic.TypeExpr.BiApp(op.cast[TypeExpr], arg1, arg2))
 
+  def composeSnd[L1, K2: ProperKind, L2, M](
+    op: TypeExpr[L1 × L2, M],
+    arg2: TypeExpr[K2, L2],
+  ): TypeExpr[L1 × K2, M] = {
+    import arg2.outKind
+    given ProperKind[L1] = Kind.fst(op.inKind)
+
+    op.transCompose(ArgTrans.snd(ArgTrans.wrap(arg2)))
+  }
+
   def pair: TypeExpr[● × ●, ●] =
     TypeExpr(generic.TypeExpr.Pair())
 

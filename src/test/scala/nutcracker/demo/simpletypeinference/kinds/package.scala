@@ -83,6 +83,11 @@ package object kinds {
 
     given [K, L](using k: ProperKind[K], l: ProperKind[L]): ProperKind[K × L] = Prod(k, l)
     given [K](using k: OutputKind[K]): ProperKind[K] = k.properKind
+
+    def fromProd[K, L](kl: Kind[K × L]): ProperKind[K × L] =
+      kl match {
+        case Kind.Prod(k, l) => Prod(k, l)
+      }
   }
 
   /** Witnesses that `K` is a legal output kind of type functions. */
@@ -104,5 +109,8 @@ package object kinds {
     case object Type extends OutputKind[●]
 
     given OutputKind[●] = Type
+
+    def apply[K](using OutputKind[K]): OutputKind[K] =
+      summon[OutputKind[K]]
   }
 }

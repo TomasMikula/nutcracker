@@ -40,6 +40,9 @@ object ast {
 
     final class Label[A, B] private[Fun]()
 
+    def id[A]: Fun[A, A] =
+      IdFun()
+
     def par[A1, A2, B1, B2](f1: Fun[A1, B1], f2: Fun[A2, B2]): Fun[(A1, A2), (B1, B2)] =
       Par(f1, f2)
 
